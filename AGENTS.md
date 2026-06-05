@@ -9,10 +9,12 @@
 - [docs/PRD.md](docs/PRD.md)
 - [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+- [docs/DEVELOPMENT_SPEC.md](docs/DEVELOPMENT_SPEC.md)
 
 `docs/PRD.md` 是当前产品 PRD 主文档。后续 Codex 进行需求分析、计划、实现、评审时，应以该文档为准。
 `docs/TECHNICAL_ARCHITECTURE.md` 是当前技术架构方案，涉及实现边界、异步任务、数据模型、模型路由和部署策略时必须参考。
 `docs/IMPLEMENTATION_PLAN.md` 是当前 MVP 实施路线图，编码前应按阶段拆分执行。
+`docs/DEVELOPMENT_SPEC.md` 是部署验收前的详细开发 SPEC，具体开发和验收应以它为执行清单。
 
 ## 当前产品方向
 

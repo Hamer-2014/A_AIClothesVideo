@@ -2,7 +2,7 @@
 
 版本：MVP 草案  
 日期：2026-06-05  
-关联文档：[PRD.md](PRD.md)
+关联文档：[PRD.md](PRD.md)、[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)、[DEVELOPMENT_SPEC.md](DEVELOPMENT_SPEC.md)
 
 ## 1. 目标
 

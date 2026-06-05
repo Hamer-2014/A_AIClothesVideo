@@ -9,10 +9,12 @@
 - [docs/PRD.md](docs/PRD.md)
 - [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+- [docs/DEVELOPMENT_SPEC.md](docs/DEVELOPMENT_SPEC.md)
 
 该 PRD 是当前产品需求的主文档。任何产品、技术、UI、数据模型、模型路由和异步任务相关讨论，都应以此为基础。
 技术实现细节、组件职责、异步任务和部署边界请同时参考技术架构方案。
 执行阶段和里程碑请参考实现计划。
+具体开发任务、文件边界和部署验收前检查请参考开发 SPEC。
 
 ## 产品摘要
 

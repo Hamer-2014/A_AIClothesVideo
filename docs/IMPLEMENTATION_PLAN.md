@@ -8,6 +8,8 @@
 
 **Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, cron-job.org, Cloud Run, ffmpeg, DeepSeek, GPT vision model, EvoLink Veo 3.1 Pro Beta.
 
+详细执行 SPEC 见：[DEVELOPMENT_SPEC.md](DEVELOPMENT_SPEC.md)
+
 ---
 
 ## 0. 实现边界

@@ -9,10 +9,12 @@
 - [docs/PRD.md](docs/PRD.md)
 - [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+- [docs/DEVELOPMENT_SPEC.md](docs/DEVELOPMENT_SPEC.md)
 
 这是当前产品 PRD 主文档，包含产品定位、MVP 范围、模型策略、镜头模板、任务状态机、计费、对象存储、后台和技术架构。
 技术实现、异步任务、模型路由、数据库边界和部署策略以技术架构方案为准。
 实施顺序和阶段拆分以实现计划为准。
+具体开发任务、文件边界和部署验收前检查以开发 SPEC 为准。
 
 ## 产品摘要
 

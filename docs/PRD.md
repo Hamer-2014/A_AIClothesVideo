@@ -8,6 +8,7 @@
 
 - [技术架构方案](TECHNICAL_ARCHITECTURE.md)
 - [实现计划](IMPLEMENTATION_PLAN.md)
+- [开发 SPEC](DEVELOPMENT_SPEC.md)
 
 ## 1. 产品定位
 
