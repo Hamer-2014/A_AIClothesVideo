@@ -1,0 +1,504 @@
+import { randomUUID } from "node:crypto";
+
+import { and, eq } from "drizzle-orm";
+
+import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
+import { reserveCredits, type CreditLedgerResult } from "@/lib/credits/ledger";
+import type { CreditLedgerStore } from "@/lib/credits/types";
+import { getDb } from "@/lib/db/client";
+import { storyboards, videoJobAssets, videoJobs, videoSegments } from "@/lib/db/schema";
+import type { JsonValue } from "@/lib/db/schema/common";
+import type { CreemPromptModerationResult } from "@/lib/providers/creem/moderation";
+import { createDrizzleJobStore, type JobStore } from "@/server/jobs/state-machine";
+import { transitionJobStatus } from "@/server/jobs/state-machine";
+import { checkPrompt } from "@/server/moderation/check-prompt";
+import {
+  createDrizzleModerationResultStore,
+  type ModerationResultStore,
+} from "@/server/moderation/results";
+
+import { parseStoryboardJson, type ParsedStoryboard } from "./schema";
+import type { StoryboardRecord } from "./generate";
+
+export interface StoryboardConfirmJobRecord {
+  id: string;
+  userId: string;
+  status: string;
+  durationSeconds: number;
+  creditCost: number;
+  reservedLedgerId?: string | null;
+  isTest: boolean;
+}
+
+export interface StoryboardConfirmJobAssetRecord {
+  videoJobId: string;
+  assetId: string;
+  role: string;
+  sortOrder: number;
+}
+
+export interface VideoSegmentRecord {
+  id: string;
+  videoJobId: string;
+  storyboardId: string | null;
+  segmentIndex: number;
+  status: "queued" | "generating" | "succeeded" | "failed" | "stored";
+  templateId: string;
+  prompt: string;
+  inputAssetSnapshot: JsonValue;
+  provider: string | null;
+  model: string | null;
+  providerTaskId: string | null;
+  providerCallLogId: string | null;
+  videoKey: string | null;
+  costEstimate: string;
+  isTest: boolean;
+  lockedBy: string | null;
+  lockedUntil: Date | null;
+  attemptCount: number;
+  lastError: string | null;
+  nextRetryAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewVideoSegmentRecord {
+  videoJobId: string;
+  storyboardId: string;
+  segmentIndex: number;
+  templateId: string;
+  prompt: string;
+  inputAssetSnapshot: JsonValue;
+  isTest: boolean;
+}
+
+export interface StoryboardConfirmationStore {
+  findJob(input: {
+    jobId: string;
+    userId: string;
+  }): Promise<StoryboardConfirmJobRecord | null>;
+  findStoryboard(input: {
+    storyboardId: string;
+    jobId: string;
+  }): Promise<StoryboardRecord | null>;
+  listJobAssets(jobId: string): Promise<StoryboardConfirmJobAssetRecord[]>;
+  confirmStoryboard(input: {
+    storyboardId: string;
+    finalPromptSnapshot: JsonValue;
+  }): Promise<StoryboardRecord>;
+  setReservedLedgerId(input: {
+    jobId: string;
+    reservedLedgerId: string;
+  }): Promise<void>;
+  createVideoSegments(input: NewVideoSegmentRecord[]): Promise<VideoSegmentRecord[]>;
+}
+
+function buildFinalPromptSnapshot({
+  parsed,
+  assets,
+}: {
+  parsed: ParsedStoryboard;
+  assets: StoryboardConfirmJobAssetRecord[];
+}) {
+  return {
+    durationSeconds: parsed.durationSeconds,
+    segmentPrompts: parsed.segments.map((segment) => ({
+      index: segment.index,
+      durationSeconds: segment.durationSeconds,
+      templateId: segment.templateId,
+      prompt: segment.prompt,
+    })),
+    systemConstraints: [
+      "Do not invent clothing details absent from provided assets.",
+      "Do not show back views unless a back asset is present.",
+      "Do not create detail closeups unless detail assets are present.",
+    ],
+    inputAssets: assets.map((asset) => ({
+      assetId: asset.assetId,
+      role: asset.role,
+      sortOrder: asset.sortOrder,
+    })),
+  } satisfies JsonValue;
+}
+
+function finalPromptText(snapshot: ReturnType<typeof buildFinalPromptSnapshot>) {
+  return [
+    ...snapshot.segmentPrompts.map(
+      (segment) =>
+        `Segment ${segment.index + 1} (${segment.templateId}): ${segment.prompt}`,
+    ),
+    ...snapshot.systemConstraints.map((constraint) => `Constraint: ${constraint}`),
+  ].join("\n");
+}
+
+function assetSnapshotForSegment({
+  segment,
+  assets,
+}: {
+  segment: ParsedStoryboard["segments"][number];
+  assets: StoryboardConfirmJobAssetRecord[];
+}) {
+  return {
+    segmentIndex: segment.index,
+    templateId: segment.templateId,
+    assets: assets.map((asset) => ({
+      assetId: asset.assetId,
+      role: asset.role,
+      sortOrder: asset.sortOrder,
+    })),
+  } satisfies JsonValue;
+}
+
+function assertDraftStoryboard(storyboard: StoryboardRecord) {
+  if (storyboard.status !== "draft") {
+    throw new Error("Storyboard is not confirmable.");
+  }
+}
+
+export async function confirmStoryboard({
+  jobStore = createDrizzleJobStore(),
+  storyboardStore,
+  creditStore = createDrizzleCreditLedgerStore(),
+  moderationStore = createDrizzleModerationResultStore(),
+  jobId,
+  userId,
+  storyboardId,
+  moderatePrompt,
+}: {
+  jobStore?: JobStore;
+  storyboardStore: StoryboardConfirmationStore;
+  creditStore?: CreditLedgerStore;
+  moderationStore?: ModerationResultStore;
+  jobId: string;
+  userId: string;
+  storyboardId: string;
+  moderatePrompt?: (input: {
+    prompt: string;
+    externalId?: string;
+  }) => Promise<CreemPromptModerationResult>;
+}) {
+  const job = await storyboardStore.findJob({ jobId, userId });
+  if (!job) {
+    throw new Error("Video job not found for user.");
+  }
+
+  const storyboard = await storyboardStore.findStoryboard({ storyboardId, jobId });
+  if (!storyboard) {
+    throw new Error("Storyboard not found for job.");
+  }
+  assertDraftStoryboard(storyboard);
+
+  const parsed = parseStoryboardJson(storyboard.storyboardJson, {
+    durationSeconds: job.durationSeconds,
+    allowedTemplateIds: Array.isArray(storyboard.selectedTemplateIds)
+      ? storyboard.selectedTemplateIds.filter((id): id is string => typeof id === "string")
+      : [],
+  });
+  const assets = await storyboardStore.listJobAssets(jobId);
+  const finalPromptSnapshot = buildFinalPromptSnapshot({ parsed, assets });
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "storyboard_confirmed",
+    reason: "storyboard_confirmed",
+    actorType: "user",
+    actorId: userId,
+    eventSnapshot: { storyboardId },
+  });
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "prompt_moderation_running",
+    reason: "final_prompt_moderation_started",
+    eventSnapshot: { storyboardId },
+  });
+
+  const moderation = await checkPrompt(
+    {
+      userId,
+      videoJobId: jobId,
+      source: "final_video_prompt",
+      prompt: finalPromptText(finalPromptSnapshot),
+      externalId: `job:${jobId}:storyboard:${storyboardId}:final_prompt`,
+    },
+    {
+      resultStore: moderationStore,
+      moderatePrompt,
+    },
+  );
+
+  if (!moderation.allowed) {
+    await transitionJobStatus({
+      store: jobStore,
+      jobId,
+      toStatus: "prompt_moderation_blocked",
+      reason: "final_prompt_moderation_blocked",
+      eventSnapshot: {
+        storyboardId,
+        decision: moderation.decision,
+        errorCode: moderation.errorCode,
+      },
+    });
+    throw new Error("Final prompt moderation blocked video generation.");
+  }
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "prompt_moderation_passed",
+    reason: "final_prompt_moderation_passed",
+    eventSnapshot: { storyboardId, moderationId: moderation.moderationId },
+  });
+
+  let reserveResult: CreditLedgerResult;
+  if (job.creditCost > 0) {
+    reserveResult = await reserveCredits({
+      store: creditStore,
+      userId,
+      amount: job.creditCost,
+      reason: "reserve credits for confirmed storyboard",
+      idempotencyKey: `reserve:job:${jobId}`,
+      relatedJobId: jobId,
+      metadata: {
+        storyboardId,
+        durationSeconds: job.durationSeconds,
+      },
+    });
+    await storyboardStore.setReservedLedgerId({
+      jobId,
+      reservedLedgerId: reserveResult.ledger.id,
+    });
+  } else {
+    throw new Error("Credit cost must be greater than zero before video generation.");
+  }
+
+  const confirmedStoryboard = await storyboardStore.confirmStoryboard({
+    storyboardId,
+    finalPromptSnapshot,
+  });
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "credits_reserved",
+    reason: "credits_reserved",
+    eventSnapshot: {
+      storyboardId,
+      ledgerId: reserveResult.ledger.id,
+      amount: job.creditCost,
+    },
+  });
+
+  const segments = await storyboardStore.createVideoSegments(
+    parsed.segments.map((segment) => ({
+      videoJobId: jobId,
+      storyboardId,
+      segmentIndex: segment.index,
+      templateId: segment.templateId,
+      prompt: segment.prompt,
+      inputAssetSnapshot: assetSnapshotForSegment({ segment, assets }),
+      isTest: job.isTest,
+    })),
+  );
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "segments_queued",
+    reason: "segments_created",
+    eventSnapshot: {
+      storyboardId,
+      segmentIds: segments.map((segment) => segment.id),
+    },
+  });
+
+  return {
+    jobId,
+    storyboardId: confirmedStoryboard.id,
+    status: "segments_queued" as const,
+    reservedLedgerId: reserveResult.ledger.id,
+    segmentCount: segments.length,
+  };
+}
+
+export function createInMemoryStoryboardConfirmationStore({
+  jobs,
+  jobAssets,
+  storyboards: initialStoryboards,
+}: {
+  jobs: StoryboardConfirmJobRecord[];
+  jobAssets: StoryboardConfirmJobAssetRecord[];
+  storyboards: StoryboardRecord[];
+}): StoryboardConfirmationStore & {
+  listJobs: () => StoryboardConfirmJobRecord[];
+  listStoryboards: () => StoryboardRecord[];
+  listSegments: () => VideoSegmentRecord[];
+} {
+  const jobRecords = new Map(jobs.map((job) => [job.id, { ...job }]));
+  const storyboardRecords = new Map(
+    initialStoryboards.map((storyboard) => [storyboard.id, { ...storyboard }]),
+  );
+  const segments: VideoSegmentRecord[] = [];
+
+  return {
+    async findJob({ jobId, userId }) {
+      const job = jobRecords.get(jobId);
+      return job && job.userId === userId ? { ...job } : null;
+    },
+    async findStoryboard({ storyboardId, jobId }) {
+      const storyboard = storyboardRecords.get(storyboardId);
+      return storyboard && storyboard.videoJobId === jobId
+        ? { ...storyboard }
+        : null;
+    },
+    async listJobAssets(videoJobId) {
+      return jobAssets
+        .filter((asset) => asset.videoJobId === videoJobId)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((asset) => ({ ...asset }));
+    },
+    async confirmStoryboard({ storyboardId: id, finalPromptSnapshot }) {
+      const storyboard = storyboardRecords.get(id);
+      if (!storyboard) {
+        throw new Error(`Storyboard not found: ${id}.`);
+      }
+      const updated: StoryboardRecord = {
+        ...storyboard,
+        status: "confirmed",
+        finalPromptSnapshot,
+        confirmedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      storyboardRecords.set(id, updated);
+      return { ...updated };
+    },
+    async setReservedLedgerId({ jobId: id, reservedLedgerId }) {
+      const job = jobRecords.get(id);
+      if (!job) {
+        throw new Error(`Video job not found: ${id}.`);
+      }
+      jobRecords.set(id, { ...job, reservedLedgerId });
+    },
+    async createVideoSegments(input) {
+      const now = new Date();
+      const created = input.map((segment) => ({
+        id: randomUUID(),
+        status: "queued" as const,
+        provider: null,
+        model: null,
+        providerTaskId: null,
+        providerCallLogId: null,
+        videoKey: null,
+        costEstimate: "0",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+        nextRetryAt: null,
+        createdAt: now,
+        updatedAt: now,
+        ...segment,
+      }));
+      segments.push(...created);
+      return created.map((segment) => ({ ...segment }));
+    },
+    listJobs() {
+      return Array.from(jobRecords.values()).map((job) => ({ ...job }));
+    },
+    listStoryboards() {
+      return Array.from(storyboardRecords.values()).map((storyboard) => ({
+        ...storyboard,
+      }));
+    },
+    listSegments() {
+      return segments.map((segment) => ({ ...segment }));
+    },
+  };
+}
+
+type DbClient = ReturnType<typeof getDb>;
+
+export function createDrizzleStoryboardConfirmationStore(
+  db: DbClient = getDb(),
+): StoryboardConfirmationStore {
+  return {
+    async findJob({ jobId, userId }) {
+      const [job] = await db
+        .select({
+          id: videoJobs.id,
+          userId: videoJobs.userId,
+          status: videoJobs.status,
+          durationSeconds: videoJobs.durationSeconds,
+          creditCost: videoJobs.creditCost,
+          reservedLedgerId: videoJobs.reservedLedgerId,
+          isTest: videoJobs.isTest,
+        })
+        .from(videoJobs)
+        .where(and(eq(videoJobs.id, jobId), eq(videoJobs.userId, userId)))
+        .limit(1);
+
+      return (job as StoryboardConfirmJobRecord | undefined) ?? null;
+    },
+    async findStoryboard({ storyboardId, jobId }) {
+      const [storyboard] = await db
+        .select()
+        .from(storyboards)
+        .where(
+          and(
+            eq(storyboards.id, storyboardId),
+            eq(storyboards.videoJobId, jobId),
+          ),
+        )
+        .limit(1);
+
+      return (storyboard as StoryboardRecord | undefined) ?? null;
+    },
+    async listJobAssets(jobId) {
+      return db
+        .select({
+          videoJobId: videoJobAssets.videoJobId,
+          assetId: videoJobAssets.assetId,
+          role: videoJobAssets.role,
+          sortOrder: videoJobAssets.sortOrder,
+        })
+        .from(videoJobAssets)
+        .where(eq(videoJobAssets.videoJobId, jobId));
+    },
+    async confirmStoryboard({ storyboardId, finalPromptSnapshot }) {
+      const [storyboard] = await db
+        .update(storyboards)
+        .set({
+          status: "confirmed",
+          finalPromptSnapshot,
+          confirmedAt: new Date(),
+        })
+        .where(eq(storyboards.id, storyboardId))
+        .returning();
+
+      if (!storyboard) {
+        throw new Error(`Storyboard not found: ${storyboardId}.`);
+      }
+
+      return storyboard as StoryboardRecord;
+    },
+    async setReservedLedgerId({ jobId, reservedLedgerId }) {
+      await db
+        .update(videoJobs)
+        .set({ reservedLedgerId })
+        .where(eq(videoJobs.id, jobId));
+    },
+    async createVideoSegments(input) {
+      if (input.length === 0) {
+        return [];
+      }
+
+      const records = await db
+        .insert(videoSegments)
+        .values(input)
+        .returning();
+
+      return records as VideoSegmentRecord[];
+    },
+  };
+}
