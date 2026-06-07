@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1780713354336,
+      "tag": "0000_init_mvp_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780759032971,
+      "tag": "0001_add_auth_email_events",
+      "breakpoints": true
+    }
+  ]
+}
