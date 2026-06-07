@@ -8,6 +8,11 @@ import {
   createDrizzleStitchStore,
   createStitchJobForVideo,
 } from "@/server/stitch/jobs";
+import {
+  triggerCloudRunStitchJob,
+  type CloudRunStitchPayload,
+  type CloudRunStitchTriggerResult,
+} from "@/server/stitch/trigger-cloud-run";
 
 interface CreateStitchJobDeps {
   expectedSecret?: string | null;
@@ -16,7 +21,15 @@ interface CreateStitchJobDeps {
     stitchJobId: string;
     status: "queued";
     segmentCount: number;
+    segmentKeys: string[];
+    finalVideoKey: string;
+    coverKey?: string | null;
+    frameKeyPrefix?: string | null;
+    callbackUrl: string;
   }>;
+  triggerCloudRun?: (
+    payload: CloudRunStitchPayload,
+  ) => Promise<CloudRunStitchTriggerResult>;
 }
 
 function parseBody(body: unknown) {
@@ -38,6 +51,10 @@ function defaultCreateStitchJob(input: { jobId: string }) {
     stitchStore: createDrizzleStitchStore(),
     ...input,
   });
+}
+
+function defaultTriggerCloudRun(payload: CloudRunStitchPayload) {
+  return triggerCloudRunStitchJob({ payload });
 }
 
 export async function handleCreateStitchJobRequest(
@@ -65,7 +82,31 @@ export async function handleCreateStitchJobRequest(
 
   try {
     const result = await (deps.createStitchJob ?? defaultCreateStitchJob)(input);
-    return NextResponse.json(result);
+    let cloudRun: CloudRunStitchTriggerResult;
+    try {
+      cloudRun = await (deps.triggerCloudRun ?? defaultTriggerCloudRun)({
+        stitchJobId: result.stitchJobId,
+        videoJobId: result.jobId,
+        segmentKeys: result.segmentKeys,
+        finalVideoKey: result.finalVideoKey,
+        coverKey: result.coverKey,
+        frameKeyPrefix: result.frameKeyPrefix,
+        callbackUrl: result.callbackUrl,
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "cloud_run_trigger_failed" },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({
+      jobId: result.jobId,
+      stitchJobId: result.stitchJobId,
+      status: result.status,
+      segmentCount: result.segmentCount,
+      cloudRun,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Video job not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

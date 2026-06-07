@@ -572,6 +572,8 @@ Cloud Run 触发方式：
 - Next.js/worker tick 创建 `stitch_job`。
 - 主应用通过内部受保护请求触发 Cloud Run 执行具体 stitch job。
 - Cloud Run 不作为 MVP 主动轮询数据库的常驻 worker。
+- Cloud Run worker 源码入口位于 `workers/stitch-worker/`，部署文档入口为 `docs/deployment/cloud-run-stitch.md`。
+- 主应用触发 Cloud Run 的代码入口为 `src/server/stitch/trigger-cloud-run.ts`。
 
 不要在 Vercel Function 内跑 ffmpeg。
 

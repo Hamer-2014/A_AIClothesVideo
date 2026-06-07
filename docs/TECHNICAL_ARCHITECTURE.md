@@ -179,6 +179,16 @@ MVP 开发阶段直接接入真实 Creem 和真实模型服务，不做 mock 成
 - Cloud Run 执行完成后回写主应用内部 callback 或直接调用受保护状态更新 API。
 - MVP 不要求 Cloud Run 主动轮询数据库。
 
+代码与部署入口：
+
+- Worker 源码：`workers/stitch-worker/`。
+- Worker Dockerfile：`workers/stitch-worker/Dockerfile`。
+- 主应用触发模块：`src/server/stitch/trigger-cloud-run.ts`。
+- 主应用创建 job API：`POST /api/internal/stitch/jobs`。
+- 主应用 callback API：`POST /api/internal/stitch/callback`。
+- 部署文档：`docs/deployment/cloud-run-stitch.md`。
+- Cloud Run 构建上下文必须指向 `workers/stitch-worker`，不要从仓库根目录构建镜像。
+
 ## 4. 推荐应用目录结构
 
 最终实现可以调整，但建议从一开始保持边界清晰。

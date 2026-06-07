@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { stitchJobs, videoJobs, videoSegments } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
+import { buildCoverKey, buildFinalVideoKey } from "@/lib/storage/keys";
 import {
   createDrizzleJobStore,
   type JobStore,
@@ -107,12 +108,21 @@ export async function createStitchJobForVideo({
       segmentKeys,
     },
   });
+  const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
+  if (!appUrl) {
+    throw new Error("APP_URL is required to create a Cloud Run stitch callback URL.");
+  }
 
   return {
     jobId,
     stitchJobId: stitchJob.id,
     status: stitchJob.status,
     segmentCount: sortedSegments.length,
+    segmentKeys: segmentKeys as string[],
+    finalVideoKey: buildFinalVideoKey(jobId),
+    coverKey: buildCoverKey(jobId),
+    frameKeyPrefix: `jobs/${jobId}/qa/frames`,
+    callbackUrl: `${appUrl}/api/internal/stitch/callback`,
   };
 }
 

@@ -801,6 +801,15 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 Cloud Run 独立执行视频拼接、封面生成和抽帧。
 
+入口：
+
+- Worker 源码：`workers/stitch-worker/`。
+- Worker 部署文档：`docs/deployment/cloud-run-stitch.md`。
+- 主应用触发模块：`src/server/stitch/trigger-cloud-run.ts`。
+- 主应用创建 job API：`POST /api/internal/stitch/jobs`。
+- 主应用 callback API：`POST /api/internal/stitch/callback`。
+- Cloud Run 构建上下文必须使用 `workers/stitch-worker`。
+
 ### 14.2 文件边界
 
 建议单独目录：
@@ -1085,4 +1094,3 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 18. production 部署验收前检查。
 
 不要打乱顺序去先写视频生成。先写视频生成看起来快，实际上会把账本、状态机、审计和失败恢复全部拖成烂尾。
-

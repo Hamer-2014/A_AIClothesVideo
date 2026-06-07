@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 
@@ -7,6 +7,16 @@ import {
   createStitchJobForVideo,
   handleStitchCallback,
 } from "./jobs";
+
+const originalAppUrl = process.env.APP_URL;
+
+beforeEach(() => {
+  process.env.APP_URL = "https://app.example.com";
+});
+
+afterEach(() => {
+  process.env.APP_URL = originalAppUrl;
+});
 
 const userId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
@@ -61,11 +71,19 @@ describe("stitch jobs", () => {
       jobId,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       jobId,
       stitchJobId: expect.any(String),
       status: "queued",
       segmentCount: 2,
+      segmentKeys: [
+        "jobs/job-1/segments/segment-1/video.mp4",
+        "jobs/job-1/segments/segment-2/video.mp4",
+      ],
+      finalVideoKey: `jobs/${jobId}/stitched/final.mp4`,
+      coverKey: `jobs/${jobId}/covers/cover.webp`,
+      frameKeyPrefix: `jobs/${jobId}/qa/frames`,
+      callbackUrl: "https://app.example.com/api/internal/stitch/callback",
     });
     expect(stores.stitchStore.listStitchJobs()[0]).toMatchObject({
       videoJobId: jobId,

@@ -18,6 +18,7 @@ describe("POST /api/internal/stitch/jobs", () => {
   });
 
   it("creates a stitch job when authorized", async () => {
+    const triggered: unknown[] = [];
     const response = await handleCreateStitchJobRequest(
       new Request("http://localhost/api/internal/stitch/jobs", {
         method: "POST",
@@ -31,7 +32,16 @@ describe("POST /api/internal/stitch/jobs", () => {
           stitchJobId: "stitch-1",
           status: "queued",
           segmentCount: 2,
+          segmentKeys: ["jobs/job-1/segments/segment-1/video.mp4"],
+          finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          coverKey: "jobs/job-1/covers/cover.webp",
+          frameKeyPrefix: "jobs/job-1/qa/frames",
+          callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
+        triggerCloudRun: async (payload) => {
+          triggered.push(payload);
+          return { accepted: true };
+        },
       },
     );
 
@@ -41,6 +51,38 @@ describe("POST /api/internal/stitch/jobs", () => {
       stitchJobId: "stitch-1",
       status: "queued",
       segmentCount: 2,
+      cloudRun: { accepted: true },
     });
+    expect(triggered).toHaveLength(1);
+  });
+
+  it("returns a bad gateway response when Cloud Run cannot be triggered", async () => {
+    const response = await handleCreateStitchJobRequest(
+      new Request("http://localhost/api/internal/stitch/jobs", {
+        method: "POST",
+        headers: { Authorization: "Bearer secret" },
+        body: JSON.stringify({ jobId: "job-1" }),
+      }),
+      {
+        expectedSecret: "secret",
+        createStitchJob: async () => ({
+          jobId: "job-1",
+          stitchJobId: "stitch-1",
+          status: "queued",
+          segmentCount: 1,
+          segmentKeys: ["jobs/job-1/segments/segment-1/video.mp4"],
+          finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          coverKey: "jobs/job-1/covers/cover.webp",
+          frameKeyPrefix: "jobs/job-1/qa/frames",
+          callbackUrl: "http://localhost/api/internal/stitch/callback",
+        }),
+        triggerCloudRun: async () => {
+          throw new Error("Cloud Run is down.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "cloud_run_trigger_failed" });
   });
 });

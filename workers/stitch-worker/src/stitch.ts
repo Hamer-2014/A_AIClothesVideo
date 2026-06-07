@@ -1,0 +1,134 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import type { WorkerConfig } from "./config";
+import { sendStitchCallback } from "./callback";
+import {
+  buildConcatList,
+  extractQaFrames as defaultExtractQaFrames,
+  stitchSegments as defaultStitchSegments,
+} from "./ffmpeg";
+import type { StitchResult } from "./http";
+import type { StitchPayload } from "./payload";
+import { createR2Transfer, type ObjectTransferInput } from "./r2";
+
+interface RunStitchJobDeps {
+  payload: StitchPayload;
+  config: WorkerConfig;
+  createWorkDir?: () => Promise<string>;
+  writeTextFile?: (filePath: string, contents: string) => Promise<void>;
+  downloadObject?: (input: Required<Pick<ObjectTransferInput, "key" | "destinationPath">>) => Promise<void>;
+  uploadObject?: (input: Required<Pick<ObjectTransferInput, "key" | "sourcePath" | "contentType">>) => Promise<void>;
+  stitchSegments?: typeof defaultStitchSegments;
+  extractQaFrames?: typeof defaultExtractQaFrames;
+  sendCallback?: typeof sendStitchCallback;
+  cleanupWorkDir?: (workDir: string) => Promise<void>;
+}
+
+async function defaultCreateWorkDir() {
+  return mkdtemp(path.join(tmpdir(), "stitch-worker-"));
+}
+
+function normalizedPath(...parts: string[]) {
+  return path.join(...parts).replaceAll("\\", "/");
+}
+
+function frameKey(prefix: string, index: number) {
+  return `${prefix.replace(/\/+$/, "")}/${index}.jpg`;
+}
+
+export async function runStitchJob({
+  payload,
+  config,
+  createWorkDir = defaultCreateWorkDir,
+  writeTextFile = writeFile,
+  stitchSegments = defaultStitchSegments,
+  extractQaFrames = defaultExtractQaFrames,
+  sendCallback = sendStitchCallback,
+  cleanupWorkDir = (workDir) => rm(workDir, { recursive: true, force: true }),
+  downloadObject,
+  uploadObject,
+}: RunStitchJobDeps): Promise<StitchResult> {
+  const transfer = downloadObject && uploadObject ? null : createR2Transfer(config);
+  const download = downloadObject ?? transfer?.downloadObject;
+  const upload = uploadObject ?? transfer?.uploadObject;
+
+  if (!download || !upload) {
+    throw new Error("R2 transfer functions are not configured.");
+  }
+
+  const workDir = await createWorkDir();
+  const frameDirectory = normalizedPath(workDir, "frames");
+  const outputPath = normalizedPath(workDir, "final.mp4");
+  const concatListPath = normalizedPath(workDir, "segments.txt");
+
+  try {
+    await mkdir(frameDirectory, { recursive: true });
+    const segmentPaths = payload.segmentKeys.map((_, index) =>
+      normalizedPath(workDir, `segment-${index}.mp4`),
+    );
+
+    await Promise.all(
+      payload.segmentKeys.map((key, index) =>
+        download({ key, destinationPath: segmentPaths[index] as string }),
+      ),
+    );
+    await writeTextFile(concatListPath, buildConcatList(segmentPaths));
+    await stitchSegments({ concatListPath, outputPath });
+
+    const localFramePaths = await extractQaFrames({
+      videoPath: outputPath,
+      frameDirectory,
+      frameCount: 3,
+    });
+    const frameKeys = payload.frameKeyPrefix
+      ? localFramePaths.map((_, index) => frameKey(payload.frameKeyPrefix as string, index))
+      : [];
+
+    await upload({
+      key: payload.finalVideoKey,
+      sourcePath: outputPath,
+      contentType: "video/mp4",
+    });
+
+    await Promise.all(
+      frameKeys.map((key, index) =>
+        upload({
+          key,
+          sourcePath: localFramePaths[index] as string,
+          contentType: "image/jpeg",
+        }),
+      ),
+    );
+
+    const result: StitchResult = {
+      stitchJobId: payload.stitchJobId,
+      status: "succeeded",
+      finalVideoKey: payload.finalVideoKey,
+      coverKey: payload.coverKey,
+      frameKeys,
+    };
+    await sendCallback({
+      callbackUrl: payload.callbackUrl,
+      workerSecret: config.workerSecret,
+      result,
+    });
+
+    return result;
+  } catch (error) {
+    const failedResult: StitchResult = {
+      stitchJobId: payload.stitchJobId,
+      status: "failed",
+      errorMessage: error instanceof Error ? error.message : "Unknown stitch error",
+    };
+    await sendCallback({
+      callbackUrl: payload.callbackUrl,
+      workerSecret: config.workerSecret,
+      result: failedResult,
+    });
+    throw error;
+  } finally {
+    await cleanupWorkDir(workDir);
+  }
+}
