@@ -75,6 +75,26 @@ describe("get video job detail", () => {
           },
         },
       ],
+      storyboards: [
+        {
+          id: "storyboard-1",
+          videoJobId: jobId,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow front push-in.",
+              },
+            ],
+          },
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
     });
 
     const detail = await getVideoJobDetail({
@@ -101,6 +121,10 @@ describe("get video job detail", () => {
         { assetId: "asset-back", role: "back" },
       ],
       acceptable: true,
+      latestStoryboard: {
+        id: "storyboard-1",
+        status: "draft",
+      },
     });
     expect(detail.recommendations.availableTemplateIds).toContain("back_display");
   });
@@ -120,6 +144,7 @@ describe("get video job detail", () => {
       ],
       assets: [],
       analyses: [],
+      storyboards: [],
     });
 
     await expect(

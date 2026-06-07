@@ -87,6 +87,14 @@ export async function handleGetJobRequest(
     acceptable: detail.acceptable,
     assetCompleteness: detail.assetCompleteness,
     recommendations: detail.recommendations,
+    latestStoryboard: detail.latestStoryboard
+      ? {
+          id: detail.latestStoryboard.id,
+          status: detail.latestStoryboard.status,
+          selectedTemplateIds: detail.latestStoryboard.selectedTemplateIds,
+          storyboardJson: detail.latestStoryboard.storyboardJson,
+        }
+      : null,
   });
 }
 

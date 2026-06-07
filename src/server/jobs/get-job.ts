@@ -1,8 +1,9 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
   assetAnalyses,
+  storyboards,
   videoJobAssets,
   videoJobs,
 } from "@/lib/db/schema";
@@ -32,20 +33,32 @@ export interface VideoJobAnalysisSummary {
   analysisJson: JsonValue;
 }
 
+export interface VideoJobStoryboardSummary {
+  id: string;
+  videoJobId: string;
+  status: string;
+  selectedTemplateIds: JsonValue;
+  storyboardJson: JsonValue;
+  createdAt: Date;
+}
+
 export interface VideoJobReadStore {
   findJob(input: { jobId: string; userId: string }): Promise<VideoJobSummary | null>;
   listJobAssets(jobId: string): Promise<VideoJobAssetSummary[]>;
   listAnalyses(assetIds: string[]): Promise<VideoJobAnalysisSummary[]>;
+  findLatestStoryboard(jobId: string): Promise<VideoJobStoryboardSummary | null>;
 }
 
 export function createInMemoryVideoJobReadStore({
   jobs,
   assets,
   analyses,
+  storyboards,
 }: {
   jobs: VideoJobSummary[];
   assets: VideoJobAssetSummary[];
   analyses: VideoJobAnalysisSummary[];
+  storyboards?: VideoJobStoryboardSummary[];
 }): VideoJobReadStore {
   return {
     async findJob({ jobId, userId }) {
@@ -56,6 +69,14 @@ export function createInMemoryVideoJobReadStore({
     },
     async listAnalyses(assetIds) {
       return analyses.filter((analysis) => assetIds.includes(analysis.assetId));
+    },
+    async findLatestStoryboard(jobId) {
+      return (
+        [...(storyboards ?? [])]
+          .filter((storyboard) => storyboard.videoJobId === jobId)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ??
+        null
+      );
     },
   };
 }
@@ -113,6 +134,23 @@ export function createDrizzleVideoJobReadStore(
         .from(assetAnalyses)
         .where(inArray(assetAnalyses.assetId, assetIds));
     },
+    async findLatestStoryboard(jobId) {
+      const [storyboard] = await db
+        .select({
+          id: storyboards.id,
+          videoJobId: storyboards.videoJobId,
+          status: storyboards.status,
+          selectedTemplateIds: storyboards.selectedTemplateIds,
+          storyboardJson: storyboards.storyboardJson,
+          createdAt: storyboards.createdAt,
+        })
+        .from(storyboards)
+        .where(eq(storyboards.videoJobId, jobId))
+        .orderBy(desc(storyboards.createdAt))
+        .limit(1);
+
+      return (storyboard as VideoJobStoryboardSummary | undefined) ?? null;
+    },
   };
 }
 
@@ -136,6 +174,7 @@ export async function getVideoJobDetail({
 
   const assets = await store.listJobAssets(jobId);
   const analyses = await store.listAnalyses(assets.map((asset) => asset.assetId));
+  const latestStoryboard = await store.findLatestStoryboard(jobId);
   const parsedAnalyses = analyses.map((analysis) =>
     parseAssetAnalysisJson(analysis.analysisJson),
   );
@@ -149,6 +188,7 @@ export async function getVideoJobDetail({
     job,
     assets,
     analyses,
+    latestStoryboard,
     ...recommendationResult,
   };
 }

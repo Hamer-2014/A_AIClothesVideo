@@ -50,6 +50,17 @@ describe("GET /api/jobs/[id]", () => {
             unavailable: [],
             availableTemplateIds: ["front_push_in"],
           },
+          latestStoryboard: {
+            id: "storyboard-1",
+            videoJobId: "job-1",
+            status: "draft",
+            selectedTemplateIds: ["front_push_in"],
+            storyboardJson: {
+              duration_seconds: 8,
+              segments: [],
+            },
+            createdAt: new Date(),
+          },
         }),
       },
     );
@@ -64,6 +75,10 @@ describe("GET /api/jobs/[id]", () => {
       assetCount: 1,
       recommendations: {
         availableTemplateIds: ["front_push_in"],
+      },
+      latestStoryboard: {
+        id: "storyboard-1",
+        status: "draft",
       },
     });
   });
