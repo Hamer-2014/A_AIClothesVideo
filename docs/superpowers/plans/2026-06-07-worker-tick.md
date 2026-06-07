@@ -49,14 +49,27 @@
 **Files:**
 - Create: `src/server/assets/job-analysis.ts`
 - Create: `src/server/assets/job-analysis.test.ts`
+- Create: `src/server/jobs/create-job.ts`
+- Create: `src/server/jobs/create-job.test.ts`
+- Create: `src/server/jobs/get-job.ts`
+- Create: `src/server/jobs/get-job.test.ts`
+- Create: `src/app/api/jobs/route.ts`
+- Create: `src/app/api/jobs/route.test.ts`
+- Create: `src/app/api/jobs/[id]/route.ts`
+- Create: `src/app/api/jobs/[id]/route.test.ts`
 - Create: `src/app/api/jobs/[id]/analyze/route.ts`
 - Create: `src/app/api/jobs/[id]/analyze/route.test.ts`
 
+- [x] 用户可用已上传素材创建 `video_jobs`。
+- [x] 创建 job 时绑定 `video_job_assets`。
+- [x] 创建 job 只允许当前用户拥有的素材。
+- [x] 创建 job 后进入 `asset_analysis_queued`，不冻结点数。
 - [x] 只分析绑定到 `video_job_assets` 的素材。
 - [x] 校验 job 属于当前用户。
 - [x] 使用 R2 signed URL 调用视觉分析。
 - [x] 聚合多素材模板推荐。
 - [x] 用户 API 可手动触发素材分析。
+- [x] 用户可查询 job 状态、素材完整度和模板推荐。
 
 ### Task 5: Internal Cron Endpoint
 
