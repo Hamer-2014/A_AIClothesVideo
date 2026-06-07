@@ -2,7 +2,7 @@
 
 ## 目标
 
-建立真实视觉 provider 调用、调用审计、模型 JSON 解析、分析保存和模板推荐衔接服务。本阶段仍不接前台 UI 和 worker tick，但服务层必须做到“不配置不可用、不伪造成功、失败可审计”。
+建立真实视觉 provider 调用、调用审计、模型 JSON 解析、分析保存和模板推荐衔接服务。本阶段已接入素材分析触发 API 与 asset-analysis worker tick；仍不接前台 UI、DeepSeek 和视频生成。
 
 ## 设计
 
@@ -11,6 +11,8 @@
 - `src/server/assets/analysis-schema.ts` 解析视觉模型 JSON，要求包含 `asset_role`、`garment_category`、`view_angle`、`human_present`、`visible_details`、`not_visible_details`、`quality`、`confidence`、`risk_flags`。
 - `src/server/assets/classify-role.ts` 将一条或多条分析转换为模板规则引擎需要的素材完整度。
 - `src/server/assets/analyze.ts` 编排视觉调用、审计日志、`asset_analyses` 保存，判断素材是否可继续生成，并输出模板推荐结果。
+- `src/server/assets/job-analysis.ts` 从 `video_job_assets` 读取当前 job 绑定素材，生成 R2 signed URL 后逐张分析，并聚合模板推荐。
+- `POST /api/jobs/[id]/analyze` 只接受当前登录用户自己的 job，不信任请求体传入的 assetId 列表。
 
 ## 规则
 
@@ -30,8 +32,8 @@
 
 - 不更新 `assets.status`。
 - 不做前台展示。
-- 不做 worker tick 触发。
 - 不接 Post-QA 抽帧复用。
+- 不实现 Lite 预检 worker；当前 cron tick 只处理 `asset_analysis_queued`。
 
 ## 验收
 
@@ -43,3 +45,5 @@
 - 每次视觉 provider 调用写入 `provider_call_logs`。
 - provider 失败不会伪造素材分析成功。
 - 持久化失败不会被错误归因为 provider 失败。
+- job 素材分析只分析已绑定到 `video_job_assets` 且属于当前用户的素材。
+- asset-analysis worker tick 可以处理 `asset_analysis_queued`，但 Lite 预检仍待单独实现。
