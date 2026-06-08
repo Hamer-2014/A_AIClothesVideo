@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readWorkerConfig } from "./config";
+import { readWorkerConfig } from "./config.js";
 
 describe("readWorkerConfig", () => {
   it("requires runtime configuration for Cloud Run stitch execution", () => {

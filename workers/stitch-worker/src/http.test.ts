@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { handleRequest } from "./http";
+import { handleRequest } from "./http.js";
 
 describe("stitch-worker HTTP handler", () => {
   const config = {

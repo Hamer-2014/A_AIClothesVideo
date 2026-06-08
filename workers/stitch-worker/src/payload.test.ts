@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStitchPayload } from "./payload";
+import { parseStitchPayload } from "./payload.js";
 
 describe("parseStitchPayload", () => {
   it("normalizes the Cloud Run stitch request payload", () => {

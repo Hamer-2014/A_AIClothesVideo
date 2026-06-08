@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildConcatList, extractQaFrames, stitchSegments } from "./ffmpeg";
+import { buildConcatList, extractQaFrames, stitchSegments } from "./ffmpeg.js";
 
 describe("ffmpeg helpers", () => {
   it("builds an ffmpeg concat list with escaped file paths", () => {

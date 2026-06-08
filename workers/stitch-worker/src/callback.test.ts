@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sendStitchCallback } from "./callback";
+import { sendStitchCallback } from "./callback.js";
 
 describe("sendStitchCallback", () => {
   it("posts the stitch result back to the main app with the worker secret", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runStitchJob } from "./stitch";
+import { runStitchJob } from "./stitch.js";
 
 describe("runStitchJob", () => {
   it("downloads segments, stitches them, uploads outputs, and callbacks the app", async () => {

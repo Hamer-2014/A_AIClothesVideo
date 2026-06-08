@@ -2,16 +2,16 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { WorkerConfig } from "./config";
-import { sendStitchCallback } from "./callback";
+import type { WorkerConfig } from "./config.js";
+import { sendStitchCallback } from "./callback.js";
 import {
   buildConcatList,
   extractQaFrames as defaultExtractQaFrames,
   stitchSegments as defaultStitchSegments,
-} from "./ffmpeg";
-import type { StitchResult } from "./http";
-import type { StitchPayload } from "./payload";
-import { createR2Transfer, type ObjectTransferInput } from "./r2";
+} from "./ffmpeg.js";
+import type { StitchResult } from "./http.js";
+import type { StitchPayload } from "./payload.js";
+import { createR2Transfer, type ObjectTransferInput } from "./r2.js";
 
 interface RunStitchJobDeps {
   payload: StitchPayload;

@@ -1,4 +1,4 @@
-import type { StitchResult } from "./http";
+import type { StitchResult } from "./http.js";
 
 export async function sendStitchCallback({
   callbackUrl,

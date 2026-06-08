@@ -1,5 +1,5 @@
-import type { WorkerConfig } from "./config";
-import { parseStitchPayload, type StitchPayload } from "./payload";
+import type { WorkerConfig } from "./config.js";
+import { parseStitchPayload, type StitchPayload } from "./payload.js";
 
 export interface StitchResult {
   stitchJobId: string;

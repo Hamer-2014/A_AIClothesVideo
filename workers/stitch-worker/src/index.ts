@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
 
-import { readWorkerConfig } from "./config";
-import { handleRequest } from "./http";
-import { runStitchJob } from "./stitch";
+import { readWorkerConfig } from "./config.js";
+import { handleRequest } from "./http.js";
+import { runStitchJob } from "./stitch.js";
 
 const config = readWorkerConfig();
 const port = Number(process.env.PORT ?? 8080);

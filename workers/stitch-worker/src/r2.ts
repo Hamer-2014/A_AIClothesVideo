@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import type { WorkerConfig } from "./config";
+import type { WorkerConfig } from "./config.js";
 
 export interface ObjectTransferInput {
   key: string;
