@@ -69,6 +69,8 @@ export async function extractQaFrames({
     videoPath,
     "-vf",
     `fps=1/${normalizedFrameCount}`,
+    "-start_number",
+    "0",
     "-frames:v",
     String(normalizedFrameCount),
     pattern,

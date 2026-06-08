@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { stitchJobs, videoJobs, videoSegments } from "@/lib/db/schema";
@@ -11,6 +11,11 @@ import {
   type JobStore,
   transitionJobStatus,
 } from "@/server/jobs/state-machine";
+import {
+  triggerCloudRunStitchJob,
+  type CloudRunStitchPayload,
+  type CloudRunStitchTriggerResult,
+} from "./trigger-cloud-run";
 
 export interface StitchJobSourceRecord {
   id: string;
@@ -55,6 +60,7 @@ export interface StitchStore {
   findJob(jobId: string): Promise<StitchJobSourceRecord | null>;
   listSegments(jobId: string): Promise<StitchSegmentRecord[]>;
   createStitchJob(input: NewStitchJobRecord): Promise<StitchJobRecord>;
+  findQueuedStitchJobForVideo(jobId: string): Promise<StitchJobRecord | null>;
   findStitchJob(stitchJobId: string): Promise<StitchJobRecord | null>;
   updateStitchJob(
     stitchJobId: string,
@@ -65,6 +71,51 @@ export interface StitchStore {
     finalVideoKey: string;
     coverKey: string | null;
   }): Promise<void>;
+}
+
+export interface StitchDispatchResult {
+  jobId: string;
+  stitchJobId: string;
+  status: "queued";
+  segmentCount: number;
+  segmentKeys: string[];
+  finalVideoKey: string;
+  coverKey?: string | null;
+  frameKeyPrefix?: string | null;
+  callbackUrl: string;
+}
+
+function asStringArray(value: JsonValue) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function buildDispatchResult({
+  jobId,
+  stitchJob,
+  segmentKeys,
+}: {
+  jobId: string;
+  stitchJob: StitchJobRecord;
+  segmentKeys: string[];
+}): StitchDispatchResult {
+  const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
+  if (!appUrl) {
+    throw new Error("APP_URL is required to create a Cloud Run stitch callback URL.");
+  }
+
+  return {
+    jobId,
+    stitchJobId: stitchJob.id,
+    status: "queued",
+    segmentCount: segmentKeys.length,
+    segmentKeys,
+    finalVideoKey: buildFinalVideoKey(jobId),
+    coverKey: buildCoverKey(jobId),
+    frameKeyPrefix: `jobs/${jobId}/qa/frames`,
+    callbackUrl: `${appUrl}/api/internal/stitch/callback`,
+  };
 }
 
 export async function createStitchJobForVideo({
@@ -108,21 +159,102 @@ export async function createStitchJobForVideo({
       segmentKeys,
     },
   });
-  const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
-  if (!appUrl) {
-    throw new Error("APP_URL is required to create a Cloud Run stitch callback URL.");
+  return buildDispatchResult({
+    jobId,
+    stitchJob,
+    segmentKeys: segmentKeys as string[],
+  });
+}
+
+export async function getQueuedStitchJobPayloadForVideo({
+  stitchStore,
+  jobId,
+}: {
+  stitchStore: StitchStore;
+  jobId: string;
+}) {
+  const stitchJob = await stitchStore.findQueuedStitchJobForVideo(jobId);
+  if (!stitchJob) {
+    throw new Error("Queued stitch job not found.");
   }
 
-  return {
+  return buildDispatchResult({
     jobId,
-    stitchJobId: stitchJob.id,
-    status: stitchJob.status,
-    segmentCount: sortedSegments.length,
-    segmentKeys: segmentKeys as string[],
-    finalVideoKey: buildFinalVideoKey(jobId),
-    coverKey: buildCoverKey(jobId),
-    frameKeyPrefix: `jobs/${jobId}/qa/frames`,
-    callbackUrl: `${appUrl}/api/internal/stitch/callback`,
+    stitchJob,
+    segmentKeys: asStringArray(stitchJob.segmentKeys),
+  });
+}
+
+export async function triggerQueuedStitchJobForVideo({
+  jobStore = createDrizzleJobStore(),
+  stitchStore,
+  jobId,
+  triggerCloudRun = (payload) => triggerCloudRunStitchJob({ payload }),
+}: {
+  jobStore?: JobStore;
+  stitchStore: StitchStore;
+  jobId: string;
+  triggerCloudRun?: (
+    payload: CloudRunStitchPayload,
+  ) => Promise<CloudRunStitchTriggerResult>;
+}) {
+  const result = await getQueuedStitchJobPayloadForVideo({ stitchStore, jobId });
+  const cloudRun = await triggerCloudRun({
+    stitchJobId: result.stitchJobId,
+    videoJobId: result.jobId,
+    segmentKeys: result.segmentKeys,
+    finalVideoKey: result.finalVideoKey,
+    coverKey: result.coverKey,
+    frameKeyPrefix: result.frameKeyPrefix,
+    callbackUrl: result.callbackUrl,
+  });
+  await markStitchJobRunning({
+    jobStore,
+    stitchStore,
+    stitchJobId: result.stitchJobId,
+  });
+
+  return {
+    ...result,
+    cloudRun,
+  };
+}
+
+export async function createAndTriggerStitchJobForVideo({
+  jobStore = createDrizzleJobStore(),
+  stitchStore,
+  jobId,
+  triggerCloudRun = (payload) => triggerCloudRunStitchJob({ payload }),
+}: {
+  jobStore?: JobStore;
+  stitchStore: StitchStore;
+  jobId: string;
+  triggerCloudRun?: (
+    payload: CloudRunStitchPayload,
+  ) => Promise<CloudRunStitchTriggerResult>;
+}) {
+  const existing = await stitchStore.findQueuedStitchJobForVideo(jobId);
+  const result = existing
+    ? await getQueuedStitchJobPayloadForVideo({ stitchStore, jobId })
+    : await createStitchJobForVideo({ jobStore, stitchStore, jobId });
+  const cloudRun = await triggerCloudRun({
+    stitchJobId: result.stitchJobId,
+    videoJobId: result.jobId,
+    segmentKeys: result.segmentKeys,
+    finalVideoKey: result.finalVideoKey,
+    coverKey: result.coverKey,
+    frameKeyPrefix: result.frameKeyPrefix,
+    callbackUrl: result.callbackUrl,
+  });
+  await markStitchJobRunning({
+    jobStore,
+    stitchStore,
+    stitchJobId: result.stitchJobId,
+  });
+
+  return {
+    ...result,
+    cloudRun,
   };
 }
 
@@ -205,6 +337,38 @@ export async function handleStitchCallback({
   };
 }
 
+export async function markStitchJobRunning({
+  jobStore = createDrizzleJobStore(),
+  stitchStore,
+  stitchJobId,
+}: {
+  jobStore?: JobStore;
+  stitchStore: StitchStore;
+  stitchJobId: string;
+}) {
+  const stitchJob = await stitchStore.findStitchJob(stitchJobId);
+  if (!stitchJob) {
+    throw new Error("Stitch job not found.");
+  }
+
+  const updated = await stitchStore.updateStitchJob(stitchJobId, {
+    status: "running",
+  });
+  await transitionJobStatus({
+    store: jobStore,
+    jobId: stitchJob.videoJobId,
+    toStatus: "stitching_running",
+    reason: "cloud_run_stitch_started",
+    eventSnapshot: { stitchJobId },
+  });
+
+  return {
+    jobId: stitchJob.videoJobId,
+    stitchJobId,
+    status: updated.status,
+  };
+}
+
 export function createInMemoryStitchStore({
   jobs,
   segments,
@@ -250,6 +414,13 @@ export function createInMemoryStitchStore({
       };
       stitchRecords.set(record.id, record);
       return { ...record };
+    },
+    async findQueuedStitchJobForVideo(jobId) {
+      const stitchJob = Array.from(stitchRecords.values()).find(
+        (record) => record.videoJobId === jobId && record.status === "queued",
+      );
+
+      return stitchJob ? { ...stitchJob } : null;
     },
     async findStitchJob(stitchJobId) {
       const job = stitchRecords.get(stitchJobId);
@@ -321,6 +492,17 @@ export function createDrizzleStitchStore(db: DbClient = getDb()): StitchStore {
       }
 
       return record as StitchJobRecord;
+    },
+    async findQueuedStitchJobForVideo(jobId) {
+      const [record] = await db
+        .select()
+        .from(stitchJobs)
+        .where(
+          and(eq(stitchJobs.videoJobId, jobId), eq(stitchJobs.status, "queued")),
+        )
+        .limit(1);
+
+      return (record as StitchJobRecord | undefined) ?? null;
     },
     async findStitchJob(stitchJobId) {
       const [record] = await db

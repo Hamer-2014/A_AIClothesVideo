@@ -7,9 +7,30 @@ import {
 } from "@/server/assets/job-analysis";
 import { createDrizzleJobLockStore } from "@/server/jobs/locks";
 import { createDrizzleJobStore } from "@/server/jobs/state-machine";
+import { createDrizzlePostQaJobStore, getPostQaJobInput } from "@/server/post-qa/jobs";
+import { runPostQaCheck } from "@/server/post-qa/check";
+import {
+  createAndTriggerStitchJobForVideo,
+  createDrizzleStitchStore,
+} from "@/server/stitch/jobs";
 import { runWorkerTick } from "@/server/workers/tick";
+import {
+  createDrizzleVideoSegmentStore,
+  defaultStoreProviderOutput,
+  pollSubmittedSegment,
+  submitQueuedSegment,
+} from "@/server/video/segments";
+import { runGenerationWorkerTick } from "@/server/workers/generation-tick";
+import { runPostQaWorkerTick } from "@/server/workers/post-qa-tick";
 
 interface WorkerTickResult {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  stages?: Record<string, WorkerTickStageResult>;
+}
+
+interface WorkerTickStageResult {
   processed: number;
   succeeded: number;
   failed: number;
@@ -33,11 +54,15 @@ function requestSecret(request: Request) {
 
 async function defaultRunTick(): Promise<WorkerTickResult> {
   const jobStore = createDrizzleJobStore();
+  const lockStore = createDrizzleJobLockStore();
   const jobAssetStore = createDrizzleVideoJobAssetStore();
+  const segmentStore = createDrizzleVideoSegmentStore();
+  const stitchStore = createDrizzleStitchStore();
+  const postQaJobStore = createDrizzlePostQaJobStore();
 
-  return runWorkerTick({
+  const analysis = await runWorkerTick({
     workerId: `cron:${Date.now()}`,
-    lockStore: createDrizzleJobLockStore(),
+    lockStore,
     jobStore,
     eligibleJobStatuses: ["asset_analysis_queued"],
     handlers: {
@@ -58,6 +83,70 @@ async function defaultRunTick(): Promise<WorkerTickResult> {
       },
     },
   });
+  const generation = await runGenerationWorkerTick({
+    workerId: `cron:${Date.now()}:generation`,
+    lockStore,
+    jobStore,
+    handlers: {
+      submitSegments: async (job) => {
+        const segments = await segmentStore.listSegmentsForJob(job.id);
+        for (const segment of segments.filter((item) => item.status === "queued")) {
+          await submitQueuedSegment({
+            jobStore,
+            segmentStore,
+            jobId: job.id,
+            segmentId: segment.id,
+          });
+        }
+      },
+      pollSegments: async (job) => {
+        const segments = await segmentStore.listSegmentsForJob(job.id);
+        for (const segment of segments.filter(
+          (item) => item.status === "generating" && item.providerTaskId,
+        )) {
+          await pollSubmittedSegment({
+            jobStore,
+            segmentStore,
+            jobId: job.id,
+            segmentId: segment.id,
+            storeProviderOutput: defaultStoreProviderOutput,
+          });
+        }
+      },
+      createStitchJob: async (job) => {
+        await createAndTriggerStitchJobForVideo({
+          jobStore,
+          stitchStore,
+          jobId: job.id,
+        });
+      },
+    },
+  });
+  const postQa = await runPostQaWorkerTick({
+    workerId: `cron:${Date.now()}:post-qa`,
+    lockStore,
+    jobStore,
+    checkPostQa: async (job) => {
+      const input = await getPostQaJobInput({
+        store: postQaJobStore,
+        jobId: job.id,
+      });
+      await runPostQaCheck({
+        jobStore,
+        jobId: input.jobId,
+        userId: input.userId,
+        mode: input.mode,
+        frameKeys: input.frameKeys,
+      });
+    },
+  });
+
+  return {
+    processed: analysis.processed + generation.processed + postQa.processed,
+    succeeded: analysis.succeeded + generation.succeeded + postQa.succeeded,
+    failed: analysis.failed + generation.failed + postQa.failed,
+    stages: { analysis, generation, postQa },
+  };
 }
 
 export async function handleWorkerTickRequest(

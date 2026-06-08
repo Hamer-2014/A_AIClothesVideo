@@ -1,5 +1,6 @@
 export interface WorkerConfig {
   workerSecret: string;
+  callbackSecret: string;
   bucket: string;
   r2Endpoint: string;
   r2AccessKeyId: string;
@@ -8,6 +9,7 @@ export interface WorkerConfig {
 
 const requiredEnv = [
   "CLOUD_RUN_STITCH_SECRET",
+  "INTERNAL_WORKER_SECRET",
   "CLOUDFLARE_R2_ACCESS_KEY_ID",
   "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
   "CLOUDFLARE_R2_BUCKET",
@@ -43,6 +45,7 @@ export function readWorkerConfig(
 
   return {
     workerSecret,
+    callbackSecret: requireEnv(env, "INTERNAL_WORKER_SECRET"),
     bucket: requireEnv(env, "CLOUDFLARE_R2_BUCKET"),
     r2Endpoint,
     r2AccessKeyId: requireEnv(env, "CLOUDFLARE_R2_ACCESS_KEY_ID"),

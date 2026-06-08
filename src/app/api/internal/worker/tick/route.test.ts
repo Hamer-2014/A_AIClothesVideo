@@ -60,4 +60,36 @@ describe("POST /api/internal/worker/tick", () => {
       failed: 1,
     });
   });
+
+  it("returns staged worker results when the default tick is composed", async () => {
+    vi.stubEnv("CRON_JOB_SECRET", "expected_secret");
+    const response = await handleWorkerTickRequest(
+      new Request("http://localhost/api/internal/worker/tick", {
+        method: "POST",
+        headers: { "x-cron-secret": "expected_secret" },
+      }),
+      {
+        runTick: async () => ({
+          processed: 3,
+          succeeded: 2,
+          failed: 1,
+          stages: {
+            analysis: { processed: 1, succeeded: 1, failed: 0 },
+            generation: { processed: 2, succeeded: 1, failed: 1 },
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      processed: 3,
+      succeeded: 2,
+      failed: 1,
+      stages: {
+        analysis: { processed: 1, succeeded: 1, failed: 0 },
+        generation: { processed: 2, succeeded: 1, failed: 1 },
+      },
+    });
+  });
 });

@@ -111,7 +111,7 @@ export async function runStitchJob({
     };
     await sendCallback({
       callbackUrl: payload.callbackUrl,
-      workerSecret: config.workerSecret,
+      workerSecret: config.callbackSecret,
       result,
     });
 
@@ -124,7 +124,7 @@ export async function runStitchJob({
     };
     await sendCallback({
       callbackUrl: payload.callbackUrl,
-      workerSecret: config.workerSecret,
+      workerSecret: config.callbackSecret,
       result: failedResult,
     });
     throw error;

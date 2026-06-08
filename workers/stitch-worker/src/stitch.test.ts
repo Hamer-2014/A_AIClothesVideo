@@ -18,6 +18,7 @@ describe("runStitchJob", () => {
       },
       config: {
         workerSecret: "secret",
+        callbackSecret: "callback-secret",
         bucket: "bucket",
         r2Endpoint: "https://account.r2.cloudflarestorage.com",
         r2AccessKeyId: "access",
@@ -76,6 +77,7 @@ describe("runStitchJob", () => {
         },
         config: {
           workerSecret: "secret",
+          callbackSecret: "callback-secret",
           bucket: "bucket",
           r2Endpoint: "https://account.r2.cloudflarestorage.com",
           r2AccessKeyId: "access",

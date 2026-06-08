@@ -5,8 +5,9 @@ import {
   isInternalWorkerAuthorized,
 } from "@/server/internal/auth";
 import {
+  createAndTriggerStitchJobForVideo,
   createDrizzleStitchStore,
-  createStitchJobForVideo,
+  markStitchJobRunning,
 } from "@/server/stitch/jobs";
 import {
   triggerCloudRunStitchJob,
@@ -26,10 +27,12 @@ interface CreateStitchJobDeps {
     coverKey?: string | null;
     frameKeyPrefix?: string | null;
     callbackUrl: string;
+    cloudRun?: CloudRunStitchTriggerResult;
   }>;
   triggerCloudRun?: (
     payload: CloudRunStitchPayload,
   ) => Promise<CloudRunStitchTriggerResult>;
+  markRunning?: (input: { stitchJobId: string }) => Promise<void>;
 }
 
 function parseBody(body: unknown) {
@@ -47,7 +50,7 @@ function parseBody(body: unknown) {
 }
 
 function defaultCreateStitchJob(input: { jobId: string }) {
-  return createStitchJobForVideo({
+  return createAndTriggerStitchJobForVideo({
     stitchStore: createDrizzleStitchStore(),
     ...input,
   });
@@ -55,6 +58,13 @@ function defaultCreateStitchJob(input: { jobId: string }) {
 
 function defaultTriggerCloudRun(payload: CloudRunStitchPayload) {
   return triggerCloudRunStitchJob({ payload });
+}
+
+async function defaultMarkRunning(input: { stitchJobId: string }) {
+  await markStitchJobRunning({
+    stitchStore: createDrizzleStitchStore(),
+    stitchJobId: input.stitchJobId,
+  });
 }
 
 export async function handleCreateStitchJobRequest(
@@ -82,22 +92,47 @@ export async function handleCreateStitchJobRequest(
 
   try {
     const result = await (deps.createStitchJob ?? defaultCreateStitchJob)(input);
-    let cloudRun: CloudRunStitchTriggerResult;
-    try {
-      cloudRun = await (deps.triggerCloudRun ?? defaultTriggerCloudRun)({
-        stitchJobId: result.stitchJobId,
-        videoJobId: result.jobId,
-        segmentKeys: result.segmentKeys,
-        finalVideoKey: result.finalVideoKey,
-        coverKey: result.coverKey,
-        frameKeyPrefix: result.frameKeyPrefix,
-        callbackUrl: result.callbackUrl,
-      });
-    } catch {
-      return NextResponse.json(
-        { error: "cloud_run_trigger_failed" },
-        { status: 502 },
-      );
+    let cloudRun: CloudRunStitchTriggerResult = result.cloudRun ?? {
+      accepted: false,
+    };
+    if (deps.triggerCloudRun) {
+      try {
+        cloudRun = await (deps.triggerCloudRun ?? defaultTriggerCloudRun)({
+          stitchJobId: result.stitchJobId,
+          videoJobId: result.jobId,
+          segmentKeys: result.segmentKeys,
+          finalVideoKey: result.finalVideoKey,
+          coverKey: result.coverKey,
+          frameKeyPrefix: result.frameKeyPrefix,
+          callbackUrl: result.callbackUrl,
+        });
+        await (deps.markRunning ?? defaultMarkRunning)({
+          stitchJobId: result.stitchJobId,
+        });
+      } catch {
+        return NextResponse.json(
+          { error: "cloud_run_trigger_failed" },
+          { status: 502 },
+        );
+      }
+    } else if (!result.cloudRun) {
+      try {
+        cloudRun = await defaultTriggerCloudRun({
+          stitchJobId: result.stitchJobId,
+          videoJobId: result.jobId,
+          segmentKeys: result.segmentKeys,
+          finalVideoKey: result.finalVideoKey,
+          coverKey: result.coverKey,
+          frameKeyPrefix: result.frameKeyPrefix,
+          callbackUrl: result.callbackUrl,
+        });
+        await defaultMarkRunning({ stitchJobId: result.stitchJobId });
+      } catch {
+        return NextResponse.json(
+          { error: "cloud_run_trigger_failed" },
+          { status: 502 },
+        );
+      }
     }
 
     return NextResponse.json({

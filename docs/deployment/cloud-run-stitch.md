@@ -54,7 +54,11 @@ worker 完成后回调主应用：
 POST /api/internal/stitch/callback
 ```
 
-回调同样使用 `x-worker-secret`。
+回调同样使用 `x-worker-secret`，但值必须是主应用的 `INTERNAL_WORKER_SECRET`。
+不要把它和触发 Cloud Run 的 `CLOUD_RUN_STITCH_SECRET` 混为一谈：
+
+- `CLOUD_RUN_STITCH_SECRET`：主应用 -> Cloud Run `/stitch`
+- `INTERNAL_WORKER_SECRET`：Cloud Run -> 主应用 `/api/internal/stitch/callback`
 
 ## 必需环境变量
 
@@ -71,6 +75,7 @@ Cloud Run worker：
 
 ```env
 CLOUD_RUN_STITCH_SECRET=
+INTERNAL_WORKER_SECRET=
 CLOUDFLARE_R2_ACCOUNT_ID=
 CLOUDFLARE_R2_ACCESS_KEY_ID=
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=
@@ -108,6 +113,7 @@ gcloud auth configure-docker $REGION-docker.pkg.dev
 
 ```bash
 echo -n "your-worker-secret" | gcloud secrets create cloud-run-stitch-secret --data-file=-
+echo -n "your-main-app-internal-worker-secret" | gcloud secrets create internal-worker-secret --data-file=-
 echo -n "your-r2-access-key-id" | gcloud secrets create r2-access-key-id --data-file=-
 echo -n "your-r2-secret-access-key" | gcloud secrets create r2-secret-access-key --data-file=-
 ```
@@ -165,7 +171,7 @@ gcloud run deploy stitch-worker \
   --concurrency 1 \
   --max-instances 3 \
   --set-env-vars "CLOUDFLARE_R2_ACCOUNT_ID=your-account-id,CLOUDFLARE_R2_BUCKET=your-bucket" \
-  --set-secrets "CLOUD_RUN_STITCH_SECRET=cloud-run-stitch-secret:latest,CLOUDFLARE_R2_ACCESS_KEY_ID=r2-access-key-id:latest,CLOUDFLARE_R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest"
+  --set-secrets "CLOUD_RUN_STITCH_SECRET=cloud-run-stitch-secret:latest,INTERNAL_WORKER_SECRET=internal-worker-secret:latest,CLOUDFLARE_R2_ACCESS_KEY_ID=r2-access-key-id:latest,CLOUDFLARE_R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest"
 ```
 
 获取 URL：
@@ -183,13 +189,33 @@ gcloud run services describe stitch-worker \
 - [ ] `GET {CLOUD_RUN_STITCH_URL}/health` 返回 `200`。
 - [ ] 主应用 `APP_URL` 是公网可访问域名。
 - [ ] 主应用 `CLOUD_RUN_STITCH_URL` 指向 Cloud Run service。
-- [ ] 主应用和 Cloud Run 的 `CLOUD_RUN_STITCH_SECRET` 一致。
+- [ ] 主应用的 `CLOUD_RUN_STITCH_SECRET` 和 Cloud Run 的 `CLOUD_RUN_STITCH_SECRET` 一致。
+- [ ] Cloud Run 的 `INTERNAL_WORKER_SECRET` 和主应用的 `INTERNAL_WORKER_SECRET` 一致。
 - [ ] R2 中存在测试 segment 视频。
 - [ ] `POST /api/internal/stitch/jobs` 能创建 stitch job 并触发 Cloud Run。
 - [ ] Cloud Run 日志能看到 ffmpeg 执行。
 - [ ] R2 出现 `jobs/{jobId}/stitched/final.mp4`。
 - [ ] R2 出现 `jobs/{jobId}/qa/frames/{index}.jpg`。
 - [ ] 主应用收到 `/api/internal/stitch/callback` 并更新状态。
+
+## Smoke Test
+
+准备一个已经进入 `segment_succeeded` 且所有 `video_segments.video_key` 都存在于 R2 的任务，然后运行：
+
+```bash
+APP_URL=https://app.example.com \
+CLOUD_RUN_STITCH_URL=https://stitch-worker-xxxxx-region.a.run.app \
+INTERNAL_WORKER_SECRET=your-main-app-internal-worker-secret \
+JOB_ID=your-video-job-id \
+npm run smoke:stitch
+```
+
+成功后继续检查：
+
+- Cloud Run 日志中出现 ffmpeg 执行记录。
+- R2 中出现 `jobs/{jobId}/stitched/final.mp4`。
+- R2 中出现 `jobs/{jobId}/qa/frames/0.jpg` 等抽帧。
+- 主应用任务状态从 `stitching_running` 进入 `post_qa_queued`。
 
 ## 当前限制
 

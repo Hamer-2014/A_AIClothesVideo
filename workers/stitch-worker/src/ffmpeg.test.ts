@@ -59,5 +59,7 @@ describe("ffmpeg helpers", () => {
       "/tmp/frames/frame-2.jpg",
     ]);
     expect(commands[0]?.args).toContain("fps=1/3");
+    expect(commands[0]?.args).toContain("-start_number");
+    expect(commands[0]?.args).toContain("0");
   });
 });

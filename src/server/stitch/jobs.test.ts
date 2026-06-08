@@ -6,6 +6,7 @@ import {
   createInMemoryStitchStore,
   createStitchJobForVideo,
   handleStitchCallback,
+  markStitchJobRunning,
 } from "./jobs";
 
 const originalAppUrl = process.env.APP_URL;
@@ -129,5 +130,28 @@ describe("stitch jobs", () => {
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("post_qa_queued");
+  });
+
+  it("marks a stitch job running after Cloud Run accepts the trigger", async () => {
+    const stores = createStores();
+    const created = await createStitchJobForVideo({
+      ...stores,
+      jobId,
+    });
+
+    const result = await markStitchJobRunning({
+      ...stores,
+      stitchJobId: created.stitchJobId,
+    });
+
+    expect(result).toEqual({
+      jobId,
+      stitchJobId: created.stitchJobId,
+      status: "running",
+    });
+    expect(stores.stitchStore.listStitchJobs()[0]).toMatchObject({
+      status: "running",
+    });
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("stitching_running");
   });
 });
