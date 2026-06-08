@@ -3,6 +3,9 @@ substitutions:
   _SERVICE: stitch-worker
   _REPO: runwaytools
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 steps:
   - id: build-stitch-worker
     name: gcr.io/cloud-builders/docker
