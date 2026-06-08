@@ -125,6 +125,30 @@ IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/stitch-worker:$(git rev-parse --
 gcloud builds submit workers/stitch-worker --tag "$IMAGE"
 ```
 
+## GitHub 自动部署配置
+
+项目已提供 Cloud Build 配置文件：
+
+```text
+cloudbuild.stitch-worker.yaml
+```
+
+在 Cloud Build Trigger 页面填写：
+
+```text
+Build configuration: Cloud Build configuration file
+Location: Repository
+Cloud Build configuration file location: cloudbuild.stitch-worker.yaml
+```
+
+该配置会：
+
+1. 使用 `workers/stitch-worker` 作为 Docker build context。
+2. 推送镜像到 Artifact Registry。
+3. 部署 Cloud Run service `stitch-worker`。
+
+注意：该文件只负责构建、推镜像和部署 revision。Cloud Run 的 Secret、R2 环境变量和 Secret Manager 权限仍按下方部署步骤或 Cloud Run 控制台配置。不要把密钥写进 `cloudbuild.stitch-worker.yaml`。
+
 ## 部署 Cloud Run
 
 MVP 可以先用 `--allow-unauthenticated` 加 `x-worker-secret`。上线前如需更严格，可以改为 Cloud Run IAM Invoker + OIDC。
