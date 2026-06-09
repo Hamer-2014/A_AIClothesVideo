@@ -33,6 +33,8 @@ interface VisionClientDeps {
 }
 
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
+const systemInstruction =
+  "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.";
 
 function modelEnvForMode(mode: VisionAnalysisMode) {
   switch (mode) {
@@ -88,37 +90,79 @@ function parseJsonContent(content: unknown): JsonValue {
   return JSON.parse(content) as JsonValue;
 }
 
+function isResponsesApi(baseUrl: string) {
+  return /\/responses$/i.test(baseUrl);
+}
+
+function responsesInput(imageUrls: string[]) {
+  return [
+    {
+      role: "system",
+      content: [{ type: "input_text", text: systemInstruction }],
+    },
+    {
+      role: "user",
+      content: imageUrls.map((url) => ({
+        type: "input_image",
+        image_url: url,
+      })),
+    },
+  ];
+}
+
+function chatMessages(imageUrls: string[]) {
+  return [
+    {
+      role: "system",
+      content: systemInstruction,
+    },
+    {
+      role: "user",
+      content: imageUrls.map((url) => ({
+        type: "image_url",
+        image_url: { url },
+      })),
+    },
+  ];
+}
+
+function parseResponsesOutput(raw: Record<string, unknown>) {
+  const wrapped = asRecord(raw.data);
+  const payload = Object.keys(wrapped).length > 0 ? wrapped : raw;
+  const firstChoice = asRecord((payload.choices as unknown[])?.[0]);
+  const message = asRecord(firstChoice.message);
+  return parseJsonContent(message.content);
+}
+
 export async function createVisionAssetAnalysis(
   input: VisionAssetAnalysisInput,
   deps: VisionClientDeps = {},
 ): Promise<VisionAssetAnalysisResult> {
   const config = getVisionConfig(input.mode);
   const fetchImpl = deps.fetch ?? fetch;
-  const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
+  const responsesApi = isResponsesApi(config.baseUrl);
+  const url = responsesApi
+    ? config.baseUrl
+    : `${config.baseUrl}/chat/completions`;
+  const body = responsesApi
+    ? {
+        model: config.model,
+        input: responsesInput(input.imageUrls),
+      }
+    : {
+        model: config.model,
+        stream: false,
+        response_format: { type: "json_object" },
+        messages: chatMessages(input.imageUrls),
+      };
+
+  const response = await fetchImpl(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: config.model,
-      stream: false,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.",
-        },
-        {
-          role: "user",
-          content: input.imageUrls.map((url) => ({
-            type: "image_url",
-            image_url: { url },
-          })),
-        },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
   const raw = asRecord(await response.json());
 
@@ -126,9 +170,9 @@ export async function createVisionAssetAnalysis(
     throw new Error(`Vision provider failed with status ${response.status}.`);
   }
 
-  const firstChoice = asRecord((raw.choices as unknown[])?.[0]);
-  const message = asRecord(firstChoice.message);
-  const analysisJson = parseJsonContent(message.content);
+  const analysisJson = responsesApi
+    ? parseResponsesOutput(raw)
+    : parseJsonContent(asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content);
 
   return {
     provider: config.provider,

@@ -129,25 +129,28 @@ describe("vision provider client", () => {
     });
   });
 
-  it("targets the chat completions endpoint for apimart compatible providers", async () => {
+  it("targets the responses endpoint when the configured base URL points to responses api", async () => {
     vi.stubEnv("VISION_PROVIDER", "apimart");
     vi.stubEnv("VISION_API_KEY", "vision_key");
-    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
     vi.stubEnv("VISION_MODEL_STANDARD", "gpt-5.4-mini");
     const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     const fetchMock: typeof fetch = async (input, init) => {
       calls.push([input, init]);
       return Response.json({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                passed: true,
-                failure_category: null,
-              }),
+        code: 200,
+        data: {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  passed: true,
+                  failure_category: null,
+                }),
+              },
             },
-          },
-        ],
+          ],
+        },
       });
     };
 
@@ -159,9 +162,21 @@ describe("vision provider client", () => {
       { fetch: fetchMock },
     );
 
-    expect(calls[0]?.[0]).toBe("https://api.apimart.ai/v1/chat/completions");
+    expect(calls[0]?.[0]).toBe("https://api.apimart.ai/v1/responses");
     const body = JSON.parse(calls[0]?.[1]?.body as string);
     expect(body.stream).toBe(false);
+    expect(body.input[0].role).toBe("system");
+    expect(body.input[0].content[0]).toEqual({
+      type: "input_text",
+      text:
+        "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.",
+    });
+    expect(body.input[1].content).toEqual([
+      {
+        type: "input_image",
+        image_url: "https://signed.example/frame-1.jpg",
+      },
+    ]);
     expect(result.analysisJson).toEqual({
       passed: true,
       failure_category: null,
