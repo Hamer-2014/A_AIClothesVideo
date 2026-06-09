@@ -1,4 +1,5 @@
 .superpowers/
+.worktree/
 
 # dependencies
 node_modules/
