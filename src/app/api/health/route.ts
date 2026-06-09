@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
+import { getRuntimeHealth } from "@/server/ops/health";
 
 export function GET() {
   return NextResponse.json({
-    ok: true,
-    service: "a-runwaytools",
-    environment: process.env.NODE_ENV ?? "development",
+    ...getRuntimeHealth(),
     timestamp: new Date().toISOString(),
   });
 }

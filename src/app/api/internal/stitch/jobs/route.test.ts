@@ -20,6 +20,7 @@ describe("POST /api/internal/stitch/jobs", () => {
   it("creates a stitch job when authorized", async () => {
     const triggered: unknown[] = [];
     const markedRunning: string[] = [];
+    const calls: string[] = [];
     const response = await handleCreateStitchJobRequest(
       new Request("http://localhost/api/internal/stitch/jobs", {
         method: "POST",
@@ -40,10 +41,12 @@ describe("POST /api/internal/stitch/jobs", () => {
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
         triggerCloudRun: async (payload) => {
+          calls.push("trigger");
           triggered.push(payload);
           return { accepted: true };
         },
         markRunning: async (input) => {
+          calls.push("mark-running");
           markedRunning.push(input.stitchJobId);
         },
       },
@@ -59,6 +62,7 @@ describe("POST /api/internal/stitch/jobs", () => {
     });
     expect(triggered).toHaveLength(1);
     expect(markedRunning).toEqual(["stitch-1"]);
+    expect(calls).toEqual(["mark-running", "trigger"]);
   });
 
   it("returns a bad gateway response when Cloud Run cannot be triggered", async () => {

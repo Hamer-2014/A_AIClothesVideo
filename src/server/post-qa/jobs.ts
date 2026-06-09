@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { stitchJobs, videoJobs } from "@/lib/db/schema";
@@ -121,11 +121,16 @@ export function createDrizzlePostQaJobStore(
           createdAt: stitchJobs.createdAt,
         })
         .from(stitchJobs)
-        .where(eq(stitchJobs.videoJobId, jobId))
+        .where(
+          and(
+            eq(stitchJobs.videoJobId, jobId),
+            eq(stitchJobs.status, "succeeded"),
+          ),
+        )
         .orderBy(desc(stitchJobs.createdAt))
         .limit(1);
 
-      if (!stitchJob || stitchJob.status !== "succeeded") {
+      if (!stitchJob) {
         return null;
       }
 

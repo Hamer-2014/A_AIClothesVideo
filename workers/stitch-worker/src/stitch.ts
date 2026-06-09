@@ -7,6 +7,7 @@ import { sendStitchCallback } from "./callback.js";
 import {
   buildConcatList,
   extractQaFrames as defaultExtractQaFrames,
+  listExtractedQaFrames as defaultListExtractedQaFrames,
   stitchSegments as defaultStitchSegments,
 } from "./ffmpeg.js";
 import type { StitchResult } from "./http.js";
@@ -22,6 +23,7 @@ interface RunStitchJobDeps {
   uploadObject?: (input: Required<Pick<ObjectTransferInput, "key" | "sourcePath" | "contentType">>) => Promise<void>;
   stitchSegments?: typeof defaultStitchSegments;
   extractQaFrames?: typeof defaultExtractQaFrames;
+  listExtractedQaFrames?: typeof defaultListExtractedQaFrames;
   sendCallback?: typeof sendStitchCallback;
   cleanupWorkDir?: (workDir: string) => Promise<void>;
 }
@@ -45,6 +47,7 @@ export async function runStitchJob({
   writeTextFile = writeFile,
   stitchSegments = defaultStitchSegments,
   extractQaFrames = defaultExtractQaFrames,
+  listExtractedQaFrames = defaultListExtractedQaFrames,
   sendCallback = sendStitchCallback,
   cleanupWorkDir = (workDir) => rm(workDir, { recursive: true, force: true }),
   downloadObject,
@@ -77,8 +80,12 @@ export async function runStitchJob({
     await writeTextFile(concatListPath, buildConcatList(segmentPaths));
     await stitchSegments({ concatListPath, outputPath });
 
-    const localFramePaths = await extractQaFrames({
+    await extractQaFrames({
       videoPath: outputPath,
+      frameDirectory,
+      frameCount: 3,
+    });
+    const localFramePaths = await listExtractedQaFrames({
       frameDirectory,
       frameCount: 3,
     });

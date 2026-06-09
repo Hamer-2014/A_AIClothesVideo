@@ -132,6 +132,10 @@ export async function createStitchJobForVideo({
     throw new Error("Video job not found.");
   }
 
+  if (job.status !== "segment_succeeded" && job.status !== "stitching_queued") {
+    throw new Error("Video job is not ready for stitch creation.");
+  }
+
   const segments = await stitchStore.listSegments(jobId);
   const sortedSegments = segments.sort((a, b) => a.segmentIndex - b.segmentIndex);
   const segmentKeys = sortedSegments.map((segment) => segment.videoKey);
@@ -149,16 +153,18 @@ export async function createStitchJobForVideo({
     segmentKeys: segmentKeys as string[],
     isTest: job.isTest,
   });
-  await transitionJobStatus({
-    store: jobStore,
-    jobId,
-    toStatus: "stitching_queued",
-    reason: "stitch_job_created",
-    eventSnapshot: {
-      stitchJobId: stitchJob.id,
-      segmentKeys,
-    },
-  });
+  if (job.status === "segment_succeeded") {
+    await transitionJobStatus({
+      store: jobStore,
+      jobId,
+      toStatus: "stitching_queued",
+      reason: "stitch_job_created",
+      eventSnapshot: {
+        stitchJobId: stitchJob.id,
+        segmentKeys,
+      },
+    });
+  }
   return buildDispatchResult({
     jobId,
     stitchJob,
@@ -199,6 +205,11 @@ export async function triggerQueuedStitchJobForVideo({
   ) => Promise<CloudRunStitchTriggerResult>;
 }) {
   const result = await getQueuedStitchJobPayloadForVideo({ stitchStore, jobId });
+  await markStitchJobRunning({
+    jobStore,
+    stitchStore,
+    stitchJobId: result.stitchJobId,
+  });
   const cloudRun = await triggerCloudRun({
     stitchJobId: result.stitchJobId,
     videoJobId: result.jobId,
@@ -207,11 +218,6 @@ export async function triggerQueuedStitchJobForVideo({
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
     callbackUrl: result.callbackUrl,
-  });
-  await markStitchJobRunning({
-    jobStore,
-    stitchStore,
-    stitchJobId: result.stitchJobId,
   });
 
   return {
@@ -237,6 +243,11 @@ export async function createAndTriggerStitchJobForVideo({
   const result = existing
     ? await getQueuedStitchJobPayloadForVideo({ stitchStore, jobId })
     : await createStitchJobForVideo({ jobStore, stitchStore, jobId });
+  await markStitchJobRunning({
+    jobStore,
+    stitchStore,
+    stitchJobId: result.stitchJobId,
+  });
   const cloudRun = await triggerCloudRun({
     stitchJobId: result.stitchJobId,
     videoJobId: result.jobId,
@@ -245,11 +256,6 @@ export async function createAndTriggerStitchJobForVideo({
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
     callbackUrl: result.callbackUrl,
-  });
-  await markStitchJobRunning({
-    jobStore,
-    stitchStore,
-    stitchJobId: result.stitchJobId,
   });
 
   return {

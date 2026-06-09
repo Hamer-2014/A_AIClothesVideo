@@ -49,7 +49,7 @@ export function getVisionConfig(mode: VisionAnalysisMode): VisionConfig {
   const provider = process.env.VISION_PROVIDER;
   const apiKey = process.env.VISION_API_KEY;
   const model = process.env[modelEnvForMode(mode)];
-  const baseUrl = process.env.VISION_BASE_URL?.trim();
+  const baseUrl = process.env.VISION_BASE_URL?.trim().replace(/\/+$/, "");
 
   if (
     !provider ||
@@ -102,6 +102,7 @@ export async function createVisionAssetAnalysis(
     },
     body: JSON.stringify({
       model: config.model,
+      stream: false,
       response_format: { type: "json_object" },
       messages: [
         {

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readdir } from "node:fs/promises";
 
 export type RunCommand = (command: string, args: string[]) => Promise<void>;
 
@@ -80,4 +81,29 @@ export async function extractQaFrames({
     { length: normalizedFrameCount },
     (_, index) => `${frameDirectory}/frame-${index}.jpg`,
   );
+}
+
+export async function listExtractedQaFrames({
+  frameDirectory,
+  frameCount,
+  readDirectory = readdir,
+}: {
+  frameDirectory: string;
+  frameCount: number;
+  readDirectory?: (path: string) => Promise<string[]>;
+}) {
+  const frameNames = (await readDirectory(frameDirectory))
+    .filter((name) => /^frame-\d+\.jpg$/.test(name))
+    .sort((a, b) => {
+      const left = Number(a.match(/\d+/)?.[0] ?? 0);
+      const right = Number(b.match(/\d+/)?.[0] ?? 0);
+      return left - right;
+    })
+    .slice(0, frameCount);
+
+  if (frameNames.length === 0) {
+    throw new Error("No QA frames were extracted.");
+  }
+
+  return frameNames.map((name) => `${frameDirectory}/${name}`);
 }

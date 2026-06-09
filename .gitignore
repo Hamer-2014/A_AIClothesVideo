@@ -25,3 +25,4 @@ pnpm-debug.log*
 # os/editor
 .DS_Store
 Thumbs.db
+.vercel

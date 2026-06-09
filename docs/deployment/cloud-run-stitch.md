@@ -217,6 +217,28 @@ npm run smoke:stitch
 - R2 中出现 `jobs/{jobId}/qa/frames/0.jpg` 等抽帧。
 - 主应用任务状态从 `stitching_running` 进入 `post_qa_queued`。
 
+如需继续把后端链路追到 Post-QA 终态，再运行：
+
+```bash
+APP_URL=https://app.example.com \
+DATABASE_URL=postgres://... \
+CLOUD_RUN_STITCH_URL=https://stitch-worker-xxxxx-region.a.run.app \
+INTERNAL_WORKER_SECRET=your-main-app-internal-worker-secret \
+CRON_JOB_SECRET=your-cron-secret \
+CLOUDFLARE_R2_ACCOUNT_ID=... \
+CLOUDFLARE_R2_ACCESS_KEY_ID=... \
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=... \
+CLOUDFLARE_R2_BUCKET=... \
+JOB_ID=your-video-job-id \
+npm run smoke:backend
+```
+
+`smoke:backend` 会额外检查：
+
+- 数据库中的 `video_jobs` / `stitch_jobs` / `post_qa_results` 最终状态
+- `credit_ledger` 是否出现 `capture`
+- R2 最终视频与 QA frames 是否都存在
+
 ## 当前限制
 
 - worker 不主动轮询数据库，只执行主应用触发的单个 job。

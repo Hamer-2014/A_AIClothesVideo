@@ -34,6 +34,20 @@ describe("vision provider client", () => {
     });
   });
 
+  it("normalizes non-openai base URLs by removing trailing path slashes", () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/");
+    vi.stubEnv("VISION_MODEL_STANDARD", "gpt-5.4-mini");
+
+    expect(getVisionConfig("standard")).toEqual({
+      provider: "apimart",
+      apiKey: "vision_key",
+      baseUrl: "https://api.apimart.ai/v1",
+      model: "gpt-5.4-mini",
+    });
+  });
+
   it("uses the OpenAI base URL when VISION_BASE_URL is empty", () => {
     vi.stubEnv("VISION_PROVIDER", "openai");
     vi.stubEnv("VISION_API_KEY", "vision_key");
@@ -98,6 +112,7 @@ describe("vision provider client", () => {
     expect(calls[0]?.[0]).toBe("https://api.openai.example/v1/chat/completions");
     const body = JSON.parse(calls[0]?.[1]?.body as string);
     expect(body.model).toBe("gpt-5.4-nano");
+    expect(body.stream).toBe(false);
     expect(body.messages[1].content).toEqual([
       {
         type: "image_url",
@@ -111,6 +126,45 @@ describe("vision provider client", () => {
         asset_role: "front",
         garment_category: "dress",
       },
+    });
+  });
+
+  it("targets the chat completions endpoint for apimart compatible providers", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/");
+    vi.stubEnv("VISION_MODEL_STANDARD", "gpt-5.4-mini");
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                passed: true,
+                failure_category: null,
+              }),
+            },
+          },
+        ],
+      });
+    };
+
+    const result = await createVisionAssetAnalysis(
+      {
+        mode: "standard",
+        imageUrls: ["https://signed.example/frame-1.jpg"],
+      },
+      { fetch: fetchMock },
+    );
+
+    expect(calls[0]?.[0]).toBe("https://api.apimart.ai/v1/chat/completions");
+    const body = JSON.parse(calls[0]?.[1]?.body as string);
+    expect(body.stream).toBe(false);
+    expect(result.analysisJson).toEqual({
+      passed: true,
+      failure_category: null,
     });
   });
 

@@ -37,7 +37,8 @@ describe("runStitchJob", () => {
       stitchSegments: async ({ concatListPath, outputPath }) => {
         events.push(`stitch:${concatListPath}:${outputPath}`);
       },
-      extractQaFrames: async () => ["/tmp/stitch-1/frames/frame-0.jpg"],
+      extractQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
+      listExtractedQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
       sendCallback: async ({ result: callbackResult }) => {
         events.push(`callback:${callbackResult.status}`);
       },
@@ -91,6 +92,7 @@ describe("runStitchJob", () => {
           throw new Error("ffmpeg failed");
         },
         extractQaFrames: async () => [],
+        listExtractedQaFrames: async () => [],
         sendCallback: async ({ result }) => {
           callbacks.push(`${result.status}:${result.errorMessage}`);
         },

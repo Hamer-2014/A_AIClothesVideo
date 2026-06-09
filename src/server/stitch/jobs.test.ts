@@ -154,4 +154,5 @@ describe("stitch jobs", () => {
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("stitching_running");
   });
+
 });

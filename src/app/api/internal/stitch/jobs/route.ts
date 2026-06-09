@@ -97,6 +97,9 @@ export async function handleCreateStitchJobRequest(
     };
     if (deps.triggerCloudRun) {
       try {
+        await (deps.markRunning ?? defaultMarkRunning)({
+          stitchJobId: result.stitchJobId,
+        });
         cloudRun = await (deps.triggerCloudRun ?? defaultTriggerCloudRun)({
           stitchJobId: result.stitchJobId,
           videoJobId: result.jobId,
@@ -106,9 +109,6 @@ export async function handleCreateStitchJobRequest(
           frameKeyPrefix: result.frameKeyPrefix,
           callbackUrl: result.callbackUrl,
         });
-        await (deps.markRunning ?? defaultMarkRunning)({
-          stitchJobId: result.stitchJobId,
-        });
       } catch {
         return NextResponse.json(
           { error: "cloud_run_trigger_failed" },
@@ -117,6 +117,7 @@ export async function handleCreateStitchJobRequest(
       }
     } else if (!result.cloudRun) {
       try {
+        await defaultMarkRunning({ stitchJobId: result.stitchJobId });
         cloudRun = await defaultTriggerCloudRun({
           stitchJobId: result.stitchJobId,
           videoJobId: result.jobId,
@@ -126,7 +127,6 @@ export async function handleCreateStitchJobRequest(
           frameKeyPrefix: result.frameKeyPrefix,
           callbackUrl: result.callbackUrl,
         });
-        await defaultMarkRunning({ stitchJobId: result.stitchJobId });
       } catch {
         return NextResponse.json(
           { error: "cloud_run_trigger_failed" },

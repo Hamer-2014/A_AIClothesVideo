@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildConcatList, extractQaFrames, stitchSegments } from "./ffmpeg.js";
+import {
+  buildConcatList,
+  extractQaFrames,
+  listExtractedQaFrames,
+  stitchSegments,
+} from "./ffmpeg.js";
 
 describe("ffmpeg helpers", () => {
   it("builds an ffmpeg concat list with escaped file paths", () => {
@@ -61,5 +66,19 @@ describe("ffmpeg helpers", () => {
     expect(commands[0]?.args).toContain("fps=1/3");
     expect(commands[0]?.args).toContain("-start_number");
     expect(commands[0]?.args).toContain("0");
+  });
+
+  it("lists actual extracted frames instead of assuming numbering starts at zero", async () => {
+    const frames = await listExtractedQaFrames({
+      frameDirectory: "/tmp/frames",
+      frameCount: 3,
+      readDirectory: async () => ["frame-1.jpg", "frame-2.jpg", "frame-3.jpg"],
+    });
+
+    expect(frames).toEqual([
+      "/tmp/frames/frame-1.jpg",
+      "/tmp/frames/frame-2.jpg",
+      "/tmp/frames/frame-3.jpg",
+    ]);
   });
 });
