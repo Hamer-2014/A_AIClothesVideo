@@ -50,7 +50,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function normalizeBaseUrl(value: string) {
-  return value.replace(/\/+$/, "");
+  return value
+    .replace(/\/+$/, "")
+    .replace(/\/v1\/videos\/generations$/i, "")
+    .replace(/\/v1\/tasks$/i, "");
 }
 
 function taskIdFrom(raw: Record<string, unknown>) {
@@ -93,6 +96,10 @@ function normalizeTaskStatus(status: unknown): EvoLinkTaskResult["status"] {
 function outputUrlFrom(raw: Record<string, unknown>) {
   const output = asRecord(raw.output);
   const dataOutput = asRecord(asRecord(raw.data).output);
+  const results = Array.isArray(raw.results) ? raw.results : [];
+  const dataResults = Array.isArray(asRecord(raw.data).results)
+    ? (asRecord(raw.data).results as unknown[])
+    : [];
   const videos = [
     ...(Array.isArray(output.videos) ? output.videos : []),
     ...(Array.isArray(dataOutput.videos) ? dataOutput.videos : []),
@@ -105,6 +112,8 @@ function outputUrlFrom(raw: Record<string, unknown>) {
     output.video_url,
     dataOutput.url,
     dataOutput.video_url,
+    ...results,
+    ...dataResults,
     ...videos.map((video) => asRecord(video).url),
   ];
 
@@ -130,7 +139,7 @@ export function getEvoLinkVideoConfig(
     baseUrl: normalizeBaseUrl(
       env.EVOLINK_BASE_URL?.trim() || "https://api.evolink.ai",
     ),
-    model: env.EVOLINK_VIDEO_MODEL?.trim() || "veo3.1-pro-beta",
+    model: env.EVOLINK_VIDEO_MODEL?.trim() || "veo3.1-fast-beta",
   };
 }
 

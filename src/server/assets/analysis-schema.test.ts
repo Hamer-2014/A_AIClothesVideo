@@ -110,6 +110,9 @@ describe("asset analysis schema", () => {
       "primary_clothing_item",
       "main_product",
       "clothing_product_photo",
+      "clothing_item",
+      "garment_on_mannequin",
+      "product_photo",
     ];
 
     for (const assetRole of variants) {

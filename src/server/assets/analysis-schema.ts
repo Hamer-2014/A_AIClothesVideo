@@ -36,13 +36,19 @@ const assetRoles: AssetRole[] = [
 const humanPresenceValues: HumanPresent[] = ["yes", "no", "unknown"];
 const assetRoleAliases: Record<string, AssetRole> = {
   garment: "front",
+  "garment on mannequin": "front",
+  garment_on_mannequin: "front",
   product: "front",
+  product_photo: "front",
+  "product photo": "front",
   model: "front",
   primary: "front",
   "primary garment": "front",
   primary_product: "front",
   primary_clothing_item: "front",
   main_product: "front",
+  clothing_item: "front",
+  "clothing item": "front",
   clothing_product_photo: "front",
   product_clothing_item: "front",
   product_clothing_item_on_mannequin: "front",
@@ -75,6 +81,8 @@ function normalizeAssetRole(value: string): AssetRole | string {
     normalized.startsWith("primary") ||
     normalized.startsWith("main_product") ||
     normalized.startsWith("clothing_product") ||
+    normalized.startsWith("clothing_item") ||
+    normalized.startsWith("garment_on_mannequin") ||
     normalized.startsWith("garment") ||
     normalized.startsWith("model")
   ) {

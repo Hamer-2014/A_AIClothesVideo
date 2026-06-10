@@ -69,6 +69,39 @@ describe("EvoLink video provider", () => {
     });
   });
 
+  it("accepts a base url that was mistakenly configured as the full generations endpoint", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          id: "task-1",
+          status: "pending",
+        }),
+        { status: 200 },
+      );
+    });
+
+    await createEvoLinkVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        env: {
+          EVOLINK_API_KEY: "sk-test",
+          EVOLINK_BASE_URL: "https://api.evolink.example/v1/videos/generations",
+          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.evolink.example/v1/videos/generations",
+      expect.any(Object),
+    );
+  });
+
   it("parses completed task output urls", async () => {
     const fetchImpl = vi.fn(async () => {
       return new Response(
@@ -101,6 +134,37 @@ describe("EvoLink video provider", () => {
     expect(result).toEqual({
       provider: "evolink",
       model: "veo3.1-pro-beta",
+      providerTaskId: "task-1",
+      status: "succeeded",
+      outputUrl: "https://provider.example/video.mp4",
+      raw: expect.any(Object),
+    });
+  });
+
+  it("parses completed task output urls from the official results array", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          id: "task-1",
+          status: "completed",
+          results: ["https://provider.example/video.mp4"],
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await pollEvoLinkTask("task-1", {
+      fetch: fetchImpl,
+      env: {
+        EVOLINK_API_KEY: "sk-test",
+        EVOLINK_BASE_URL: "https://api.evolink.example",
+        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+      },
+    });
+
+    expect(result).toEqual({
+      provider: "evolink",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",
