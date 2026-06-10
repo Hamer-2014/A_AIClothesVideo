@@ -253,10 +253,15 @@ export function JobContinuePanel({
             ? "审核服务暂时不可用，请稍后再试。"
             : body.error === "prompt_moderation_blocked"
               ? "最终视频提示词未通过审核。"
-              : body.error === "insufficient_credits"
-                ? "点数不足，请先充值。"
-                : "确认分镜失败。",
+            : body.error === "insufficient_credits"
+              ? "点数不足，请先充值。"
+              : body.error === "storyboard_not_confirmable"
+                ? "这个分镜已经不能重复确认，页面将刷新当前任务进度。"
+              : "确认分镜失败。",
         );
+        if (body.error === "storyboard_not_confirmable") {
+          router.refresh();
+        }
         return;
       }
 

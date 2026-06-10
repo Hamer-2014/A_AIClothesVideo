@@ -150,6 +150,10 @@ function assetSnapshotForSegment({
 }
 
 function assertDraftStoryboard(storyboard: StoryboardRecord) {
+  if (storyboard.status === "confirmed") {
+    throw new Error("Storyboard is already confirmed.");
+  }
+
   if (storyboard.status !== "draft") {
     throw new Error("Storyboard is not confirmable.");
   }

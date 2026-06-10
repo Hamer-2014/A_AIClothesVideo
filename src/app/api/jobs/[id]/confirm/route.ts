@@ -18,6 +18,7 @@ interface ConfirmStoryboardResult {
   status: "segments_queued";
   reservedLedgerId: string | null;
   segmentCount: number;
+  alreadyConfirmed?: boolean;
 }
 
 interface ConfirmStoryboardDeps {
@@ -132,6 +133,20 @@ export async function handleConfirmStoryboardRequest(
         { error: "storyboard_not_confirmable" },
         { status: 409 },
       );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Storyboard is already confirmed."
+    ) {
+      return NextResponse.json({
+        jobId: context.params.id,
+        storyboardId: input.storyboardId,
+        status: "segments_queued",
+        reservedLedgerId: null,
+        segmentCount: 0,
+        alreadyConfirmed: true,
+      } satisfies ConfirmStoryboardResult);
     }
 
     return NextResponse.json(

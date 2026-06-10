@@ -47,6 +47,32 @@ describe("POST /api/jobs/[id]/confirm", () => {
     });
   });
 
+  it("returns the current generation state when a storyboard was already confirmed", async () => {
+    const response = await handleConfirmStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ storyboardId: "storyboard-1" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        confirmStoryboard: async () => {
+          throw new Error("Storyboard is already confirmed.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      jobId: "job-1",
+      storyboardId: "storyboard-1",
+      status: "segments_queued",
+      reservedLedgerId: null,
+      segmentCount: 0,
+      alreadyConfirmed: true,
+    });
+  });
+
   it("returns 400 for missing storyboard id", async () => {
     const response = await handleConfirmStoryboardRequest(
       new Request("http://localhost/api/jobs/job-1/confirm", {
