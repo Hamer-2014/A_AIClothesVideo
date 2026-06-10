@@ -13,6 +13,7 @@ import {
   createDrizzleModerationResultStore,
   type ModerationResultStore,
 } from "./results";
+import { canUseDevBypass, getPromptModerationMode } from "./mode";
 
 interface CheckPromptInput {
   userId: string;
@@ -38,6 +39,41 @@ export interface CheckPromptResult {
   errorCode: string | null;
 }
 
+async function storeBypassResult({
+  resultStore,
+  input,
+  promptHash,
+  promptSummary,
+  errorCode,
+}: {
+  resultStore: ModerationResultStore;
+  input: CheckPromptInput;
+  promptHash: string;
+  promptSummary: string;
+  errorCode: string;
+}) {
+  await resultStore.createResult({
+    userId: input.userId,
+    videoJobId: input.videoJobId ?? null,
+    segmentId: input.segmentId ?? null,
+    source: input.source,
+    promptHash,
+    promptSummary,
+    externalId: input.externalId ?? null,
+    moderationId: null,
+    decision: "allow",
+    errorCode,
+    latencyMs: 0,
+  });
+
+  return {
+    allowed: true,
+    decision: "allow" as const,
+    moderationId: null,
+    errorCode,
+  };
+}
+
 function errorCodeFor(error: unknown) {
   if (error instanceof CreemModerationUnavailableError) {
     return "creem_moderation_unavailable";
@@ -55,6 +91,52 @@ export async function checkPrompt(
   const moderatePrompt = deps.moderatePrompt ?? createCreemPromptModeration;
   const promptHash = createPromptHash(input.prompt);
   const promptSummary = createPromptSummary(input.prompt, 80);
+  const mode = getPromptModerationMode();
+
+  if (mode === "off") {
+    return storeBypassResult({
+      resultStore,
+      input,
+      promptHash,
+      promptSummary,
+      errorCode: "prompt_moderation_off",
+    });
+  }
+
+  if (mode === "dev_bypass") {
+    if (!canUseDevBypass()) {
+      await resultStore.createResult({
+        userId: input.userId,
+        videoJobId: input.videoJobId ?? null,
+        segmentId: input.segmentId ?? null,
+        source: input.source,
+        promptHash,
+        promptSummary,
+        externalId: input.externalId ?? null,
+        moderationId: null,
+        decision: "error",
+        errorCode: "prompt_moderation_dev_bypass_forbidden",
+        errorMessage:
+          "PROMPT_MODERATION_MODE=dev_bypass is only allowed in development or test.",
+        latencyMs: 0,
+      });
+
+      return {
+        allowed: false,
+        decision: "error",
+        moderationId: null,
+        errorCode: "prompt_moderation_dev_bypass_forbidden",
+      };
+    }
+
+    return storeBypassResult({
+      resultStore,
+      input,
+      promptHash,
+      promptSummary,
+      errorCode: "prompt_moderation_dev_bypass",
+    });
+  }
 
   try {
     const result = await moderatePrompt({

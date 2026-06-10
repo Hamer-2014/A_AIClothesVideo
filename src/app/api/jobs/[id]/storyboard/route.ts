@@ -139,6 +139,16 @@ export async function handleGenerateStoryboardRequest(
       );
     }
 
+    if (
+      error instanceof Error &&
+      error.message === "Prompt moderation unavailable for storyboard generation."
+    ) {
+      return NextResponse.json(
+        { error: "prompt_moderation_unavailable" },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "storyboard_generation_failed" },
       { status: 500 },

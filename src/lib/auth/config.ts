@@ -77,4 +77,12 @@ export function createAuth() {
   });
 }
 
-export const auth = createAuth();
+let cachedAuth: ReturnType<typeof createAuth> | null = null;
+
+export function getAuth() {
+  if (!cachedAuth) {
+    cachedAuth = createAuth();
+  }
+
+  return cachedAuth;
+}

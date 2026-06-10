@@ -69,6 +69,25 @@ MVP 开发阶段直接接入真实 Creem 和真实模型服务，不做 mock 成
 - 每个 provider/key 需要配置每日成本上限、并发上限和失败暂停策略。
 - 真实接入不等于无保护直连；所有外部调用仍必须经过 provider router。
 
+## 2.2 本地 Worktree 与依赖约束
+
+当前仓库默认采用“代码在 worktree、依赖共用上层仓库”的本地开发模式。
+
+约束：
+
+- `git worktree` 目录内默认不单独安装一套 `node_modules`。
+- Next.js / Turbopack 根目录必须显式指向上层主仓库根，否则会出现 `next/package.json` 无法解析、workspace root 推断错误或多 lockfile 警告。
+- `next.config.ts` 需要显式设置 `turbopack.root` 指向主仓库根目录。
+- TypeScript 正式检查必须排除 `.next/dev/**` 这类开发态临时产物，避免 dev route types 污染 `npm run typecheck` / `npm run build`。
+- 如果后续改成“每个 worktree 独立依赖”，必须同步更新 `next.config.ts`、`tsconfig.json` 和开发文档，不允许两种模式混用。
+
+当前建议：
+
+- 主仓库根：`D:\\SelfProjects\\a_runwaytools`
+- 当前 worktree：`D:\\SelfProjects\\a_runwaytools\\.worktree\\mvp-closure-next-steps`
+- `turbopack.root` 指向主仓库根
+- build / typecheck 只消费 `.next/types`，不消费 `.next/dev/types`
+
 ## 3. 系统组件职责
 
 ### 3.1 Next.js on Vercel

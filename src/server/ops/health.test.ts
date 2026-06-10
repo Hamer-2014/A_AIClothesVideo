@@ -82,4 +82,34 @@ describe("getRuntimeHealth", () => {
       Object.values(result.checks).every((check) => check.configured),
     ).toBe(true);
   });
+
+  it("does not require CREEM_MODERATION_API_KEY when moderation mode is off", () => {
+    const result = getRuntimeHealth({
+      NODE_ENV: "development",
+      PROMPT_MODERATION_MODE: "off",
+      DATABASE_URL: "postgres://masked",
+      BETTER_AUTH_SECRET: "secret",
+      BETTER_AUTH_URL: "https://tools.runwaymotion.com",
+      CLOUDFLARE_R2_ACCOUNT_ID: "account",
+      CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
+      CLOUDFLARE_R2_BUCKET: "bucket",
+      INTERNAL_WORKER_SECRET: "internal-secret",
+      CRON_JOB_SECRET: "cron-secret",
+      CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
+      CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
+      CREEM_API_KEY: "creem-api-key",
+      CREEM_WEBHOOK_SECRET: "creem-webhook-secret",
+      CREEM_MODERATION_API_KEY: "",
+      DEEPSEEK_API_KEY: "deepseek-key",
+      VISION_PROVIDER: "openai",
+      VISION_API_KEY: "vision-key",
+      VISION_MODEL_STANDARD: "gpt-4.1-mini",
+      EVOLINK_API_KEY: "evolink-key",
+    });
+
+    expect(result.ready).toBe(true);
+    expect(result.checks.billing.configured).toBe(true);
+    expect(result.summary.missing).not.toContain("CREEM_MODERATION_API_KEY");
+  });
 });

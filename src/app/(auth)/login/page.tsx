@@ -12,7 +12,7 @@ export default function LoginPage() {
   async function signInWithGoogle() {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/",
+      callbackURL: "/workspace",
     });
   }
 
@@ -27,7 +27,7 @@ export default function LoginPage() {
   async function sendMagicLink() {
     await authClient.signIn.magicLink({
       email,
-      callbackURL: "/",
+      callbackURL: "/workspace",
     });
     setMessage("登录链接已发送，请检查邮箱。");
   }

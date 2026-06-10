@@ -89,6 +89,8 @@ async function failAnalysisJob({
     toStatus: "asset_analysis_failed",
     reason: "asset_analysis_failed",
     errorMessage: message,
+    userVisibleStatus: "failed",
+    failureReason: message,
     clearLock: true,
   });
 }
@@ -114,6 +116,9 @@ async function ensureAnalysisRunning({
     jobId,
     toStatus: "asset_analysis_running",
     reason: "asset_analysis_started",
+    errorMessage: null,
+    userVisibleStatus: "analyzing_assets",
+    failureReason: null,
   });
 }
 
@@ -192,6 +197,9 @@ export async function analyzeVideoJobAssets({
         jobId,
         toStatus: "asset_analysis_passed",
         reason: "asset_analysis_completed",
+        errorMessage: null,
+        userVisibleStatus: "assets_ready",
+        failureReason: null,
         eventSnapshot: {
           assetCount: jobAssets.length,
           availableTemplateIds:
@@ -208,6 +216,11 @@ export async function analyzeVideoJobAssets({
     };
   } catch (error) {
     if (manageJobStatus) {
+      const currentJob = await jobStore.findJob(jobId);
+      if (currentJob?.status === "asset_analysis_passed") {
+        throw error;
+      }
+
       await failAnalysisJob({
         jobStore,
         jobId,

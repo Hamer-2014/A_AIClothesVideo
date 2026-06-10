@@ -27,6 +27,8 @@ describe("GET /api/jobs/[id]", () => {
             userId: "user-1",
             status: "asset_analysis_passed",
             userVisibleStatus: "assets_ready",
+            lastError: null,
+            failureReason: null,
             durationSeconds: 8,
             aspectRatio: "9:16",
             creditCost: 0,
@@ -50,11 +52,11 @@ describe("GET /api/jobs/[id]", () => {
             unavailable: [],
             availableTemplateIds: ["front_push_in"],
           },
-          latestStoryboard: {
-            id: "storyboard-1",
-            videoJobId: "job-1",
-            status: "draft",
-            selectedTemplateIds: ["front_push_in"],
+      latestStoryboard: {
+        id: "storyboard-1",
+        videoJobId: "job-1",
+        status: "draft",
+        selectedTemplateIds: ["front_push_in"],
             storyboardJson: {
               duration_seconds: 8,
               segments: [],
@@ -79,6 +81,7 @@ describe("GET /api/jobs/[id]", () => {
       latestStoryboard: {
         id: "storyboard-1",
         status: "draft",
+        selectedTemplateIds: ["front_push_in"],
       },
     });
   });

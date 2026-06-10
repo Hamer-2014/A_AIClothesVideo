@@ -111,4 +111,85 @@ describe("resolvePostQaResult", () => {
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("failed_released");
   });
+
+  it("does not capture or release credits for zero-cost jobs", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+
+    const passed = await resolvePostQaResult({
+      creditStore,
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "post_qa_running",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      postQaStore: createInMemoryPostQaStore({
+        jobs: [
+          {
+            id: jobId,
+            userId,
+            status: "post_qa_running",
+            creditCost: 0,
+            reservedLedgerId: null,
+          },
+        ],
+      }),
+      jobId,
+      status: "passed",
+      mode: "lite",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      resultJson: { passed: true },
+    });
+
+    expect(passed).toEqual({
+      jobId,
+      status: "deliverable",
+      ledgerType: null,
+    });
+    expect(creditStore.listLedger()).toHaveLength(0);
+
+    const failed = await resolvePostQaResult({
+      creditStore,
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "post_qa_running",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      postQaStore: createInMemoryPostQaStore({
+        jobs: [
+          {
+            id: jobId,
+            userId,
+            status: "post_qa_running",
+            creditCost: 0,
+            reservedLedgerId: null,
+          },
+        ],
+      }),
+      jobId,
+      status: "failed",
+      mode: "lite",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      resultJson: { passed: false },
+      failureCategory: "garment_mismatch",
+    });
+
+    expect(failed).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: null,
+    });
+    expect(creditStore.listLedger()).toHaveLength(0);
+  });
 });

@@ -17,6 +17,8 @@ export interface VideoJobSummary {
   userId: string;
   status: string;
   userVisibleStatus: string;
+  lastError: string | null;
+  failureReason: string | null;
   durationSeconds: number;
   aspectRatio: string;
   creditCost: number;
@@ -94,6 +96,8 @@ export function createDrizzleVideoJobReadStore(
           userId: videoJobs.userId,
           status: videoJobs.status,
           userVisibleStatus: videoJobs.userVisibleStatus,
+          lastError: videoJobs.lastError,
+          failureReason: videoJobs.failureReason,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
           creditCost: videoJobs.creditCost,

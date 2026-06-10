@@ -85,6 +85,7 @@ describe("POST /api/internal/stitch/jobs", () => {
           frameKeyPrefix: "jobs/job-1/qa/frames",
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
+        markRunning: async () => {},
         triggerCloudRun: async () => {
           throw new Error("Cloud Run is down.");
         },

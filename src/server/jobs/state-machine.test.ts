@@ -100,4 +100,78 @@ describe("job state machine", () => {
       reason: "vision_provider_error",
     });
   });
+
+  it("allows retrying asset analysis directly from a failed state", async () => {
+    const store = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "asset_analysis_failed",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 1,
+        lastError: "previous failure",
+      },
+    ]);
+
+    const job = await transitionJobStatus({
+      store,
+      jobId,
+      toStatus: "asset_analysis_running",
+      reason: "asset_analysis_restarted",
+    });
+
+    expect(job.status).toBe("asset_analysis_running");
+    expect(store.listEvents()[0]).toMatchObject({
+      fromStatus: "asset_analysis_failed",
+      toStatus: "asset_analysis_running",
+      reason: "asset_analysis_restarted",
+    });
+  });
+
+  it("restores the previous job state when event persistence fails", async () => {
+    const lockedUntil = new Date("2026-06-10T10:00:00.000Z");
+    const baseStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "asset_analysis_running",
+        userVisibleStatus: "analyzing_assets",
+        failureReason: "previous failure",
+        lockedBy: "worker-1",
+        lockedUntil,
+        attemptCount: 1,
+        lastError: "vision timeout",
+      },
+    ]);
+    const store = {
+      ...baseStore,
+      async createStateEvent() {
+        throw new Error("job state event unavailable");
+      },
+    };
+
+    await expect(
+      transitionJobStatus({
+        store,
+        jobId,
+        toStatus: "asset_analysis_passed",
+        reason: "asset_analysis_completed",
+        clearLock: true,
+        errorMessage: null,
+        userVisibleStatus: "assets_ready",
+        failureReason: null,
+      }),
+    ).rejects.toThrow("job state event unavailable");
+
+    const restored = await store.findJob(jobId);
+    expect(restored).toMatchObject({
+      status: "asset_analysis_running",
+      userVisibleStatus: "analyzing_assets",
+      failureReason: "previous failure",
+      lastError: "vision timeout",
+      lockedBy: "worker-1",
+    });
+    expect(restored?.lockedUntil?.toISOString()).toBe(lockedUntil.toISOString());
+  });
 });

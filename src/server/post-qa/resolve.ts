@@ -110,37 +110,42 @@ export async function resolvePostQaResult({
     },
   });
 
-  let ledgerType: CreditLedgerType;
+  let ledgerType: CreditLedgerType | null = null;
   if (status === "passed") {
-    await captureReservedCredits({
-      store: creditStore,
-      userId: job.userId,
-      amount: job.creditCost,
-      reason: "capture credits after post QA passed",
-      idempotencyKey: `capture:job:${jobId}`,
-      relatedJobId: jobId,
-      metadata: { reservedLedgerId: job.reservedLedgerId },
-    });
+    if (job.creditCost > 0) {
+      await captureReservedCredits({
+        store: creditStore,
+        userId: job.userId,
+        amount: job.creditCost,
+        reason: "capture credits after post QA passed",
+        idempotencyKey: `capture:job:${jobId}`,
+        relatedJobId: jobId,
+        metadata: { reservedLedgerId: job.reservedLedgerId },
+      });
+      ledgerType = "capture";
+    }
     await transitionJobStatus({
       store: jobStore,
       jobId,
       toStatus: "deliverable",
       reason: "video_deliverable",
     });
-    ledgerType = "capture";
   } else {
-    await releaseReservedCredits({
-      store: creditStore,
-      userId: job.userId,
-      amount: job.creditCost,
-      reason: "release credits after post QA failed",
-      idempotencyKey: `release:job:${jobId}:post_qa_failed`,
-      relatedJobId: jobId,
-      metadata: {
-        reservedLedgerId: job.reservedLedgerId,
-        failureCategory: failureCategory ?? null,
-      },
-    });
+    if (job.creditCost > 0) {
+      await releaseReservedCredits({
+        store: creditStore,
+        userId: job.userId,
+        amount: job.creditCost,
+        reason: "release credits after post QA failed",
+        idempotencyKey: `release:job:${jobId}:post_qa_failed`,
+        relatedJobId: jobId,
+        metadata: {
+          reservedLedgerId: job.reservedLedgerId,
+          failureCategory: failureCategory ?? null,
+        },
+      });
+      ledgerType = "release";
+    }
     await transitionJobStatus({
       store: jobStore,
       jobId,
@@ -148,7 +153,6 @@ export async function resolvePostQaResult({
       reason: "post_qa_failed_released",
       eventSnapshot: { failureCategory: failureCategory ?? null },
     });
-    ledgerType = "release";
   }
 
   return {

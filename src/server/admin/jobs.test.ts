@@ -21,7 +21,45 @@ describe("admin job detail", () => {
           finalVideoKey: null,
           coverKey: null,
           isTest: false,
+          failureReason: null,
           createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+      assets: [
+        {
+          videoJobId: "job-1",
+          assetId: "asset-1",
+          role: "front",
+          sortOrder: 0,
+          fileName: "front.jpg",
+          originalKey: "uploads/front.jpg",
+          detectedRole: "front",
+        },
+      ],
+      analyses: [
+        {
+          videoJobId: "job-1",
+          assetId: "asset-1",
+          analysisJson: {
+            view_angle: "front",
+          },
+          mode: "standard",
+        },
+      ],
+      storyboards: [
+        {
+          id: "storyboard-1",
+          videoJobId: "job-1",
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          storyboardJson: {
+            duration_seconds: 16,
+            segments: [],
+          },
+          finalPromptSnapshot: {
+            prompt: "keep front view",
+          },
+          createdAt: new Date("2026-06-07T00:00:20.000Z"),
         },
       ],
       segments: [
@@ -71,6 +109,20 @@ describe("admin job detail", () => {
       ],
       stitchJobs: [],
       postQaResults: [],
+      stateEvents: [
+        {
+          id: "evt-1",
+          videoJobId: "job-1",
+          segmentId: null,
+          fromStatus: "segments_queued",
+          toStatus: "segment_generating",
+          reason: "worker_claimed_segment",
+          actorType: "system",
+          actorId: null,
+          eventSnapshot: { segmentId: "segment-1" },
+          createdAt: new Date("2026-06-07T00:00:10.000Z"),
+        },
+      ],
     });
 
     const detail = await getAdminJobDetail({ store, jobId: "job-1" });
@@ -80,6 +132,9 @@ describe("admin job detail", () => {
         id: "job-1",
         status: "segment_generating",
       }),
+      assets: [expect.objectContaining({ assetId: "asset-1" })],
+      analyses: [expect.objectContaining({ assetId: "asset-1", mode: "standard" })],
+      latestStoryboard: expect.objectContaining({ id: "storyboard-1" }),
       segments: [
         expect.objectContaining({
           id: "segment-1",
@@ -91,6 +146,7 @@ describe("admin job detail", () => {
       ledger: [expect.objectContaining({ id: "ledger-reserve" })],
       stitchJobs: [],
       postQaResults: [],
+      stateEvents: [expect.objectContaining({ id: "evt-1" })],
     });
   });
 });

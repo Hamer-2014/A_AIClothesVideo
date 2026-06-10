@@ -27,7 +27,7 @@ export const orderStatusEnum = pgEnum("order_status", orderStatusValues);
 
 export const creditWallets = pgTable("credit_wallets", {
   ...id,
-  userId: uuid("user_id").notNull().unique(),
+  userId: text("user_id").notNull().unique(),
   availableBalance: integer("available_balance").notNull().default(0),
   reservedBalance: integer("reserved_balance").notNull().default(0),
   totalPurchased: integer("total_purchased").notNull().default(0),
@@ -38,7 +38,7 @@ export const creditWallets = pgTable("credit_wallets", {
 
 export const creditLedger = pgTable("credit_ledger", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   walletId: uuid("wallet_id"),
   type: creditLedgerTypeEnum("type").notNull(),
   amount: integer("amount").notNull(),
@@ -56,7 +56,7 @@ export const creditLedger = pgTable("credit_ledger", {
 
 export const orders = pgTable("orders", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   status: orderStatusEnum("status").notNull().default("created"),
   provider: text("provider").notNull().default("creem"),
   externalOrderId: text("external_order_id").notNull().unique(),

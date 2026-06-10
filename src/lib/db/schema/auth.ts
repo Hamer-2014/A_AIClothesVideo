@@ -1,4 +1,11 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { id, timestamps } from "./common";
 
@@ -19,16 +26,16 @@ export const authEmailEventStatusEnum = pgEnum(
 );
 
 export const users = pgTable("users", {
-  ...id,
+  id: text("id").primaryKey(),
   name: text("name"),
   email: text("email").notNull().unique(),
-  emailVerified: timestamp("email_verified", { withTimezone: true }),
+  emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   ...timestamps,
 });
 
 export const sessions = pgTable("sessions", {
-  ...id,
+  id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -38,7 +45,7 @@ export const sessions = pgTable("sessions", {
 });
 
 export const accounts = pgTable("accounts", {
-  ...id,
+  id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
@@ -57,7 +64,7 @@ export const accounts = pgTable("accounts", {
 });
 
 export const verifications = pgTable("verifications", {
-  ...id,
+  id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -66,7 +73,7 @@ export const verifications = pgTable("verifications", {
 
 export const authEmailEvents = pgTable("auth_email_events", {
   ...id,
-  userId: uuid("user_id"),
+  userId: text("user_id"),
   email: text("email").notNull(),
   type: authEmailEventTypeEnum("type").notNull(),
   status: authEmailEventStatusEnum("status").notNull(),

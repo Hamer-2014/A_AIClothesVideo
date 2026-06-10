@@ -30,7 +30,7 @@ export const assetStatusEnum = pgEnum("asset_status", assetStatusValues);
 
 export const assets = pgTable("assets", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   status: assetStatusEnum("status").notNull().default("uploaded"),
   originalKey: text("original_key").notNull(),
   thumbKey: text("thumb_key"),

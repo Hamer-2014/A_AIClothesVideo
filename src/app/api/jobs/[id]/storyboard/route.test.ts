@@ -102,4 +102,29 @@ describe("POST /api/jobs/[id]/storyboard", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_storyboard_input" });
   });
+
+  it("returns 503 when prompt moderation is temporarily unavailable", async () => {
+    const response = await handleGenerateStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/storyboard", {
+        method: "POST",
+        body: JSON.stringify({
+          selectedTemplateIds: ["front_push_in"],
+          userPrompt: "Show front view.",
+          isTrial: true,
+        }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        generateStoryboard: async () => {
+          throw new Error("Prompt moderation unavailable for storyboard generation.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "prompt_moderation_unavailable",
+    });
+  });
 });

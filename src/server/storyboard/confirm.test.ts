@@ -220,4 +220,87 @@ describe("confirmStoryboard", () => {
     expect(stores.storyboardStore.listSegments()).toHaveLength(0);
     expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("draft");
   });
+
+  it("allows trial jobs with zero credit cost to confirm storyboard without reserving credits", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+
+    const result = await confirmStoryboard({
+      ...stores,
+      storyboardStore: trialStoryboardStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-trial",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      storyboardId,
+      status: "segments_queued",
+      reservedLedgerId: null,
+      segmentCount: 1,
+    });
+    expect(stores.creditStore.listLedger()).toHaveLength(0);
+    expect(trialStoryboardStore.listStoryboards()[0]).toMatchObject({
+      status: "confirmed",
+    });
+    expect(trialStoryboardStore.listSegments()).toEqual([
+      expect.objectContaining({
+        videoJobId: jobId,
+        storyboardId,
+        segmentIndex: 0,
+        status: "queued",
+      }),
+    ]);
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+  });
 });

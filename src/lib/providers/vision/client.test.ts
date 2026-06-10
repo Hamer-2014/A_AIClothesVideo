@@ -129,7 +129,7 @@ describe("vision provider client", () => {
     });
   });
 
-  it("targets the responses endpoint when the configured base URL points to responses api", async () => {
+  it("targets the responses endpoint with structured output and parses output_text content", async () => {
     vi.stubEnv("VISION_PROVIDER", "apimart");
     vi.stubEnv("VISION_API_KEY", "vision_key");
     vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
@@ -138,19 +138,37 @@ describe("vision provider client", () => {
     const fetchMock: typeof fetch = async (input, init) => {
       calls.push([input, init]);
       return Response.json({
-        code: 200,
-        data: {
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  passed: true,
-                  failure_category: null,
+        id: "resp_123",
+        status: "completed",
+        output: [
+          {
+            id: "msg_123",
+            type: "message",
+            status: "completed",
+            role: "assistant",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  asset_role: "front",
+                  garment_category: "dress",
+                  view_angle: "front",
+                  human_present: "no",
+                  visible_details: ["front_shape"],
+                  not_visible_details: [],
+                  quality: {
+                    is_garment: true,
+                    is_clear: true,
+                    is_safe: true,
+                    has_flat_lay_or_white_background: true,
+                  },
+                  confidence: "high",
+                  risk_flags: [],
                 }),
               },
-            },
-          ],
-        },
+            ],
+          },
+        ],
       });
     };
 
@@ -164,7 +182,12 @@ describe("vision provider client", () => {
 
     expect(calls[0]?.[0]).toBe("https://api.apimart.ai/v1/responses");
     const body = JSON.parse(calls[0]?.[1]?.body as string);
-    expect(body.stream).toBe(false);
+    expect(body).not.toHaveProperty("stream");
+    expect(body.text?.format).toMatchObject({
+      type: "json_schema",
+      name: "asset_analysis",
+      strict: true,
+    });
     expect(body.input[0].role).toBe("system");
     expect(body.input[0].content[0]).toEqual({
       type: "input_text",
@@ -178,8 +201,20 @@ describe("vision provider client", () => {
       },
     ]);
     expect(result.analysisJson).toEqual({
-      passed: true,
-      failure_category: null,
+      asset_role: "front",
+      garment_category: "dress",
+      view_angle: "front",
+      human_present: "no",
+      visible_details: ["front_shape"],
+      not_visible_details: [],
+      quality: {
+        is_garment: true,
+        is_clear: true,
+        is_safe: true,
+        has_flat_lay_or_white_background: true,
+      },
+      confidence: "high",
+      risk_flags: [],
     });
   });
 

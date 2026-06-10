@@ -97,7 +97,7 @@ export const providerCallLogs = pgTable("provider_call_logs", {
   providerKeyId: uuid("provider_key_id"),
   model: text("model").notNull(),
   purpose: providerPurposeEnum("purpose").notNull(),
-  userId: uuid("user_id"),
+  userId: text("user_id"),
   videoJobId: uuid("video_job_id"),
   segmentId: uuid("segment_id"),
   requestSnapshot: jsonSnapshot("request_snapshot").notNull(),
@@ -114,7 +114,7 @@ export const providerCallLogs = pgTable("provider_call_logs", {
 
 export const promptModerationResults = pgTable("prompt_moderation_results", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   videoJobId: uuid("video_job_id"),
   segmentId: uuid("segment_id"),
   source: text("source").notNull(),

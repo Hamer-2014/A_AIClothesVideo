@@ -53,9 +53,9 @@ describe("POST /api/uploads/presign", () => {
     expect(createdAssets).toHaveLength(1);
     expect(body).toMatchObject({
       assetId: "asset-1",
-      key: "users/user-1/assets/asset-1/original.jpg",
       uploadUrl: "https://upload.example/users/user-1/assets/asset-1/original.jpg",
       headers: { "content-type": "image/jpeg" },
     });
+    expect(body).not.toHaveProperty("key");
   });
 });

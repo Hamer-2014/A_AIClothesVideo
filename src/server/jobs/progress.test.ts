@@ -67,4 +67,45 @@ describe("video job progress", () => {
       getVideoJobProgress({ store, jobId: "job-1", userId: "user-1" }),
     ).resolves.toBeNull();
   });
+
+  it("treats segments_queued as generation phase and reports queued segments", async () => {
+    const store = createInMemoryJobProgressStore({
+      jobs: [
+        {
+          id: "job-1",
+          userId: "user-1",
+          status: "segments_queued",
+          userVisibleStatus: "generating",
+          finalVideoKey: null,
+          coverKey: null,
+        },
+      ],
+      segments: [
+        { videoJobId: "job-1", status: "queued" },
+      ],
+      stitchJobs: [],
+      postQaResults: [],
+    });
+
+    await expect(
+      getVideoJobProgress({ store, jobId: "job-1", userId: "user-1" }),
+    ).resolves.toEqual({
+      jobId: "job-1",
+      status: "segments_queued",
+      userVisibleStatus: "generating",
+      phase: "generation",
+      segmentProgress: {
+        total: 1,
+        queued: 1,
+        generating: 0,
+        succeeded: 0,
+        failed: 0,
+      },
+      stitching: { status: "not_started" },
+      postQa: { status: "not_started" },
+      downloadReady: false,
+      finalVideoKey: null,
+      coverKey: null,
+    });
+  });
 });

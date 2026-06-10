@@ -10,7 +10,7 @@ export const userStatusEnum = pgEnum("user_status", userStatusValues);
 
 export const userProfiles = pgTable("user_profiles", {
   ...id,
-  userId: uuid("user_id").notNull().unique(),
+  userId: text("user_id").notNull().unique(),
   status: userStatusEnum("status").notNull().default("active"),
   displayName: text("display_name"),
   companyName: text("company_name"),
@@ -26,10 +26,10 @@ export const userProfiles = pgTable("user_profiles", {
 
 export const adminRoles = pgTable("admin_roles", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   email: text("email").notNull(),
   role: adminRoleEnum("role").notNull(),
-  grantedBy: uuid("granted_by"),
+  grantedBy: text("granted_by"),
   grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   ...timestamps,

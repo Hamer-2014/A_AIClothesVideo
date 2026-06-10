@@ -39,7 +39,7 @@ function phaseForStatus(status: string) {
   if (status.startsWith("prompt_") || status === "credits_reserved") {
     return "pre_generation";
   }
-  if (status.startsWith("segment")) {
+  if (status === "segments_queued" || status.startsWith("segment")) {
     return "generation";
   }
   if (status.startsWith("stitch") || status === "stitched") {

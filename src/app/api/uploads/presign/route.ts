@@ -103,7 +103,6 @@ export async function handleUploadPresignRequest(
 
   return NextResponse.json({
     assetId: asset.id,
-    key: asset.key,
     uploadUrl: signed.url,
     headers: signed.headers,
   });

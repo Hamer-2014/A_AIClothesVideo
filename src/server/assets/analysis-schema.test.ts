@@ -58,4 +58,80 @@ describe("asset analysis schema", () => {
       }),
     ).toThrow("Asset analysis JSON has invalid asset_role.");
   });
+
+  it("normalizes common provider asset_role aliases into supported internal roles", () => {
+    const result = parseAssetAnalysisJson({
+      asset_role: "product_clothing_item",
+      garment_category: "dress",
+      view_angle: "front",
+      human_present: "no (dress on a mannequin)",
+      visible_details: ["front_shape"],
+      not_visible_details: ["back"],
+      quality: {
+        is_garment: true,
+        is_clear: true,
+        is_safe: true,
+        has_flat_lay_or_white_background: true,
+      },
+      confidence: "high",
+      risk_flags: [],
+    });
+
+    expect(result.assetRole).toBe("front");
+    expect(result.humanPresent).toBe("no");
+  });
+
+  it("normalizes provider asset_role prefixes instead of only exact alias strings", () => {
+    const result = parseAssetAnalysisJson({
+      asset_role: "product_clothing_item_on_model_torso",
+      garment_category: "dress",
+      view_angle: "front",
+      human_present: "unknown",
+      visible_details: ["front_shape"],
+      not_visible_details: ["back"],
+      quality: {
+        is_garment: true,
+        is_clear: true,
+        is_safe: true,
+        has_flat_lay_or_white_background: true,
+      },
+      confidence: "high",
+      risk_flags: [],
+    });
+
+    expect(result.assetRole).toBe("front");
+  });
+
+  it("normalizes newly observed APIMart asset_role variants into front", () => {
+    const variants = [
+      "primary",
+      "primary garment",
+      "primary_product",
+      "primary_clothing_item",
+      "main_product",
+      "clothing_product_photo",
+    ];
+
+    for (const assetRole of variants) {
+      const result = parseAssetAnalysisJson({
+        asset_role: assetRole,
+        garment_category: "dress",
+        view_angle: "front",
+        human_present: "no (shown on a mannequin form)",
+        visible_details: ["front_shape"],
+        not_visible_details: ["back"],
+        quality: {
+          is_garment: true,
+          is_clear: true,
+          is_safe: true,
+          has_flat_lay_or_white_background: true,
+        },
+        confidence: "high",
+        risk_flags: [],
+      });
+
+      expect(result.assetRole).toBe("front");
+      expect(result.humanPresent).toBe("no");
+    }
+  });
 });

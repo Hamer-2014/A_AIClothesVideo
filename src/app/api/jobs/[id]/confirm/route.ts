@@ -16,7 +16,7 @@ interface ConfirmStoryboardResult {
   jobId: string;
   storyboardId: string;
   status: "segments_queued";
-  reservedLedgerId: string;
+  reservedLedgerId: string | null;
   segmentCount: number;
 }
 
@@ -101,6 +101,16 @@ export async function handleConfirmStoryboardRequest(
       return NextResponse.json(
         { error: "prompt_moderation_blocked" },
         { status: 403 },
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Final prompt moderation unavailable for video generation."
+    ) {
+      return NextResponse.json(
+        { error: "prompt_moderation_unavailable" },
+        { status: 503 },
       );
     }
 

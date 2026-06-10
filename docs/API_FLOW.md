@@ -163,6 +163,37 @@ stateDiagram-v2
 - Cloud Run 健康检查：`GET {CLOUD_RUN_STITCH_URL}/health`
 - Stitch 冒烟：`npm run smoke:stitch`
 - 完整后端冒烟：`npm run smoke:backend`
+- 单任务排障：`node scripts/job-debug.mjs <jobId>`
+
+### 单任务排障建议顺序
+
+当用户反馈“任务卡住但不知道卡在哪”时，不要先猜前端问题，先查数据库链路：
+
+1. 运行：
+
+```bash
+node scripts/job-debug.mjs <jobId>
+```
+
+2. 按顺序看：
+
+- `JOB`：当前主状态、锁、最后错误
+- `EVENTS`：最后一次状态推进停在哪
+- `STORYBOARDS`：是否已生成/确认分镜
+- `SEGMENTS`：是否仍停在 `queued` / `generating`
+- `STITCH`：是否已经创建 stitch job
+- `POSTQA`：是否进入质检
+- `PROVIDERLOGS`：真实外部调用报错
+
+3. 常见判断：
+
+- `asset_analysis_failed`：素材分析链路问题
+- `storyboard_draft_ready`：还没确认分镜
+- `segments_queued`：generation worker 未推进或提交失败
+- `segment_generating`：已提交视频模型，等待 poll
+- `stitching_queued` / `stitching_running`：Cloud Run 拼接链路问题
+- `post_qa_queued` / `post_qa_running`：质检链路问题
+- `failed_*`：已经正式失败，优先看 `failure_reason`、`last_error`、`provider_call_logs`
 
 ## 当前需要你警惕的坑
 

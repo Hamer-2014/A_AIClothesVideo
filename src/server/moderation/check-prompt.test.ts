@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CreemModerationUnavailableError } from "@/lib/providers/creem/moderation";
 
@@ -8,6 +8,10 @@ import { createInMemoryModerationResultStore } from "./results";
 const userId = "11111111-1111-4111-8111-111111111111";
 
 describe("checkPrompt", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("allows prompts only when Creem returns allow", async () => {
     const store = createInMemoryModerationResultStore();
 
@@ -117,5 +121,98 @@ describe("checkPrompt", () => {
     });
     expect(store.listResults()[0]?.promptSummary).not.toBe(longPrompt);
     expect(store.listResults()[0]?.promptSummary?.length).toBeLessThanOrEqual(80);
+  });
+
+  it("allows prompts in dev_bypass mode during development without calling Creem", async () => {
+    vi.stubEnv("PROMPT_MODERATION_MODE", "dev_bypass");
+    vi.stubEnv("NODE_ENV", "development");
+    const store = createInMemoryModerationResultStore();
+
+    const result = await checkPrompt(
+      {
+        userId,
+        source: "user_input",
+        prompt: "Bypass this prompt in local development.",
+      },
+      {
+        resultStore: store,
+        moderatePrompt: async () => {
+          throw new Error("must not call Creem");
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      allowed: true,
+      decision: "allow",
+      moderationId: null,
+      errorCode: "prompt_moderation_dev_bypass",
+    });
+    expect(store.listResults()[0]).toMatchObject({
+      decision: "allow",
+      errorCode: "prompt_moderation_dev_bypass",
+    });
+  });
+
+  it("allows prompts in off mode without calling Creem", async () => {
+    vi.stubEnv("PROMPT_MODERATION_MODE", "off");
+    vi.stubEnv("NODE_ENV", "production");
+    const store = createInMemoryModerationResultStore();
+
+    const result = await checkPrompt(
+      {
+        userId,
+        source: "user_input",
+        prompt: "Moderation is disabled on purpose.",
+      },
+      {
+        resultStore: store,
+        moderatePrompt: async () => {
+          throw new Error("must not call Creem");
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      allowed: true,
+      decision: "allow",
+      moderationId: null,
+      errorCode: "prompt_moderation_off",
+    });
+    expect(store.listResults()[0]).toMatchObject({
+      decision: "allow",
+      errorCode: "prompt_moderation_off",
+    });
+  });
+
+  it("fails closed when dev_bypass is used outside development or test", async () => {
+    vi.stubEnv("PROMPT_MODERATION_MODE", "dev_bypass");
+    vi.stubEnv("NODE_ENV", "production");
+    const store = createInMemoryModerationResultStore();
+
+    const result = await checkPrompt(
+      {
+        userId,
+        source: "user_input",
+        prompt: "This should not bypass in production.",
+      },
+      {
+        resultStore: store,
+        moderatePrompt: async () => {
+          throw new Error("must not call Creem");
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      allowed: false,
+      decision: "error",
+      moderationId: null,
+      errorCode: "prompt_moderation_dev_bypass_forbidden",
+    });
+    expect(store.listResults()[0]).toMatchObject({
+      decision: "error",
+      errorCode: "prompt_moderation_dev_bypass_forbidden",
+    });
   });
 });

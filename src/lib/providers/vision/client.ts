@@ -35,6 +35,56 @@ interface VisionClientDeps {
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
   "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.";
+const assetAnalysisJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "asset_role",
+    "garment_category",
+    "view_angle",
+    "human_present",
+    "visible_details",
+    "not_visible_details",
+    "quality",
+    "confidence",
+    "risk_flags",
+  ],
+  properties: {
+    asset_role: { type: "string" },
+    garment_category: { type: "string" },
+    view_angle: { type: "string" },
+    human_present: { type: "string" },
+    visible_details: {
+      type: "array",
+      items: { type: "string" },
+    },
+    not_visible_details: {
+      type: "array",
+      items: { type: "string" },
+    },
+    quality: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "is_garment",
+        "is_clear",
+        "is_safe",
+        "has_flat_lay_or_white_background",
+      ],
+      properties: {
+        is_garment: { type: "boolean" },
+        is_clear: { type: "boolean" },
+        is_safe: { type: "boolean" },
+        has_flat_lay_or_white_background: { type: "boolean" },
+      },
+    },
+    confidence: { type: "string" },
+    risk_flags: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+} as const;
 
 function modelEnvForMode(mode: VisionAnalysisMode) {
   switch (mode) {
@@ -127,6 +177,20 @@ function chatMessages(imageUrls: string[]) {
 }
 
 function parseResponsesOutput(raw: Record<string, unknown>) {
+  const output = Array.isArray(raw.output) ? raw.output : [];
+
+  for (const item of output) {
+    const message = asRecord(item);
+    const contentItems = Array.isArray(message.content) ? message.content : [];
+
+    for (const content of contentItems) {
+      const contentRecord = asRecord(content);
+      if (contentRecord.type === "output_text") {
+        return parseJsonContent(contentRecord.text);
+      }
+    }
+  }
+
   const wrapped = asRecord(raw.data);
   const payload = Object.keys(wrapped).length > 0 ? wrapped : raw;
   const firstChoice = asRecord((payload.choices as unknown[])?.[0]);
@@ -148,6 +212,14 @@ export async function createVisionAssetAnalysis(
     ? {
         model: config.model,
         input: responsesInput(input.imageUrls),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "asset_analysis",
+            strict: true,
+            schema: assetAnalysisJsonSchema,
+          },
+        },
       }
     : {
         model: config.model,

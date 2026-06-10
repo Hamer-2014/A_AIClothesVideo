@@ -34,6 +34,55 @@ const assetRoles: AssetRole[] = [
   "unknown",
 ];
 const humanPresenceValues: HumanPresent[] = ["yes", "no", "unknown"];
+const assetRoleAliases: Record<string, AssetRole> = {
+  garment: "front",
+  product: "front",
+  model: "front",
+  primary: "front",
+  "primary garment": "front",
+  primary_product: "front",
+  primary_clothing_item: "front",
+  main_product: "front",
+  clothing_product_photo: "front",
+  product_clothing_item: "front",
+  product_clothing_item_on_mannequin: "front",
+};
+
+function normalizeHumanPresent(value: string): HumanPresent {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized.startsWith("yes")) {
+    return "yes";
+  }
+
+  if (normalized.startsWith("no")) {
+    return "no";
+  }
+
+  return "unknown";
+}
+
+function normalizeAssetRole(value: string): AssetRole | string {
+  const normalized = value.trim().toLowerCase();
+  const aliased = assetRoleAliases[normalized];
+
+  if (aliased) {
+    return aliased;
+  }
+
+  if (
+    normalized.startsWith("product") ||
+    normalized.startsWith("primary") ||
+    normalized.startsWith("main_product") ||
+    normalized.startsWith("clothing_product") ||
+    normalized.startsWith("garment") ||
+    normalized.startsWith("model")
+  ) {
+    return "front";
+  }
+
+  return normalized;
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -72,13 +121,15 @@ function booleanFromQuality(
 
 export function parseAssetAnalysisJson(input: unknown): ParsedAssetAnalysis {
   const record = asRecord(input);
-  const assetRole = requireString(record, "asset_role");
+  const assetRole = normalizeAssetRole(requireString(record, "asset_role"));
   if (!assetRoles.includes(assetRole as AssetRole)) {
     throw new Error("Asset analysis JSON has invalid asset_role.");
   }
 
-  const humanPresent = requireString(record, "human_present");
-  if (!humanPresenceValues.includes(humanPresent as HumanPresent)) {
+  const humanPresent = normalizeHumanPresent(
+    requireString(record, "human_present"),
+  );
+  if (!humanPresenceValues.includes(humanPresent)) {
     throw new Error("Asset analysis JSON has invalid human_present.");
   }
 

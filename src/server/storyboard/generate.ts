@@ -234,6 +234,10 @@ export async function generateStoryboardDraft({
   );
 
   if (!moderation.allowed) {
+    if (moderation.decision === "error") {
+      throw new Error("Prompt moderation unavailable for storyboard generation.");
+    }
+
     throw new Error("Prompt moderation blocked storyboard generation.");
   }
 

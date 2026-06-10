@@ -87,6 +87,9 @@ describe("video job asset analysis", () => {
     expect(result.recommendations.availableTemplateIds).toContain("back_display");
     expect(jobStore.listJobs()[0]).toMatchObject({
       status: "asset_analysis_passed",
+      userVisibleStatus: "assets_ready",
+      failureReason: null,
+      lastError: null,
       lockedBy: null,
       lockedUntil: null,
     });
@@ -157,6 +160,8 @@ describe("video job asset analysis", () => {
 
     expect(jobStore.listJobs()[0]).toMatchObject({
       status: "asset_analysis_failed",
+      userVisibleStatus: "failed",
+      failureReason: "Video job has no attached assets.",
       lastError: "Video job has no attached assets.",
     });
   });

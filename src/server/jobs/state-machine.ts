@@ -15,6 +15,8 @@ export interface JobRecord {
   id: string;
   userId: string;
   status: JobStatus;
+  userVisibleStatus?: string;
+  failureReason?: string | null;
   lockedBy: string | null;
   lockedUntil: Date | null;
   attemptCount: number;
@@ -37,6 +39,10 @@ export interface JobStateEventRecord {
 export interface JobStatusChanges {
   status: JobStatus;
   lastError?: string | null;
+  userVisibleStatus?: string;
+  failureReason?: string | null;
+  lockedBy?: string | null;
+  lockedUntil?: Date | null;
   clearLock?: boolean;
 }
 
@@ -72,7 +78,12 @@ const allowedTransitions: Partial<Record<JobStatus, JobStatus[]>> = {
     "asset_analysis_failed",
     "storyboard_draft_ready",
   ],
-  asset_analysis_failed: ["retrying", "failed_released", "failed_refunded"],
+  asset_analysis_failed: [
+    "retrying",
+    "asset_analysis_running",
+    "failed_released",
+    "failed_refunded",
+  ],
   asset_analysis_passed: ["storyboard_draft_ready"],
   storyboard_draft_ready: ["storyboard_confirmed"],
   storyboard_confirmed: ["prompt_moderation_running"],
@@ -124,8 +135,26 @@ export function createInMemoryJobStore(initialJobs: JobRecord[] = []): JobStore 
         status: changes.status,
         lastError:
           changes.lastError === undefined ? job.lastError : changes.lastError,
-        lockedBy: changes.clearLock ? null : job.lockedBy,
-        lockedUntil: changes.clearLock ? null : job.lockedUntil,
+        userVisibleStatus:
+          changes.userVisibleStatus === undefined
+            ? job.userVisibleStatus
+            : changes.userVisibleStatus,
+        failureReason:
+          changes.failureReason === undefined
+            ? job.failureReason
+            : changes.failureReason,
+        lockedBy:
+          changes.lockedBy !== undefined
+            ? changes.lockedBy
+            : changes.clearLock
+              ? null
+              : job.lockedBy,
+        lockedUntil:
+          changes.lockedUntil !== undefined
+            ? changes.lockedUntil
+            : changes.clearLock
+              ? null
+              : job.lockedUntil,
       };
       jobs.set(jobId, updated);
       return { ...updated };
@@ -165,6 +194,8 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           id: videoJobs.id,
           userId: videoJobs.userId,
           status: videoJobs.status,
+          userVisibleStatus: videoJobs.userVisibleStatus,
+          failureReason: videoJobs.failureReason,
           lockedBy: videoJobs.lockedBy,
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
@@ -179,12 +210,19 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
     async updateJobStatus(jobId, changes) {
       const values = {
         status: changes.status,
-        lastError: changes.lastError,
-        ...(changes.clearLock
-          ? {
-              lockedBy: null,
-              lockedUntil: null,
-            }
+        ...(changes.lastError !== undefined
+          ? { lastError: changes.lastError }
+          : {}),
+        ...(changes.userVisibleStatus !== undefined
+          ? { userVisibleStatus: changes.userVisibleStatus }
+          : {}),
+        ...(changes.failureReason !== undefined
+          ? { failureReason: changes.failureReason }
+          : {}),
+        ...(changes.clearLock ? { lockedBy: null, lockedUntil: null } : {}),
+        ...(changes.lockedBy !== undefined ? { lockedBy: changes.lockedBy } : {}),
+        ...(changes.lockedUntil !== undefined
+          ? { lockedUntil: changes.lockedUntil }
           : {}),
       };
       const [job] = await db
@@ -195,6 +233,8 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           id: videoJobs.id,
           userId: videoJobs.userId,
           status: videoJobs.status,
+          userVisibleStatus: videoJobs.userVisibleStatus,
+          failureReason: videoJobs.failureReason,
           lockedBy: videoJobs.lockedBy,
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
@@ -240,6 +280,8 @@ export async function transitionJobStatus({
   actorId,
   eventSnapshot,
   errorMessage,
+  userVisibleStatus,
+  failureReason,
   clearLock = false,
 }: {
   store: JobStore;
@@ -250,6 +292,8 @@ export async function transitionJobStatus({
   actorId?: string | null;
   eventSnapshot?: JsonValue | null;
   errorMessage?: string | null;
+  userVisibleStatus?: string;
+  failureReason?: string | null;
   clearLock?: boolean;
 }) {
   const job = await store.findJob(jobId);
@@ -264,17 +308,33 @@ export async function transitionJobStatus({
   const updated = await store.updateJobStatus(jobId, {
     status: toStatus,
     lastError: errorMessage === undefined ? job.lastError : errorMessage,
+    userVisibleStatus,
+    failureReason,
     clearLock,
   });
-  await store.createStateEvent({
-    videoJobId: jobId,
-    fromStatus: job.status,
-    toStatus,
-    reason: reason ?? null,
-    actorType,
-    actorId: actorId ?? null,
-    eventSnapshot: eventSnapshot ?? null,
-  });
+
+  try {
+    await store.createStateEvent({
+      videoJobId: jobId,
+      fromStatus: job.status,
+      toStatus,
+      reason: reason ?? null,
+      actorType,
+      actorId: actorId ?? null,
+      eventSnapshot: eventSnapshot ?? null,
+    });
+  } catch (error) {
+    await store.updateJobStatus(jobId, {
+      status: job.status,
+      lastError: job.lastError,
+      userVisibleStatus: job.userVisibleStatus,
+      failureReason: job.failureReason,
+      lockedBy: job.lockedBy,
+      lockedUntil: job.lockedUntil,
+      clearLock: false,
+    });
+    throw error;
+  }
 
   return updated;
 }

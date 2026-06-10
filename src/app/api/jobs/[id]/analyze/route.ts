@@ -94,8 +94,16 @@ export async function handleAnalyzeJobRequest(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    const body = {
+      error: "asset_analysis_failed",
+      message:
+        error instanceof Error
+          ? error.message
+          : "素材分析失败，请稍后重试。",
+    };
+
     return NextResponse.json(
-      { error: "asset_analysis_failed" },
+      body,
       { status: 500 },
     );
   }

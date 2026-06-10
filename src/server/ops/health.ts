@@ -37,6 +37,15 @@ function buildCheck(env: EnvSource, keys: string[]): RuntimeHealthCheck {
   };
 }
 
+function moderationKeys(env: EnvSource) {
+  const mode = env.PROMPT_MODERATION_MODE?.trim().toLowerCase();
+  return mode === "off" ? ["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] : [
+    "CREEM_API_KEY",
+    "CREEM_WEBHOOK_SECRET",
+    "CREEM_MODERATION_API_KEY",
+  ];
+}
+
 export function getRuntimeHealth(
   env: EnvSource = process.env,
 ): Omit<RuntimeHealthReport, "timestamp"> {
@@ -57,11 +66,7 @@ export function getRuntimeHealth(
       "CLOUD_RUN_STITCH_URL",
       "CLOUD_RUN_STITCH_SECRET",
     ]),
-    billing: buildCheck(env, [
-      "CREEM_API_KEY",
-      "CREEM_WEBHOOK_SECRET",
-      "CREEM_MODERATION_API_KEY",
-    ]),
+    billing: buildCheck(env, moderationKeys(env)),
     aiProviders: buildCheck(env, [
       "DEEPSEEK_API_KEY",
       "VISION_PROVIDER",

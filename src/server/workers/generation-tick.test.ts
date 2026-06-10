@@ -126,4 +126,30 @@ describe("generation worker tick", () => {
       lastError: "Cloud Run unavailable",
     });
   });
+
+  it("records the submission error on segments_queued jobs without forcing an invalid failure transition", async () => {
+    const lockStore = createInMemoryJobLockStore([job("job-1", "segments_queued")]);
+    const jobStore = createInMemoryJobStore(lockStore.listJobs());
+
+    const result = await runGenerationWorkerTick({
+      workerId: "worker-1",
+      lockStore,
+      jobStore,
+      handlers: {
+        submitSegments: async () => {
+          throw new Error("EvoLink video generation failed with status 404.");
+        },
+        pollSegments: async () => undefined,
+        createStitchJob: async () => undefined,
+      },
+    });
+
+    expect(result).toEqual({ processed: 1, succeeded: 0, failed: 1 });
+    expect(jobStore.listJobs()[0]).toMatchObject({
+      status: "segments_queued",
+      lockedBy: null,
+      lockedUntil: null,
+      lastError: "EvoLink video generation failed with status 404.",
+    });
+  });
 });

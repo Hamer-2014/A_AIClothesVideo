@@ -78,6 +78,8 @@ export async function handleGetJobRequest(
       id: detail.job.id,
       status: detail.job.status,
       userVisibleStatus: detail.job.userVisibleStatus,
+      lastError: detail.job.lastError,
+      failureReason: detail.job.failureReason,
       durationSeconds: detail.job.durationSeconds,
       aspectRatio: detail.job.aspectRatio,
       creditCost: detail.job.creditCost,

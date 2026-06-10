@@ -41,7 +41,6 @@ function statusAfterSuccess(status: JobStatus): JobStatus | null {
 
 function statusAfterFailure(status: JobStatus): JobStatus {
   switch (status) {
-    case "segments_queued":
     case "segment_generating":
       return "segment_failed";
     case "segment_succeeded":
@@ -117,7 +116,10 @@ export async function runGenerationWorkerTick({
       succeeded += 1;
     } catch (error) {
       const afterHandler = await jobStore.findJob(job.id);
-      if (afterHandler?.status === job.status) {
+      const canTransitionToFailure =
+        job.status !== "segments_queued" && afterHandler?.status === job.status;
+
+      if (canTransitionToFailure) {
         await transitionJobStatus({
           store: jobStore,
           jobId: job.id,

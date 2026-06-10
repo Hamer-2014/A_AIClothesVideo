@@ -22,6 +22,8 @@ function createReadStore() {
         userId,
         status: "asset_analysis_passed",
         userVisibleStatus: "assets_ready",
+        lastError: null,
+        failureReason: null,
         durationSeconds: 8,
         aspectRatio: "9:16",
         creditCost: 0,

@@ -4,7 +4,7 @@ import { id, jsonSnapshot } from "./common";
 
 export const adminAuditLogs = pgTable("admin_audit_logs", {
   ...id,
-  adminUserId: uuid("admin_user_id"),
+  adminUserId: text("admin_user_id"),
   actorEmail: text("actor_email"),
   action: text("action").notNull(),
   targetType: text("target_type").notNull(),
@@ -19,7 +19,7 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
 
 export const abuseEvents = pgTable("abuse_events", {
   ...id,
-  userId: uuid("user_id"),
+  userId: text("user_id"),
   eventType: text("event_type").notNull(),
   severity: text("severity").notNull().default("medium"),
   ipAddress: text("ip_address"),

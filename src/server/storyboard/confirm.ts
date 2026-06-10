@@ -196,6 +196,7 @@ export async function confirmStoryboard({
   });
   const assets = await storyboardStore.listJobAssets(jobId);
   const finalPromptSnapshot = buildFinalPromptSnapshot({ parsed, assets });
+  const shouldReserveCredits = job.creditCost > 0;
 
   await transitionJobStatus({
     store: jobStore,
@@ -229,6 +230,10 @@ export async function confirmStoryboard({
   );
 
   if (!moderation.allowed) {
+    if (moderation.decision === "error") {
+      throw new Error("Final prompt moderation unavailable for video generation.");
+    }
+
     await transitionJobStatus({
       store: jobStore,
       jobId,
@@ -251,8 +256,8 @@ export async function confirmStoryboard({
     eventSnapshot: { storyboardId, moderationId: moderation.moderationId },
   });
 
-  let reserveResult: CreditLedgerResult;
-  if (job.creditCost > 0) {
+  let reserveResult: CreditLedgerResult | null = null;
+  if (shouldReserveCredits) {
     reserveResult = await reserveCredits({
       store: creditStore,
       userId,
@@ -269,8 +274,6 @@ export async function confirmStoryboard({
       jobId,
       reservedLedgerId: reserveResult.ledger.id,
     });
-  } else {
-    throw new Error("Credit cost must be greater than zero before video generation.");
   }
 
   const confirmedStoryboard = await storyboardStore.confirmStoryboard({
@@ -278,17 +281,19 @@ export async function confirmStoryboard({
     finalPromptSnapshot,
   });
 
-  await transitionJobStatus({
-    store: jobStore,
-    jobId,
-    toStatus: "credits_reserved",
-    reason: "credits_reserved",
-    eventSnapshot: {
-      storyboardId,
-      ledgerId: reserveResult.ledger.id,
-      amount: job.creditCost,
-    },
-  });
+  if (shouldReserveCredits && reserveResult) {
+    await transitionJobStatus({
+      store: jobStore,
+      jobId,
+      toStatus: "credits_reserved",
+      reason: "credits_reserved",
+      eventSnapshot: {
+        storyboardId,
+        ledgerId: reserveResult.ledger.id,
+        amount: job.creditCost,
+      },
+    });
+  }
 
   const segments = await storyboardStore.createVideoSegments(
     parsed.segments.map((segment) => ({
@@ -305,19 +310,33 @@ export async function confirmStoryboard({
   await transitionJobStatus({
     store: jobStore,
     jobId,
-    toStatus: "segments_queued",
-    reason: "segments_created",
+    toStatus: shouldReserveCredits ? "segments_queued" : "credits_reserved",
+    reason: shouldReserveCredits ? "segments_created" : "trial_segments_prepared",
     eventSnapshot: {
       storyboardId,
+      ...(reserveResult ? { ledgerId: reserveResult.ledger.id } : {}),
       segmentIds: segments.map((segment) => segment.id),
     },
   });
+
+  if (!shouldReserveCredits) {
+    await transitionJobStatus({
+      store: jobStore,
+      jobId,
+      toStatus: "segments_queued",
+      reason: "trial_segments_created",
+      eventSnapshot: {
+        storyboardId,
+        segmentIds: segments.map((segment) => segment.id),
+      },
+    });
+  }
 
   return {
     jobId,
     storyboardId: confirmedStoryboard.id,
     status: "segments_queued" as const,
-    reservedLedgerId: reserveResult.ledger.id,
+    reservedLedgerId: reserveResult?.ledger.id ?? null,
     segmentCount: segments.length,
   };
 }

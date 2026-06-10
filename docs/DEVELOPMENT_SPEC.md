@@ -86,6 +86,36 @@ npm test
 
 如果某阶段没有测试命令，必须在阶段说明里写清楚原因，并提供人工验收步骤。
 
+### 0.5 Worktree 本地开发约束
+
+当前项目默认采用“继续共用上层依赖”的 worktree 模式。
+
+要求：
+
+- worktree 目录内不额外维护独立 `node_modules`。
+- 所有本地开发默认复用主仓库根目录的依赖。
+- `next.config.ts` 必须配置 `turbopack.root` 指向主仓库根目录。
+- `tsconfig.json` 必须排除 `.next/dev/**`，避免开发态 route types 污染正式 `typecheck` 与 `build`。
+- 若切换为“worktree 独立依赖”模式，必须单独开变更并更新文档，不允许临时混用。
+
+当前路径约定：
+
+- 主仓库根：`D:\\SelfProjects\\a_runwaytools`
+- worktree 示例：`D:\\SelfProjects\\a_runwaytools\\.worktree\\mvp-closure-next-steps`
+
+常用校验：
+
+```bash
+npm run typecheck
+npm run build
+```
+
+如果出现 `.next/dev/types/routes.d.ts` 相关错误，优先检查：
+
+1. `tsconfig.json` 是否重新把 `.next/dev/**` 纳入正式检查。
+2. `next.config.ts` 的 `turbopack.root` 是否仍指向主仓库根。
+3. 当前 worktree 是否误装了另一套不一致的依赖。
+
 ## 1. 环境变量与密钥 SPEC
 
 ### 1.1 `.env.example`

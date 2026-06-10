@@ -83,7 +83,7 @@ export const videoAspectRatioEnum = pgEnum(
 
 export const videoJobs = pgTable("video_jobs", {
   ...id,
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   status: jobStatusEnum("status").notNull().default("draft_uploaded"),
   userVisibleStatus: text("user_visible_status").notNull().default("uploaded"),
   durationSeconds: integer("duration_seconds").notNull(),
@@ -181,7 +181,7 @@ export const jobStateEvents = pgTable("job_state_events", {
   toStatus: text("to_status").notNull(),
   reason: text("reason"),
   actorType: text("actor_type").notNull().default("system"),
-  actorId: uuid("actor_id"),
+  actorId: text("actor_id"),
   eventSnapshot: jsonSnapshot("event_snapshot"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
 import { getCreditPackage } from "@/lib/credits/packages";
-import { createCreemCheckout } from "@/lib/providers/creem/client";
+import {
+  createCreemCheckout,
+  CreemUnavailableError,
+} from "@/lib/providers/creem/client";
 import { createCheckoutOrder, type OrderStore } from "@/server/billing/orders";
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 
@@ -71,28 +74,39 @@ export async function handleBillingCheckoutRequest(
         ...result,
         externalOrderId: input.requestId,
       })));
-  const checkout = await createCheckout({
-    productId: selectedPackage.creemProductId,
-    requestId,
-    successUrl: `${getAppUrl()}/billing/success`,
-    metadata: {
+  const orderStore = deps.orderStore ?? createDrizzleOrderStore();
+  try {
+    const checkout = await createCheckout({
+      productId: selectedPackage.creemProductId,
+      requestId,
+      successUrl: `${getAppUrl()}/billing/success`,
+      metadata: {
+        userId,
+        packageCode: selectedPackage.code,
+      },
+    });
+
+    await createCheckoutOrder({
+      store: orderStore,
       userId,
       packageCode: selectedPackage.code,
-    },
-  });
-  const orderStore = deps.orderStore ?? createDrizzleOrderStore();
+      externalOrderId: checkout.externalOrderId ?? requestId,
+      checkoutSnapshot: checkout.raw as never,
+    });
 
-  await createCheckoutOrder({
-    store: orderStore,
-    userId,
-    packageCode: selectedPackage.code,
-    externalOrderId: checkout.externalOrderId ?? requestId,
-    checkoutSnapshot: checkout.raw as never,
-  });
+    return NextResponse.json({
+      checkoutUrl: checkout.checkoutUrl,
+    });
+  } catch (error) {
+    if (error instanceof CreemUnavailableError) {
+      return NextResponse.json(
+        { error: "billing_provider_unavailable" },
+        { status: 503 },
+      );
+    }
 
-  return NextResponse.json({
-    checkoutUrl: checkout.checkoutUrl,
-  });
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {

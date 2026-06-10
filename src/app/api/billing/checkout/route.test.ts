@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { CreemUnavailableError } from "@/lib/providers/creem/client";
 import { createInMemoryOrderStore } from "@/server/billing/orders";
 
 import { handleBillingCheckoutRequest } from "./route";
@@ -64,5 +65,30 @@ describe("POST /api/billing/checkout", () => {
       externalOrderId: expect.any(String),
       status: "created",
     });
+  });
+
+  it("fails closed when the Creem checkout provider is unavailable", async () => {
+    const orderStore = createInMemoryOrderStore();
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "creator" }),
+      }),
+      {
+        getSession: async () => ({
+          user: { id: "11111111-1111-4111-8111-111111111111" },
+        }),
+        orderStore,
+        createCheckout: async () => {
+          throw new CreemUnavailableError();
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "billing_provider_unavailable",
+    });
+    expect(orderStore.listOrders()).toHaveLength(0);
   });
 });

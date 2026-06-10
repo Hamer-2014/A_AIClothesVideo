@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { handleAnalyzeJobRequest } from "./route";
 
 describe("POST /api/jobs/[id]/analyze", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns 401 when unauthenticated", async () => {
     const response = await handleAnalyzeJobRequest(
       new Request("http://localhost/api/jobs/job-1/analyze", { method: "POST" }),
@@ -57,5 +61,24 @@ describe("POST /api/jobs/[id]/analyze", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("surfaces the failure reason for unexpected analysis errors", async () => {
+    const response = await handleAnalyzeJobRequest(
+      new Request("http://localhost/api/jobs/job-1/analyze", { method: "POST" }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        analyzeJob: async () => {
+          throw new Error("Vision provider response is missing JSON content.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "asset_analysis_failed",
+      message: "Vision provider response is missing JSON content.",
+    });
   });
 });

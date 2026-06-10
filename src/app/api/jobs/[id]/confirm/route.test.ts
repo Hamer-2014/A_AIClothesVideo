@@ -83,4 +83,25 @@ describe("POST /api/jobs/[id]/confirm", () => {
       error: "prompt_moderation_blocked",
     });
   });
+
+  it("returns 503 when final prompt moderation is temporarily unavailable", async () => {
+    const response = await handleConfirmStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ storyboardId: "storyboard-1" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        confirmStoryboard: async () => {
+          throw new Error("Final prompt moderation unavailable for video generation.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "prompt_moderation_unavailable",
+    });
+  });
 });

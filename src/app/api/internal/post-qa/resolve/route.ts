@@ -22,7 +22,7 @@ interface ResolvePostQaDeps {
   }) => Promise<{
     jobId: string;
     status: "deliverable" | "failed_released";
-    ledgerType: "capture" | "release";
+    ledgerType: "capture" | "release" | null;
   }>;
 }
 
