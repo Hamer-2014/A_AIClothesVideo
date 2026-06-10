@@ -234,16 +234,22 @@ export async function pollSubmittedSegment({
   const task = await pollTask(segment.providerTaskId);
 
   if (task.status === "failed") {
+    const providerError = task.errorMessage ?? "Provider task failed.";
     await segmentStore.updateSegment(segmentId, {
       status: "failed",
-      lastError: "Provider task failed.",
+      lastError: providerError,
     });
     await transitionJobStatus({
       store: jobStore,
       jobId,
       toStatus: "segment_failed",
       reason: "provider_task_failed",
-      eventSnapshot: { segmentId, providerTaskId: segment.providerTaskId },
+      errorMessage: providerError,
+      eventSnapshot: {
+        segmentId,
+        providerTaskId: segment.providerTaskId,
+        errorMessage: providerError,
+      },
     });
     return {
       jobId,

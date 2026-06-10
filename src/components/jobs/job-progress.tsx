@@ -2,6 +2,7 @@ interface JobProgressProps {
   progress: {
     status: string;
     phase: string;
+    message?: string | null;
     segmentProgress: {
       total: number;
       queued: number;
@@ -35,6 +36,7 @@ function phaseLabel(phase: string) {
 export function JobProgress({ progress }: JobProgressProps) {
   const done = progress.segmentProgress.succeeded;
   const total = progress.segmentProgress.total;
+  const failed = progress.phase === "failed" || progress.segmentProgress.failed > 0;
 
   return (
     <section className="rounded-lg border border-[var(--line)] bg-white p-5">
@@ -72,6 +74,17 @@ export function JobProgress({ progress }: JobProgressProps) {
           <p className="mt-2 text-sm">{progress.postQa.status}</p>
         </div>
       </div>
+      {progress.message ? (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-medium">生成失败原因</p>
+          <p className="mt-1">{progress.message}</p>
+          {failed ? (
+            <p className="mt-2 text-red-800">
+              请先确认任务日志；如果是供应商繁忙或临时不可用，可以稍后重试生成。
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

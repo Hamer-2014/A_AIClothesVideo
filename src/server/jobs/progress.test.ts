@@ -11,6 +11,8 @@ describe("video job progress", () => {
           userId: "user-1",
           status: "segment_generating",
           userVisibleStatus: "generating",
+          lastError: null,
+          failureReason: null,
           finalVideoKey: null,
           coverKey: null,
         },
@@ -30,6 +32,7 @@ describe("video job progress", () => {
       jobId: "job-1",
       status: "segment_generating",
       userVisibleStatus: "generating",
+      message: null,
       phase: "generation",
       segmentProgress: {
         total: 3,
@@ -54,6 +57,8 @@ describe("video job progress", () => {
           userId: "user-2",
           status: "deliverable",
           userVisibleStatus: "ready",
+          lastError: null,
+          failureReason: null,
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           coverKey: "jobs/job-1/covers/cover.webp",
         },
@@ -76,6 +81,8 @@ describe("video job progress", () => {
           userId: "user-1",
           status: "segments_queued",
           userVisibleStatus: "generating",
+          lastError: null,
+          failureReason: null,
           finalVideoKey: null,
           coverKey: null,
         },
@@ -93,6 +100,7 @@ describe("video job progress", () => {
       jobId: "job-1",
       status: "segments_queued",
       userVisibleStatus: "generating",
+      message: null,
       phase: "generation",
       segmentProgress: {
         total: 1,
@@ -106,6 +114,39 @@ describe("video job progress", () => {
       downloadReady: false,
       finalVideoKey: null,
       coverKey: null,
+    });
+  });
+
+  it("returns the stored failure reason so the job page can explain failed generation", async () => {
+    const store = createInMemoryJobProgressStore({
+      jobs: [
+        {
+          id: "job-1",
+          userId: "user-1",
+          status: "segment_failed",
+          userVisibleStatus: "generating",
+          lastError: "Provider task failed.",
+          failureReason:
+            "EvoLink failed: Service busy. Allocating resources, please retry later.",
+          finalVideoKey: null,
+          coverKey: null,
+        },
+      ],
+      segments: [{ videoJobId: "job-1", status: "failed" }],
+      stitchJobs: [],
+      postQaResults: [],
+    });
+
+    await expect(
+      getVideoJobProgress({ store, jobId: "job-1", userId: "user-1" }),
+    ).resolves.toMatchObject({
+      status: "segment_failed",
+      phase: "failed",
+      message:
+        "EvoLink failed: Service busy. Allocating resources, please retry later.",
+      segmentProgress: {
+        failed: 1,
+      },
     });
   });
 });

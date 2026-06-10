@@ -144,6 +144,7 @@ describe("video segment services", () => {
         providerTaskId: "task-1",
         status: "succeeded",
         outputUrl: "https://provider.example/video.mp4",
+        errorMessage: null,
         raw: { status: "succeeded" },
       }),
       storeProviderOutput: async ({ segmentId: id }) =>
@@ -161,5 +162,60 @@ describe("video segment services", () => {
       videoKey: `jobs/${jobId}/segments/${segmentId}/video.mp4`,
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segment_succeeded");
+  });
+
+  it("stores provider task failure details on the segment and job event", async () => {
+    const stores = createStores();
+    await stores.segmentStore.updateSegment(segmentId, {
+      status: "generating",
+      provider: "evolink",
+      model: "veo3.1-fast-beta",
+      providerTaskId: "task-1",
+    });
+    await stores.jobStore.updateJobStatus(jobId, { status: "segment_generating" });
+
+    const result = await pollSubmittedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      pollTask: async () => ({
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerTaskId: "task-1",
+        status: "failed",
+        outputUrl: null,
+        errorMessage: "Input image URL could not be downloaded.",
+        raw: {
+          status: "failed",
+          error: { message: "Input image URL could not be downloaded." },
+        },
+      }),
+      storeProviderOutput: async () => {
+        throw new Error("should not store failed provider output");
+      },
+    });
+
+    expect(result).toEqual({
+      jobId,
+      segmentId,
+      status: "failed",
+      videoKey: null,
+    });
+    expect(stores.segmentStore.listSegments()[0]).toMatchObject({
+      status: "failed",
+      lastError: "Input image URL could not be downloaded.",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "segment_failed",
+      lastError: "Input image URL could not be downloaded.",
+    });
+    expect(stores.jobStore.listEvents()[0]).toMatchObject({
+      toStatus: "segment_failed",
+      eventSnapshot: {
+        segmentId,
+        providerTaskId: "task-1",
+        errorMessage: "Input image URL could not be downloaded.",
+      },
+    });
   });
 });

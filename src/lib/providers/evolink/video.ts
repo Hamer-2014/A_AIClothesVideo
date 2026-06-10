@@ -33,6 +33,7 @@ export interface EvoLinkTaskResult {
   providerTaskId: string;
   status: "queued" | "running" | "succeeded" | "failed";
   outputUrl: string | null;
+  errorMessage: string | null;
   raw: JsonValue;
 }
 
@@ -143,6 +144,24 @@ export function getEvoLinkVideoConfig(
   };
 }
 
+function errorMessageFrom(raw: Record<string, unknown>) {
+  const error = asRecord(raw.error);
+  const dataError = asRecord(asRecord(raw.data).error);
+  const candidates = [
+    error.message,
+    dataError.message,
+    raw.error_message,
+    raw.errorMessage,
+  ];
+
+  return (
+    candidates.find(
+      (candidate): candidate is string =>
+        typeof candidate === "string" && candidate.trim().length > 0,
+    ) ?? null
+  );
+}
+
 async function readJson(response: Response) {
   return asRecord(await response.json().catch(() => ({})));
 }
@@ -208,6 +227,7 @@ export async function pollEvoLinkTask(
     providerTaskId,
     status: normalizeTaskStatus(raw.status ?? asRecord(raw.data).status),
     outputUrl: outputUrlFrom(raw),
+    errorMessage: errorMessageFrom(raw),
     raw: raw as JsonValue,
   };
 }

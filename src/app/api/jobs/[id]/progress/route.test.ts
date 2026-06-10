@@ -25,6 +25,7 @@ describe("GET /api/jobs/[id]/progress", () => {
           jobId: "job-1",
           status: "segment_generating",
           userVisibleStatus: "generating",
+          message: null,
           phase: "generation",
           segmentProgress: {
             total: 2,

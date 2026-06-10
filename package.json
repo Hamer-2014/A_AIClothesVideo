@@ -11,6 +11,7 @@
     "test": "vitest run",
     "smoke:backend": "node scripts/backend-smoke.mjs",
     "smoke:stitch": "node scripts/stitch-smoke.mjs",
+    "debug:generation": "node scripts/generation-debug.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

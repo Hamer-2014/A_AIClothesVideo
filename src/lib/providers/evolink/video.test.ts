@@ -137,6 +137,7 @@ describe("EvoLink video provider", () => {
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",
+      errorMessage: null,
       raw: expect.any(Object),
     });
   });
@@ -168,7 +169,43 @@ describe("EvoLink video provider", () => {
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",
+      errorMessage: null,
       raw: expect.any(Object),
+    });
+  });
+
+  it("parses failed task error messages", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          id: "task-1",
+          status: "failed",
+          error: {
+            code: "generation_failed",
+            message: "Input image URL could not be downloaded.",
+            type: "task_error",
+          },
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await pollEvoLinkTask("task-1", {
+      fetch: fetchImpl,
+      env: {
+        EVOLINK_API_KEY: "sk-test",
+        EVOLINK_BASE_URL: "https://api.evolink.example",
+        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+      },
+    });
+
+    expect(result).toMatchObject({
+      provider: "evolink",
+      model: "veo3.1-fast-beta",
+      providerTaskId: "task-1",
+      status: "failed",
+      outputUrl: null,
+      errorMessage: "Input image URL could not be downloaded.",
     });
   });
 });

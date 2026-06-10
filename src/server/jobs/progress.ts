@@ -8,6 +8,8 @@ export interface JobProgressRecord {
   userId: string;
   status: string;
   userVisibleStatus: string;
+  lastError: string | null;
+  failureReason: string | null;
   finalVideoKey: string | null;
   coverKey: string | null;
 }
@@ -30,6 +32,9 @@ export interface JobProgressStore {
 }
 
 function phaseForStatus(status: string) {
+  if (status.endsWith("_failed") || status.startsWith("failed")) {
+    return "failed";
+  }
   if (status.startsWith("asset_") || status.startsWith("lite_")) {
     return "asset_analysis";
   }
@@ -51,10 +56,6 @@ function phaseForStatus(status: string) {
   if (status === "deliverable") {
     return "deliverable";
   }
-  if (status.startsWith("failed")) {
-    return "failed";
-  }
-
   return "setup";
 }
 
@@ -92,6 +93,7 @@ export async function getVideoJobProgress({
     jobId: job.id,
     status: job.status,
     userVisibleStatus: job.userVisibleStatus,
+    message: job.failureReason ?? job.lastError,
     phase: phaseForStatus(job.status),
     segmentProgress: countSegments(segments),
     stitching: { status: stitchJob?.status ?? "not_started" },
@@ -147,6 +149,8 @@ export function createDrizzleJobProgressStore(
           userId: videoJobs.userId,
           status: videoJobs.status,
           userVisibleStatus: videoJobs.userVisibleStatus,
+          lastError: videoJobs.lastError,
+          failureReason: videoJobs.failureReason,
           finalVideoKey: videoJobs.finalVideoKey,
           coverKey: videoJobs.coverKey,
         })
