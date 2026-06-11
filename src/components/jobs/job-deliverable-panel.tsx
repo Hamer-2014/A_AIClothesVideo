@@ -65,7 +65,7 @@ export function JobDeliverablePanel({
       </div>
       {previewUrl ? (
         <video
-          className="mt-5 aspect-video w-full rounded-lg bg-black"
+          className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
           controls
           playsInline
           preload="metadata"
