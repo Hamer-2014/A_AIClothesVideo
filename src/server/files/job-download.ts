@@ -57,14 +57,28 @@ export function createDrizzleJobDownloadStore(
   };
 }
 
+export function sanitizeDownloadFilename(filename?: string) {
+  const sanitized = filename
+    ?.trim()
+    .replace(/[\\/]+/g, "_")
+    .replace(/[\u0000-\u001f\u007f<>:"|?*]+/g, "_")
+    .replace(/^[._]+/, "")
+    .slice(0, 120);
+  const safeBase = sanitized || "video";
+
+  return safeBase.toLowerCase().endsWith(".mp4") ? safeBase : `${safeBase}.mp4`;
+}
+
 export async function createJobDownloadUrl({
   store,
   jobId,
   userId,
+  filename,
 }: {
   store: JobDownloadStore;
   jobId: string;
   userId: string;
+  filename?: string;
 }) {
   const job = await store.findJob({ jobId, userId });
   if (!job) {
@@ -79,10 +93,25 @@ export async function createJobDownloadUrl({
   const url = await createDownloadSignedUrl({
     key: job.finalVideoKey,
     expiresIn,
+    filename: sanitizeDownloadFilename(filename),
   });
 
   return {
     url,
     expiresIn,
   };
+}
+
+export function createPublicJobVideoUrl({
+  key,
+  publicBaseUrl = process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL,
+}: {
+  key: string | null;
+  publicBaseUrl?: string;
+}) {
+  if (!key || !publicBaseUrl) {
+    return null;
+  }
+
+  return `${publicBaseUrl.replace(/\/+$/, "")}/${key.replace(/^\/+/, "")}`;
 }

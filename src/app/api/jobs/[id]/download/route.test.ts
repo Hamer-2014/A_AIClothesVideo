@@ -15,23 +15,27 @@ describe("GET /api/jobs/[id]/download", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns a download URL for the owner of a deliverable job", async () => {
+  it("redirects to a signed attachment URL for the owner of a deliverable job", async () => {
     const response = await handleJobDownloadRequest(
-      new Request("http://localhost/api/jobs/job-1/download"),
+      new Request(
+        "http://localhost/api/jobs/job-1/download?filename=spring-dress.mp4",
+      ),
       { params: { id: "job-1" } },
       {
         getSession: async () => ({ user: { id: "user-1" } }),
-        createDownload: async () => ({
-          url: "https://download.example/final.mp4",
-          expiresIn: 900,
-        }),
+        createDownload: async (input) => {
+          expect(input.filename).toBe("spring-dress.mp4");
+          return {
+            url: "https://download.example/final.mp4",
+            expiresIn: 900,
+          };
+        },
       },
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      url: "https://download.example/final.mp4",
-      expiresIn: 900,
-    });
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://download.example/final.mp4",
+    );
   });
 });

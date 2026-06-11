@@ -22,6 +22,14 @@ type SignedUrlSigner = (
 const defaultSigner: SignedUrlSigner = (client, command, options) =>
   getSignedUrl(client, command, options);
 
+function contentDispositionFor(filename: string) {
+  const fallbackName = filename
+    .replace(/[\u0000-\u001f\u007f"\\]+/g, "")
+    .replace(/[^\x20-\x7e]/g, "_");
+
+  return `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 export async function createUploadSignedUrl({
   bucket = getR2Config().bucket,
   key,
@@ -56,12 +64,14 @@ export async function createUploadSignedUrl({
 export async function createDownloadSignedUrl({
   bucket = getR2Config().bucket,
   key,
+  filename,
   expiresIn = 900,
   client = createR2Client(),
   signer = defaultSigner,
 }: {
   bucket?: string;
   key: string;
+  filename?: string;
   expiresIn?: number;
   client?: S3Client;
   signer?: SignedUrlSigner;
@@ -69,6 +79,11 @@ export async function createDownloadSignedUrl({
   const input: GetObjectCommandInput = {
     Bucket: bucket,
     Key: key,
+    ...(filename
+      ? {
+          ResponseContentDisposition: contentDispositionFor(filename),
+        }
+      : {}),
   };
   const command = new GetObjectCommand(input);
 

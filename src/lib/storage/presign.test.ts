@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { GetObjectCommandInput } from "@aws-sdk/client-s3";
 
 import { createDownloadSignedUrl, createUploadSignedUrl } from "./presign";
 
@@ -48,5 +49,29 @@ describe("R2 presign helpers", () => {
     });
 
     expect(result).toBe("https://signed-download.example");
+  });
+
+  it("adds content disposition for attachment downloads with custom filenames", async () => {
+    const signer: Parameters<typeof createDownloadSignedUrl>[0]["signer"] =
+      vi.fn(async () => "https://signed.example/final.mp4");
+
+    await createDownloadSignedUrl({
+      bucket: "bucket",
+      key: "jobs/job-1/stitched/final.mp4",
+      filename: "spring dress.mp4",
+      signer,
+      client: {} as never,
+    });
+
+    const mockedSigner = vi.mocked(signer);
+    const commandInput = mockedSigner.mock.calls[0]?.[1].input as
+      | GetObjectCommandInput
+      | undefined;
+    expect(commandInput).toMatchObject({
+      Bucket: "bucket",
+      Key: "jobs/job-1/stitched/final.mp4",
+      ResponseContentDisposition:
+        "attachment; filename=\"spring dress.mp4\"; filename*=UTF-8''spring%20dress.mp4",
+    });
   });
 });

@@ -17,18 +17,28 @@ interface DownloadJobDeps {
   createDownload?: (input: {
     jobId: string;
     userId: string;
+    filename?: string;
   }) => Promise<{ url: string; expiresIn: number }>;
 }
 
-function defaultCreateDownload(input: { jobId: string; userId: string }) {
+function defaultCreateDownload(input: {
+  jobId: string;
+  userId: string;
+  filename?: string;
+}) {
   return createJobDownloadUrl({
     store: createDrizzleJobDownloadStore(),
     ...input,
   });
 }
 
+function filenameFrom(request: Request) {
+  const value = new URL(request.url).searchParams.get("filename")?.trim();
+  return value || undefined;
+}
+
 export async function handleJobDownloadRequest(
-  _request: Request,
+  request: Request,
   context: { params: { id: string } },
   deps: DownloadJobDeps = {},
 ) {
@@ -40,12 +50,12 @@ export async function handleJobDownloadRequest(
   }
 
   try {
-    return NextResponse.json(
-      await (deps.createDownload ?? defaultCreateDownload)({
-        jobId: context.params.id,
-        userId,
-      }),
-    );
+    const download = await (deps.createDownload ?? defaultCreateDownload)({
+      jobId: context.params.id,
+      userId,
+      filename: filenameFrom(request),
+    });
+    return NextResponse.redirect(download.url);
   } catch (error) {
     if (
       error instanceof Error &&

@@ -1,16 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { AnalyzeRetryButton } from "@/components/jobs/analyze-retry-button";
+import { JobDeliverablePanel } from "@/components/jobs/job-deliverable-panel";
 import { JobContinuePanel } from "@/components/jobs/job-continue-panel";
 import { JobProgress } from "@/components/jobs/job-progress";
 import { buildDashboardNav } from "@/app/app-shell";
 import { getServerSession } from "@/lib/auth/server";
-import {
-  createDrizzleJobDownloadStore,
-  createJobDownloadUrl,
-} from "@/server/files/job-download";
+import { createPublicJobVideoUrl } from "@/server/files/job-download";
 import {
   createDrizzleVideoJobReadStore,
   getVideoJobDetail,
@@ -55,22 +52,12 @@ export default async function JobDetailPage({
     redirect("/jobs");
   }
 
-  let downloadUrl: string | null = null;
+  const previewUrl = createPublicJobVideoUrl({
+    key: progress.finalVideoKey,
+  });
   const canRetryAnalyze =
     detail.job.status === "asset_analysis_failed" ||
     detail.job.status === "asset_analysis_queued";
-  if (progress.downloadReady) {
-    try {
-      const download = await createJobDownloadUrl({
-        store: createDrizzleJobDownloadStore(),
-        jobId: id,
-        userId,
-      });
-      downloadUrl = download.url;
-    } catch {
-      downloadUrl = null;
-    }
-  }
 
   return (
     <DashboardShell
@@ -85,19 +72,19 @@ export default async function JobDetailPage({
               jobId={detail.job.id}
             />
           ) : null}
-          {downloadUrl ? (
-            <Link
-              className="inline-flex h-10 items-center rounded-md bg-[var(--ink)] px-4 text-sm font-medium text-white"
-              href={downloadUrl}
-            >
-              下载成片
-            </Link>
-          ) : null}
         </div>
       }
     >
       <div className="space-y-6">
         <JobProgress progress={progress} />
+
+        {progress.downloadReady ? (
+          <JobDeliverablePanel
+            defaultFilename={`runwaytools-${detail.job.id.slice(0, 8)}.mp4`}
+            jobId={detail.job.id}
+            previewUrl={previewUrl}
+          />
+        ) : null}
 
         <JobContinuePanel
           job={detail.job}
