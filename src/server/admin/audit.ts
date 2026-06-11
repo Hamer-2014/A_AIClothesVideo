@@ -46,6 +46,16 @@ export interface AdminAuditStore {
   createAuditLog(input: NewAdminAuditRecord): Promise<AdminAuditRecord>;
 }
 
+export function normalizeAdminReason(reason: string | undefined) {
+  const normalized = reason?.trim() ?? "";
+
+  if (normalized.length < 6) {
+    throw new Error("Admin action reason must be at least 6 characters.");
+  }
+
+  return normalized;
+}
+
 export function toAuditSnapshot(value: unknown): JsonValue {
   if (value === undefined || value === null) {
     return null;

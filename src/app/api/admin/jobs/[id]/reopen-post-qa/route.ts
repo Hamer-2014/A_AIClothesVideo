@@ -29,7 +29,7 @@ function parseBody(body: unknown) {
       : {};
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
-  if (!reason) {
+  if (reason.length < 6) {
     throw new Error("invalid_reopen_post_qa_input");
   }
 
@@ -88,6 +88,15 @@ export async function handleReopenPostQaRequest(
   } catch (error) {
     if (error instanceof Error && error.message === "Actor cannot reopen Post-QA.") {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_reopen_post_qa_input" },
+        { status: 400 },
+      );
     }
     if (error instanceof Error && error.message === "Video job not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

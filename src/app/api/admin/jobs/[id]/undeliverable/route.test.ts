@@ -44,4 +44,25 @@ describe("POST /api/admin/jobs/[id]/undeliverable", () => {
       ledgerType: "release",
     });
   });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleMarkUndeliverableRequest(
+        new Request("http://localhost/api/admin/jobs/job-1/undeliverable", {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        }),
+        { params: { id: "job-1" } },
+        {
+          getAdminSession: async () => ({
+            userId: "operator-1",
+            email: "operator@example.com",
+            role: "operator",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
+  });
 });

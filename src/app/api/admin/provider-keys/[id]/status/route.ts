@@ -33,7 +33,10 @@ function parseBody(body: unknown) {
   const status = record.status;
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
-  if (!providerStatuses.includes(status as ProviderStatus) || !reason) {
+  if (
+    !providerStatuses.includes(status as ProviderStatus) ||
+    reason.length < 6
+  ) {
     throw new Error("invalid_provider_key_status_input");
   }
 
@@ -100,6 +103,15 @@ export async function handleUpdateProviderKeyStatusRequest(
       error.message === "Actor cannot update provider keys."
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_provider_key_status_input" },
+        { status: 400 },
+      );
     }
     if (error instanceof Error && error.message === "Provider key not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

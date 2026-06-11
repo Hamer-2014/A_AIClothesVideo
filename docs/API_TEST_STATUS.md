@@ -1,170 +1,187 @@
 # API 测试状态清单
 
-> 目的：把“已经真实验证过什么、只做了单测什么、还没跑什么”说清楚，避免误判开发完成度。
+> 目的：把这次真实跑过什么、哪里成功、哪里失败、失败卡在哪，写成可复核记录，避免把“代码写了”误当成“闭环验收完成”。
 
-更新时间：2026-06-09
+更新时间：2026-06-11
 
 ## 结论先说
 
-- 后台与内部 API 的代码面已经基本齐了。
-- 真实端到端已经验证过的是 `stitch -> callback -> post_qa_queued` 这段主链路。
-- Post-QA 代码与测试是有的，但你我还没完成“生产环境下真实 provider 跑到 deliverable”的一次完整 smoke 留痕。
-- 这就是接下来优先要补的，不要被“接口都在”骗了。
+- Admin Ops Closure 的代码改动已完成，`/admin/jobs`、`/admin/jobs/[id]`、Provider / Template / Billing 页面和敏感动作 reason / audit 约束都已落地。
+- 本轮本地验证已通过：
+  - `npm run typecheck`
+  - `npm test`
+  - `npm run build`
+- 本轮真实环境验证结果分成两半：
+  - `npm run smoke:stitch` 成功
+  - `npm run smoke:backend` 失败
+- 失败不是环境没配，也不是 Cloud Run 不通，而是目标真实任务已经 `deliverable`，但 `credit_ledger` 里没有任何 `capture` 记录，账务闭环存在真实缺口。
 
-## 已做真实链路验证
+## 本轮真实验收样本
 
-### 1. Cloud Run stitch 主链路
+- 日期：2026-06-11
+- 验收 job id：`5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4`
+- `/api/health` 摘要：
+  - `ready = true`
+  - `database/auth/storage/internalSecurity/stitchWorker/billing/aiProviders` 全部 `configured = true`
+- `video_jobs.status`：`deliverable`
+- `post_qa_mode`：`lite`
+- final video R2 key：
+  - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/stitched/final.mp4`
+- cover R2 key：
+  - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/covers/cover.webp`
+- QA frame R2 keys：
+  - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/qa/frames/0.jpg`
+  - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/qa/frames/1.jpg`
+  - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/qa/frames/2.jpg`
+- stitch job：
+  - `stitchJobId = 61197807-d969-4495-b8bf-2d612573e7ed`
+  - `status = succeeded`
+- post-qa：
+  - `postQaResultId = e4ab4c4f-7c88-403e-828c-99405558a067`
+  - `status = passed`
 
-已验证内容：
+## 本轮命令结果
 
-- `GET {CLOUD_RUN_STITCH_URL}/health`
-- `POST /api/internal/stitch/jobs`
-- Cloud Run 下载 R2 segment
-- ffmpeg 拼接
-- R2 上传 `jobs/{jobId}/stitched/final.mp4`
-- R2 上传 `jobs/{jobId}/qa/frames/*.jpg`
-- `POST /api/internal/stitch/callback`
-- `video_jobs.status -> post_qa_queued`
+### 1. 核心构建验证
 
-已知真实样本：
+已通过：
 
-- `jobId = e204403f-8bd0-4496-8089-1532cdfbdac7`
-- `stitchJobId = 67a1d931-dfd5-4266-9b63-96e92be22952`
-- 结果状态：
-  - `video_jobs.status = post_qa_queued`
-  - `stitch_jobs.status = succeeded`
+```bash
+npm run typecheck
+npm test
+npm run build
+```
 
-R2 已确认对象：
+结果：
 
-- `jobs/e204403f-8bd0-4496-8089-1532cdfbdac7/stitched/final.mp4`
-- `jobs/e204403f-8bd0-4496-8089-1532cdfbdac7/qa/frames/0.jpg`
-- `jobs/e204403f-8bd0-4496-8089-1532cdfbdac7/qa/frames/1.jpg`
-- `jobs/e204403f-8bd0-4496-8089-1532cdfbdac7/qa/frames/2.jpg`
+- `typecheck` 通过
+- `test` 通过，`107` 个 test files、`348` 个 tests 全绿
+- `build` 通过，admin 页面与 admin API 均进入 Next.js route 清单
 
-## 已有自动化测试覆盖
+### 2. 真实 smoke
 
-### 用户侧 API
+#### `npm run smoke:stitch`
 
-| API | 自动化状态 | 备注 |
+结果：成功
+
+关键信息：
+
+- Cloud Run `/health` 返回 `ok: true`
+- 该任务复用了已有 stitch/post-qa 结果，没有重复触发 stitch
+- `final.mp4` 存在
+- QA frames 共 `3` 张，均存在
+- smoke 结论：`stitch_completed`
+
+#### `npm run smoke:backend`
+
+结果：失败
+
+失败信息原文：
+
+```text
+Full smoke expected credit capture, but ledger only has:
+```
+
+这代表：
+
+- 目标任务已经是 `deliverable`
+- stitch 与 post-qa 都成功
+- 但 `credit_ledger` 中没有 `capture`
+- 当前真实系统状态不满足“交付后账务闭环完成”的验收要求
+
+## credit_ledger 真实状态
+
+针对 job `5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4`：
+
+- `reserve`：未在本次 smoke 输出中找到
+- `capture`：未找到
+- `release`：未找到
+- `refund`：未找到
+
+这不是文档缺失，是当前真实数据缺失。
+
+## Admin Ops Closure 本轮完成内容
+
+### Jobs
+
+- `/admin/jobs` 新增：
+  - `attention=1` 异常队列
+  - `isTest=true|false` 筛选
+  - `status` 筛选
+  - `q=jobId|userId` 搜索
+- attention 规则已覆盖失败态和 10 分钟以上 stale 运行态
+
+### Job Detail
+
+- `/admin/jobs/[id]` 首屏先显示诊断摘要，不再以 JSON dump 作为唯一入口
+- 已展示：
+  - 任务总览
+  - 素材区
+  - 分镜区
+  - Segment 表
+  - Stitch 区
+  - Post-QA 区
+  - Provider logs
+  - Moderation results
+  - Credit ledger
+  - State events timeline
+
+### Admin Actions
+
+- 以下动作已统一要求 `reason` 至少 `6` 个字符：
+  - 重试 segment
+  - 重开 Post-QA
+  - 标记不可交付
+  - 手动补点
+  - 更新模板状态
+  - 更新 provider key 状态
+  - 更新 model route
+- 服务层已统一复用 reason 校验
+- route 层已把该类输入错误映射为 `400`
+- operator 仍不能修改 provider key / model route
+- 模板状态更新也已补上 admin audit
+
+### Provider / Template / Billing 页面
+
+- Provider 页面已显示：
+  - provider key label
+  - provider id
+  - status
+  - masked key preview
+  - daily limit / current daily cost
+  - concurrency
+  - failure count
+- Template 页面已显示：
+  - template id
+  - name
+  - status
+  - risk level
+  - trial eligibility
+- Billing 页面已显示：
+  - wallet
+  - orders
+  - credit ledger
+  - admin adjustment 入口
+
+## 当前仍未完成的真实验收项
+
+下面这些不能假装已经过：
+
+| 项目 | 当前状态 | 说明 |
 | --- | --- | --- |
-| `POST /api/uploads/presign` | 已有测试 | 接口级 |
-| `GET /api/files/signed-url` | 已有测试 | 接口级 |
-| `POST /api/jobs` | 已有测试 | 接口级 |
-| `GET /api/jobs/[id]` | 已有测试 | 接口级 |
-| `POST /api/jobs/[id]/analyze` | 已有测试 | 接口级 |
-| `POST /api/jobs/[id]/storyboard` | 已有测试 | 接口级 |
-| `POST /api/jobs/[id]/confirm` | 已有测试 | 接口级 |
-| `GET /api/jobs/[id]/progress` | 已有测试 | 接口级 |
+| deliverable 后 `credit_ledger.capture` | 未通过 | `smoke:backend` 明确失败 |
+| `failed_released / failed_refunded` 真实补偿回路 smoke | 未补 | 仍需真实任务演练 |
+| 运维动作后的 `admin_audit_logs` 真实库回查 | 未单独留档 | 自动化已覆盖，但缺本轮真实截图/SQL 留痕 |
 
-### 内部 API
+## 这次记录真正暴露的问题
 
-| API | 自动化状态 | 备注 |
-| --- | --- | --- |
-| `POST /api/internal/worker/tick` | 已有测试 | 包括 staged result 返回 |
-| `POST /api/internal/segments/[id]/submit` | 已有测试 | 接口级 |
-| `POST /api/internal/segments/[id]/poll` | 已有测试 | 接口级 |
-| `POST /api/internal/stitch/jobs` | 已有测试 | 接口级 |
-| `POST /api/internal/stitch/callback` | 已有测试 | 接口级 |
-| `POST /api/internal/post-qa/resolve` | 已有测试 | 接口级 |
+最大的问题不是后台页面，而是账务闭环：
 
-### 后台运维 API
+- 当前真实任务已经 `deliverable`
+- Post-QA 已 `passed`
+- final video 与 QA frames 都在 R2
+- 但 `credit_ledger.capture` 缺失
 
-| API | 自动化状态 | 备注 |
-| --- | --- | --- |
-| `GET /api/admin/jobs/[id]` | 已有测试 | 接口级 |
-| `POST /api/admin/templates/status` | 已有测试 | 接口级 |
-| `GET /api/admin/providers` | 已有测试 | 接口级 |
-| `POST /api/admin/provider-keys/[id]/status` | 已有测试 | 接口级 |
-| `POST /api/admin/model-routes/[id]` | 已有测试 | 接口级 |
-| `GET /api/admin/billing` | 已有测试 | 接口级 |
-| `POST /api/admin/credits/adjust` | 已有测试 | 接口级 |
-| `POST /api/admin/segments/[id]/retry` | 已有测试 | 接口级 |
-| `POST /api/admin/jobs/[id]/undeliverable` | 已有测试 | 接口级 |
+这意味着如果现在只看后台 UI 和测试通过率，很容易误判“系统闭环已经完成”。实际上没有，账务链路还差最后一刀。
 
-### 服务层 / 核心逻辑
-
-| 模块 | 自动化状态 | 备注 |
-| --- | --- | --- |
-| 模板规则引擎 | 已有测试 | catalog/rules/recommend/seed/status |
-| stitch job 创建与回调 | 已有测试 | `src/server/stitch/*.test.ts` |
-| Post-QA job input / check / resolve / tick | 已有测试 | `src/server/post-qa/*.test.ts` |
-| admin job actions | 已有测试 | 重试片段、标记不可交付 |
-| provider ops | 已有测试 | key/route 状态运维 |
-| billing ops | 已有测试 | 补点、账本视图 |
-| `/api/health` 运行时检查 | 已补测试 | 本轮新增 |
-
-## 已补但尚未完成真实 smoke 的内容
-
-### 1. 完整后端冒烟脚本
-
-脚本：
-
-- `npm run smoke:backend`
-- `npm run smoke:stitch`
-
-用途：
-
-- `smoke:stitch` 只验证 stitch 到 `post_qa_queued`
-- `smoke:backend` 继续追到 Post-QA 终态，并检查 R2、数据库、账本
-
-现状：
-
-- 脚本已补。
-- 还没在你当前真实环境上重新跑出一份新的完整结果留档。
-
-### 2. `/api/health` 运维视图
-
-现状：
-
-- 已从简单 ping 扩展为 runtime readiness 视图。
-- 会按模块报告缺失配置：
-  - database
-  - auth
-  - storage
-  - internalSecurity
-  - stitchWorker
-  - billing
-  - aiProviders
-
-限制：
-
-- 这是“配置就绪度”，不是外部依赖的真实联通性探针。
-- 它不会去真的连数据库、调用 Creem、探测 DeepSeek。
-- 这是有意保守设计，避免 health 接口自己变成高风险慢接口。
-
-## 尚未完成的真实验证
-
-下面这些不能自称“已验收”：
-
-| 项目 | 当前状态 | 风险 |
-| --- | --- | --- |
-| Post-QA 使用真实视觉 provider 跑到 `deliverable` | 未留存完整 smoke 结果 | 可能在 provider schema、signed URL、capture 上翻车 |
-| `failed_released` 真实失败回路演练 | 未完整留档 | 退款/释放和状态切换可能有边角问题 |
-| Creem moderation 拦截真实 case | 未做完整生产链路回放 | 可能只在单测里对 |
-| 16/24 秒多 segment 到完整交付 | stitch 主链路做过，但未形成完整最终验收清单 | 并发/顺序/账务仍需盯 |
-| 运维 API 联合演练 | 未做系统化脚本 | 单接口能用不等于整套运维流程顺手 |
-
-## 推荐验收顺序
-
-1. 先跑 `GET /api/health`
-2. 跑 `npm run smoke:stitch`
-3. 跑 `npm run smoke:backend`
-4. 查数据库：
-   - `video_jobs`
-   - `stitch_jobs`
-   - `post_qa_results`
-   - `credit_ledger`
-5. 查 R2：
-   - `stitched/final.mp4`
-   - `qa/frames/*`
-6. 最后再演练后台运维 API
-
-## 这份清单真正想防的坑
-
-最大的坑不是 bug，本质上是错觉：
-
-- “有 route 文件了，所以功能完成了”
-- “单测过了，所以生产能跑”
-- “之前某次跑通过，所以现在也一定没问题”
-
-这些都不成立。后面你验收后台 API，优先看 smoke 结果和真实状态，不要被接口列表麻痹。
+如果下一个 session 做验收，优先盯这个问题，不要先去挑页面样式。

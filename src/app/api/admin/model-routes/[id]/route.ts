@@ -50,7 +50,7 @@ function parseBody(body: unknown) {
       : undefined;
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
-  if (!reason) {
+  if (reason.length < 6) {
     throw new Error("invalid_model_route_input");
   }
 
@@ -129,6 +129,15 @@ export async function handleUpdateModelRouteRequest(
       error.message === "Actor cannot update model routes."
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_model_route_input" },
+        { status: 400 },
+      );
     }
     if (error instanceof Error && error.message === "Model route not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

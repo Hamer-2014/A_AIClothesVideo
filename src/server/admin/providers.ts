@@ -12,6 +12,7 @@ import {
   type AdminAuditActor,
   type AdminAuditStore,
   type AdminAuditRequestMeta,
+  normalizeAdminReason,
   toAuditSnapshot,
   writeAdminAuditLog,
 } from "./audit";
@@ -116,6 +117,8 @@ export async function updateProviderKeyStatus({
     throw new Error("Actor cannot update provider keys.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const before = await store.findKey(keyId);
   if (!before) {
     throw new Error("Provider key not found.");
@@ -128,7 +131,7 @@ export async function updateProviderKeyStatus({
     action: "provider_key:update",
     targetType: "provider_key",
     targetId: keyId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: toAuditSnapshot(before),
     afterSnapshot: toAuditSnapshot(after),
     requestMeta,
@@ -164,6 +167,8 @@ export async function updateModelRoute({
     throw new Error("Actor cannot update model routes.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const before = await store.findRoute(routeId);
   if (!before) {
     throw new Error("Model route not found.");
@@ -182,7 +187,7 @@ export async function updateModelRoute({
     action: "model_route:update",
     targetType: "model_route",
     targetId: routeId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: toAuditSnapshot(before),
     afterSnapshot: toAuditSnapshot(after),
     requestMeta,

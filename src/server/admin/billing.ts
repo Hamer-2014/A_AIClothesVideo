@@ -11,6 +11,7 @@ import {
   type AdminAuditActor,
   type AdminAuditStore,
   type AdminAuditRequestMeta,
+  normalizeAdminReason,
   toAuditSnapshot,
   writeAdminAuditLog,
 } from "./audit";
@@ -99,11 +100,13 @@ export async function adjustUserCreditsByAdmin({
     throw new Error("Actor cannot adjust credits.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const result = await adjustCredits({
     store: ledgerStore,
     userId: targetUserId,
     amount,
-    reason,
+    reason: normalizedReason,
     idempotencyKey: `admin_adjust:${targetUserId}:${actor.userId}:${Date.now()}`,
     metadata: {
       actorUserId: actor.userId,
@@ -117,7 +120,7 @@ export async function adjustUserCreditsByAdmin({
     action: "credits:admin_adjust",
     targetType: "user",
     targetId: targetUserId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: null,
     afterSnapshot: toAuditSnapshot(result.ledger),
     requestMeta,

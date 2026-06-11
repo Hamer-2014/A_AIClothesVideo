@@ -29,7 +29,7 @@ function parseBody(body: unknown) {
   const jobId = typeof record.jobId === "string" ? record.jobId.trim() : "";
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
-  if (!jobId || !reason) {
+  if (!jobId || reason.length < 6) {
     throw new Error("invalid_retry_segment_input");
   }
 
@@ -93,6 +93,15 @@ export async function handleRetrySegmentRequest(
       error.message === "Actor cannot retry video segments."
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_retry_segment_input" },
+        { status: 400 },
+      );
     }
     if (error instanceof Error && error.message === "Video segment not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

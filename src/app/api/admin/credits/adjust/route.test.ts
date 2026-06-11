@@ -54,4 +54,28 @@ describe("POST /api/admin/credits/adjust", () => {
       },
     });
   });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleAdjustCreditsRequest(
+        new Request("http://localhost/api/admin/credits/adjust", {
+          method: "POST",
+          body: JSON.stringify({
+            userId: "user-1",
+            amount: 25,
+            reason,
+          }),
+        }),
+        {
+          getAdminSession: async () => ({
+            userId: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
+  });
 });

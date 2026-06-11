@@ -29,6 +29,7 @@ describe("POST /api/admin/templates/status", () => {
           templateId: "front_pan",
           version: 1,
           status: "paused",
+          reason: "pause unstable template",
         }),
       }),
       {
@@ -51,5 +52,30 @@ describe("POST /api/admin/templates/status", () => {
       version: 1,
       status: "paused",
     });
+  });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleUpdateTemplateStatusRequest(
+        new Request("http://localhost/api/admin/templates/status", {
+          method: "POST",
+          body: JSON.stringify({
+            templateId: "front_pan",
+            version: 1,
+            status: "paused",
+            reason,
+          }),
+        }),
+        {
+          getAdminSession: async () => ({
+            userId: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
   });
 });
