@@ -21,10 +21,22 @@ export interface VisionAssetAnalysisInput {
   imageUrls: string[];
 }
 
+export interface VisionPostQaInput {
+  mode: VisionAnalysisMode;
+  frameUrls: string[];
+}
+
 export interface VisionAssetAnalysisResult {
   provider: string;
   model: string;
   analysisJson: JsonValue;
+  raw: JsonValue;
+}
+
+export interface VisionPostQaResult {
+  provider: string;
+  model: string;
+  qaJson: JsonValue;
   raw: JsonValue;
 }
 
@@ -35,6 +47,8 @@ interface VisionClientDeps {
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
   "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.";
+const postQaSystemInstruction =
+  "Review stitched clothing product video frames for generation quality. Return only JSON with passed, failure_category, checks, risk_flags, summary. Set passed to true only when the garment remains consistent, frames are clear, safe, and suitable for a product marketing video.";
 const assetAnalysisJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -83,6 +97,44 @@ const assetAnalysisJsonSchema = {
       type: "array",
       items: { type: "string" },
     },
+  },
+} as const;
+const postQaJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "passed",
+    "failure_category",
+    "checks",
+    "risk_flags",
+    "summary",
+  ],
+  properties: {
+    passed: { type: "boolean" },
+    failure_category: {
+      anyOf: [
+        { type: "string" },
+        { type: "null" },
+      ],
+    },
+    checks: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "passed", "notes"],
+        properties: {
+          name: { type: "string" },
+          passed: { type: "boolean" },
+          notes: { type: "string" },
+        },
+      },
+    },
+    risk_flags: {
+      type: "array",
+      items: { type: "string" },
+    },
+    summary: { type: "string" },
   },
 } as const;
 
@@ -144,11 +196,11 @@ function isResponsesApi(baseUrl: string) {
   return /\/responses$/i.test(baseUrl);
 }
 
-function responsesInput(imageUrls: string[]) {
+function responsesInput(imageUrls: string[], instruction = systemInstruction) {
   return [
     {
       role: "system",
-      content: [{ type: "input_text", text: systemInstruction }],
+      content: [{ type: "input_text", text: instruction }],
     },
     {
       role: "user",
@@ -160,11 +212,11 @@ function responsesInput(imageUrls: string[]) {
   ];
 }
 
-function chatMessages(imageUrls: string[]) {
+function chatMessages(imageUrls: string[], instruction = systemInstruction) {
   return [
     {
       role: "system",
-      content: systemInstruction,
+      content: instruction,
     },
     {
       role: "user",
@@ -250,6 +302,62 @@ export async function createVisionAssetAnalysis(
     provider: config.provider,
     model: config.model,
     analysisJson,
+    raw: raw as JsonValue,
+  };
+}
+
+export async function createVisionPostQaCheck(
+  input: VisionPostQaInput,
+  deps: VisionClientDeps = {},
+): Promise<VisionPostQaResult> {
+  const config = getVisionConfig(input.mode);
+  const fetchImpl = deps.fetch ?? fetch;
+  const responsesApi = isResponsesApi(config.baseUrl);
+  const url = responsesApi
+    ? config.baseUrl
+    : `${config.baseUrl}/chat/completions`;
+  const body = responsesApi
+    ? {
+        model: config.model,
+        input: responsesInput(input.frameUrls, postQaSystemInstruction),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "post_qa",
+            strict: true,
+            schema: postQaJsonSchema,
+          },
+        },
+      }
+    : {
+        model: config.model,
+        stream: false,
+        response_format: { type: "json_object" },
+        messages: chatMessages(input.frameUrls, postQaSystemInstruction),
+      };
+
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const raw = asRecord(await response.json());
+
+  if (!response.ok) {
+    throw new Error(`Vision provider failed with status ${response.status}.`);
+  }
+
+  const qaJson = responsesApi
+    ? parseResponsesOutput(raw)
+    : parseJsonContent(asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content);
+
+  return {
+    provider: config.provider,
+    model: config.model,
+    qaJson,
     raw: raw as JsonValue,
   };
 }

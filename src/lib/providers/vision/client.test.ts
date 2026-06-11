@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createVisionAssetAnalysis,
+  createVisionPostQaCheck,
   getVisionConfig,
   VisionProviderUnavailableError,
 } from "./client";
@@ -234,5 +235,70 @@ describe("vision provider client", () => {
         { fetch: fetchMock },
       ),
     ).rejects.toThrow("Vision provider failed with status 400.");
+  });
+
+  it("uses a dedicated post-QA schema requiring a boolean passed result", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_MODEL_LITE", "gpt-5.4-nano");
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json({
+        id: "resp_qa_123",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            status: "completed",
+            role: "assistant",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  passed: true,
+                  failure_category: null,
+                  checks: [
+                    {
+                      name: "garment_consistency",
+                      passed: true,
+                      notes: "Generated frames preserve the garment.",
+                    },
+                  ],
+                  risk_flags: [],
+                  summary: "The stitched video is acceptable.",
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    };
+
+    const result = await createVisionPostQaCheck(
+      {
+        mode: "lite",
+        frameUrls: ["https://signed.example/frame-0.jpg"],
+      },
+      { fetch: fetchMock },
+    );
+
+    expect(calls[0]?.[0]).toBe("https://api.apimart.ai/v1/responses");
+    const body = JSON.parse(calls[0]?.[1]?.body as string);
+    expect(body.text?.format).toMatchObject({
+      type: "json_schema",
+      name: "post_qa",
+      strict: true,
+    });
+    expect(body.text?.format?.schema?.required).toContain("passed");
+    expect(body.input[0].content[0].text).toContain(
+      "Return only JSON with passed",
+    );
+    expect(body.input[0].content[0].text).not.toContain("asset_role");
+    expect(result.qaJson).toMatchObject({
+      passed: true,
+      failure_category: null,
+    });
   });
 });

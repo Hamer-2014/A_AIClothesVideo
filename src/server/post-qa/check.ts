@@ -5,7 +5,7 @@ import {
   type ProviderCallLogStore,
 } from "@/lib/providers/log-call";
 import {
-  createVisionAssetAnalysis,
+  createVisionPostQaCheck,
   type VisionAnalysisMode,
 } from "@/lib/providers/vision/client";
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
@@ -69,12 +69,12 @@ async function defaultPostQaVisionProvider({
   mode,
   frameUrls,
 }: PostQaVisionInput): Promise<PostQaVisionResult> {
-  const result = await createVisionAssetAnalysis({ mode, imageUrls: frameUrls });
+  const result = await createVisionPostQaCheck({ mode, frameUrls });
 
   return {
     provider: result.provider,
     model: result.model,
-    qaJson: result.analysisJson,
+    qaJson: result.qaJson,
     raw: result.raw,
   };
 }
