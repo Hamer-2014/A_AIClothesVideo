@@ -47,22 +47,24 @@ describe("POST /api/admin/jobs/[id]/reopen-post-qa", () => {
     });
   });
 
-  it("rejects missing reasons", async () => {
-    const response = await handleReopenPostQaRequest(
-      new Request("http://localhost/api/admin/jobs/job-1/reopen-post-qa", {
-        method: "POST",
-        body: JSON.stringify({ reason: "" }),
-      }),
-      { params: { id: "job-1" } },
-      {
-        getAdminSession: async () => ({
-          userId: "operator-1",
-          email: "operator@example.com",
-          role: "operator",
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleReopenPostQaRequest(
+        new Request("http://localhost/api/admin/jobs/job-1/reopen-post-qa", {
+          method: "POST",
+          body: JSON.stringify({ reason }),
         }),
-      },
-    );
+        { params: { id: "job-1" } },
+        {
+          getAdminSession: async () => ({
+            userId: "operator-1",
+            email: "operator@example.com",
+            role: "operator",
+          }),
+        },
+      );
 
-    expect(response.status).toBe(400);
+      expect(response.status).toBe(400);
+    }
   });
 });

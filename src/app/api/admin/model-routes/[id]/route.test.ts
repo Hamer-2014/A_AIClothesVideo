@@ -57,4 +57,28 @@ describe("POST /api/admin/model-routes/[id]", () => {
       allowPublicFallback: false,
     });
   });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleUpdateModelRouteRequest(
+        new Request("http://localhost/api/admin/model-routes/route-1", {
+          method: "POST",
+          body: JSON.stringify({
+            status: "active",
+            reason,
+          }),
+        }),
+        { params: { id: "route-1" } },
+        {
+          getAdminSession: async () => ({
+            userId: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
+  });
 });

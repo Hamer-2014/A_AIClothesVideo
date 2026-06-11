@@ -7,7 +7,7 @@ describe("POST /api/admin/segments/[id]/retry", () => {
     const response = await handleRetrySegmentRequest(
       new Request("http://localhost/api/admin/segments/segment-1/retry", {
         method: "POST",
-        body: JSON.stringify({ jobId: "job-1", reason: "retry" }),
+        body: JSON.stringify({ jobId: "job-1", reason: "retry segment failure" }),
       }),
       { params: { id: "segment-1" } },
       { getAdminSession: async () => null },
@@ -20,7 +20,7 @@ describe("POST /api/admin/segments/[id]/retry", () => {
     const response = await handleRetrySegmentRequest(
       new Request("http://localhost/api/admin/segments/segment-1/retry", {
         method: "POST",
-        body: JSON.stringify({ jobId: "job-1", reason: "retry" }),
+        body: JSON.stringify({ jobId: "job-1", reason: "retry failed segment" }),
       }),
       { params: { id: "segment-1" } },
       {
@@ -43,5 +43,26 @@ describe("POST /api/admin/segments/[id]/retry", () => {
       segmentId: "segment-1",
       status: "queued",
     });
+  });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleRetrySegmentRequest(
+        new Request("http://localhost/api/admin/segments/segment-1/retry", {
+          method: "POST",
+          body: JSON.stringify({ jobId: "job-1", reason }),
+        }),
+        { params: { id: "segment-1" } },
+        {
+          getAdminSession: async () => ({
+            userId: "operator-1",
+            email: "operator@example.com",
+            role: "operator",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
   });
 });

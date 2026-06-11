@@ -91,4 +91,17 @@ describe("billing ops", () => {
       reason: "manual compensation",
     });
   });
+
+  it("rejects admin credit adjustment when reason is too short", async () => {
+    await expect(
+      adjustUserCreditsByAdmin({
+        ledgerStore: createInMemoryCreditLedgerStore(),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor,
+        targetUserId: "user-1",
+        amount: 25,
+        reason: "short",
+      }),
+    ).rejects.toThrow("Admin action reason must be at least 6 characters.");
+  });
 });

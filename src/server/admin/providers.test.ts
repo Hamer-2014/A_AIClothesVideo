@@ -92,6 +92,19 @@ describe("provider ops", () => {
     });
   });
 
+  it("rejects provider key updates when reason is too short", async () => {
+    await expect(
+      updateProviderKeyStatus({
+        store: createStore(),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor,
+        keyId: "key-1",
+        status: "active",
+        reason: "short",
+      }),
+    ).rejects.toThrow("Admin action reason must be at least 6 characters.");
+  });
+
   it("blocks operators from updating provider keys", async () => {
     await expect(
       updateProviderKeyStatus({
@@ -132,5 +145,18 @@ describe("provider ops", () => {
       targetType: "model_route",
       targetId: "route-1",
     });
+  });
+
+  it("rejects model route updates when reason is empty or too short", async () => {
+    await expect(
+      updateModelRoute({
+        store: createStore(),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor,
+        routeId: "route-1",
+        status: "active",
+        reason: "   ",
+      }),
+    ).rejects.toThrow("Admin action reason must be at least 6 characters.");
   });
 });

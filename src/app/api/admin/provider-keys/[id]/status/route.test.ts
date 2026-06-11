@@ -42,4 +42,25 @@ describe("POST /api/admin/provider-keys/[id]/status", () => {
       status: "active",
     });
   });
+
+  it("rejects missing, whitespace-only, and short reasons", async () => {
+    for (const reason of ["", "   ", "short"]) {
+      const response = await handleUpdateProviderKeyStatusRequest(
+        new Request("http://localhost/api/admin/provider-keys/key-1/status", {
+          method: "POST",
+          body: JSON.stringify({ status: "active", reason }),
+        }),
+        { params: { id: "key-1" } },
+        {
+          getAdminSession: async () => ({
+            userId: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+    }
+  });
 });

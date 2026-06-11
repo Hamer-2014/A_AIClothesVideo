@@ -30,7 +30,12 @@ function parseBody(body: unknown) {
   const amount = typeof record.amount === "number" ? record.amount : Number.NaN;
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
-  if (!userId || !Number.isInteger(amount) || amount <= 0 || !reason) {
+  if (
+    !userId ||
+    !Number.isInteger(amount) ||
+    amount <= 0 ||
+    reason.length < 6
+  ) {
     throw new Error("invalid_credit_adjust_input");
   }
 
@@ -93,6 +98,15 @@ export async function handleAdjustCreditsRequest(
       error.message === "Actor cannot adjust credits."
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_credit_adjust_input" },
+        { status: 400 },
+      );
     }
 
     return NextResponse.json(

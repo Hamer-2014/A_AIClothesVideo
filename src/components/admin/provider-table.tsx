@@ -10,74 +10,120 @@ interface ProviderTableProps {
   routes: ProviderOpsRoute[];
 }
 
+function SectionTable({
+  title,
+  columns,
+  rows,
+  emptyText,
+}: {
+  title: string;
+  columns: string[];
+  rows: string[][];
+  emptyText: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
+      <div className="border-b border-[var(--line)] px-5 py-4">
+        <h3 className="text-base font-medium">{title}</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-[var(--line)] text-sm">
+          <thead className="bg-[var(--surface)] text-left text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
+            <tr>
+              {columns.map((column) => (
+                <th className="px-4 py-3 font-medium" key={column}>
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--line)]">
+            {rows.length === 0 ? (
+              <tr>
+                <td className="px-4 py-6 text-[var(--muted)]" colSpan={columns.length}>
+                  {emptyText}
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, index) => (
+                <tr className="align-top" key={`${title}-${index}`}>
+                  {row.map((value, valueIndex) => (
+                    <td className="px-4 py-4" key={`${title}-${index}-${valueIndex}`}>
+                      {value}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function ProviderTable({ providers, keys, routes }: ProviderTableProps) {
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-        <h3 className="text-base font-medium">Providers</h3>
-        <div className="mt-4 space-y-3">
-          {providers.map((provider) => (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-3 last:border-0"
-              key={String(provider.id)}
-            >
-              <div>
-                <p className="text-sm font-medium">{String(provider.displayName ?? provider.name)}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {String(provider.status ?? "unknown")}
-                </p>
-              </div>
-              <p className="text-xs text-[var(--muted)]">
-                {String(provider.baseUrl ?? "-")}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <SectionTable
+        title="Providers"
+        columns={["Provider", "显示名", "状态", "Base URL"]}
+        emptyText="当前没有 provider 记录。"
+        rows={providers.map((provider) => [
+          provider.name,
+          provider.displayName,
+          provider.status,
+          provider.baseUrl ?? "-",
+        ])}
+      />
 
-      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-        <h3 className="text-base font-medium">Provider Keys</h3>
-        <div className="mt-4 space-y-3">
-          {keys.map((key) => (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-3 last:border-0"
-              key={String(key.id)}
-            >
-              <div>
-                <p className="text-sm font-medium">{String(key.label)}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {String(key.keyPreview ?? "-")}
-                </p>
-              </div>
-              <p className="text-xs text-[var(--muted)]">
-                {String(key.status ?? "unknown")}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <SectionTable
+        title="Provider Keys"
+        columns={[
+          "Label",
+          "Provider ID",
+          "状态",
+          "Masked Key",
+          "Daily Limit",
+          "Current Daily Cost",
+          "Concurrency",
+          "Failure Count",
+        ]}
+        emptyText="当前没有 provider key。"
+        rows={keys.map((key) => [
+          key.label,
+          key.providerId,
+          key.status,
+          key.keyPreview,
+          key.dailyCostLimit,
+          key.currentDailyCost,
+          `${key.currentConcurrency}/${key.concurrentLimit}`,
+          String(key.failureCount),
+        ])}
+      />
 
-      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-        <h3 className="text-base font-medium">Model Routes</h3>
-        <div className="mt-4 space-y-3">
-          {routes.map((route) => (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-3 last:border-0"
-              key={String(route.id)}
-            >
-              <div>
-                <p className="text-sm font-medium">{String(route.purpose)}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {String(route.primaryModel ?? "-")}
-                </p>
-              </div>
-              <p className="text-xs text-[var(--muted)]">
-                {String(route.status ?? "unknown")}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <SectionTable
+        title="Model Routes"
+        columns={[
+          "Purpose",
+          "环境",
+          "状态",
+          "Primary Model",
+          "Fallback Model",
+          "Min Margin",
+          "Public Fallback",
+        ]}
+        emptyText="当前没有 model route。"
+        rows={routes.map((route) => [
+          route.purpose,
+          route.environment,
+          route.status,
+          route.primaryModel,
+          route.fallbackModel ?? "-",
+          `${route.minMarginPercent}%`,
+          route.allowPublicFallback,
+        ])}
+      />
     </div>
   );
 }

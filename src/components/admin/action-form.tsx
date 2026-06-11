@@ -43,8 +43,8 @@ export function AdminActionForm({
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
-    if (!reason.trim()) {
-      setMessage("必须填写原因。");
+    if (reason.trim().length < 6) {
+      setMessage("原因至少 6 个字符，会写入审计日志。");
       return;
     }
 
@@ -138,9 +138,13 @@ export function AdminActionForm({
             className="min-h-24 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm"
             id={`${title}-reason`}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="必须填写操作原因"
+            placeholder="必须填写操作原因，至少 6 个字符"
+            required
             value={reason}
           />
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            至少 6 个字符，会写入审计日志。
+          </p>
         </label>
       </div>
 

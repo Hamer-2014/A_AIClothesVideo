@@ -5,9 +5,13 @@ import {
   type AdminSession,
 } from "@/server/auth/admin-session";
 import {
-  createDrizzleShotTemplateStore,
-  updateShotTemplateStatus,
-} from "@/server/templates/seed";
+  createDrizzleTemplateActionStore,
+  updateTemplateStatusByAdmin,
+} from "@/server/admin/template-actions";
+import {
+  createDrizzleAdminAuditStore,
+  getRequestMeta,
+} from "@/server/admin/audit";
 import type { ShotTemplateStatus } from "@/lib/templates/types";
 
 const allowedStatuses = ["draft", "beta", "active", "paused"] as const;
@@ -15,10 +19,10 @@ const allowedStatuses = ["draft", "beta", "active", "paused"] as const;
 interface UpdateTemplateStatusDeps {
   getAdminSession?: () => Promise<AdminSession | null>;
   updateStatus?: (input: {
-    actorRole: "admin" | "operator";
     templateId: string;
     version: number;
     status: ShotTemplateStatus;
+    reason: string;
   }) => Promise<unknown>;
 }
 
@@ -31,11 +35,13 @@ function parseBody(body: unknown) {
     typeof record.templateId === "string" ? record.templateId.trim() : "";
   const version = typeof record.version === "number" ? record.version : Number.NaN;
   const status = record.status;
+  const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
   if (
     !templateId ||
     !Number.isInteger(version) ||
-    !allowedStatuses.includes(status as ShotTemplateStatus)
+    !allowedStatuses.includes(status as ShotTemplateStatus) ||
+    reason.length < 6
   ) {
     throw new Error("invalid_template_status_input");
   }
@@ -44,18 +50,27 @@ function parseBody(body: unknown) {
     templateId,
     version,
     status: status as ShotTemplateStatus,
+    reason,
   };
 }
 
 function defaultUpdateStatus(input: {
-  actorRole: "admin" | "operator";
+  admin: AdminSession;
+  request: Request;
   templateId: string;
   version: number;
   status: ShotTemplateStatus;
+  reason: string;
 }) {
-  return updateShotTemplateStatus({
-    store: createDrizzleShotTemplateStore(),
-    ...input,
+  return updateTemplateStatusByAdmin({
+    store: createDrizzleTemplateActionStore(),
+    auditStore: createDrizzleAdminAuditStore(),
+    actor: input.admin,
+    templateId: input.templateId,
+    version: input.version,
+    status: input.status,
+    reason: input.reason,
+    requestMeta: getRequestMeta(input.request),
   });
 }
 
@@ -79,10 +94,8 @@ export async function handleUpdateTemplateStatusRequest(
   }
 
   try {
-    const result = await (deps.updateStatus ?? defaultUpdateStatus)({
-      actorRole: admin.role,
-      ...input,
-    });
+    const result = await (deps.updateStatus ??
+      ((args) => defaultUpdateStatus({ admin, request, ...args })))(input);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -91,6 +104,15 @@ export async function handleUpdateTemplateStatusRequest(
       error.message === "Actor cannot update template status."
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Admin action reason must be at least 6 characters."
+    ) {
+      return NextResponse.json(
+        { error: "invalid_template_status_input" },
+        { status: 400 },
+      );
     }
 
     if (

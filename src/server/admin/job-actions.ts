@@ -21,6 +21,7 @@ import {
   type AdminAuditActor,
   type AdminAuditRequestMeta,
   type AdminAuditStore,
+  normalizeAdminReason,
   toAuditSnapshot,
   writeAdminAuditLog,
 } from "./audit";
@@ -84,6 +85,8 @@ export async function retryVideoSegmentByAdmin({
     throw new Error("Actor cannot retry video segments.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const before = await segmentStore.findSegment({ jobId, segmentId });
   if (!before) {
     throw new Error("Video segment not found.");
@@ -106,7 +109,7 @@ export async function retryVideoSegmentByAdmin({
     reason: "admin_retry_segment",
     actorType: "admin",
     actorId: actor.userId,
-    eventSnapshot: { segmentId, reason },
+    eventSnapshot: { segmentId, reason: normalizedReason },
   });
   await transitionJobStatus({
     store: jobStore,
@@ -123,7 +126,7 @@ export async function retryVideoSegmentByAdmin({
     action: "job:retry_segment",
     targetType: "video_segment",
     targetId: segmentId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: toAuditSnapshot(before),
     afterSnapshot: toAuditSnapshot(after),
     requestMeta,
@@ -159,6 +162,8 @@ export async function markJobUndeliverable({
     throw new Error("Actor cannot mark jobs undeliverable.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const before = await actionStore.findJob(jobId);
   if (!before) {
     throw new Error("Video job not found.");
@@ -168,7 +173,7 @@ export async function markJobUndeliverable({
     store: creditStore,
     userId: before.userId,
     amount: before.creditCost,
-    reason,
+    reason: normalizedReason,
     idempotencyKey: `admin_release:job:${jobId}`,
     relatedJobId: jobId,
     metadata: {
@@ -179,7 +184,7 @@ export async function markJobUndeliverable({
   });
   const after = await actionStore.updateFailureReason({
     jobId,
-    failureReason: reason,
+    failureReason: normalizedReason,
   });
   await transitionJobStatus({
     store: jobStore,
@@ -188,7 +193,7 @@ export async function markJobUndeliverable({
     reason: "admin_mark_undeliverable",
     actorType: "admin",
     actorId: actor.userId,
-    eventSnapshot: { reason },
+    eventSnapshot: { reason: normalizedReason },
   });
   await writeAdminAuditLog({
     store: auditStore,
@@ -196,7 +201,7 @@ export async function markJobUndeliverable({
     action: "job:mark_undeliverable",
     targetType: "video_job",
     targetId: jobId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: toAuditSnapshot(before),
     afterSnapshot: toAuditSnapshot(after),
     requestMeta,
@@ -238,6 +243,8 @@ export async function reopenPostQaByAdmin({
     throw new Error("Actor cannot reopen Post-QA.");
   }
 
+  const normalizedReason = normalizeAdminReason(reason);
+
   const before = await actionStore.findJob(jobId);
   if (!before) {
     throw new Error("Video job not found.");
@@ -263,7 +270,7 @@ export async function reopenPostQaByAdmin({
     actorId: actor.userId,
     errorMessage: null,
     failureReason: null,
-    eventSnapshot: { reason, stitchJobId: stitchJob.id },
+    eventSnapshot: { reason: normalizedReason, stitchJobId: stitchJob.id },
   });
   await transitionJobStatus({
     store: jobStore,
@@ -286,7 +293,7 @@ export async function reopenPostQaByAdmin({
     action: "job:reopen_post_qa",
     targetType: "video_job",
     targetId: jobId,
-    reason,
+    reason: normalizedReason,
     beforeSnapshot: toAuditSnapshot(before),
     afterSnapshot: toAuditSnapshot(after),
     requestMeta,
