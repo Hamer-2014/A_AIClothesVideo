@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createInMemoryAdminJobLedgerSummaryStore,
   createInMemoryAdminJobListStore,
   listAdminJobs,
 } from "./list-jobs";
@@ -82,15 +83,35 @@ describe("admin job list", () => {
           creditCost: 70,
           failureReason: null,
           isTest: false,
+          hasCapture: true,
           createdAt: new Date("2026-06-11T00:03:00.000Z"),
           updatedAt: new Date("2026-06-11T00:19:00.000Z"),
         },
+        {
+          id: "job-billing",
+          userId: "user-4",
+          status: "deliverable",
+          userVisibleStatus: "downloadable",
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          failureReason: null,
+          isTest: false,
+          hasCapture: false,
+          createdAt: new Date("2026-06-11T00:04:00.000Z"),
+          updatedAt: new Date("2026-06-11T00:19:30.000Z"),
+        },
       ]),
+      ledgerSummaryStore: createInMemoryAdminJobLedgerSummaryStore(["job-ok"]),
       filters: { attention: true },
       now,
     });
 
-    expect(jobs.map((job) => job.id)).toEqual(["job-stale", "job-failed"]);
+    expect(jobs.map((job) => job.id)).toEqual([
+      "job-billing",
+      "job-stale",
+      "job-failed",
+    ]);
   });
 
   it("filters by isTest flag", async () => {

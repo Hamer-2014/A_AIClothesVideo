@@ -1,7 +1,7 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
-import { videoJobs } from "@/lib/db/schema";
+import { creditLedger, videoJobs } from "@/lib/db/schema";
 
 const ATTENTION_FAILURE_STATUSES = new Set([
   "segment_failed",
@@ -33,6 +33,7 @@ export interface AdminJobListItem {
   creditCost: number;
   failureReason: string | null;
   isTest: boolean;
+  hasCapture?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +49,10 @@ export interface AdminJobListStore {
   listJobs(): Promise<AdminJobListItem[]>;
 }
 
+export interface AdminJobLedgerSummaryStore {
+  listCapturedJobIds(): Promise<Set<string>>;
+}
+
 export function createInMemoryAdminJobListStore(
   jobs: AdminJobListItem[],
 ): AdminJobListStore {
@@ -56,6 +61,16 @@ export function createInMemoryAdminJobListStore(
       return [...jobs]
         .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
         .map((job) => ({ ...job }));
+    },
+  };
+}
+
+export function createInMemoryAdminJobLedgerSummaryStore(
+  capturedJobIds: string[],
+): AdminJobLedgerSummaryStore {
+  return {
+    async listCapturedJobIds() {
+      return new Set(capturedJobIds);
     },
   };
 }
@@ -87,7 +102,40 @@ export function createDrizzleAdminJobListStore(
   };
 }
 
+export function createDrizzleAdminJobLedgerSummaryStore(
+  db: DbClient = getDb(),
+): AdminJobLedgerSummaryStore {
+  return {
+    async listCapturedJobIds() {
+      const rows = await db
+        .select({
+          relatedJobId: creditLedger.relatedJobId,
+        })
+        .from(creditLedger)
+        .where(eq(creditLedger.type, "capture"));
+
+      return new Set(
+        rows
+          .map((row) => row.relatedJobId)
+          .filter((jobId): jobId is string => typeof jobId === "string"),
+      );
+    },
+  };
+}
+
+function isDeliveredWithoutCapture(job: AdminJobListItem) {
+  return (
+    job.status === "deliverable" &&
+    job.creditCost > 0 &&
+    job.hasCapture === false
+  );
+}
+
 export function isAttentionJob(job: AdminJobListItem, now: Date) {
+  if (isDeliveredWithoutCapture(job)) {
+    return true;
+  }
+
   if (ATTENTION_FAILURE_STATUSES.has(job.status)) {
     return true;
   }
@@ -101,17 +149,28 @@ export function isAttentionJob(job: AdminJobListItem, now: Date) {
 
 export async function listAdminJobs({
   store,
+  ledgerSummaryStore,
   filters,
   now = new Date(),
 }: {
   store: AdminJobListStore;
+  ledgerSummaryStore?: AdminJobLedgerSummaryStore;
   filters?: AdminJobListFilters;
   now?: Date;
 }) {
-  const jobs = await store.listJobs();
+  const [jobs, capturedJobIds] = await Promise.all([
+    store.listJobs(),
+    ledgerSummaryStore?.listCapturedJobIds(),
+  ]);
   const normalizedQuery = filters?.query?.trim().toLowerCase();
+  const jobsWithLedger = capturedJobIds
+    ? jobs.map((job) => ({
+        ...job,
+        hasCapture: capturedJobIds.has(job.id),
+      }))
+    : jobs;
 
-  return jobs.filter((job) => {
+  return jobsWithLedger.filter((job) => {
     if (filters?.attention && !isAttentionJob(job, now)) {
       return false;
     }

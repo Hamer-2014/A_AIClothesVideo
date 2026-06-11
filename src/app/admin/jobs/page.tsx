@@ -5,6 +5,7 @@ import { buildAdminNav } from "@/app/app-shell";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminSession } from "@/server/auth/admin-session";
 import {
+  createDrizzleAdminJobLedgerSummaryStore,
   createDrizzleAdminJobListStore,
   listAdminJobs,
 } from "@/server/admin/list-jobs";
@@ -49,6 +50,7 @@ export default async function AdminJobsPage({
 
   const jobs = await listAdminJobs({
     store: createDrizzleAdminJobListStore(),
+    ledgerSummaryStore: createDrizzleAdminJobLedgerSummaryStore(),
     filters: {
       attention,
       isTest,
@@ -142,6 +144,7 @@ export default async function AdminJobsPage({
                 <th className="px-4 py-3 font-medium">用户态</th>
                 <th className="px-4 py-3 font-medium">时长 / 比例</th>
                 <th className="px-4 py-3 font-medium">点数</th>
+                <th className="px-4 py-3 font-medium">账务</th>
                 <th className="px-4 py-3 font-medium">测试</th>
                 <th className="px-4 py-3 font-medium">失败原因</th>
                 <th className="px-4 py-3 font-medium">创建时间</th>
@@ -151,7 +154,7 @@ export default async function AdminJobsPage({
             <tbody className="divide-y divide-[var(--line)]">
               {jobs.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-[var(--muted)]" colSpan={10}>
+                  <td className="px-4 py-6 text-sm text-[var(--muted)]" colSpan={11}>
                     当前筛选条件下没有任务。
                   </td>
                 </tr>
@@ -166,6 +169,19 @@ export default async function AdminJobsPage({
                       {job.durationSeconds} 秒 / {job.aspectRatio}
                     </td>
                     <td className="px-4 py-4">{job.creditCost}</td>
+                    <td className="px-4 py-4">
+                      {job.status === "deliverable" && job.creditCost > 0 ? (
+                        job.hasCapture ? (
+                          "已 capture"
+                        ) : (
+                          <span className="font-medium text-[var(--accent)]">
+                            未 capture
+                          </span>
+                        )
+                      ) : (
+                        "-"
+                      )}
+                    </td>
                     <td className="px-4 py-4">{job.isTest ? "测试" : "正式"}</td>
                     <td className="px-4 py-4 text-[var(--muted)]">
                       {job.failureReason ?? "-"}

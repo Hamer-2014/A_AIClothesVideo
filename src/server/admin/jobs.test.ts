@@ -235,7 +235,20 @@ describe("admin job detail", () => {
         segments: [],
         providerLogs: [],
         moderationResults: [],
-        ledger: [],
+        ledger: [
+          {
+            id: "ledger-capture",
+            userId: "user-1",
+            relatedJobId: "job-deliverable",
+            type: "capture",
+            amount: 70,
+            balanceBefore: 30,
+            balanceAfter: 30,
+            reason: "capture credits after post QA passed",
+            idempotencyKey: "capture:job:job-deliverable",
+            createdAt: new Date("2026-06-11T00:06:00.000Z"),
+          },
+        ],
         stitchJobs: [],
         postQaResults: [],
       }),
@@ -247,6 +260,47 @@ describe("admin job detail", () => {
       expect.objectContaining({
         kind: "deliverable",
         severity: "info",
+      }),
+    );
+  });
+
+  it("diagnoses delivered paid jobs without captured credits", async () => {
+    const detail = await getAdminJobDetail({
+      store: createInMemoryAdminJobStore({
+        jobs: [
+          {
+            id: "job-delivered-without-capture",
+            userId: "user-1",
+            status: "deliverable",
+            userVisibleStatus: "downloadable",
+            durationSeconds: 8,
+            aspectRatio: "9:16",
+            creditCost: 70,
+            reservedLedgerId: null,
+            finalVideoKey: "jobs/job-delivered-without-capture/stitched/final.mp4",
+            coverKey: "jobs/job-delivered-without-capture/covers/cover.webp",
+            isTest: false,
+            failureReason: null,
+            lastError: null,
+            createdAt: new Date("2026-06-11T00:00:00.000Z"),
+            updatedAt: new Date("2026-06-11T00:05:00.000Z"),
+          },
+        ],
+        segments: [],
+        providerLogs: [],
+        moderationResults: [],
+        ledger: [],
+        stitchJobs: [],
+        postQaResults: [],
+      }),
+      jobId: "job-delivered-without-capture",
+      now: new Date("2026-06-11T00:10:00.000Z"),
+    });
+
+    expect(detail?.diagnosis).toEqual(
+      expect.objectContaining({
+        kind: "credits_need_attention",
+        severity: "critical",
       }),
     );
   });

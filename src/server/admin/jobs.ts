@@ -208,6 +208,10 @@ function hasUnresolvedReserve(ledger: AdminLedgerRecord[]) {
   return hasReserve && !hasResolution;
 }
 
+function hasCapturedCredits(ledger: AdminLedgerRecord[]) {
+  return ledger.some((entry) => entry.type === "capture");
+}
+
 export function diagnoseAdminJob({
   job,
   segments,
@@ -223,6 +227,22 @@ export function diagnoseAdminJob({
   ledger: AdminLedgerRecord[];
   now: Date;
 }): AdminJobDiagnosis {
+  if (
+    job.status === "deliverable" &&
+    job.finalVideoKey &&
+    job.creditCost > 0 &&
+    !hasCapturedCredits(ledger)
+  ) {
+    return {
+      kind: "credits_need_attention",
+      severity: "critical",
+      title: "已交付但未扣点",
+      recommendation:
+        "任务已经 deliverable，但 credit_ledger 没有 capture。先核对 Post-QA resolve 和账本，再决定补扣、补偿或人工处理。",
+      needsManualAction: true,
+    };
+  }
+
   if (job.status === "deliverable" && job.finalVideoKey) {
     return {
       kind: "deliverable",
