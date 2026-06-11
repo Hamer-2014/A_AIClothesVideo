@@ -105,7 +105,13 @@ const allowedTransitions: Partial<Record<JobStatus, JobStatus[]>> = {
   post_qa_running: ["post_qa_passed", "post_qa_failed"],
   post_qa_passed: ["deliverable"],
   post_qa_failed: ["retrying", "failed_released", "failed_refunded"],
-  retrying: ["lite_check_queued", "asset_analysis_queued", "segments_queued"],
+  failed_released: ["retrying"],
+  retrying: [
+    "lite_check_queued",
+    "asset_analysis_queued",
+    "segments_queued",
+    "post_qa_queued",
+  ],
 };
 
 function isTransitionAllowed(fromStatus: JobStatus, toStatus: JobStatus) {

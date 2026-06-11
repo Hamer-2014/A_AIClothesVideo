@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { releaseReservedCredits } from "@/lib/credits/ledger";
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import type { CreditLedgerStore, CreditLedgerType } from "@/lib/credits/types";
 import { getDb } from "@/lib/db/client";
-import { videoJobs } from "@/lib/db/schema";
+import { stitchJobs, videoJobs } from "@/lib/db/schema";
+import type { JsonValue } from "@/lib/db/schema/common";
 import { canRolePerformAdminAction, type AdminRole } from "@/server/auth/admin-access";
 import {
   createDrizzleJobStore,
@@ -43,6 +44,21 @@ export interface AdminJobActionStore {
     jobId: string;
     failureReason: string;
   }): Promise<AdminJobActionRecord>;
+}
+
+export interface AdminPostQaReopenStitchRecord {
+  id: string;
+  videoJobId: string;
+  status: string;
+  finalVideoKey: string | null;
+  coverKey: string | null;
+  frameKeys: JsonValue;
+}
+
+export interface AdminPostQaReopenStore {
+  findLatestSucceededStitchJob(
+    jobId: string,
+  ): Promise<AdminPostQaReopenStitchRecord | null>;
 }
 
 export async function retryVideoSegmentByAdmin({
@@ -193,6 +209,97 @@ export async function markJobUndeliverable({
   };
 }
 
+function frameKeysFrom(value: JsonValue) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+export async function reopenPostQaByAdmin({
+  jobStore = createDrizzleJobStore(),
+  actionStore,
+  postQaStore,
+  auditStore,
+  actor,
+  jobId,
+  reason,
+  requestMeta,
+}: {
+  jobStore?: JobStore;
+  actionStore: AdminJobActionStore;
+  postQaStore: AdminPostQaReopenStore;
+  auditStore: AdminAuditStore;
+  actor: AdminJobActionActor;
+  jobId: string;
+  reason: string;
+  requestMeta?: AdminAuditRequestMeta;
+}) {
+  if (!canRolePerformAdminAction(actor.role, "job:reopen_post_qa")) {
+    throw new Error("Actor cannot reopen Post-QA.");
+  }
+
+  const before = await actionStore.findJob(jobId);
+  if (!before) {
+    throw new Error("Video job not found.");
+  }
+
+  if (!["post_qa_failed", "failed_released", "failed_refunded"].includes(before.status)) {
+    throw new Error("Video job is not failed in Post-QA.");
+  }
+
+  const stitchJob = await postQaStore.findLatestSucceededStitchJob(jobId);
+  const frameKeys = frameKeysFrom(stitchJob?.frameKeys ?? []);
+  if (!stitchJob?.finalVideoKey || frameKeys.length === 0) {
+    throw new Error("Successful stitch output is required to reopen Post-QA.");
+  }
+
+  await actionStore.updateFailureReason({ jobId, failureReason: "" });
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "retrying",
+    reason: "admin_reopen_post_qa",
+    actorType: "admin",
+    actorId: actor.userId,
+    errorMessage: null,
+    failureReason: null,
+    eventSnapshot: { reason, stitchJobId: stitchJob.id },
+  });
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "post_qa_queued",
+    reason: "admin_reopen_post_qa_requeued",
+    actorType: "admin",
+    actorId: actor.userId,
+    clearLock: true,
+    eventSnapshot: {
+      stitchJobId: stitchJob.id,
+      finalVideoKey: stitchJob.finalVideoKey,
+      frameKeys,
+    },
+  });
+  const after = await actionStore.findJob(jobId);
+  await writeAdminAuditLog({
+    store: auditStore,
+    actor,
+    action: "job:reopen_post_qa",
+    targetType: "video_job",
+    targetId: jobId,
+    reason,
+    beforeSnapshot: toAuditSnapshot(before),
+    afterSnapshot: toAuditSnapshot(after),
+    requestMeta,
+  });
+
+  return {
+    jobId,
+    status: "post_qa_queued" as const,
+    stitchJobId: stitchJob.id,
+    frameCount: frameKeys.length,
+  };
+}
+
 export function createInMemoryAdminJobActionStore(
   initialJobs: AdminJobActionRecord[],
 ): AdminJobActionStore & {
@@ -216,6 +323,22 @@ export function createInMemoryAdminJobActionStore(
     },
     listJobs() {
       return Array.from(jobs.values()).map((job) => ({ ...job }));
+    },
+  };
+}
+
+export function createInMemoryAdminPostQaReopenStore(
+  stitchJobRecords: AdminPostQaReopenStitchRecord[],
+): AdminPostQaReopenStore {
+  const records = stitchJobRecords.map((record) => ({ ...record }));
+
+  return {
+    async findLatestSucceededStitchJob(jobId) {
+      return (
+        records.find(
+          (record) => record.videoJobId === jobId && record.status === "succeeded",
+        ) ?? null
+      );
     },
   };
 }
@@ -261,6 +384,32 @@ export function createDrizzleAdminJobActionStore(
       }
 
       return job as AdminJobActionRecord;
+    },
+  };
+}
+
+export function createDrizzleAdminPostQaReopenStore(
+  db: DbClient = getDb(),
+): AdminPostQaReopenStore {
+  return {
+    async findLatestSucceededStitchJob(jobId) {
+      const [record] = await db
+        .select({
+          id: stitchJobs.id,
+          videoJobId: stitchJobs.videoJobId,
+          status: stitchJobs.status,
+          finalVideoKey: stitchJobs.finalVideoKey,
+          coverKey: stitchJobs.coverKey,
+          frameKeys: stitchJobs.frameKeys,
+        })
+        .from(stitchJobs)
+        .where(
+          and(eq(stitchJobs.videoJobId, jobId), eq(stitchJobs.status, "succeeded")),
+        )
+        .orderBy(desc(stitchJobs.createdAt))
+        .limit(1);
+
+      return (record as AdminPostQaReopenStitchRecord | undefined) ?? null;
     },
   };
 }

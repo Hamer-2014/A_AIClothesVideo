@@ -41,6 +41,12 @@ export default async function AdminJobDetailPage({
       <div className="space-y-6">
         <div className="grid gap-4 xl:grid-cols-2">
           <AdminActionForm
+            description="仅用于已有拼接成片和 QA 抽帧、但 Post-QA 被错误打失败的任务。会重新进入 post_qa_queued。"
+            endpoint={`/api/admin/jobs/${detail.job.id}/reopen-post-qa`}
+            submitLabel="重开 Post-QA"
+            title="重试质检"
+          />
+          <AdminActionForm
             description="当任务无法恢复时，填写原因并释放冻结点数。"
             endpoint={`/api/admin/jobs/${detail.job.id}/undeliverable`}
             submitLabel="标记不可交付"

@@ -10,7 +10,9 @@ import {
 import { createInMemoryAdminAuditStore } from "./audit";
 import {
   createInMemoryAdminJobActionStore,
+  createInMemoryAdminPostQaReopenStore,
   markJobUndeliverable,
+  reopenPostQaByAdmin,
   retryVideoSegmentByAdmin,
 } from "./job-actions";
 
@@ -22,6 +24,7 @@ const actor = {
 const userId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
 const segmentId = "44444444-4444-4444-8444-444444444444";
+const stitchJobId = "55555555-5555-4555-8555-555555555555";
 
 function createRetryStores() {
   const jobStore = createInMemoryJobStore([
@@ -173,5 +176,105 @@ describe("admin job actions", () => {
       targetType: "video_job",
       targetId: jobId,
     });
+  });
+
+  it("reopens a post-QA failed job when a stitched output and QA frames exist", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "failed_released",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 1,
+        lastError: "Post QA provider response is missing boolean passed.",
+      },
+    ]);
+    const actionStore = createInMemoryAdminJobActionStore([
+      {
+        id: jobId,
+        userId,
+        status: "failed_released",
+        creditCost: 70,
+        reservedLedgerId: "ledger-reserve",
+        failureReason: "Post-QA schema error",
+      },
+    ]);
+    const postQaStore = createInMemoryAdminPostQaReopenStore([
+      {
+        id: stitchJobId,
+        videoJobId: jobId,
+        status: "succeeded",
+        finalVideoKey: "jobs/job-1/stitched/final.mp4",
+        coverKey: "jobs/job-1/covers/cover.webp",
+        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      },
+    ]);
+    const auditStore = createInMemoryAdminAuditStore();
+
+    const result = await reopenPostQaByAdmin({
+      jobStore,
+      actionStore,
+      postQaStore,
+      auditStore,
+      actor,
+      jobId,
+      reason: "retry with fixed Post-QA schema",
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "post_qa_queued",
+      stitchJobId,
+      frameCount: 1,
+    });
+    expect(jobStore.listJobs()[0]).toMatchObject({
+      status: "post_qa_queued",
+      lastError: null,
+    });
+    expect(actionStore.listJobs()[0]).toMatchObject({
+      failureReason: "",
+    });
+    expect(auditStore.listAuditLogs()[0]).toMatchObject({
+      action: "job:reopen_post_qa",
+      targetType: "video_job",
+      targetId: jobId,
+    });
+  });
+
+  it("rejects post-QA reopen when no successful stitched output exists", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "failed_released",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 1,
+        lastError: "Post QA failed",
+      },
+    ]);
+    const actionStore = createInMemoryAdminJobActionStore([
+      {
+        id: jobId,
+        userId,
+        status: "failed_released",
+        creditCost: 70,
+        reservedLedgerId: "ledger-reserve",
+        failureReason: "Post-QA schema error",
+      },
+    ]);
+
+    await expect(
+      reopenPostQaByAdmin({
+        jobStore,
+        actionStore,
+        postQaStore: createInMemoryAdminPostQaReopenStore([]),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor,
+        jobId,
+        reason: "retry with fixed Post-QA schema",
+      }),
+    ).rejects.toThrow("Successful stitch output is required to reopen Post-QA.");
   });
 });

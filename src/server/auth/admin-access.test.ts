@@ -28,5 +28,6 @@ describe("admin access helpers", () => {
       false,
     );
     expect(canRolePerformAdminAction("operator", "job:retry_segment")).toBe(true);
+    expect(canRolePerformAdminAction("operator", "job:reopen_post_qa")).toBe(true);
   });
 });
