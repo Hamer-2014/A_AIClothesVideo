@@ -107,8 +107,7 @@ async function runWorkerTick() {
   }
 
   const baseUrl =
-    process.env.APP_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.GENERATION_DEBUG_BASE_URL ??
     "http://localhost:3000";
   const endpoint = new URL("/api/internal/worker/tick", baseUrl);
   const response = await fetch(endpoint, {

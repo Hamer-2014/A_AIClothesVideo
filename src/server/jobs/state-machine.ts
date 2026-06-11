@@ -94,7 +94,7 @@ const allowedTransitions: Partial<Record<JobStatus, JobStatus[]>> = {
   prompt_moderation_passed: ["credits_reserved"],
   prompt_moderation_blocked: ["failed_released", "failed_refunded"],
   credits_reserved: ["segments_queued"],
-  segments_queued: ["segment_generating"],
+  segments_queued: ["segment_generating", "segment_failed"],
   segment_generating: ["segment_succeeded", "segment_failed"],
   segment_succeeded: ["stitching_queued"],
   segment_failed: ["retrying", "failed_released", "failed_refunded"],

@@ -54,6 +54,10 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown generation worker error.";
 }
 
+function shouldReleaseLock(status: JobStatus, eligibleJobStatuses: JobStatus[]) {
+  return !eligibleJobStatuses.includes(status);
+}
+
 export async function runGenerationWorkerTick({
   workerId,
   limit = 5,
@@ -104,20 +108,20 @@ export async function runGenerationWorkerTick({
           jobId: job.id,
           toStatus: nextStatus,
           reason: "generation_worker_tick_succeeded",
-          clearLock: true,
+          clearLock: shouldReleaseLock(nextStatus, eligibleJobStatuses),
           eventSnapshot: { workerId },
         });
       } else {
+        const status = afterHandler?.status ?? job.status;
         await jobStore.updateJobStatus(job.id, {
-          status: afterHandler?.status ?? job.status,
-          clearLock: true,
+          status,
+          clearLock: shouldReleaseLock(status, eligibleJobStatuses),
         });
       }
       succeeded += 1;
     } catch (error) {
       const afterHandler = await jobStore.findJob(job.id);
-      const canTransitionToFailure =
-        job.status !== "segments_queued" && afterHandler?.status === job.status;
+      const canTransitionToFailure = afterHandler?.status === job.status;
 
       if (canTransitionToFailure) {
         await transitionJobStatus({

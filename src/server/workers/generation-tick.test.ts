@@ -47,6 +47,41 @@ describe("generation worker tick", () => {
     expect(jobStore.listJobs()[0]?.status).toBe("segment_generating");
   });
 
+  it("does not reacquire the same still-eligible job in the same tick", async () => {
+    const lockStore = createInMemoryJobLockStore([
+      job("job-1", "segments_queued"),
+      job("job-2", "segments_queued"),
+    ]);
+    const jobStore = createInMemoryJobStore(lockStore.listJobs());
+    const submitted: string[] = [];
+
+    const result = await runGenerationWorkerTick({
+      workerId: "worker-1",
+      lockStore,
+      jobStore,
+      handlers: {
+        submitSegments: async (lockedJob) => {
+          submitted.push(lockedJob.id);
+        },
+        pollSegments: async () => undefined,
+        createStitchJob: async () => undefined,
+      },
+    });
+
+    expect(result).toEqual({ processed: 2, succeeded: 2, failed: 0 });
+    expect(submitted).toEqual(["job-1", "job-2"]);
+    expect(jobStore.listJobs()).toEqual([
+      expect.objectContaining({
+        id: "job-1",
+        status: "segment_generating",
+      }),
+      expect.objectContaining({
+        id: "job-2",
+        status: "segment_generating",
+      }),
+    ]);
+  });
+
   it("polls generating video segments", async () => {
     const lockStore = createInMemoryJobLockStore([
       job("job-1", "segment_generating"),
@@ -127,7 +162,7 @@ describe("generation worker tick", () => {
     });
   });
 
-  it("records the submission error on segments_queued jobs without forcing an invalid failure transition", async () => {
+  it("marks segments_queued jobs failed when provider submission fails", async () => {
     const lockStore = createInMemoryJobLockStore([job("job-1", "segments_queued")]);
     const jobStore = createInMemoryJobStore(lockStore.listJobs());
 
@@ -146,10 +181,15 @@ describe("generation worker tick", () => {
 
     expect(result).toEqual({ processed: 1, succeeded: 0, failed: 1 });
     expect(jobStore.listJobs()[0]).toMatchObject({
-      status: "segments_queued",
+      status: "segment_failed",
       lockedBy: null,
       lockedUntil: null,
       lastError: "EvoLink video generation failed with status 404.",
+    });
+    expect(jobStore.listEvents()[0]).toMatchObject({
+      fromStatus: "segments_queued",
+      toStatus: "segment_failed",
+      reason: "generation_worker_tick_failed",
     });
   });
 });
