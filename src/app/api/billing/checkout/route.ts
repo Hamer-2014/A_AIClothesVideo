@@ -50,6 +50,18 @@ export async function handleBillingCheckoutRequest(
   }
 
   const body = await request.json();
+  if (
+    body &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    ("amountCents" in body || "credits" in body)
+  ) {
+    return NextResponse.json(
+      { error: "client_price_fields_not_allowed" },
+      { status: 400 },
+    );
+  }
+
   const packageCode =
     typeof body.packageCode === "string" ? body.packageCode : "";
   const selectedPackage = getCreditPackage(packageCode);

@@ -86,6 +86,33 @@ describe("resolvePostQaResult", () => {
     });
   });
 
+  it("does not capture credits twice when a passed QA resolve is replayed", async () => {
+    const stores = await createStores();
+
+    await resolvePostQaResult({
+      ...stores,
+      jobId,
+      status: "passed",
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      resultJson: { passed: true },
+    });
+    await resolvePostQaResult({
+      ...stores,
+      jobId,
+      status: "passed",
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      resultJson: { passed: true },
+    });
+
+    expect(
+      stores.creditStore
+        .listLedger()
+        .filter((entry) => entry.type === "capture"),
+    ).toHaveLength(1);
+  });
+
   it("releases reserved credits when QA fails", async () => {
     const stores = await createStores();
 

@@ -88,6 +88,28 @@ export async function resolvePostQaResult({
     throw new Error("Video job not found.");
   }
 
+  const currentJob = await jobStore.findJob(jobId);
+  const currentStatus = currentJob?.status ?? job.status;
+
+  if (currentStatus === "deliverable" && status === "passed") {
+    return {
+      jobId,
+      status: "deliverable" as const,
+      ledgerType: null,
+    };
+  }
+
+  if (
+    (currentStatus === "failed_released" || currentStatus === "failed_refunded") &&
+    status === "failed"
+  ) {
+    return {
+      jobId,
+      status: "failed_released" as const,
+      ledgerType: null,
+    };
+  }
+
   await postQaStore.createResult({
     videoJobId: jobId,
     stitchJobId: null,

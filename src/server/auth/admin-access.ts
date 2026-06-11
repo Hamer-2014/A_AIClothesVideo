@@ -7,6 +7,8 @@ export type AdminAction =
   | "job:refund"
   | "template:update_status"
   | "provider_key:update"
+  | "provider_key:create"
+  | "provider_key:rotate"
   | "model_route:update"
   | "pricing:update"
   | "credits:admin_adjust";

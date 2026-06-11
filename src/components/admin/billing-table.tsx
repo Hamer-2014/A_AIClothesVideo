@@ -3,11 +3,15 @@ import type {
   BillingOrderRecord,
   BillingWalletRecord,
 } from "@/server/admin/billing";
+import type { CreditPackage } from "@/lib/credits/packages";
 
 interface BillingTableProps {
   wallets: BillingWalletRecord[];
   orders: BillingOrderRecord[];
   ledger: BillingLedgerRecord[];
+  creditPackages?: CreditPackage[];
+  pricingSource?: "code";
+  creemVerificationStatus?: "pending_creem_approval";
 }
 
 function formatDateTime(value: Date) {
@@ -66,9 +70,56 @@ function SectionTable({
   );
 }
 
-export function BillingTable({ wallets, orders, ledger }: BillingTableProps) {
+export function BillingTable({
+  wallets,
+  orders,
+  ledger,
+  creditPackages = [],
+  pricingSource,
+  creemVerificationStatus,
+}: BillingTableProps) {
   return (
     <div className="space-y-6">
+      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+        <h3 className="text-base font-medium">Credit Packages</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          当前点数包来自代码配置；Creem 产品 ID 和真实 checkout 待 Creem 账号通过后复核。
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Pricing source: {pricingSource ?? "unknown"} / Creem verification:{" "}
+          {creemVerificationStatus ?? "unknown"}
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full divide-y divide-[var(--line)] text-sm">
+            <thead className="bg-[var(--surface)] text-left text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
+              <tr>
+                {["Code", "Name", "Amount", "Currency", "Credits", "Creem Product"].map(
+                  (column) => (
+                    <th className="px-4 py-3 font-medium" key={column}>
+                      {column}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--line)]">
+              {creditPackages.map((item) => (
+                <tr key={item.code}>
+                  <td className="px-4 py-4">{item.code}</td>
+                  <td className="px-4 py-4">{item.name}</td>
+                  <td className="px-4 py-4">
+                    {(item.amountCents / 100).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-4">{item.currency}</td>
+                  <td className="px-4 py-4">{item.credits}</td>
+                  <td className="px-4 py-4">{item.creemProductId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <SectionTable
         title="钱包"
         columns={["Wallet", "User", "可用", "冻结", "累计购买", "累计赠送", "累计消耗"]}

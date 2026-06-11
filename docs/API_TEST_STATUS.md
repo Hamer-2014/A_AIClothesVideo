@@ -16,6 +16,7 @@
   - `npm run smoke:backend -- --job-id 5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4` 成功
 - 之前 `smoke:backend` 失败不是 Cloud Run 或 Post-QA 问题，也不是该样本的 capture 漏扣；根因是该 job 的 `credit_cost = 0`，属于 8 秒免费试用链路，旧 smoke 对 0 成本任务也强制要求 `credit_ledger.capture`，造成误报。
 - 已修复 smoke 断言：只有 full smoke 且 `credit_cost > 0` 的付费任务才必须存在 `capture`；同时 full smoke 缺少 `credit_cost` 字段会直接失败，避免付费任务被误当 0 成本而假绿。
+- Backend/API Hardening 本轮补齐：audit logs 查询、provider key 新增/轮换、billing 点数包可见化、Creem checkout/webhook 边界测试、Post-QA resolve 重放幂等、health 中 payment pending 与 moderation readiness 分离。
 
 ## 本轮真实验收样本
 
@@ -44,6 +45,18 @@
   - `status = passed`
 
 ## 本轮命令结果
+
+### Backend/API Hardening 起点
+
+- 日期：2026-06-11
+- 基础验证：
+  - `npm run typecheck`: pass
+  - `npm test`: pass，`107` 个 test files、`350` 个 tests
+  - `npm run build`: pass
+- 当前已知缺口：
+  - 付费任务 `credit_cost > 0` full smoke 未验收
+  - 失败补偿路径已有自动化覆盖，但真实/半真实演练仍需留痕
+  - Creem 真实支付验证：pending Creem approval
 
 ### 1. 核心构建验证
 
@@ -109,7 +122,47 @@ npm run build
 - `scripts/backend-smoke.mjs` 现在查询 `credit_cost`。
 - `scripts/lib/backend-smoke-utils.mjs` 新增 `assertSmokeCreditLedger`。
 - full smoke 下如果缺少 `credit_cost` 会失败。
-- full smoke 下只有 `credit_cost > 0` 才要求 `capture`。
+- full smoke 下只有 `credit_cost > 0` 才要求 `reserve` 和 `capture`。
+
+### Paid smoke 断言
+
+- full smoke 下 `credit_cost > 0` 必须同时存在 `reserve` 和 `capture`。
+- full smoke 下 `credit_cost = 0` 不要求账本流水。
+- full smoke 缺少 `credit_cost` 直接失败。
+
+### 失败补偿自动化覆盖
+
+- Post-QA failed 不 capture。
+- Post-QA failed 释放冻结点数。
+- Post-QA resolve replay 不重复 capture。
+- Admin undeliverable 已有 release 和 audit 自动化覆盖。
+
+### Creem 代码审查状态
+
+- checkout 不接受任意金额或 credits：已覆盖。
+- checkout 未配置 key 不伪造 URL、不创建假订单：已覆盖。
+- webhook 缺签名拒绝：已覆盖。
+- webhook 错签名拒绝：已覆盖。
+- webhook 重放不重复充值：已覆盖。
+- 真实 Creem checkout/webhook 验证：pending Creem approval。
+
+### Backend/API Hardening 本地验证
+
+已通过：
+
+```bash
+npm test -- scripts/lib/backend-smoke-utils.test.ts src/server/admin/audit.test.ts src/app/api/admin/audit-logs/route.test.ts src/server/admin/provider-key-crypto.test.ts src/server/admin/providers.test.ts src/app/api/admin/provider-keys/route.test.ts src/app/api/admin/provider-keys/[id]/rotate/route.test.ts src/server/admin/billing.test.ts src/app/api/admin/billing/route.test.ts src/app/api/billing/checkout/route.test.ts src/app/api/webhooks/creem/route.test.ts src/lib/providers/creem/webhook.test.ts src/server/post-qa/resolve.test.ts src/app/api/jobs/[id]/download/route.test.ts src/server/ops/health.test.ts src/app/api/health/route.test.ts
+npm run typecheck
+```
+
+结果：
+
+- 加固相关测试：`16` 个 test files、`75` 个 tests 通过。
+- `typecheck` 通过。
+- `GET /api/health` 现在区分 `creemPayment` 与 `moderation`：
+  - `creemPayment.status = pending` 可用于标记 Creem 真实支付验收后置。
+  - `moderation.configured = false` 会导致 `ready = false`。
+- `.env.example` 已新增 `PROVIDER_KEY_ENCRYPTION_SECRET`，创建/轮换 provider key 时未配置会失败。
 
 ## Admin Ops Closure 本轮完成内容
 
@@ -162,6 +215,8 @@ npm run build
   - daily limit / current daily cost
   - concurrency
   - failure count
+  - create key 表单
+  - rotate key 表单
 - Template 页面已显示：
   - template id
   - name
@@ -173,6 +228,13 @@ npm run build
   - orders
   - credit ledger
   - admin adjustment 入口
+  - 当前代码配置的 credit packages
+  - Creem 产品 ID / 真实 checkout pending 提示
+- Audit Logs 页面已新增：
+  - `/admin/audit-logs`
+  - `GET /api/admin/audit-logs`
+  - 支持 actor/action/targetType/targetId 查询
+  - snapshot 中 key/prompt 字段做脱敏
 
 ## 当前仍未完成的真实验收项
 

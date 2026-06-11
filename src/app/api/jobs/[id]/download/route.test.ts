@@ -38,4 +38,20 @@ describe("GET /api/jobs/[id]/download", () => {
       "https://download.example/final.mp4",
     );
   });
+
+  it("rejects download before the job is deliverable", async () => {
+    const response = await handleJobDownloadRequest(
+      new Request("http://localhost/api/jobs/job-1/download"),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createDownload: async () => {
+          throw new Error("Video job is not downloadable.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "not_downloadable" });
+  });
 });

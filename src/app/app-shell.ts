@@ -70,6 +70,11 @@ export function buildAdminNav(pathname: string): NavItem[] {
       label: "模板",
       active: pathname.startsWith("/admin/templates"),
     },
+    {
+      href: "/admin/audit-logs",
+      label: "审计",
+      active: pathname.startsWith("/admin/audit-logs"),
+    },
   ];
 }
 

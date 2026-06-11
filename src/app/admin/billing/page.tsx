@@ -55,6 +55,9 @@ export default async function AdminBillingPage() {
           wallets={overview.wallets}
           orders={overview.orders}
           ledger={overview.ledger}
+          creditPackages={overview.creditPackages}
+          pricingSource={overview.pricingSource}
+          creemVerificationStatus={overview.creemVerificationStatus}
         />
       </div>
     </AdminShell>
