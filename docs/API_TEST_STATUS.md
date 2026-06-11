@@ -11,10 +11,11 @@
   - `npm run typecheck`
   - `npm test`
   - `npm run build`
-- 本轮真实环境验证结果分成两半：
+- 本轮真实环境验证结论已更新：
   - `npm run smoke:stitch` 成功
-  - `npm run smoke:backend` 失败
-- 失败不是环境没配，也不是 Cloud Run 不通，而是目标真实任务已经 `deliverable`，但 `credit_ledger` 里没有任何 `capture` 记录，账务闭环存在真实缺口。
+  - `npm run smoke:backend -- --job-id 5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4` 成功
+- 之前 `smoke:backend` 失败不是 Cloud Run 或 Post-QA 问题，也不是该样本的 capture 漏扣；根因是该 job 的 `credit_cost = 0`，属于 8 秒免费试用链路，旧 smoke 对 0 成本任务也强制要求 `credit_ledger.capture`，造成误报。
+- 已修复 smoke 断言：只有 full smoke 且 `credit_cost > 0` 的付费任务才必须存在 `capture`；同时 full smoke 缺少 `credit_cost` 字段会直接失败，避免付费任务被误当 0 成本而假绿。
 
 ## 本轮真实验收样本
 
@@ -25,6 +26,8 @@
   - `database/auth/storage/internalSecurity/stitchWorker/billing/aiProviders` 全部 `configured = true`
 - `video_jobs.status`：`deliverable`
 - `post_qa_mode`：`lite`
+- `credit_cost`：`0`
+- `credit_ledger`：空，符合 0 成本试用单预期
 - final video R2 key：
   - `jobs/5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4/stitched/final.mp4`
 - cover R2 key：
@@ -55,7 +58,7 @@ npm run build
 结果：
 
 - `typecheck` 通过
-- `test` 通过，`107` 个 test files、`348` 个 tests 全绿
+- `test` 通过，`107` 个 test files、`350` 个 tests 全绿
 - `build` 通过，admin 页面与 admin API 均进入 Next.js route 清单
 
 ### 2. 真实 smoke
@@ -72,33 +75,41 @@ npm run build
 - QA frames 共 `3` 张，均存在
 - smoke 结论：`stitch_completed`
 
-#### `npm run smoke:backend`
+#### `npm run smoke:backend -- --job-id 5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4`
 
-结果：失败
+结果：成功
 
-失败信息原文：
+关键信息：
 
-```text
-Full smoke expected credit capture, but ledger only has:
-```
-
-这代表：
-
-- 目标任务已经是 `deliverable`
-- stitch 与 post-qa 都成功
-- 但 `credit_ledger` 中没有 `capture`
-- 当前真实系统状态不满足“交付后账务闭环完成”的验收要求
+- Cloud Run `/health` 返回 `ok: true`
+- 该任务复用了已有 stitch/post-qa 结果，没有重复触发 stitch
+- `video_jobs.status = deliverable`
+- `post_qa_results.status = passed`
+- `credit_cost = 0`
+- `credit_ledger = []`
+- smoke 结论：`deliverable`
 
 ## credit_ledger 真实状态
 
 针对 job `5dff9bea-3bf6-4c14-bf31-18ddc5d4bcd4`：
 
-- `reserve`：未在本次 smoke 输出中找到
-- `capture`：未找到
-- `release`：未找到
-- `refund`：未找到
+- `reserve`：无
+- `capture`：无
+- `release`：无
+- `refund`：无
 
-这不是文档缺失，是当前真实数据缺失。
+解释：
+
+- 该 job 的 `credit_cost = 0`，且状态事件中出现 `trial_segments_prepared` / `trial_segments_created`。
+- 因此 ledger 为空是 0 成本试用单的合理结果。
+- 这不能证明付费账务闭环已经通过；付费任务仍必须单独跑真实 smoke，要求 `credit_cost > 0` 且存在 `credit_ledger.capture`。
+
+修复：
+
+- `scripts/backend-smoke.mjs` 现在查询 `credit_cost`。
+- `scripts/lib/backend-smoke-utils.mjs` 新增 `assertSmokeCreditLedger`。
+- full smoke 下如果缺少 `credit_cost` 会失败。
+- full smoke 下只有 `credit_cost > 0` 才要求 `capture`。
 
 ## Admin Ops Closure 本轮完成内容
 
@@ -169,19 +180,20 @@ Full smoke expected credit capture, but ledger only has:
 
 | 项目 | 当前状态 | 说明 |
 | --- | --- | --- |
-| deliverable 后 `credit_ledger.capture` | 未通过 | `smoke:backend` 明确失败 |
+| 0 成本试用任务 deliverable 后 smoke | 已通过 | 样本 job `credit_cost = 0`，不要求 capture |
+| 付费任务 deliverable 后 `credit_ledger.capture` | 未验收 | 需要新建或选择 `credit_cost > 0` 的真实任务跑 full smoke |
 | `failed_released / failed_refunded` 真实补偿回路 smoke | 未补 | 仍需真实任务演练 |
 | 运维动作后的 `admin_audit_logs` 真实库回查 | 未单独留档 | 自动化已覆盖，但缺本轮真实截图/SQL 留痕 |
 
 ## 这次记录真正暴露的问题
 
-最大的问题不是后台页面，而是账务闭环：
+最大的问题不是后台页面，而是验收口径之前错了：
 
 - 当前真实任务已经 `deliverable`
 - Post-QA 已 `passed`
 - final video 与 QA frames 都在 R2
-- 但 `credit_ledger.capture` 缺失
+- 但该任务 `credit_cost = 0`，旧 smoke 没查 `credit_cost` 却强制要求 `capture`
 
-这意味着如果现在只看后台 UI 和测试通过率，很容易误判“系统闭环已经完成”。实际上没有，账务链路还差最后一刀。
+这意味着如果只看一句 “ledger 没有 capture”，很容易把试用单误判成账务事故；反过来，如果 smoke 没有 `credit_cost` 保护，也可能把付费单误判成试用单而放过真正的漏扣。
 
-如果下一个 session 做验收，优先盯这个问题，不要先去挑页面样式。
+下一步不要先去挑页面样式，优先补齐付费任务真实 smoke：必须拿一个 `credit_cost > 0` 的任务跑到 `deliverable`，并看到 `credit_ledger.reserve` 与 `credit_ledger.capture`。

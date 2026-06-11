@@ -10,6 +10,7 @@ import {
   classifySmokeOutcome,
   normalizeSmokeMode,
   resolveSmokeJobId,
+  assertSmokeCreditLedger,
   shouldTriggerStitch,
 } from "./lib/backend-smoke-utils.mjs";
 
@@ -182,6 +183,7 @@ async function loadJobSnapshot(sql, jobId) {
       status,
       user_visible_status,
       post_qa_mode,
+      credit_cost,
       final_video_key,
       cover_key,
       updated_at
@@ -292,14 +294,11 @@ function assertSuccess({ mode, outcome, artifacts, snapshot }) {
     );
   }
 
-  if (mode === "full") {
-    const ledgerTypes = snapshot.ledger.map((entry) => entry.type);
-    if (!ledgerTypes.includes("capture")) {
-      throw new Error(
-        `Full smoke expected credit capture, but ledger only has: ${ledgerTypes.join(", ")}`,
-      );
-    }
-  }
+  assertSmokeCreditLedger({
+    mode,
+    job: snapshot.job,
+    ledger: snapshot.ledger,
+  });
 }
 
 async function main() {

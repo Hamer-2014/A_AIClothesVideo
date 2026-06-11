@@ -39,4 +39,10 @@ declare module "*.mjs" {
     success: boolean;
     reason: string;
   };
+
+  export function assertSmokeCreditLedger(input: {
+    mode: "stitch" | "full";
+    job: { credit_cost?: number | null; creditCost?: number | null } | null;
+    ledger?: Array<{ type: string }>;
+  }): void;
 }

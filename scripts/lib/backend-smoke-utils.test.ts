@@ -6,6 +6,7 @@ import {
   classifySmokeOutcome,
   normalizeSmokeMode,
   resolveSmokeJobId,
+  assertSmokeCreditLedger,
   shouldTriggerStitch,
 } from "./backend-smoke-utils.mjs";
 
@@ -170,5 +171,39 @@ describe("backend smoke utils", () => {
       success: false,
       reason: "failed_released",
     });
+  });
+
+  it("requires capture only for paid full-smoke jobs", () => {
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "full",
+        job: {},
+        ledger: [],
+      }),
+    ).toThrow("Full smoke job snapshot is missing credit_cost");
+
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "full",
+        job: { credit_cost: 70 },
+        ledger: [{ type: "reserve" }],
+      }),
+    ).toThrow("Full smoke expected credit capture");
+
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "full",
+        job: { credit_cost: 0 },
+        ledger: [],
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "stitch",
+        job: { credit_cost: 70 },
+        ledger: [],
+      }),
+    ).not.toThrow();
   });
 });

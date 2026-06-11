@@ -148,3 +148,26 @@ export function classifySmokeOutcome({
     reason: "waiting_for_post_qa",
   };
 }
+
+export function assertSmokeCreditLedger({ mode, job, ledger = [] }) {
+  if (mode !== "full") {
+    return;
+  }
+
+  const rawCreditCost = job?.credit_cost ?? job?.creditCost;
+  if (rawCreditCost === undefined || rawCreditCost === null) {
+    throw new Error("Full smoke job snapshot is missing credit_cost.");
+  }
+
+  const creditCost = Number(rawCreditCost);
+  if (creditCost <= 0) {
+    return;
+  }
+
+  const ledgerTypes = ledger.map((entry) => entry.type);
+  if (!ledgerTypes.includes("capture")) {
+    throw new Error(
+      `Full smoke expected credit capture for paid job (${creditCost} credits), but ledger only has: ${ledgerTypes.join(", ")}`,
+    );
+  }
+}
