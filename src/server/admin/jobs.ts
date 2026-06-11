@@ -16,6 +16,17 @@ import {
   videoSegments,
 } from "@/lib/db/schema";
 
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
+type AdminCreditLedgerType =
+  | "purchase"
+  | "trial_grant"
+  | "reserve"
+  | "capture"
+  | "release"
+  | "refund"
+  | "admin_adjust";
+
 export interface AdminJobRecord {
   id: string;
   userId: string;
@@ -29,7 +40,9 @@ export interface AdminJobRecord {
   coverKey: string | null;
   isTest: boolean;
   failureReason: string | null;
+  lastError: string | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface AdminSegmentRecord {
@@ -42,10 +55,10 @@ export interface AdminSegmentRecord {
   model: string | null;
   providerTaskId: string | null;
   videoKey: string | null;
-  prompt?: string;
+  prompt: string;
+  lastError: string | null;
+  attemptCount: number;
 }
-
-export type AdminRelatedRecord = Record<string, unknown>;
 
 export interface AdminAssetRecord {
   videoJobId: string;
@@ -74,6 +87,72 @@ export interface AdminStoryboardRecord {
   createdAt: Date;
 }
 
+export interface AdminProviderLogRecord {
+  id: string;
+  videoJobId: string | null;
+  segmentId: string | null;
+  purpose: string;
+  provider: string;
+  model: string;
+  status: string;
+  durationMs: number | null;
+  costEstimate: string | null;
+  fallbackReason: string | null;
+  responseSummary: unknown;
+  providerTaskId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+}
+
+export interface AdminModerationResultRecord {
+  id: string;
+  videoJobId: string | null;
+  segmentId: string | null;
+  source: string;
+  decision: string;
+  provider: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+}
+
+export interface AdminLedgerRecord {
+  id: string;
+  userId: string;
+  relatedJobId: string | null;
+  type: AdminCreditLedgerType;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  reason: string;
+  idempotencyKey: string;
+  createdAt: Date;
+}
+
+export interface AdminStitchJobRecord {
+  id: string;
+  videoJobId: string;
+  status: string;
+  segmentKeys: unknown;
+  finalVideoKey: string | null;
+  coverKey: string | null;
+  frameKeys: unknown;
+  lastError: string | null;
+  createdAt?: Date;
+}
+
+export interface AdminPostQaRecord {
+  id: string;
+  videoJobId: string;
+  status: string;
+  mode: string;
+  failureCategory: string | null;
+  frameKeys: unknown;
+  resultJson: unknown;
+  createdAt: Date;
+}
+
 export interface AdminStateEventRecord {
   id: string;
   videoJobId: string;
@@ -87,26 +166,158 @@ export interface AdminStateEventRecord {
   createdAt: Date;
 }
 
+export interface AdminJobDiagnosis {
+  kind:
+    | "deliverable"
+    | "post_qa_stalled"
+    | "segment_failed"
+    | "stitch_failed"
+    | "moderation_blocked"
+    | "credits_need_attention"
+    | "in_progress";
+  severity: "info" | "warning" | "critical";
+  title: string;
+  recommendation: string;
+  needsManualAction: boolean;
+}
+
 export interface AdminJobStore {
   findJob(jobId: string): Promise<AdminJobRecord | null>;
   listAssets(jobId: string): Promise<AdminAssetRecord[]>;
   listAnalyses(jobId: string): Promise<AdminAnalysisRecord[]>;
   findLatestStoryboard(jobId: string): Promise<AdminStoryboardRecord | null>;
   listSegments(jobId: string): Promise<AdminSegmentRecord[]>;
-  listProviderLogs(jobId: string): Promise<AdminRelatedRecord[]>;
-  listModerationResults(jobId: string): Promise<AdminRelatedRecord[]>;
-  listLedger(jobId: string): Promise<AdminRelatedRecord[]>;
-  listStitchJobs(jobId: string): Promise<AdminRelatedRecord[]>;
-  listPostQaResults(jobId: string): Promise<AdminRelatedRecord[]>;
+  listProviderLogs(jobId: string): Promise<AdminProviderLogRecord[]>;
+  listModerationResults(jobId: string): Promise<AdminModerationResultRecord[]>;
+  listLedger(jobId: string): Promise<AdminLedgerRecord[]>;
+  listStitchJobs(jobId: string): Promise<AdminStitchJobRecord[]>;
+  listPostQaResults(jobId: string): Promise<AdminPostQaRecord[]>;
   listStateEvents(jobId: string): Promise<AdminStateEventRecord[]>;
+}
+
+function isStale(updatedAt: Date, now: Date) {
+  return now.getTime() - updatedAt.getTime() > STALE_THRESHOLD_MS;
+}
+
+function hasUnresolvedReserve(ledger: AdminLedgerRecord[]) {
+  const hasReserve = ledger.some((entry) => entry.type === "reserve");
+  const hasResolution = ledger.some((entry) =>
+    ["capture", "release", "refund"].includes(entry.type),
+  );
+
+  return hasReserve && !hasResolution;
+}
+
+export function diagnoseAdminJob({
+  job,
+  segments,
+  stitchJobs,
+  moderationResults,
+  ledger,
+  now,
+}: {
+  job: AdminJobRecord;
+  segments: AdminSegmentRecord[];
+  stitchJobs: AdminStitchJobRecord[];
+  moderationResults: AdminModerationResultRecord[];
+  ledger: AdminLedgerRecord[];
+  now: Date;
+}): AdminJobDiagnosis {
+  if (job.status === "deliverable" && job.finalVideoKey) {
+    return {
+      kind: "deliverable",
+      severity: "info",
+      title: "任务可交付",
+      recommendation: "检查下载链路、封面和 Post-QA 记录，确认用户侧可正常获取成片。",
+      needsManualAction: false,
+    };
+  }
+
+  if (
+    ["post_qa_queued", "post_qa_running"].includes(job.status) &&
+    isStale(job.updatedAt, now)
+  ) {
+    return {
+      kind: "post_qa_stalled",
+      severity: "warning",
+      title: "Post-QA 可能卡住",
+      recommendation: "先检查 frame keys 和 provider logs，必要时重开 Post-QA，不要直接放行交付。",
+      needsManualAction: true,
+    };
+  }
+
+  if (
+    job.status === "prompt_moderation_blocked" ||
+    moderationResults.some((result) => result.decision !== "allow")
+  ) {
+    return {
+      kind: "moderation_blocked",
+      severity: "critical",
+      title: "任务被合规拦截",
+      recommendation: "不要重试生成。需要用户修改 prompt 后重新走审核链路。",
+      needsManualAction: true,
+    };
+  }
+
+  if (
+    job.status === "segment_failed" ||
+    segments.some((segment) => segment.status === "failed")
+  ) {
+    return {
+      kind: "segment_failed",
+      severity: "critical",
+      title: "存在失败片段",
+      recommendation: "优先重试失败 segment，不要整单重跑；同时检查 provider task id 和 last error。",
+      needsManualAction: true,
+    };
+  }
+
+  if (
+    stitchJobs.some((stitchJob) => stitchJob.status === "failed") ||
+    (["stitching_queued", "stitching_running", "stitched"].includes(job.status) &&
+      !job.finalVideoKey)
+  ) {
+    return {
+      kind: "stitch_failed",
+      severity: "critical",
+      title: "拼接链路异常",
+      recommendation: "检查 Cloud Run、stitch job、segment keys 和 finalVideoKey，确认不是回写或 ffmpeg 失败。",
+      needsManualAction: true,
+    };
+  }
+
+  if (
+    ["failed_released", "failed_refunded", "post_qa_failed", "segment_failed"].includes(
+      job.status,
+    ) &&
+    hasUnresolvedReserve(ledger)
+  ) {
+    return {
+      kind: "credits_need_attention",
+      severity: "warning",
+      title: "点数冻结可能未闭环",
+      recommendation: "账本里有 reserve 但没有 capture/release/refund，先核对 credit ledger，再决定释放或退款。",
+      needsManualAction: true,
+    };
+  }
+
+  return {
+    kind: "in_progress",
+    severity: "info",
+    title: "任务仍在推进中",
+    recommendation: "继续检查当前状态对应的 provider logs、状态事件和最近更新时间，确认是否真的在推进而不是静默卡住。",
+    needsManualAction: false,
+  };
 }
 
 export async function getAdminJobDetail({
   store,
   jobId,
+  now = new Date(),
 }: {
   store: AdminJobStore;
   jobId: string;
+  now?: Date;
 }) {
   const job = await store.findJob(jobId);
   if (!job) {
@@ -114,16 +325,16 @@ export async function getAdminJobDetail({
   }
 
   const [
-    assets,
-    analyses,
+    assetRecords,
+    analysisRecords,
     latestStoryboard,
-    segments,
-    providerLogs,
-    moderationResults,
-    ledger,
+    segmentRecords,
+    providerLogRecords,
+    moderationResultRecords,
+    ledgerRecords,
     stitchJobRecords,
     postQaResultRecords,
-    stateEvents,
+    stateEventRecords,
   ] = await Promise.all([
     store.listAssets(jobId),
     store.listAnalyses(jobId),
@@ -137,18 +348,46 @@ export async function getAdminJobDetail({
     store.listStateEvents(jobId),
   ]);
 
+  const diagnosis = diagnoseAdminJob({
+    job,
+    segments: segmentRecords,
+    stitchJobs: stitchJobRecords,
+    moderationResults: moderationResultRecords,
+    ledger: ledgerRecords,
+    now,
+  });
+
   return {
     job,
-    assets,
-    analyses,
+    diagnosis,
+    assets: assetRecords,
+    analyses: analysisRecords,
     latestStoryboard,
-    segments,
-    providerLogs,
-    moderationResults,
-    ledger,
-    stitchJobs: stitchJobRecords,
-    postQaResults: postQaResultRecords,
-    stateEvents,
+    segments: [...segmentRecords].sort(
+      (left, right) => left.segmentIndex - right.segmentIndex,
+    ),
+    providerLogs: [...providerLogRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
+    moderationResults: [...moderationResultRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
+    ledger: [...ledgerRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
+    stitchJobs: [...stitchJobRecords].sort((left, right) => {
+      if (!left.createdAt || !right.createdAt) {
+        return 0;
+      }
+
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    }),
+    postQaResults: [...postQaResultRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
+    stateEvents: [...stateEventRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
   };
 }
 
@@ -158,11 +397,11 @@ export function createInMemoryAdminJobStore(input: {
   analyses?: AdminAnalysisRecord[];
   storyboards?: AdminStoryboardRecord[];
   segments: AdminSegmentRecord[];
-  providerLogs: AdminRelatedRecord[];
-  moderationResults: AdminRelatedRecord[];
-  ledger: AdminRelatedRecord[];
-  stitchJobs: AdminRelatedRecord[];
-  postQaResults: AdminRelatedRecord[];
+  providerLogs: AdminProviderLogRecord[];
+  moderationResults: AdminModerationResultRecord[];
+  ledger: AdminLedgerRecord[];
+  stitchJobs: AdminStitchJobRecord[];
+  postQaResults: AdminPostQaRecord[];
   stateEvents?: AdminStateEventRecord[];
 }): AdminJobStore {
   return {
@@ -195,10 +434,10 @@ export function createInMemoryAdminJobStore(input: {
       return input.ledger.filter((entry) => entry.relatedJobId === jobId);
     },
     async listStitchJobs(jobId) {
-      return input.stitchJobs.filter((job) => job.videoJobId === jobId);
+      return input.stitchJobs.filter((record) => record.videoJobId === jobId);
     },
     async listPostQaResults(jobId) {
-      return input.postQaResults.filter((result) => result.videoJobId === jobId);
+      return input.postQaResults.filter((record) => record.videoJobId === jobId);
     },
     async listStateEvents(jobId) {
       return (input.stateEvents ?? []).filter((event) => event.videoJobId === jobId);
@@ -225,7 +464,9 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           coverKey: videoJobs.coverKey,
           isTest: videoJobs.isTest,
           failureReason: videoJobs.failureReason,
+          lastError: videoJobs.lastError,
           createdAt: videoJobs.createdAt,
+          updatedAt: videoJobs.updatedAt,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))
@@ -246,7 +487,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
         })
         .from(videoJobAssets)
         .innerJoin(assets, eq(videoJobAssets.assetId, assets.id))
-        .where(eq(videoJobAssets.videoJobId, jobId));
+        .where(eq(videoJobAssets.videoJobId, jobId))
+        .orderBy(videoJobAssets.sortOrder);
     },
     async listAnalyses(jobId) {
       return db
@@ -258,7 +500,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
         })
         .from(assetAnalyses)
         .innerJoin(videoJobAssets, eq(assetAnalyses.assetId, videoJobAssets.assetId))
-        .where(eq(videoJobAssets.videoJobId, jobId));
+        .where(eq(videoJobAssets.videoJobId, jobId))
+        .orderBy(desc(assetAnalyses.createdAt));
     },
     async findLatestStoryboard(jobId) {
       const [storyboard] = await db
@@ -291,36 +534,103 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           providerTaskId: videoSegments.providerTaskId,
           videoKey: videoSegments.videoKey,
           prompt: videoSegments.prompt,
+          lastError: videoSegments.lastError,
+          attemptCount: videoSegments.attemptCount,
         })
         .from(videoSegments)
-        .where(eq(videoSegments.videoJobId, jobId));
+        .where(eq(videoSegments.videoJobId, jobId))
+        .orderBy(videoSegments.segmentIndex);
     },
     async listProviderLogs(jobId) {
       return db
-        .select()
+        .select({
+          id: providerCallLogs.id,
+          videoJobId: providerCallLogs.videoJobId,
+          segmentId: providerCallLogs.segmentId,
+          purpose: providerCallLogs.purpose,
+          provider: providerCallLogs.provider,
+          model: providerCallLogs.model,
+          status: providerCallLogs.status,
+          durationMs: providerCallLogs.durationMs,
+          costEstimate: providerCallLogs.costEstimate,
+          fallbackReason: providerCallLogs.fallbackReason,
+          responseSummary: providerCallLogs.responseSummary,
+          providerTaskId: providerCallLogs.providerTaskId,
+          errorCode: providerCallLogs.errorCode,
+          errorMessage: providerCallLogs.errorMessage,
+          createdAt: providerCallLogs.createdAt,
+        })
         .from(providerCallLogs)
-        .where(eq(providerCallLogs.videoJobId, jobId));
+        .where(eq(providerCallLogs.videoJobId, jobId))
+        .orderBy(desc(providerCallLogs.createdAt));
     },
     async listModerationResults(jobId) {
       return db
-        .select()
+        .select({
+          id: promptModerationResults.id,
+          videoJobId: promptModerationResults.videoJobId,
+          segmentId: promptModerationResults.segmentId,
+          source: promptModerationResults.source,
+          decision: promptModerationResults.decision,
+          provider: promptModerationResults.moderationId,
+          errorCode: promptModerationResults.errorCode,
+          errorMessage: promptModerationResults.errorMessage,
+          createdAt: promptModerationResults.createdAt,
+        })
         .from(promptModerationResults)
-        .where(eq(promptModerationResults.videoJobId, jobId));
+        .where(eq(promptModerationResults.videoJobId, jobId))
+        .orderBy(desc(promptModerationResults.createdAt));
     },
     async listLedger(jobId) {
       return db
-        .select()
+        .select({
+          id: creditLedger.id,
+          userId: creditLedger.userId,
+          relatedJobId: creditLedger.relatedJobId,
+          type: creditLedger.type,
+          amount: creditLedger.amount,
+          balanceBefore: creditLedger.balanceBefore,
+          balanceAfter: creditLedger.balanceAfter,
+          reason: creditLedger.reason,
+          idempotencyKey: creditLedger.idempotencyKey,
+          createdAt: creditLedger.createdAt,
+        })
         .from(creditLedger)
-        .where(eq(creditLedger.relatedJobId, jobId));
+        .where(eq(creditLedger.relatedJobId, jobId))
+        .orderBy(desc(creditLedger.createdAt));
     },
     async listStitchJobs(jobId) {
-      return db.select().from(stitchJobs).where(eq(stitchJobs.videoJobId, jobId));
+      return db
+        .select({
+          id: stitchJobs.id,
+          videoJobId: stitchJobs.videoJobId,
+          status: stitchJobs.status,
+          segmentKeys: stitchJobs.segmentKeys,
+          finalVideoKey: stitchJobs.finalVideoKey,
+          coverKey: stitchJobs.coverKey,
+          frameKeys: stitchJobs.frameKeys,
+          lastError: stitchJobs.lastError,
+          createdAt: stitchJobs.createdAt,
+        })
+        .from(stitchJobs)
+        .where(eq(stitchJobs.videoJobId, jobId))
+        .orderBy(desc(stitchJobs.createdAt));
     },
     async listPostQaResults(jobId) {
       return db
-        .select()
+        .select({
+          id: postQaResults.id,
+          videoJobId: postQaResults.videoJobId,
+          status: postQaResults.status,
+          mode: postQaResults.mode,
+          failureCategory: postQaResults.failureCategory,
+          frameKeys: postQaResults.frameKeys,
+          resultJson: postQaResults.resultJson,
+          createdAt: postQaResults.createdAt,
+        })
         .from(postQaResults)
-        .where(eq(postQaResults.videoJobId, jobId));
+        .where(eq(postQaResults.videoJobId, jobId))
+        .orderBy(desc(postQaResults.createdAt));
     },
     async listStateEvents(jobId) {
       return db
@@ -337,7 +647,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           createdAt: jobStateEvents.createdAt,
         })
         .from(jobStateEvents)
-        .where(eq(jobStateEvents.videoJobId, jobId));
+        .where(eq(jobStateEvents.videoJobId, jobId))
+        .orderBy(desc(jobStateEvents.createdAt));
     },
   };
 }
