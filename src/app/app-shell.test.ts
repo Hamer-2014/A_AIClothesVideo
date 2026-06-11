@@ -35,7 +35,14 @@ describe("app shell helpers", () => {
       { href: "/admin/providers", label: "供应商", active: true },
       { href: "/admin/billing", label: "点数", active: false },
       { href: "/admin/templates", label: "模板", active: false },
+      { href: "/admin/audit-logs", label: "审计", active: false },
     ]);
+
+    expect(
+      buildAdminNav("/admin/audit-logs").find(
+        (item) => item.href === "/admin/audit-logs",
+      ),
+    ).toEqual({ href: "/admin/audit-logs", label: "审计", active: true });
   });
 
   it("groups provider keys under their provider id", () => {

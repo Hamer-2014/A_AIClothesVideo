@@ -1,6 +1,6 @@
 # Backend API Flow and Connection Map
 
-> 当前阶段目标：先完成后台/API/运维链路，前台与后台 UI 以后再接。
+> 当前阶段目标：完成后台/API/运维链路的上线前复核面，避免把“接口存在”误判为“商业闭环可靠”。
 
 这份文档按“已经实现的真实链路”重写，不再保留过时描述。
 
@@ -9,7 +9,9 @@
 - Cloud Run `stitch-worker` 已实现并完成真实 smoke 验证。
 - `POST /api/internal/worker/tick` 已经组合了素材分析、片段生成推进、stitch 创建、Post-QA 推进。
 - Post-QA 不是空壳，已经具备真实状态流转、provider call log 写入、capture/release 结算。
-- 后台运维 API 已具备最小闭环：任务查看、模板状态、provider/key 状态、model route、补点、片段重试、不可交付释放。
+- 后台运维 API 和页面已具备最小闭环：任务查看、审计查询、模板状态、provider key 新增/轮换/状态、model route、点数包可见化、补点、片段重试、不可交付释放。
+- Creem 真实支付账号验收仍是 `pending Creem approval`；代码路径已要求签名、幂等和不得伪造 checkout URL。
+- 付费 `credit_cost > 0` full smoke 仍必须单独执行，不能用 0 成本试用任务替代。
 
 ## API 清单
 
@@ -25,6 +27,7 @@
 | `POST /api/jobs/[id]/storyboard` | 生成 DeepSeek 分镜草稿 | 已实现 | 用户输入先过 Creem Moderation |
 | `POST /api/jobs/[id]/confirm` | 确认分镜、审核最终 prompt、冻结点数、创建 segment | 已实现 | `flag/deny/error` 均阻断生成 |
 | `GET /api/jobs/[id]/progress` | 返回进度聚合视图 | 已实现 | 用户侧只看完整任务，不直接暴露全部运维细节 |
+| `GET /api/jobs/[id]/download` | 下载最终成片 | 已实现 | 仅 owner 且 `deliverable` 可下载 |
 
 ### 内部 Worker API
 
@@ -44,20 +47,24 @@
 | `GET /api/admin/jobs/[id]` | 查看任务、segment、provider logs、moderation、ledger、stitch、QA | 已实现 | 需 admin/operator 登录态 |
 | `POST /api/admin/templates/status` | 暂停/恢复模板版本 | 已实现 | 走模板状态权限服务 |
 | `GET /api/admin/providers` | 查看 provider、key preview、model route | 已实现 | 不返回完整密钥 |
+| `POST /api/admin/provider-keys` | 新增 provider key | 已实现 | admin only，服务端加密写入，不返回明文或密文 |
+| `POST /api/admin/provider-keys/[id]/rotate` | 轮换 provider key | 已实现 | admin only，必须填写 reason 并写 audit |
 | `POST /api/admin/provider-keys/[id]/status` | 更新 provider key 状态 | 已实现 | 写 `admin_audit_logs` |
 | `POST /api/admin/model-routes/[id]` | 更新模型路由状态/模型名/毛利阈值/fallback 开关 | 已实现 | 写 `admin_audit_logs` |
-| `GET /api/admin/billing` | 查询钱包、订单、点数流水 | 已实现 | 只读运维视图 |
+| `GET /api/admin/billing` | 查询钱包、订单、点数流水、点数包配置 | 已实现 | 点数包来自代码配置，Creem 产品待复核 |
+| `GET /api/admin/audit-logs` | 查询后台审计日志 | 已实现 | admin only，snapshot 做 key/prompt 脱敏 |
 | `POST /api/admin/credits/adjust` | 管理员补点 | 已实现 | 只支持正向补点，写账本与审计 |
 | `POST /api/admin/segments/[id]/retry` | 重试失败片段 | 已实现 | operator/admin 可用 |
 | `POST /api/admin/jobs/[id]/undeliverable` | 标记任务不可交付并释放冻结点数 | 已实现 | operator/admin 可用，当前不走 Creem 原路退款 |
 
 ## 运维边界
 
-- 当前“后台运维 API 包已补完”的含义是：MVP 所需的状态查看、补偿、重试、暂停、释放能力都已有服务层与 API。
-- 这不等于“后台系统已经完善”。下面几个点仍然是后续项：
-  - provider key 新增/轮换的加密写入接口还没补。
-  - pricing 管理接口还没做，当前仍以代码配置和 Creem 产品配置为准。
-  - 管理台 UI 还没做，当前主要靠 API、数据库、日志和 smoke 脚本运维。
+- 当前“后台运维 API 包已补完”的含义是：MVP 所需的状态查看、审计查询、补偿、重试、暂停、释放、provider key 轮换能力都有服务层、API 和基础页面。
+- 这不等于“商业闭环已经验收”。下面几个点仍然不能假装完成：
+  - 付费 `credit_cost > 0` 真实任务 full smoke 仍未留痕。
+  - `failed_released / failed_refunded` 真实补偿演练仍需记录 job id、ledger 和 state events。
+  - Creem 真实 checkout/webhook 仍是 `pending Creem approval`。
+  - pricing 不做后台改价，当前只展示代码配置，避免站内价格和 Creem 产品不同步。
 
 ## 主流程图
 
@@ -160,6 +167,8 @@ stateDiagram-v2
 ## 运维检查入口
 
 - 应用健康检查：`GET /api/health`
+  - `creemPayment` 可为 `pending`，不代表公开视频生成链路可绕过 moderation。
+  - `moderation` 缺失会使 `ready=false`，生成链路必须 fail closed。
 - Cloud Run 健康检查：`GET {CLOUD_RUN_STITCH_URL}/health`
 - Stitch 冒烟：`npm run smoke:stitch`
 - 完整后端冒烟：`npm run smoke:backend`
@@ -199,3 +208,4 @@ node scripts/job-debug.mjs <jobId>
 
 - 现在最容易自欺欺人的点不是“有没有接口”，而是“接口有了但没人能证明整条链路真的活着”。所以后续验收优先看 smoke 输出、R2 实物、数据库状态和账本流水，不要只看 200 响应。
 - Post-QA 是真实扣点前的最后闸门，任何想绕过它来“先快点上线”的想法，都会把账务和交付搞烂。
+- Provider key 轮换只解决安全写入闭环，不解决供应商额度、模型质量和真实失败率问题；这些仍要靠 provider logs 和 smoke 任务复核。

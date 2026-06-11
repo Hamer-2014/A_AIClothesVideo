@@ -1,6 +1,7 @@
 export interface RuntimeHealthCheck {
   configured: boolean;
   missing: string[];
+  status?: "ready" | "pending" | "missing";
 }
 
 export interface RuntimeHealthReport {
@@ -16,6 +17,8 @@ export interface RuntimeHealthReport {
     internalSecurity: RuntimeHealthCheck;
     stitchWorker: RuntimeHealthCheck;
     billing: RuntimeHealthCheck;
+    moderation: RuntimeHealthCheck;
+    creemPayment: RuntimeHealthCheck;
     aiProviders: RuntimeHealthCheck;
   };
   summary: {
@@ -34,16 +37,18 @@ function buildCheck(env: EnvSource, keys: string[]): RuntimeHealthCheck {
   return {
     configured: missing.length === 0,
     missing,
+    status: missing.length === 0 ? "ready" : "missing",
   };
 }
 
-function moderationKeys(env: EnvSource) {
-  const mode = env.PROMPT_MODERATION_MODE?.trim().toLowerCase();
-  return mode === "off" ? ["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] : [
-    "CREEM_API_KEY",
-    "CREEM_WEBHOOK_SECRET",
-    "CREEM_MODERATION_API_KEY",
-  ];
+function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
+  const required = ["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"];
+  const missing = required.filter((key) => !trimEnv(env, key));
+  return {
+    configured: missing.length === 0,
+    missing,
+    status: missing.length === 0 ? "ready" : "pending",
+  };
 }
 
 export function getRuntimeHealth(
@@ -66,7 +71,9 @@ export function getRuntimeHealth(
       "CLOUD_RUN_STITCH_URL",
       "CLOUD_RUN_STITCH_SECRET",
     ]),
-    billing: buildCheck(env, moderationKeys(env)),
+    billing: buildCheck(env, []),
+    moderation: buildCheck(env, ["CREEM_MODERATION_API_KEY"]),
+    creemPayment: buildOptionalPaymentCheck(env),
     aiProviders: buildCheck(env, [
       "DEEPSEEK_API_KEY",
       "VISION_PROVIDER",
@@ -76,8 +83,11 @@ export function getRuntimeHealth(
     ]),
   };
 
+  const readinessChecks = Object.entries(checks).filter(
+    ([name]) => name !== "creemPayment",
+  );
   const missing = Array.from(
-    new Set(Object.values(checks).flatMap((check) => check.missing)),
+    new Set(readinessChecks.flatMap(([, check]) => check.missing)),
   ).sort();
 
   return {

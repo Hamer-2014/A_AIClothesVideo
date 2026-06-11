@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { and, desc, eq, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { adminAuditLogs } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
@@ -46,6 +47,24 @@ export interface AdminAuditStore {
   createAuditLog(input: NewAdminAuditRecord): Promise<AdminAuditRecord>;
 }
 
+export interface AdminAuditFilters {
+  actorEmail?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  limit?: number;
+}
+
+export interface AdminAuditQueryStore extends AdminAuditStore {
+  listAuditLogs(filters: {
+    actorEmail?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+    limit: number;
+  }): Promise<AdminAuditRecord[]>;
+}
+
 export function normalizeAdminReason(reason: string | undefined) {
   const normalized = reason?.trim() ?? "";
 
@@ -89,6 +108,32 @@ export function toAuditSnapshot(value: unknown): JsonValue {
   return String(value);
 }
 
+const sensitiveSnapshotKeyPattern =
+  /(^|_)(plain)?key$|encryptedkey|apikey|api_key|secret|token|prompt/i;
+
+export function redactAuditSnapshot(value: JsonValue): JsonValue {
+  if (value === null) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactAuditSnapshot(item));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [
+        key,
+        sensitiveSnapshotKeyPattern.test(key)
+          ? "[REDACTED]"
+          : redactAuditSnapshot(nested),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 export async function writeAdminAuditLog({
   store,
   actor,
@@ -117,8 +162,8 @@ export async function writeAdminAuditLog({
     targetType,
     targetId: targetId ?? null,
     reason: reason ?? null,
-    beforeSnapshot: toAuditSnapshot(beforeSnapshot),
-    afterSnapshot: toAuditSnapshot(afterSnapshot),
+    beforeSnapshot: redactAuditSnapshot(toAuditSnapshot(beforeSnapshot)),
+    afterSnapshot: redactAuditSnapshot(toAuditSnapshot(afterSnapshot)),
     ipAddress: requestMeta?.ipAddress ?? null,
     userAgent: requestMeta?.userAgent ?? null,
   });
@@ -134,10 +179,79 @@ export function getRequestMeta(request: Request): AdminAuditRequestMeta {
   };
 }
 
+function normalizeAuditLimit(limit: number | undefined) {
+  const parsed = Number.isFinite(limit) ? Number(limit) : 50;
+  return Math.min(Math.max(parsed || 50, 1), 100);
+}
+
+export async function listAdminAuditLogs({
+  store,
+  filters = {},
+}: {
+  store: AdminAuditQueryStore;
+  filters?: AdminAuditFilters;
+}) {
+  return store.listAuditLogs({
+    actorEmail: filters.actorEmail,
+    action: filters.action,
+    targetType: filters.targetType,
+    targetId: filters.targetId,
+    limit: normalizeAuditLimit(filters.limit),
+  });
+}
+
 export function createInMemoryAdminAuditStore(): AdminAuditStore & {
-  listAuditLogs: () => AdminAuditRecord[];
+  listAuditLogs: {
+    (): AdminAuditRecord[];
+    (filters: {
+      actorEmail?: string;
+      action?: string;
+      targetType?: string;
+      targetId?: string;
+      limit: number;
+    }): Promise<AdminAuditRecord[]>;
+  };
 } {
   const records: AdminAuditRecord[] = [];
+  const listAuditLogs = ((filters?: {
+    actorEmail?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+    limit: number;
+  }) => {
+    let rows = records.toSorted(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    );
+
+    if (filters?.actorEmail) {
+      rows = rows.filter((record) => record.actorEmail === filters.actorEmail);
+    }
+    if (filters?.action) {
+      rows = rows.filter((record) => record.action === filters.action);
+    }
+    if (filters?.targetType) {
+      rows = rows.filter((record) => record.targetType === filters.targetType);
+    }
+    if (filters?.targetId) {
+      rows = rows.filter((record) => record.targetId === filters.targetId);
+    }
+
+    const result = rows
+      .slice(0, filters?.limit ?? records.length)
+      .map((record) => ({ ...record }));
+
+    return filters ? Promise.resolve(result) : result;
+  }) as {
+    (): AdminAuditRecord[];
+    (filters: {
+      actorEmail?: string;
+      action?: string;
+      targetType?: string;
+      targetId?: string;
+      limit: number;
+    }): Promise<AdminAuditRecord[]>;
+  };
 
   return {
     async createAuditLog(input) {
@@ -158,9 +272,7 @@ export function createInMemoryAdminAuditStore(): AdminAuditStore & {
       records.push(record);
       return { ...record };
     },
-    listAuditLogs() {
-      return records.map((record) => ({ ...record }));
-    },
+    listAuditLogs,
   };
 }
 
@@ -168,7 +280,7 @@ type DbClient = ReturnType<typeof getDb>;
 
 export function createDrizzleAdminAuditStore(
   db: DbClient = getDb(),
-): AdminAuditStore {
+): AdminAuditQueryStore {
   return {
     async createAuditLog(input) {
       const [record] = await db
@@ -192,6 +304,31 @@ export function createDrizzleAdminAuditStore(
       }
 
       return record as AdminAuditRecord;
+    },
+    async listAuditLogs(filters) {
+      const whereClauses: SQL[] = [];
+
+      if (filters.actorEmail) {
+        whereClauses.push(eq(adminAuditLogs.actorEmail, filters.actorEmail));
+      }
+      if (filters.action) {
+        whereClauses.push(eq(adminAuditLogs.action, filters.action));
+      }
+      if (filters.targetType) {
+        whereClauses.push(eq(adminAuditLogs.targetType, filters.targetType));
+      }
+      if (filters.targetId) {
+        whereClauses.push(eq(adminAuditLogs.targetId, filters.targetId));
+      }
+
+      const rows = await db
+        .select()
+        .from(adminAuditLogs)
+        .where(whereClauses.length > 0 ? and(...whereClauses) : undefined)
+        .orderBy(desc(adminAuditLogs.createdAt))
+        .limit(filters.limit);
+
+      return rows as AdminAuditRecord[];
     },
   };
 }

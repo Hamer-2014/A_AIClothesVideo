@@ -34,6 +34,27 @@ describe("POST /api/billing/checkout", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects arbitrary amount and credits from client input", async () => {
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({
+          packageCode: "starter",
+          amountCents: 1,
+          credits: 999999,
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "client_price_fields_not_allowed",
+    });
+  });
+
   it("creates a Creem checkout and records a local order", async () => {
     const orderStore = createInMemoryOrderStore();
     const response = await handleBillingCheckoutRequest(

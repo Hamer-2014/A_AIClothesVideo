@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { createInMemoryAdminAuditStore } from "./audit";
 import {
+  createProviderKey,
   createInMemoryProviderOpsStore,
   getProviderOpsOverview,
+  rotateProviderKey,
   updateModelRoute,
   updateProviderKeyStatus,
 } from "./providers";
@@ -158,5 +160,116 @@ describe("provider ops", () => {
         reason: "   ",
       }),
     ).rejects.toThrow("Admin action reason must be at least 6 characters.");
+  });
+
+  it("allows admin to create provider keys without returning secrets", async () => {
+    const store = createInMemoryProviderOpsStore({
+      providers: [
+        {
+          id: "provider-1",
+          name: "evolink",
+          displayName: "EvoLink",
+          status: "active",
+          baseUrl: "https://api.evolink.ai",
+        },
+      ],
+      keys: [],
+      routes: [],
+    });
+    const auditStore = createInMemoryAdminAuditStore();
+
+    const key = await createProviderKey({
+      store,
+      auditStore,
+      actor,
+      input: {
+        providerId: "provider-1",
+        label: "EvoLink staging",
+        environment: "staging",
+        plainKey: "sk-test-1234567890",
+        dailyCostLimit: "20.00",
+        concurrentLimit: 1,
+        status: "paused",
+        reason: "initial staging key",
+      },
+      encryptionSecret: "12345678901234567890123456789012",
+    });
+
+    expect(key.keyPreview).toBe("sk-t...7890");
+    expect(JSON.stringify(key)).not.toContain("sk-test-1234567890");
+    expect(JSON.stringify(key)).not.toContain("encrypted");
+    expect(auditStore.listAuditLogs()[0]).toMatchObject({
+      action: "provider_key:create",
+      targetType: "provider_key",
+    });
+  });
+
+  it("rejects operator provider key creation", async () => {
+    await expect(
+      createProviderKey({
+        store: createInMemoryProviderOpsStore({
+          providers: [],
+          keys: [],
+          routes: [],
+        }),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor: { ...actor, role: "operator" },
+        input: {
+          providerId: "provider-1",
+          label: "bad",
+          environment: "staging",
+          plainKey: "sk-test",
+          dailyCostLimit: "20.00",
+          concurrentLimit: 1,
+          status: "paused",
+          reason: "operator attempt",
+        },
+        encryptionSecret: "12345678901234567890123456789012",
+      }),
+    ).rejects.toThrow("Actor cannot create provider keys.");
+  });
+
+  it("fails provider key creation without encryption secret", async () => {
+    await expect(
+      createProviderKey({
+        store: createStore(),
+        auditStore: createInMemoryAdminAuditStore(),
+        actor,
+        input: {
+          providerId: "provider-1",
+          label: "missing secret",
+          environment: "staging",
+          plainKey: "sk-test",
+          dailyCostLimit: "20.00",
+          concurrentLimit: 1,
+          status: "paused",
+          reason: "missing encryption secret",
+        },
+        encryptionSecret: "",
+      }),
+    ).rejects.toThrow("PROVIDER_KEY_ENCRYPTION_SECRET");
+  });
+
+  it("allows admin to rotate provider keys and writes audit", async () => {
+    const store = createStore();
+    const auditStore = createInMemoryAdminAuditStore();
+
+    const key = await rotateProviderKey({
+      store,
+      auditStore,
+      actor,
+      keyId: "key-1",
+      plainKey: "sk-rotated-abcdef",
+      reason: "scheduled key rotation",
+      encryptionSecret: "12345678901234567890123456789012",
+    });
+
+    expect(key.keyPreview).toBe("sk-r...cdef");
+    expect(JSON.stringify(key)).not.toContain("sk-rotated-abcdef");
+    expect(auditStore.listAuditLogs()[0]).toMatchObject({
+      action: "provider_key:rotate",
+      targetType: "provider_key",
+      targetId: "key-1",
+    });
   });
 });

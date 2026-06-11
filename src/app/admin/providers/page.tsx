@@ -30,6 +30,58 @@ export default async function AdminProvidersPage() {
     >
       <div className="space-y-6">
         <div className="grid gap-4 xl:grid-cols-2">
+          <AdminActionForm
+            description="新增 provider key。完整 key 只提交一次，服务端加密保存，页面不会回显。"
+            endpoint="/api/admin/provider-keys"
+            fields={[
+              {
+                name: "providerId",
+                label: "Provider ID",
+                placeholder: "输入 provider id",
+              },
+              {
+                name: "label",
+                label: "Label",
+                placeholder: "EvoLink staging",
+              },
+              {
+                name: "environment",
+                label: "Environment",
+                defaultValue: "staging",
+              },
+              {
+                name: "plainKey",
+                label: "Plain Key",
+                placeholder: "只提交一次，不会回显",
+              },
+              {
+                name: "dailyCostLimit",
+                label: "Daily Cost Limit",
+                defaultValue: "20.00",
+              },
+              {
+                name: "concurrentLimit",
+                label: "Concurrent Limit",
+                type: "number",
+                defaultValue: "1",
+              },
+              {
+                name: "status",
+                label: "初始状态",
+                type: "select",
+                defaultValue: "paused",
+                options: [
+                  { label: "paused", value: "paused" },
+                  { label: "active", value: "active" },
+                  { label: "exhausted", value: "exhausted" },
+                  { label: "error", value: "error" },
+                ],
+              },
+            ]}
+            submitLabel="新增 Key"
+            title="Create Provider Key"
+          />
+
           {overview.keys.map((key) => (
             <AdminActionForm
               description={`更新 ${key.label} 的状态。operator 无权执行，必须由 admin 提交。`}
@@ -51,6 +103,25 @@ export default async function AdminProvidersPage() {
               key={key.id}
               submitLabel="更新 Key 状态"
               title={`Key ${key.label}`}
+            />
+          ))}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {overview.keys.map((key) => (
+            <AdminActionForm
+              description={`轮换 ${key.label}。完整 key 只提交一次，服务端加密保存，页面不会回显。`}
+              endpoint={`/api/admin/provider-keys/${key.id}/rotate`}
+              fields={[
+                {
+                  name: "plainKey",
+                  label: "New Plain Key",
+                  placeholder: "只提交一次，不会回显",
+                },
+              ]}
+              key={`${key.id}-rotate`}
+              submitLabel="轮换 Key"
+              title={`Rotate ${key.label}`}
             />
           ))}
         </div>

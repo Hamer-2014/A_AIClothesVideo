@@ -165,6 +165,12 @@ export function assertSmokeCreditLedger({ mode, job, ledger = [] }) {
   }
 
   const ledgerTypes = ledger.map((entry) => entry.type);
+  if (!ledgerTypes.includes("reserve")) {
+    throw new Error(
+      `Full smoke expected credit reserve for paid job (${creditCost} credits), but ledger only has: ${ledgerTypes.join(", ")}`,
+    );
+  }
+
   if (!ledgerTypes.includes("capture")) {
     throw new Error(
       `Full smoke expected credit capture for paid job (${creditCost} credits), but ledger only has: ${ledgerTypes.join(", ")}`,

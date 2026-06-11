@@ -193,6 +193,14 @@ describe("backend smoke utils", () => {
     expect(() =>
       assertSmokeCreditLedger({
         mode: "full",
+        job: { credit_cost: 70 },
+        ledger: [{ type: "capture" }],
+      }),
+    ).toThrow("Full smoke expected credit reserve");
+
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "full",
         job: { credit_cost: 0 },
         ledger: [],
       }),
@@ -203,6 +211,19 @@ describe("backend smoke utils", () => {
         mode: "stitch",
         job: { credit_cost: 70 },
         ledger: [],
+      }),
+    ).not.toThrow();
+  });
+
+  it("requires reserve and capture for paid full-smoke jobs", () => {
+    expect(() =>
+      assertSmokeCreditLedger({
+        mode: "full",
+        job: { credit_cost: 70 },
+        ledger: [
+          { type: "reserve" },
+          { type: "capture" },
+        ],
       }),
     ).not.toThrow();
   });

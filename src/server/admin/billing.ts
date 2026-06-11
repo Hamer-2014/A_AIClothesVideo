@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 
+import { creditPackages } from "@/lib/credits/packages";
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import { adjustCredits } from "@/lib/credits/ledger";
 import type { CreditLedgerStore, CreditLedgerType } from "@/lib/credits/types";
@@ -76,6 +77,9 @@ export async function getBillingOpsOverview({
     wallets,
     orders: orderRecords,
     ledger: ledgerRecords,
+    creditPackages,
+    pricingSource: "code" as const,
+    creemVerificationStatus: "pending_creem_approval" as const,
   };
 }
 

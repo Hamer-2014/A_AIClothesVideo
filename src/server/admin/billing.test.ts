@@ -59,11 +59,34 @@ describe("billing ops", () => {
       userId: "user-1",
     });
 
-    expect(overview).toEqual({
+    expect(overview).toMatchObject({
       wallets: [expect.objectContaining({ id: "wallet-1" })],
       orders: [expect.objectContaining({ id: "order-1" })],
       ledger: [expect.objectContaining({ id: "ledger-1" })],
     });
+  });
+
+  it("includes configured credit packages in billing ops overview", async () => {
+    const overview = await getBillingOpsOverview({
+      store: createInMemoryBillingOpsStore({
+        wallets: [],
+        orders: [],
+        ledger: [],
+      }),
+    });
+
+    expect(overview.creditPackages.map((item) => item.code)).toEqual([
+      "starter",
+      "creator",
+      "studio",
+    ]);
+    expect(overview.creditPackages[0]).toMatchObject({
+      amountCents: 999,
+      currency: "USD",
+      credits: 100,
+    });
+    expect(overview.pricingSource).toBe("code");
+    expect(overview.creemVerificationStatus).toBe("pending_creem_approval");
   });
 
   it("adds admin adjustment credits through ledger and writes audit log", async () => {

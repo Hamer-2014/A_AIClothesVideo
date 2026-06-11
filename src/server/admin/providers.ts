@@ -16,6 +16,10 @@ import {
   toAuditSnapshot,
   writeAdminAuditLog,
 } from "./audit";
+import {
+  createProviderKeyPreview,
+  encryptProviderKey,
+} from "./provider-key-crypto";
 
 export type ProviderStatus = (typeof providerStatusValues)[number];
 export type ProviderPurpose = (typeof providerPurposeValues)[number];
@@ -46,6 +50,17 @@ export interface ProviderOpsKey {
   failureCount: number;
 }
 
+export interface ProviderOpsKeyInput {
+  providerId: string;
+  label: string;
+  environment: string;
+  status: ProviderStatus;
+  encryptedKey: string;
+  keyPreview: string;
+  dailyCostLimit: string;
+  concurrentLimit: number;
+}
+
 export interface ProviderOpsRoute {
   id: string;
   purpose: ProviderPurpose;
@@ -68,6 +83,12 @@ export interface ProviderOpsStore {
     keyId: string;
     status: ProviderStatus;
   }): Promise<ProviderOpsKey>;
+  createKey(input: ProviderOpsKeyInput): Promise<ProviderOpsKey>;
+  rotateKey(input: {
+    keyId: string;
+    encryptedKey: string;
+    keyPreview: string;
+  }): Promise<ProviderOpsKey>;
   findRoute(routeId: string): Promise<ProviderOpsRoute | null>;
   updateRoute(input: {
     routeId: string;
@@ -76,6 +97,15 @@ export interface ProviderOpsStore {
     minMarginPercent?: number;
     allowPublicFallback?: boolean;
   }): Promise<ProviderOpsRoute>;
+}
+
+function assertPlainKey(plainKey: string) {
+  const normalized = plainKey.trim();
+  if (!normalized) {
+    throw new Error("Provider key cannot be empty.");
+  }
+
+  return normalized;
 }
 
 export async function getProviderOpsOverview({
@@ -129,6 +159,114 @@ export async function updateProviderKeyStatus({
     store: auditStore,
     actor,
     action: "provider_key:update",
+    targetType: "provider_key",
+    targetId: keyId,
+    reason: normalizedReason,
+    beforeSnapshot: toAuditSnapshot(before),
+    afterSnapshot: toAuditSnapshot(after),
+    requestMeta,
+  });
+
+  return after;
+}
+
+export async function createProviderKey({
+  store,
+  auditStore,
+  actor,
+  input,
+  encryptionSecret = process.env.PROVIDER_KEY_ENCRYPTION_SECRET,
+  requestMeta,
+}: {
+  store: ProviderOpsStore;
+  auditStore: AdminAuditStore;
+  actor: ProviderOpsActor;
+  input: {
+    providerId: string;
+    label: string;
+    environment: string;
+    plainKey: string;
+    dailyCostLimit: string;
+    concurrentLimit: number;
+    status: ProviderStatus;
+    reason: string;
+  };
+  encryptionSecret?: string;
+  requestMeta?: AdminAuditRequestMeta;
+}) {
+  if (!canRolePerformAdminAction(actor.role, "provider_key:create")) {
+    throw new Error("Actor cannot create provider keys.");
+  }
+
+  const normalizedReason = normalizeAdminReason(input.reason);
+  const plainKey = assertPlainKey(input.plainKey);
+  const keyPreview = createProviderKeyPreview(plainKey);
+  const encryptedKey = encryptProviderKey(plainKey, encryptionSecret);
+  const key = await store.createKey({
+    providerId: input.providerId,
+    label: input.label.trim(),
+    environment: input.environment.trim() || "development",
+    status: input.status,
+    encryptedKey,
+    keyPreview,
+    dailyCostLimit: input.dailyCostLimit,
+    concurrentLimit: input.concurrentLimit,
+  });
+
+  await writeAdminAuditLog({
+    store: auditStore,
+    actor,
+    action: "provider_key:create",
+    targetType: "provider_key",
+    targetId: key.id,
+    reason: normalizedReason,
+    afterSnapshot: toAuditSnapshot(key),
+    requestMeta,
+  });
+
+  return key;
+}
+
+export async function rotateProviderKey({
+  store,
+  auditStore,
+  actor,
+  keyId,
+  plainKey,
+  reason,
+  encryptionSecret = process.env.PROVIDER_KEY_ENCRYPTION_SECRET,
+  requestMeta,
+}: {
+  store: ProviderOpsStore;
+  auditStore: AdminAuditStore;
+  actor: ProviderOpsActor;
+  keyId: string;
+  plainKey: string;
+  reason: string;
+  encryptionSecret?: string;
+  requestMeta?: AdminAuditRequestMeta;
+}) {
+  if (!canRolePerformAdminAction(actor.role, "provider_key:rotate")) {
+    throw new Error("Actor cannot rotate provider keys.");
+  }
+
+  const normalizedReason = normalizeAdminReason(reason);
+  const before = await store.findKey(keyId);
+  if (!before) {
+    throw new Error("Provider key not found.");
+  }
+
+  const normalizedPlainKey = assertPlainKey(plainKey);
+  const after = await store.rotateKey({
+    keyId,
+    encryptedKey: encryptProviderKey(normalizedPlainKey, encryptionSecret),
+    keyPreview: createProviderKeyPreview(normalizedPlainKey),
+  });
+
+  await writeAdminAuditLog({
+    store: auditStore,
+    actor,
+    action: "provider_key:rotate",
     targetType: "provider_key",
     targetId: keyId,
     reason: normalizedReason,
@@ -225,6 +363,32 @@ export function createInMemoryProviderOpsStore(input: {
         throw new Error("Provider key not found.");
       }
       const updated = { ...key, status };
+      keys.set(keyId, updated);
+      return { ...updated };
+    },
+    async createKey(input) {
+      const key: ProviderOpsKey = {
+        id: `key-${keys.size + 1}`,
+        providerId: input.providerId,
+        label: input.label,
+        environment: input.environment,
+        status: input.status,
+        keyPreview: input.keyPreview,
+        dailyCostLimit: input.dailyCostLimit,
+        currentDailyCost: "0",
+        concurrentLimit: input.concurrentLimit,
+        currentConcurrency: 0,
+        failureCount: 0,
+      };
+      keys.set(key.id, key);
+      return { ...key };
+    },
+    async rotateKey({ keyId, keyPreview }) {
+      const key = keys.get(keyId);
+      if (!key) {
+        throw new Error("Provider key not found.");
+      }
+      const updated = { ...key, keyPreview };
       keys.set(keyId, updated);
       return { ...updated };
     },
@@ -334,6 +498,67 @@ export function createDrizzleProviderOpsStore(
       const [key] = await db
         .update(providerKeys)
         .set({ status })
+        .where(eq(providerKeys.id, keyId))
+        .returning({
+          id: providerKeys.id,
+          providerId: providerKeys.providerId,
+          label: providerKeys.label,
+          environment: providerKeys.environment,
+          status: providerKeys.status,
+          keyPreview: providerKeys.keyPreview,
+          dailyCostLimit: providerKeys.dailyCostLimit,
+          currentDailyCost: providerKeys.currentDailyCost,
+          concurrentLimit: providerKeys.concurrentLimit,
+          currentConcurrency: providerKeys.currentConcurrency,
+          failureCount: providerKeys.failureCount,
+        });
+
+      if (!key) {
+        throw new Error("Provider key not found.");
+      }
+
+      return key as ProviderOpsKey;
+    },
+    async createKey(input) {
+      const [key] = await db
+        .insert(providerKeys)
+        .values({
+          providerId: input.providerId,
+          label: input.label,
+          environment: input.environment,
+          status: input.status,
+          encryptedKey: input.encryptedKey,
+          keyPreview: input.keyPreview,
+          dailyCostLimit: input.dailyCostLimit,
+          concurrentLimit: input.concurrentLimit,
+        })
+        .returning({
+          id: providerKeys.id,
+          providerId: providerKeys.providerId,
+          label: providerKeys.label,
+          environment: providerKeys.environment,
+          status: providerKeys.status,
+          keyPreview: providerKeys.keyPreview,
+          dailyCostLimit: providerKeys.dailyCostLimit,
+          currentDailyCost: providerKeys.currentDailyCost,
+          concurrentLimit: providerKeys.concurrentLimit,
+          currentConcurrency: providerKeys.currentConcurrency,
+          failureCount: providerKeys.failureCount,
+        });
+
+      if (!key) {
+        throw new Error("Provider key creation failed.");
+      }
+
+      return key as ProviderOpsKey;
+    },
+    async rotateKey({ keyId, encryptedKey, keyPreview }) {
+      const [key] = await db
+        .update(providerKeys)
+        .set({
+          encryptedKey,
+          keyPreview,
+        })
         .where(eq(providerKeys.id, keyId))
         .returning({
           id: providerKeys.id,

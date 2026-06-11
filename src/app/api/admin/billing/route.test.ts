@@ -25,6 +25,9 @@ describe("GET /api/admin/billing", () => {
           wallets: [{ userId: input.userId, availableBalance: 100 }],
           orders: [],
           ledger: [],
+          creditPackages: [{ code: "starter", credits: 100 }],
+          pricingSource: "code",
+          creemVerificationStatus: "pending_creem_approval",
         }),
       },
     );
@@ -34,6 +37,9 @@ describe("GET /api/admin/billing", () => {
       wallets: [{ userId: "user-1", availableBalance: 100 }],
       orders: [],
       ledger: [],
+      creditPackages: [{ code: "starter", credits: 100 }],
+      pricingSource: "code",
+      creemVerificationStatus: "pending_creem_approval",
     });
   });
 });

@@ -36,6 +36,19 @@ describe("POST /api/webhooks/creem", () => {
     expect(response.status).toBe(401);
   });
 
+  it("returns 401 for missing signatures", async () => {
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+
+    const response = await handleCreemWebhookRequest(
+      new Request("http://localhost/api/webhooks/creem", {
+        method: "POST",
+        body: JSON.stringify({ id: "evt_missing" }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
   it("ignores unsupported events after signature verification", async () => {
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
     const payload = JSON.stringify({ id: "evt_2", type: "checkout.created" });
@@ -97,5 +110,49 @@ describe("POST /api/webhooks/creem", () => {
     expect(body).toEqual({ received: true });
     expect(ledgerStore.listLedger()).toHaveLength(1);
     expect(ledgerStore.listLedger()[0]?.amount).toBe(360);
+  });
+
+  it("does not grant credits twice for replayed paid webhook events", async () => {
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "starter",
+      externalOrderId: "ord_replay",
+    });
+    const payload = JSON.stringify({
+      id: "evt_replay",
+      type: "checkout.completed",
+      object: {
+        id: "checkout_replay",
+        order: {
+          id: "ord_replay",
+          amount: 999,
+          currency: "USD",
+        },
+        product: {
+          id: "starter",
+        },
+        metadata: {
+          userId,
+          packageCode: "starter",
+        },
+      },
+    });
+    const signature = signCreemWebhookPayloadForTest(payload, "whsec_test");
+
+    await handleCreemWebhookRequest(signedRequest(payload, signature), {
+      orderStore,
+      ledgerStore,
+    });
+    await handleCreemWebhookRequest(signedRequest(payload, signature), {
+      orderStore,
+      ledgerStore,
+    });
+
+    expect(ledgerStore.listLedger()).toHaveLength(1);
+    expect(ledgerStore.listLedger()[0]?.amount).toBe(100);
   });
 });
