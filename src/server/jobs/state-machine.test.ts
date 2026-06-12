@@ -101,6 +101,40 @@ describe("job state machine", () => {
     });
   });
 
+  it("touches the job updatedAt timestamp on every status transition", async () => {
+    let capturedUpdatedAt: Date | undefined;
+    const baseStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "draft_uploaded",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const store = {
+      ...baseStore,
+      async updateJobStatus(
+        jobIdToUpdate: string,
+        changes: Parameters<typeof baseStore.updateJobStatus>[1],
+      ) {
+        capturedUpdatedAt = changes.updatedAt;
+        return baseStore.updateJobStatus(jobIdToUpdate, changes);
+      },
+    };
+
+    await transitionJobStatus({
+      store,
+      jobId,
+      toStatus: "lite_check_queued",
+      reason: "upload_complete",
+    });
+
+    expect(capturedUpdatedAt).toBeInstanceOf(Date);
+  });
+
   it("allows retrying asset analysis directly from a failed state", async () => {
     const store = createInMemoryJobStore([
       {

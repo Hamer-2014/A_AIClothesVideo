@@ -25,7 +25,7 @@ describe("POST /api/admin/model-routes/[id]", () => {
         method: "POST",
         body: JSON.stringify({
           status: "active",
-          primaryModel: "veo3.1-pro-beta",
+          primaryModel: "veo3.1-fast-beta",
           minMarginPercent: 50,
           allowPublicFallback: false,
           reason: "enable route",
@@ -52,7 +52,7 @@ describe("POST /api/admin/model-routes/[id]", () => {
     expect(await response.json()).toEqual({
       id: "route-1",
       status: "active",
-      primaryModel: "veo3.1-pro-beta",
+      primaryModel: "veo3.1-fast-beta",
       minMarginPercent: 50,
       allowPublicFallback: false,
     });

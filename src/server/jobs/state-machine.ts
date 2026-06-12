@@ -21,6 +21,7 @@ export interface JobRecord {
   lockedUntil: Date | null;
   attemptCount: number;
   lastError: string | null;
+  updatedAt?: Date;
 }
 
 export interface JobStateEventRecord {
@@ -44,6 +45,7 @@ export interface JobStatusChanges {
   lockedBy?: string | null;
   lockedUntil?: Date | null;
   clearLock?: boolean;
+  updatedAt?: Date;
 }
 
 export interface NewJobStateEvent {
@@ -166,6 +168,7 @@ export function createInMemoryJobStore(initialJobs: JobRecord[] = []): JobStore 
             : changes.clearLock
               ? null
               : job.lockedUntil,
+        updatedAt: changes.updatedAt ?? job.updatedAt,
       };
       jobs.set(jobId, updated);
       return { ...updated };
@@ -211,6 +214,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          updatedAt: videoJobs.updatedAt,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))
@@ -235,6 +239,9 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
         ...(changes.lockedUntil !== undefined
           ? { lockedUntil: changes.lockedUntil }
           : {}),
+        ...(changes.updatedAt !== undefined
+          ? { updatedAt: changes.updatedAt }
+          : {}),
       };
       const [job] = await db
         .update(videoJobs)
@@ -250,6 +257,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          updatedAt: videoJobs.updatedAt,
         });
 
       if (!job) {
@@ -322,6 +330,7 @@ export async function transitionJobStatus({
     userVisibleStatus,
     failureReason,
     clearLock,
+    updatedAt: new Date(),
   });
 
   try {
@@ -342,6 +351,7 @@ export async function transitionJobStatus({
       failureReason: job.failureReason,
       lockedBy: job.lockedBy,
       lockedUntil: job.lockedUntil,
+      updatedAt: job.updatedAt,
       clearLock: false,
     });
     throw error;

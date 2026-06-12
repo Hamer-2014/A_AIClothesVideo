@@ -58,7 +58,7 @@ function createRetryStores() {
         prompt: "retry me",
         inputAssetSnapshot: { assets: [] },
         provider: "evolink",
-        model: "veo3.1-pro-beta",
+        model: "veo3.1-fast-beta",
         providerTaskId: "task-failed",
         providerCallLogId: "call-1",
         videoKey: null,

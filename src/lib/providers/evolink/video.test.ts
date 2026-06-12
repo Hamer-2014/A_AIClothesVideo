@@ -36,7 +36,7 @@ describe("EvoLink video provider", () => {
         env: {
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example",
-          EVOLINK_VIDEO_MODEL: "veo3.1-pro-beta",
+          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
         },
       },
     );
@@ -50,7 +50,7 @@ describe("EvoLink video provider", () => {
           "Content-Type": "application/json",
         }),
         body: JSON.stringify({
-          model: "veo3.1-pro-beta",
+          model: "veo3.1-fast-beta",
           prompt: "Generate a front push-in.",
           aspect_ratio: "9:16",
           duration_seconds: 8,
@@ -60,7 +60,7 @@ describe("EvoLink video provider", () => {
     );
     expect(result).toEqual({
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
       raw: {
         task_id: "task-1",
@@ -88,7 +88,7 @@ describe("EvoLink video provider", () => {
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example",
           EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
-          VIDEO_GENERATION_MODEL: "veo3.1-pro-beta",
+          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
         },
       },
     );
@@ -96,10 +96,10 @@ describe("EvoLink video provider", () => {
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://api.evolink.example/v1/videos/generations",
       expect.objectContaining({
-        body: expect.stringContaining('"model":"veo3.1-pro-beta"'),
+        body: expect.stringContaining('"model":"veo3.1-fast-beta"'),
       }),
     );
-    expect(result.model).toBe("veo3.1-pro-beta");
+    expect(result.model).toBe("veo3.1-fast-beta");
   });
 
   it("accepts a base url that was mistakenly configured as the full generations endpoint", async () => {
@@ -154,7 +154,7 @@ describe("EvoLink video provider", () => {
       env: {
         EVOLINK_API_KEY: "sk-test",
         EVOLINK_BASE_URL: "https://api.evolink.example",
-        EVOLINK_VIDEO_MODEL: "veo3.1-pro-beta",
+        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
       },
     });
 
@@ -166,7 +166,7 @@ describe("EvoLink video provider", () => {
     );
     expect(result).toEqual({
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",

@@ -244,7 +244,7 @@ describe("video segment services", () => {
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
       createVideoGeneration: async (input) => ({
         provider: "evolink",
-        model: "veo3.1-pro-beta",
+        model: "veo3.1-fast-beta",
         providerTaskId: "task-1",
         raw: {
           receivedPrompt: input.prompt,
@@ -262,14 +262,14 @@ describe("video segment services", () => {
     expect(stores.segmentStore.listSegments()[0]).toMatchObject({
       status: "generating",
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
       providerCallLogId: expect.any(String),
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segment_generating");
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       purpose: "video_generation",
       status: "succeeded",
       providerTaskId: "task-1",
@@ -416,7 +416,7 @@ describe("video segment services", () => {
     await stores.segmentStore.updateSegment(segmentId, {
       status: "generating",
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
     });
     await stores.jobStore.updateJobStatus(jobId, { status: "segment_generating" });
@@ -427,7 +427,7 @@ describe("video segment services", () => {
       segmentId,
       pollTask: async () => ({
         provider: "evolink",
-        model: "veo3.1-pro-beta",
+        model: "veo3.1-fast-beta",
         providerTaskId: "task-1",
         status: "succeeded",
         outputUrl: "https://provider.example/video.mp4",

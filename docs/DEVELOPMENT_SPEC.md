@@ -165,7 +165,7 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 
 EVOLINK_API_KEY=
 EVOLINK_BASE_URL=
-EVOLINK_VIDEO_MODEL=veo3.1-pro-beta
+EVOLINK_VIDEO_MODEL=veo3.1-fast-beta
 
 APIMART_API_KEY=
 APIMART_BASE_URL=
@@ -796,7 +796,7 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 ### 13.1 目标
 
-真实调用 EvoLink `veo3.1-pro-beta` 生成 8 秒片段。
+真实调用 EvoLink `veo3.1-fast-beta` 生成 8 秒片段。
 
 ### 13.2 文件边界
 
@@ -1050,7 +1050,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] DeepSeek 真实调用成功。
 - [ ] 视觉模型 Lite 调用成功。
 - [ ] 视觉模型 Standard 调用成功。
-- [ ] EvoLink `veo3.1-pro-beta` 提交任务成功。
+- [ ] EvoLink `veo3.1-fast-beta` 提交任务成功。
 - [ ] EvoLink 轮询成功。
 - [ ] EvoLink 输出转存 R2 成功。
 - [ ] APIMart PixVerse 仅管理员内测可见。

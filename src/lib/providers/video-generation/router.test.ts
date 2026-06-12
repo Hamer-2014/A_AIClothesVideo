@@ -29,7 +29,7 @@ describe("video generation provider router", () => {
         fetch: fetchImpl,
         env: {
           VIDEO_GENERATION_PROVIDER: "evolink",
-          VIDEO_GENERATION_MODEL: "veo3.1-pro-beta",
+          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example",
           EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
@@ -39,10 +39,10 @@ describe("video generation provider router", () => {
 
     expect(result).toMatchObject({
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-generic-model",
     });
-    expect(requests[0]?.body.model).toBe("veo3.1-pro-beta");
+    expect(requests[0]?.body.model).toBe("veo3.1-fast-beta");
   });
 
   it("falls back to legacy EVOLINK_VIDEO_MODEL for compatibility", () => {
@@ -126,7 +126,7 @@ describe("video generation provider router", () => {
       fetch: fetchImpl,
       env: {
         VIDEO_GENERATION_PROVIDER: "evolink",
-        VIDEO_GENERATION_MODEL: "veo3.1-pro-beta",
+        VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
         EVOLINK_API_KEY: "sk-test",
         EVOLINK_BASE_URL: "https://api.evolink.example",
       },
@@ -134,7 +134,7 @@ describe("video generation provider router", () => {
 
     expect(result).toMatchObject({
       provider: "evolink",
-      model: "veo3.1-pro-beta",
+      model: "veo3.1-fast-beta",
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",

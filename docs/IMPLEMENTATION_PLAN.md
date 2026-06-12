@@ -276,7 +276,7 @@
   - `post_qa`
 - [ ] 接入 DeepSeek `deepseek-v4-flash`。
 - [ ] 接入默认 GPT 视觉模型。
-- [ ] 接入 EvoLink `veo3.1-pro-beta`。
+- [ ] 接入 EvoLink `veo3.1-fast-beta`。
 - [ ] 预留 APIMart `pixverse-v6` 实验路由。
 - [ ] 所有模型使用真实 provider 调用，不做“假成功”返回。
 - [ ] 未配置 key 的模型路线显示不可用。
