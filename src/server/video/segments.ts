@@ -88,13 +88,13 @@ function getMaxTaskRegenerations() {
 function getConfiguredVideoGenerationIdentity(
   env: Record<string, string | undefined> = process.env,
 ) {
-  const provider = env.VIDEO_GENERATION_PROVIDER?.trim().toLowerCase() || "evolink";
+  const provider = env.VIDEO_GENERATION_PROVIDER?.trim().toLowerCase() || "apimart";
   const model =
     env.VIDEO_GENERATION_MODEL?.trim() ||
     (provider === "apimart"
       ? env.APIMART_PIXVERSE_MODEL?.trim()
       : env.EVOLINK_VIDEO_MODEL?.trim()) ||
-    "unknown";
+    (provider === "apimart" ? "pixverse-v6" : "unknown");
 
   return { provider, model };
 }

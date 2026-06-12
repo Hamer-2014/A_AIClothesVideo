@@ -388,6 +388,34 @@ describe("video segment services", () => {
     });
   });
 
+  it("records submit failures against APIMart when no provider is explicitly configured", async () => {
+    vi.stubEnv("VIDEO_GENERATION_PROVIDER", "");
+    vi.stubEnv("VIDEO_GENERATION_MODEL", "");
+    vi.stubEnv("APIMART_PIXVERSE_MODEL", "pixverse-v6");
+    const stores = createStores();
+
+    await expect(
+      submitQueuedSegment({
+        ...stores,
+        jobId,
+        segmentId,
+        maxSubmitAttempts: 1,
+        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        createVideoGeneration: async () => {
+          throw new Error("default provider submit failed.");
+        },
+      }),
+    ).rejects.toThrow("default provider submit failed.");
+
+    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      provider: "apimart",
+      model: "pixverse-v6",
+      status: "failed",
+      errorCode: "video_generation_submit_failed",
+      errorMessage: "default provider submit failed.",
+    });
+  });
+
   it("prefers generic submit retry env over legacy EvoLink retry env", async () => {
     vi.stubEnv("VIDEO_GENERATION_SUBMIT_MAX_ATTEMPTS", "2");
     vi.stubEnv("EVOLINK_SUBMIT_MAX_ATTEMPTS", "4");

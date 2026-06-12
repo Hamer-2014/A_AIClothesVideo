@@ -6,7 +6,7 @@
 
 **Architecture:** 继续遵守 PRD 和技术架构：Next.js/Vercel 只负责页面、API 和短任务推进；Cloud Run `stitch-worker` 负责 ffmpeg 拼接与抽帧；Neon/Drizzle 作为任务状态机、账本和审计的唯一真实来源。所有进入生成链路的用户 prompt 和最终视频 prompt 必须经过 Creem Moderation，Post-QA 通过后才允许 `capture` 点数和下载。
 
-**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Drizzle, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, Cloud Run, ffmpeg, DeepSeek, vision provider, EvoLink Veo 3.1 Pro Beta, Vitest.
+**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Drizzle, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, Cloud Run, ffmpeg, DeepSeek, vision provider, APIMart PixVerse V6, EvoLink fast backup, Vitest.
 
 ---
 

@@ -58,13 +58,16 @@ describe("video generation provider router", () => {
     });
   });
 
-  it("defaults to EvoLink when VIDEO_GENERATION_PROVIDER is not set", () => {
+  it("defaults to APIMart PixVerse when VIDEO_GENERATION_PROVIDER is not set", () => {
     const config = getVideoGenerationConfig({
-      EVOLINK_API_KEY: "sk-test",
-      EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+      APIMART_API_KEY: "sk-test",
+      APIMART_PIXVERSE_MODEL: "pixverse-v6",
     });
 
-    expect(config.provider).toBe("evolink");
+    expect(config).toMatchObject({
+      provider: "apimart",
+      model: "pixverse-v6",
+    });
   });
 
   it("routes APIMart submissions through the APIMart adapter", async () => {

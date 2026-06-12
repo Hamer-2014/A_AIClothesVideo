@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js 部署在 Vercel，负责前台、后台、API 和短任务推进；Neon Postgres 保存状态机、点数账本、模型路由和审计日志；Cloud Run `stitch-worker` 负责 ffmpeg 拼接与抽帧；Cloudflare R2 存储图片和视频；模型调用通过可配置 provider/router 执行。
 
-**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, cron-job.org, Cloud Run, ffmpeg, DeepSeek, GPT vision model, EvoLink Veo 3.1 Pro Beta.
+**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, cron-job.org, Cloud Run, ffmpeg, DeepSeek, GPT vision model, APIMart PixVerse V6.
 
 详细执行 SPEC 见：[DEVELOPMENT_SPEC.md](DEVELOPMENT_SPEC.md)
 
@@ -276,8 +276,8 @@
   - `post_qa`
 - [ ] 接入 DeepSeek `deepseek-v4-flash`。
 - [ ] 接入默认 GPT 视觉模型。
-- [ ] 接入 EvoLink `veo3.1-fast-beta`。
-- [ ] 预留 APIMart `pixverse-v6` 实验路由。
+- [ ] 接入 APIMart `pixverse-v6`。
+- [ ] 预留 EvoLink `veo3.1-fast-beta` 备用/对照路由。
 - [ ] 所有模型使用真实 provider 调用，不做“假成功”返回。
 - [ ] 未配置 key 的模型路线显示不可用。
 - [ ] 每次模型调用写 `provider_call_logs`。
@@ -366,14 +366,14 @@
 
 ## 12. 视频生成片段流程
 
-**目标：** 使用 EvoLink Veo 3.1 Pro Beta 生成 8 秒片段。
+**目标：** 使用 APIMart PixVerse V6 生成 8 秒片段。
 
 **任务：**
 
 - [ ] 根据 storyboard 创建 `video_segments`。
 - [ ] 每个 segment 生成最终 prompt。
 - [ ] 通过 Creem Moderation 后冻结点数。
-- [ ] 提交 EvoLink 异步任务。
+- [ ] 提交 APIMart PixVerse 异步任务。
 - [ ] 保存 provider task ID。
 - [ ] 轮询任务状态。
 - [ ] 成功后下载供应商视频。
@@ -551,7 +551,7 @@
 3. **模板与模型里程碑**
    - 模板库、视觉识别、DeepSeek 分镜、模型路由日志。
 4. **视频生成里程碑**
-   - EvoLink 片段生成、worker tick、Cloud Run 拼接、Post-QA。
+   - APIMart PixVerse 片段生成、worker tick、Cloud Run 拼接、Post-QA。
 5. **产品闭环里程碑**
    - 前台工作台、任务历史、管理员后台、上线验证。
 

@@ -24,8 +24,8 @@ describe("getRuntimeHealth", () => {
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "",
       VISION_MODEL_STANDARD: "",
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "",
+      VIDEO_GENERATION_PROVIDER: "apimart",
+      APIMART_API_KEY: "",
     });
 
     expect(result.ready).toBe(false);
@@ -48,7 +48,7 @@ describe("getRuntimeHealth", () => {
       missing: [
         "VISION_API_KEY",
         "VISION_MODEL_STANDARD",
-        "EVOLINK_API_KEY",
+        "APIMART_API_KEY",
       ],
       status: "missing",
     });
@@ -78,8 +78,8 @@ describe("getRuntimeHealth", () => {
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
       VISION_MODEL_STANDARD: "gpt-4.1-mini",
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "evolink-key",
+      VIDEO_GENERATION_PROVIDER: "apimart",
+      APIMART_API_KEY: "apimart-key",
     });
 
     expect(result.ready).toBe(true);
@@ -111,8 +111,8 @@ describe("getRuntimeHealth", () => {
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
       VISION_MODEL_STANDARD: "gpt-4.1-mini",
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "evolink-key",
+      VIDEO_GENERATION_PROVIDER: "apimart",
+      APIMART_API_KEY: "apimart-key",
     });
 
     expect(result.ready).toBe(false);
@@ -141,8 +141,8 @@ describe("getRuntimeHealth", () => {
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
       VISION_MODEL_STANDARD: "gpt-4.1-mini",
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "evolink-key",
+      VIDEO_GENERATION_PROVIDER: "apimart",
+      APIMART_API_KEY: "apimart-key",
     });
 
     expect(result.ready).toBe(true);
@@ -171,8 +171,8 @@ describe("getRuntimeHealth", () => {
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
       VISION_MODEL_STANDARD: "gpt-4.1-mini",
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "evolink-key",
+      VIDEO_GENERATION_PROVIDER: "apimart",
+      APIMART_API_KEY: "apimart-key",
     });
 
     expect(result.ready).toBe(false);

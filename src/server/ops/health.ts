@@ -52,7 +52,7 @@ function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
 }
 
 function videoGenerationProviderKeys(env: EnvSource) {
-  const provider = trimEnv(env, "VIDEO_GENERATION_PROVIDER").toLowerCase() || "evolink";
+  const provider = trimEnv(env, "VIDEO_GENERATION_PROVIDER").toLowerCase() || "apimart";
 
   if (provider === "evolink") {
     return ["EVOLINK_API_KEY"];

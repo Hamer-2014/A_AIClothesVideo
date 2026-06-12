@@ -34,8 +34,8 @@
 | API | 用途 | 当前状态 | 关键约束 |
 | --- | --- | --- | --- |
 | `POST /api/internal/worker/tick` | 推进素材分析、片段生成、stitch、Post-QA | 已实现 | 校验 `CRON_JOB_SECRET` |
-| `POST /api/internal/segments/[id]/submit` | 提交 queued segment 到 EvoLink | 已实现 | 校验 `INTERNAL_WORKER_SECRET` |
-| `POST /api/internal/segments/[id]/poll` | 轮询 EvoLink 任务并转存 R2 | 已实现 | 不保留 provider 临时 URL |
+| `POST /api/internal/segments/[id]/submit` | 提交 queued segment 到 APIMart PixVerse | 已实现 | 校验 `INTERNAL_WORKER_SECRET` |
+| `POST /api/internal/segments/[id]/poll` | 轮询 APIMart PixVerse 任务并转存 R2 | 已实现 | 不保留 provider 临时 URL |
 | `POST /api/internal/stitch/jobs` | 创建并触发 stitch job | 已实现 | 仅在全部 segment 成功后可触发 |
 | `POST /api/internal/stitch/callback` | Cloud Run 回写拼接、封面、抽帧结果 | 已实现 | Vercel 不运行 ffmpeg |
 | `POST /api/internal/post-qa/resolve` | 回写 QA 结论并 capture/release 点数 | 已实现 | QA 通过后才正式扣点 |
@@ -91,7 +91,7 @@ flowchart TD
   M2 -->|flag deny error| BLOCK2[prompt_moderation_blocked]
   CR --> SEG[create video_segments]
   SEG --> T2[worker tick / internal submit]
-  T2 --> EV[EvoLink Veo 3.1 Pro Beta]
+  T2 --> EV[APIMart PixVerse V6]
   EV --> P[internal poll + transfer to R2]
   P --> DB
   DB --> I{all segments succeeded}

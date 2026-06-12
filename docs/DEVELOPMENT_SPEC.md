@@ -4,9 +4,9 @@
 
 **Goal:** 按可验收阶段实现服装商品图生成宣传短视频 MVP，直到部署验收前。
 
-**Architecture:** Next.js/Vercel 负责主站、后台、API 和短任务推进；Neon Postgres + Drizzle 保存状态机、点数账本、模型路由和审计；Cloudflare R2 保存图片和视频；Cloud Run `stitch-worker` 负责 ffmpeg 拼接与抽帧；Creem、DeepSeek、视觉模型、EvoLink 均真实接入，不做 mock 成功链路。
+**Architecture:** Next.js/Vercel 负责主站、后台、API 和短任务推进；Neon Postgres + Drizzle 保存状态机、点数账本、模型路由和审计；Cloudflare R2 保存图片和视频；Cloud Run `stitch-worker` 负责 ffmpeg 拼接与抽帧；Creem、DeepSeek、视觉模型、APIMart PixVerse 均真实接入，不做 mock 成功链路。
 
-**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Drizzle, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, cron-job.org, Cloud Run, ffmpeg, DeepSeek, GPT vision model, EvoLink Veo 3.1 Pro Beta, APIMart PixVerse V6 admin-only.
+**Tech Stack:** Next.js, TypeScript, Tailwind CSS, Radix UI, Drizzle, Neon Postgres, better-auth, Resend, Creem, Cloudflare R2, cron-job.org, Cloud Run, ffmpeg, DeepSeek, GPT vision model, APIMart PixVerse V6, EvoLink fast fallback candidate.
 
 ---
 
@@ -58,7 +58,7 @@ git checkout -b feat/foundation
 
 - Drizzle 作为数据库访问/ORM。
 - R2 signed URL 直传。
-- Creem、大模型、EvoLink 真实接入。
+- Creem、大模型、APIMart PixVerse 真实接入。
 - 未配置 API Key 时功能显示不可用，不伪造成功结果。
 - 所有内部测试任务标记 `is_test = true`。
 - 所有状态变化写 `job_state_events`。
@@ -690,8 +690,8 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 - [ ] DeepSeek 真实调用。
 - [ ] 视觉模型真实调用。
-- [ ] EvoLink 真实调用。
-- [ ] PixVerse 仅管理员内测。
+- [ ] APIMart PixVerse 真实调用。
+- [ ] EvoLink fast 仅作为备用/对照路线。
 - [ ] 未配置 key 时显示不可用。
 - [ ] 不存在假成功返回。
 
@@ -796,7 +796,7 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 ### 13.1 目标
 
-真实调用 EvoLink `veo3.1-fast-beta` 生成 8 秒片段。
+真实调用 APIMart `pixverse-v6` 生成 8 秒片段。
 
 ### 13.2 文件边界
 
@@ -819,7 +819,7 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 ### 13.4 验收
 
-- [ ] EvoLink 真实提交成功。
+- [ ] APIMart PixVerse 真实提交成功。
 - [ ] provider task ID 保存。
 - [ ] 轮询状态可恢复。
 - [ ] 供应商链接转存 R2。
@@ -1050,10 +1050,10 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] DeepSeek 真实调用成功。
 - [ ] 视觉模型 Lite 调用成功。
 - [ ] 视觉模型 Standard 调用成功。
-- [ ] EvoLink `veo3.1-fast-beta` 提交任务成功。
-- [ ] EvoLink 轮询成功。
-- [ ] EvoLink 输出转存 R2 成功。
-- [ ] APIMart PixVerse 仅管理员内测可见。
+- [ ] APIMart `pixverse-v6` 提交任务成功。
+- [ ] APIMart PixVerse 轮询成功。
+- [ ] APIMart PixVerse 输出转存 R2 成功。
+- [ ] EvoLink fast 仅作为备用/对照路线。
 
 ### 18.8 Cloud Run
 
@@ -1115,7 +1115,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 9. 视觉素材分析。
 10. DeepSeek 分镜。
 11. 任务状态机和 worker tick。
-12. EvoLink 片段生成。
+12. APIMart PixVerse 片段生成。
 13. Cloud Run 拼接与抽帧。
 14. Post-QA。
 15. 用户前台工作台。

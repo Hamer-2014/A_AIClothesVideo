@@ -65,7 +65,7 @@ export class UnsupportedVideoGenerationProviderError extends Error {
 }
 
 function selectedProvider(env: Record<string, string | undefined>) {
-  return (env.VIDEO_GENERATION_PROVIDER?.trim().toLowerCase() || "evolink");
+  return (env.VIDEO_GENERATION_PROVIDER?.trim().toLowerCase() || "apimart");
 }
 
 const adapters: Record<VideoGenerationProvider, VideoGenerationAdapter> = {
