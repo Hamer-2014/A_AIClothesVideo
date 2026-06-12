@@ -31,7 +31,14 @@ export interface JobProgressStore {
   findLatestPostQaResult(jobId: string): Promise<RelatedStatusRecord | null>;
 }
 
-function phaseForStatus(status: string) {
+function phaseForStatus(status: string, segments: SegmentProgressRecord[] = []) {
+  if (
+    status === "segment_failed" &&
+    segments.some((segment) => segment.status === "generating")
+  ) {
+    return "generation";
+  }
+
   if (status.endsWith("_failed") || status.startsWith("failed")) {
     return "failed";
   }
@@ -94,7 +101,7 @@ export async function getVideoJobProgress({
     status: job.status,
     userVisibleStatus: job.userVisibleStatus,
     message: job.failureReason ?? job.lastError,
-    phase: phaseForStatus(job.status),
+    phase: phaseForStatus(job.status, segments),
     segmentProgress: countSegments(segments),
     stitching: { status: stitchJob?.status ?? "not_started" },
     postQa: { status: postQaResult?.status ?? "not_started" },

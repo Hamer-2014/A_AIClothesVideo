@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { AnalyzeRetryButton } from "@/components/jobs/analyze-retry-button";
-import { JobDeliverablePanel } from "@/components/jobs/job-deliverable-panel";
 import { JobContinuePanel } from "@/components/jobs/job-continue-panel";
-import { JobProgress } from "@/components/jobs/job-progress";
+import { JobLivePanels } from "@/components/jobs/job-live-panels";
+import { userFacingJobMessage } from "@/components/jobs/job-progress";
 import { buildDashboardNav } from "@/app/app-shell";
 import { getServerSession } from "@/lib/auth/server";
 import { createPublicJobVideoUrl } from "@/server/files/job-download";
@@ -58,6 +58,10 @@ export default async function JobDetailPage({
   const canRetryAnalyze =
     detail.job.status === "asset_analysis_failed" ||
     detail.job.status === "asset_analysis_queued";
+  const jobFailed = progress.phase === "failed" || progress.segmentProgress.failed > 0;
+  const jobInfoMessage = jobFailed
+    ? userFacingJobMessage(detail.job.failureReason ?? detail.job.lastError)
+    : null;
 
   return (
     <DashboardShell
@@ -76,15 +80,13 @@ export default async function JobDetailPage({
       }
     >
       <div className="space-y-6">
-        <JobProgress progress={progress} />
-
-        {progress.downloadReady ? (
-          <JobDeliverablePanel
-            defaultFilename={`runwaytools-${detail.job.id.slice(0, 8)}.mp4`}
-            jobId={detail.job.id}
-            previewUrl={previewUrl}
-          />
-        ) : null}
+        <JobLivePanels
+          defaultFilename={`runwaytools-${detail.job.id.slice(0, 8)}.mp4`}
+          initialPreviewUrl={previewUrl}
+          initialProgress={progress}
+          jobId={detail.job.id}
+          publicVideoBaseUrl={process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL}
+        />
 
         <JobContinuePanel
           job={detail.job}
@@ -124,9 +126,9 @@ export default async function JobDetailPage({
                 Status
               </p>
               <p className="mt-2 text-sm">{detail.job.userVisibleStatus}</p>
-              {detail.job.failureReason || detail.job.lastError ? (
+              {jobInfoMessage ? (
                 <p className="mt-2 text-sm text-[var(--accent)]">
-                  {detail.job.failureReason ?? detail.job.lastError}
+                  {jobInfoMessage}
                 </p>
               ) : null}
             </div>

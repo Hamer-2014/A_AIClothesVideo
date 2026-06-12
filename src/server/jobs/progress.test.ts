@@ -149,4 +149,35 @@ describe("video job progress", () => {
       },
     });
   });
+
+  it("keeps polling when the job failed but a provider segment is still generating", async () => {
+    const store = createInMemoryJobProgressStore({
+      jobs: [
+        {
+          id: "job-1",
+          userId: "user-1",
+          status: "segment_failed",
+          userVisibleStatus: "generating",
+          lastError: "EvoLink task polling failed with status 404.",
+          failureReason: null,
+          finalVideoKey: null,
+          coverKey: null,
+        },
+      ],
+      segments: [{ videoJobId: "job-1", status: "generating" }],
+      stitchJobs: [],
+      postQaResults: [],
+    });
+
+    await expect(
+      getVideoJobProgress({ store, jobId: "job-1", userId: "user-1" }),
+    ).resolves.toMatchObject({
+      status: "segment_failed",
+      phase: "generation",
+      segmentProgress: {
+        generating: 1,
+        failed: 0,
+      },
+    });
+  });
 });

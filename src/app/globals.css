@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --font-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
   --surface: #f7f5f1;
   --ink: #171715;
   --muted: #676a63;
@@ -20,7 +21,7 @@ body {
   margin: 0;
   background: var(--surface);
   color: var(--ink);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+  font-family: var(--font-sans);
 }
 
 button,
