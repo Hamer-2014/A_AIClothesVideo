@@ -26,6 +26,13 @@ function asStringArray(value) {
     return value.filter((item) => typeof item === "string");
   }
   if (typeof value === "string") {
+    if (value.startsWith("{") && value.endsWith("}")) {
+      return value
+        .slice(1, -1)
+        .split(",")
+        .map((item) => item.trim().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+    }
     try {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed)
@@ -46,8 +53,8 @@ async function loadPaidDeliveryCandidates(sql) {
       vj.credit_cost,
       vj.final_video_key,
       coalesce(
-        array_remove(array_agg(distinct cl.type), null),
-        array[]::credit_ledger_type[]
+        array_remove(array_agg(distinct cl.type::text), null),
+        array[]::text[]
       ) as ledger_types,
       coalesce(max(jsonb_array_length(pqr.frame_keys::jsonb)), 0) as qa_frame_count,
       max(vj.updated_at) as updated_at
@@ -80,8 +87,8 @@ async function loadFailureCompensationCandidates(sql) {
       vj.status,
       vj.credit_cost,
       coalesce(
-        array_remove(array_agg(distinct cl.type), null),
-        array[]::credit_ledger_type[]
+        array_remove(array_agg(distinct cl.type::text), null),
+        array[]::text[]
       ) as ledger_types,
       count(distinct jse.id) as state_event_count,
       max(vj.updated_at) as updated_at

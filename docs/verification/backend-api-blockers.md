@@ -21,6 +21,14 @@ npm run verify:blockers -- --json
 
 ## 当前检查项
 
+## 最近一次通过证据
+
+- Date: 2026-06-12
+- Paid delivery job id: `5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06`
+- Failure compensation job id: `b207d897-04dd-41cc-b1a8-02b56a6cc3a1`
+- Verification command: `npm run verify:blockers -- --json`
+- Result: `passed = true`
+
 ### 1. Paid Delivery
 
 必须存在至少一个真实数据库任务满足：
@@ -93,4 +101,3 @@ npm run verify:blockers
 - 不接受手动改数据库伪造 `deliverable`、`capture` 或 `release`。
 - 不接受 Creem mock 支付成功来证明购买链路。
 - 不接受 Post-QA 未通过前开放下载。
-

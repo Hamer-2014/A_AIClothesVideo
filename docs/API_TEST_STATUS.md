@@ -287,3 +287,33 @@ npm run verify:blockers
 这意味着如果只看一句 “ledger 没有 capture”，很容易把试用单误判成账务事故；反过来，如果 smoke 没有 `credit_cost` 保护，也可能把付费单误判成试用单而放过真正的漏扣。
 
 下一步不要先去挑页面样式，优先补齐付费任务真实 smoke：必须拿一个 `credit_cost > 0` 的任务跑到 `deliverable`，并看到 `credit_ledger.reserve` 与 `credit_ledger.capture`。
+
+## 2026-06-12 Paid Closure Verification
+
+- Paid delivery job id: `5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06`
+- Paid delivery smoke command: `npm run smoke:backend -- --job-id 5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06`
+- Paid delivery result:
+  - `video_jobs.status = deliverable`
+  - `credit_cost = 70`
+  - `credit_ledger` contains `reserve` and `capture`
+  - final video exists in R2: `jobs/5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06/stitched/final.mp4`
+  - QA frames exist in R2: 3 frames
+- Failure compensation job id: `b207d897-04dd-41cc-b1a8-02b56a6cc3a1`
+- Failure compensation trigger: controlled Post-QA failure drill after the paid job reached `post_qa_queued`; transition to `post_qa_running`, then `resolvePostQaResult(status = failed)`
+- Failure compensation result:
+  - `video_jobs.status = failed_released`
+  - `credit_cost = 70`
+  - `credit_ledger` contains `reserve` and `release`
+  - `job_state_events` contains `post_qa_running -> post_qa_failed -> failed_released`
+- Final blocker command: `npm run verify:blockers -- --json`
+- Final blocker result: `passed = true`
+- Verification commands passed:
+  - `npm run typecheck`
+  - `npm test`
+  - `npm run build`
+  - `npm run smoke:backend -- --job-id 5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06`
+  - `npm run verify:blockers -- --json`
+- Residual risks:
+  - Creem real checkout/webhook approval remains separate if still pending.
+  - This verification proves one paid success and one controlled paid failure compensation sample, not large-scale provider stability.
+  - The initial direct `POST /api/internal/post-qa/resolve` attempt from `segment_generating` failed correctly because the state machine only allows Post-QA failure resolution from Post-QA states.
