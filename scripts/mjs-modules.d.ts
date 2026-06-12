@@ -45,4 +45,48 @@ declare module "*.mjs" {
     job: { credit_cost?: number | null; creditCost?: number | null } | null;
     ledger?: Array<{ type: string }>;
   }): void;
+
+  export interface BlockerCheckResult {
+    name: string;
+    passed: boolean;
+    reason: string;
+    jobId: string | null;
+    evidence: unknown;
+    nextSteps: string[];
+  }
+
+  export function evaluatePaidDeliveryEvidence(
+    jobs: Array<{
+      id: string;
+      status: string;
+      creditCost: number;
+      ledgerTypes?: string[];
+      finalVideoKey?: string | null;
+      qaFrameCount?: number;
+    }>,
+  ): BlockerCheckResult;
+
+  export function evaluateFailureCompensationEvidence(
+    jobs: Array<{
+      id: string;
+      status: string;
+      creditCost: number;
+      ledgerTypes?: string[];
+      stateEventCount?: number;
+    }>,
+  ): BlockerCheckResult;
+
+  export function evaluateAuditEvidence(
+    actions: Array<{ action: string; count: number }>,
+  ): BlockerCheckResult;
+
+  export function buildBlockerVerificationReport(input: {
+    paidDelivery: BlockerCheckResult;
+    failureCompensation: BlockerCheckResult;
+    auditEvidence: BlockerCheckResult;
+  }): {
+    passed: boolean;
+    summary: string;
+    checks: BlockerCheckResult[];
+  };
 }

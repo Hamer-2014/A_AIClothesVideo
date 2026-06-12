@@ -12,6 +12,8 @@
     "test": "vitest run",
     "smoke:backend": "node scripts/backend-smoke.mjs",
     "smoke:stitch": "node scripts/stitch-smoke.mjs",
+    "verify:blockers": "node scripts/verify-blockers.mjs",
+    "admin:credits:adjust": "node scripts/admin-adjust-credits.mjs",
     "debug:generation": "node scripts/generation-debug.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

@@ -6,6 +6,7 @@ import {
   getVideoJobProgress,
   type JobProgressStore,
 } from "@/server/jobs/progress";
+import { refreshGenerationForJob } from "@/server/video/job-refresh";
 
 type JobProgressSession = {
   user?: {
@@ -17,6 +18,7 @@ type JobProgressResult = Awaited<ReturnType<typeof getVideoJobProgress>>;
 
 interface GetJobProgressRouteDeps {
   getSession?: () => Promise<JobProgressSession>;
+  refreshGeneration?: (input: { jobId: string }) => Promise<unknown>;
   getProgress?: (input: {
     jobId: string;
     userId: string;
@@ -61,7 +63,21 @@ export async function handleGetJobProgressRequest(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  return NextResponse.json(progress);
+  try {
+    await (deps.refreshGeneration ?? refreshGenerationForJob)({
+      jobId: context.params.id,
+    });
+  } catch {
+    // Progress polling should remain readable even when a provider poll times out.
+  }
+
+  const refreshedProgress =
+    (await getProgress({
+      jobId: context.params.id,
+      userId,
+    })) ?? progress;
+
+  return NextResponse.json(refreshedProgress);
 }
 
 export async function GET(

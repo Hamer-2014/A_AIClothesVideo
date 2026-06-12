@@ -120,11 +120,16 @@ export async function resolvePostQaResult({
     failureCategory: failureCategory ?? null,
   });
 
+  const failureMessage = failureCategory ?? "post_qa_failed";
+
   await transitionJobStatus({
     store: jobStore,
     jobId,
     toStatus: status === "passed" ? "post_qa_passed" : "post_qa_failed",
     reason: status === "passed" ? "post_qa_passed" : "post_qa_failed",
+    errorMessage: status === "failed" ? failureMessage : null,
+    failureReason: status === "failed" ? failureMessage : null,
+    userVisibleStatus: status === "failed" ? "failed" : "quality_checking",
     eventSnapshot: {
       mode,
       frameKeys,
@@ -151,6 +156,7 @@ export async function resolvePostQaResult({
       jobId,
       toStatus: "deliverable",
       reason: "video_deliverable",
+      userVisibleStatus: "downloadable",
     });
   } else {
     if (job.creditCost > 0) {
@@ -173,6 +179,9 @@ export async function resolvePostQaResult({
       jobId,
       toStatus: "failed_released",
       reason: "post_qa_failed_released",
+      errorMessage: failureMessage,
+      failureReason: failureMessage,
+      userVisibleStatus: "failed",
       eventSnapshot: { failureCategory: failureCategory ?? null },
     });
   }

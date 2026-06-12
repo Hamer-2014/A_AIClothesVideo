@@ -140,7 +140,10 @@ export function getEvoLinkVideoConfig(
     baseUrl: normalizeBaseUrl(
       env.EVOLINK_BASE_URL?.trim() || "https://api.evolink.ai",
     ),
-    model: env.EVOLINK_VIDEO_MODEL?.trim() || "veo3.1-fast-beta",
+    model:
+      env.VIDEO_GENERATION_MODEL?.trim() ||
+      env.EVOLINK_VIDEO_MODEL?.trim() ||
+      "veo3.1-fast-beta",
   };
 }
 

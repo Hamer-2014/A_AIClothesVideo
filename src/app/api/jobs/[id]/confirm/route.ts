@@ -5,6 +5,11 @@ import {
   confirmStoryboard,
   createDrizzleStoryboardConfirmationStore,
 } from "@/server/storyboard/confirm";
+import {
+  createDrizzleVideoSegmentStore,
+  kickQueuedSegmentsForJob,
+  type GenerationKickResult,
+} from "@/server/video/segments";
 
 type ConfirmSession = {
   user?: {
@@ -15,10 +20,11 @@ type ConfirmSession = {
 interface ConfirmStoryboardResult {
   jobId: string;
   storyboardId: string;
-  status: "segments_queued";
+  status: "segments_queued" | "segment_generating";
   reservedLedgerId: string | null;
   segmentCount: number;
   alreadyConfirmed?: boolean;
+  generationKick?: GenerationKickResult;
 }
 
 interface ConfirmStoryboardDeps {
@@ -28,6 +34,7 @@ interface ConfirmStoryboardDeps {
     userId: string;
     storyboardId: string;
   }) => Promise<ConfirmStoryboardResult>;
+  kickGeneration?: (input: { jobId: string }) => Promise<GenerationKickResult>;
 }
 
 function parseBody(body: unknown) {
@@ -53,6 +60,13 @@ function defaultConfirmStoryboard(input: {
   return confirmStoryboard({
     storyboardStore: createDrizzleStoryboardConfirmationStore(),
     ...input,
+  });
+}
+
+function defaultKickGeneration(input: { jobId: string }) {
+  return kickQueuedSegmentsForJob({
+    segmentStore: createDrizzleVideoSegmentStore(),
+    jobId: input.jobId,
   });
 }
 
@@ -85,7 +99,31 @@ export async function handleConfirmStoryboardRequest(
       storyboardId: input.storyboardId,
     });
 
-    return NextResponse.json(result);
+    const generationKick = await (deps.kickGeneration ?? defaultKickGeneration)({
+      jobId: result.jobId,
+    });
+    const responseBody = {
+      ...result,
+      status:
+        generationKick.status === "submitted"
+          ? "segment_generating"
+          : result.status,
+      generationKick,
+    } satisfies ConfirmStoryboardResult;
+
+    if (generationKick.status === "failed") {
+      return NextResponse.json(
+        {
+          error: "generation_submit_failed",
+          message:
+            generationKick.errorMessage ?? "Immediate video generation submit failed.",
+          ...responseBody,
+        },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json(responseBody);
   } catch (error) {
     if (
       error instanceof Error &&

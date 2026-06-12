@@ -352,6 +352,8 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
             ? "最终视频提示词未通过审核。"
             : body.error === "insufficient_credits"
               ? "点数不足，请先充值。"
+              : body.error === "generation_submit_failed"
+                ? body.message ?? "提交视频生成失败，请稍后重试。"
               : body.error === "storyboard_not_confirmable"
                 ? "这个分镜已经不能重复确认，请打开任务详情查看当前进度。"
               : "确认分镜失败。",
@@ -477,6 +479,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
 
         <StoryboardConfirmation
           aspectRatio={aspectRatio}
+          confirming={busyAction === "confirm"}
           creditCost={jobDetail?.job.creditCost ?? 0}
           disabled={!storyboardId || busyAction !== null}
           durationSeconds={durationSeconds}

@@ -106,6 +106,31 @@ describe("generation worker tick", () => {
     expect(polled).toEqual(["job-1"]);
   });
 
+  it("releases the lock after polling a still-generating job", async () => {
+    const lockStore = createInMemoryJobLockStore([
+      job("job-1", "segment_generating"),
+    ]);
+    const jobStore = createInMemoryJobStore(lockStore.listJobs());
+
+    const result = await runGenerationWorkerTick({
+      workerId: "worker-1",
+      lockStore,
+      jobStore,
+      handlers: {
+        submitSegments: async () => undefined,
+        pollSegments: async () => undefined,
+        createStitchJob: async () => undefined,
+      },
+    });
+
+    expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
+    expect(jobStore.listJobs()[0]).toMatchObject({
+      status: "segment_generating",
+      lockedBy: null,
+      lockedUntil: null,
+    });
+  });
+
   it("creates stitch jobs for completed segments", async () => {
     const lockStore = createInMemoryJobLockStore([
       job("job-1", "segment_succeeded"),

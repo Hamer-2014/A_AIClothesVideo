@@ -51,9 +51,24 @@ function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
   };
 }
 
+function videoGenerationProviderKeys(env: EnvSource) {
+  const provider = trimEnv(env, "VIDEO_GENERATION_PROVIDER").toLowerCase() || "evolink";
+
+  if (provider === "evolink") {
+    return ["EVOLINK_API_KEY"];
+  }
+
+  if (provider === "apimart") {
+    return ["APIMART_API_KEY"];
+  }
+
+  return ["VIDEO_GENERATION_PROVIDER_UNSUPPORTED"];
+}
+
 export function getRuntimeHealth(
   env: EnvSource = process.env,
 ): Omit<RuntimeHealthReport, "timestamp"> {
+  const videoGenerationKeys = videoGenerationProviderKeys(env);
   const checks = {
     database: buildCheck(env, ["DATABASE_URL"]),
     auth: buildCheck(env, ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]),
@@ -79,7 +94,7 @@ export function getRuntimeHealth(
       "VISION_PROVIDER",
       "VISION_API_KEY",
       "VISION_MODEL_STANDARD",
-      "EVOLINK_API_KEY",
+      ...videoGenerationKeys,
     ]),
   };
 

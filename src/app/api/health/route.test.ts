@@ -29,6 +29,7 @@ describe("GET /api/health", () => {
     vi.stubEnv("VISION_PROVIDER", "openai");
     vi.stubEnv("VISION_API_KEY", "vision-key");
     vi.stubEnv("VISION_MODEL_STANDARD", "gpt-4.1-mini");
+    vi.stubEnv("VIDEO_GENERATION_PROVIDER", "evolink");
     vi.stubEnv("EVOLINK_API_KEY", "evolink-key");
 
     const response = await GET();
@@ -76,6 +77,7 @@ describe("GET /api/health", () => {
     vi.stubEnv("VISION_PROVIDER", "");
     vi.stubEnv("VISION_API_KEY", "");
     vi.stubEnv("VISION_MODEL_STANDARD", "");
+    vi.stubEnv("VIDEO_GENERATION_PROVIDER", "evolink");
     vi.stubEnv("EVOLINK_API_KEY", "");
 
     const response = await GET();

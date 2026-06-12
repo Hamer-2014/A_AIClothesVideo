@@ -119,6 +119,8 @@ describe("runPostQaCheck", () => {
     });
     expect(stores.jobStore.listJobs()[0]).toMatchObject({
       status: "failed_released",
+      userVisibleStatus: "failed",
+      failureReason: "provider_unavailable",
     });
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       provider: "vision",
@@ -149,7 +151,47 @@ describe("runPostQaCheck", () => {
       status: "failed_released",
       ledgerType: "release",
     });
-    expect(stores.jobStore.listJobs()[0]?.status).toBe("failed_released");
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      userVisibleStatus: "failed",
+      failureReason: "missing_frames",
+    });
     expect(stores.providerCallLogStore.listCallLogs()).toHaveLength(0);
+  });
+
+  it("stores the QA failure category on the job when visual quality is rejected", async () => {
+    const stores = await createStores();
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "lite",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-vision",
+        qaJson: {
+          passed: false,
+          failure_category: "Quality/visual artifacts",
+          risk_flags: ["dark frame"],
+          checks: [{ name: "Visual clarity", passed: false }],
+        },
+        raw: { id: "resp-qa-failed" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: "release",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      userVisibleStatus: "failed",
+      failureReason: "Quality/visual artifacts",
+      lastError: "Quality/visual artifacts",
+    });
   });
 });

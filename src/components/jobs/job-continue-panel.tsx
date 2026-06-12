@@ -255,6 +255,8 @@ export function JobContinuePanel({
               ? "最终视频提示词未通过审核。"
             : body.error === "insufficient_credits"
               ? "点数不足，请先充值。"
+              : body.error === "generation_submit_failed"
+                ? body.message ?? "提交视频生成失败，请稍后重试。"
               : body.error === "storyboard_not_confirmable"
                 ? "这个分镜已经不能重复确认，页面将刷新当前任务进度。"
               : "确认分镜失败。",
@@ -265,6 +267,7 @@ export function JobContinuePanel({
         return;
       }
 
+      router.push(`/jobs/${body.jobId ?? job.id}`);
       router.refresh();
     } finally {
       setBusyAction(null);
@@ -316,6 +319,7 @@ export function JobContinuePanel({
 
       <StoryboardConfirmation
         aspectRatio={job.aspectRatio}
+        confirming={busyAction === "confirm"}
         creditCost={job.creditCost}
         disabled={!storyboardId || busyAction !== null}
         durationSeconds={job.durationSeconds}

@@ -97,7 +97,12 @@ const allowedTransitions: Partial<Record<JobStatus, JobStatus[]>> = {
   segments_queued: ["segment_generating", "segment_failed"],
   segment_generating: ["segment_succeeded", "segment_failed"],
   segment_succeeded: ["stitching_queued"],
-  segment_failed: ["retrying", "failed_released", "failed_refunded"],
+  segment_failed: [
+    "segment_succeeded",
+    "retrying",
+    "failed_released",
+    "failed_refunded",
+  ],
   stitching_queued: ["stitching_running"],
   stitching_running: ["stitched", "post_qa_queued", "post_qa_running"],
   stitched: ["post_qa_queued", "post_qa_running"],

@@ -69,6 +69,39 @@ describe("EvoLink video provider", () => {
     });
   });
 
+  it("prefers VIDEO_GENERATION_MODEL over EVOLINK_VIDEO_MODEL", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(JSON.stringify({ task_id: "task-generic-model" }), {
+        status: 200,
+      });
+    });
+
+    const result = await createEvoLinkVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        env: {
+          EVOLINK_API_KEY: "sk-test",
+          EVOLINK_BASE_URL: "https://api.evolink.example",
+          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+          VIDEO_GENERATION_MODEL: "veo3.1-pro-beta",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.evolink.example/v1/videos/generations",
+      expect.objectContaining({
+        body: expect.stringContaining('"model":"veo3.1-pro-beta"'),
+      }),
+    );
+    expect(result.model).toBe("veo3.1-pro-beta");
+  });
+
   it("accepts a base url that was mistakenly configured as the full generations endpoint", async () => {
     const fetchImpl = vi.fn(async () => {
       return new Response(

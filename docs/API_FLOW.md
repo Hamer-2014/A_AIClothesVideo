@@ -172,6 +172,11 @@ stateDiagram-v2
 - Cloud Run 健康检查：`GET {CLOUD_RUN_STITCH_URL}/health`
 - Stitch 冒烟：`npm run smoke:stitch`
 - 完整后端冒烟：`npm run smoke:backend`
+- 阻断项硬验证：`npm run verify:blockers`
+  - 检查是否存在 `credit_cost > 0` 且 `deliverable` 的付费任务，并要求 `reserve + capture + final video + QA frames`。
+  - 检查是否存在 `failed_released / failed_refunded` 的付费失败补偿任务，并要求 `release/refund + state events`。
+  - 检查是否存在敏感后台操作审计证据，例如 provider key 新增/轮换或后台补点。
+  - 详细补齐步骤见 `docs/verification/backend-api-blockers.md`。
 - 单任务排障：`node scripts/job-debug.mjs <jobId>`
 
 ### 单任务排障建议顺序

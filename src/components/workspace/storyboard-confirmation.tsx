@@ -14,6 +14,7 @@ interface StoryboardConfirmationProps {
   segments: StoryboardSegment[];
   onConfirm: () => void;
   disabled?: boolean;
+  confirming?: boolean;
   moderationPendingMessage?: string | null;
 }
 
@@ -24,6 +25,7 @@ export function StoryboardConfirmation({
   segments,
   onConfirm,
   disabled,
+  confirming,
   moderationPendingMessage,
 }: StoryboardConfirmationProps) {
   return (
@@ -74,7 +76,7 @@ export function StoryboardConfirmation({
         onClick={onConfirm}
         type="button"
       >
-        确认分镜并生成
+        {confirming ? "正在提交生成..." : "确认分镜并生成"}
       </button>
     </section>
   );

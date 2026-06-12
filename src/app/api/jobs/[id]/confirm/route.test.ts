@@ -19,6 +19,7 @@ describe("POST /api/jobs/[id]/confirm", () => {
   });
 
   it("confirms a storyboard for authenticated users", async () => {
+    const kickedJobs: string[] = [];
     const response = await handleConfirmStoryboardRequest(
       new Request("http://localhost/api/jobs/job-1/confirm", {
         method: "POST",
@@ -34,6 +35,16 @@ describe("POST /api/jobs/[id]/confirm", () => {
           reservedLedgerId: "ledger-1",
           segmentCount: 2,
         }),
+        kickGeneration: async ({ jobId }) => {
+          kickedJobs.push(jobId);
+          return {
+            status: "submitted",
+            submittedCount: 2,
+            failedCount: 0,
+            segmentIds: ["segment-1", "segment-2"],
+            providerTaskIds: ["task-1", "task-2"],
+          };
+        },
       },
     );
 
@@ -41,13 +52,69 @@ describe("POST /api/jobs/[id]/confirm", () => {
     expect(await response.json()).toEqual({
       jobId: "job-1",
       storyboardId: "storyboard-1",
-      status: "segments_queued",
+      status: "segment_generating",
       reservedLedgerId: "ledger-1",
       segmentCount: 2,
+      generationKick: {
+        status: "submitted",
+        submittedCount: 2,
+        failedCount: 0,
+        segmentIds: ["segment-1", "segment-2"],
+        providerTaskIds: ["task-1", "task-2"],
+      },
+    });
+    expect(kickedJobs).toEqual(["job-1"]);
+  });
+
+  it("returns 502 when immediate segment submission fails", async () => {
+    const response = await handleConfirmStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ storyboardId: "storyboard-1" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        confirmStoryboard: async (input) => ({
+          jobId: input.jobId,
+          storyboardId: input.storyboardId,
+          status: "segments_queued",
+          reservedLedgerId: "ledger-1",
+          segmentCount: 1,
+        }),
+        kickGeneration: async () => ({
+          status: "failed",
+          submittedCount: 0,
+          failedCount: 1,
+          segmentIds: ["segment-1"],
+          providerTaskIds: [],
+          errorMessage: "EvoLink submit failed.",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: "generation_submit_failed",
+      message: "EvoLink submit failed.",
+      jobId: "job-1",
+      storyboardId: "storyboard-1",
+      status: "segments_queued",
+      reservedLedgerId: "ledger-1",
+      segmentCount: 1,
+      generationKick: {
+        status: "failed",
+        submittedCount: 0,
+        failedCount: 1,
+        segmentIds: ["segment-1"],
+        providerTaskIds: [],
+        errorMessage: "EvoLink submit failed.",
+      },
     });
   });
 
   it("returns the current generation state when a storyboard was already confirmed", async () => {
+    const kickedJobs: string[] = [];
     const response = await handleConfirmStoryboardRequest(
       new Request("http://localhost/api/jobs/job-1/confirm", {
         method: "POST",
@@ -58,6 +125,16 @@ describe("POST /api/jobs/[id]/confirm", () => {
         getSession: async () => ({ user: { id: "user-1" } }),
         confirmStoryboard: async () => {
           throw new Error("Storyboard is already confirmed.");
+        },
+        kickGeneration: async ({ jobId }) => {
+          kickedJobs.push(jobId);
+          return {
+            status: "submitted",
+            submittedCount: 1,
+            failedCount: 0,
+            segmentIds: ["segment-1"],
+            providerTaskIds: ["task-1"],
+          };
         },
       },
     );
@@ -71,6 +148,7 @@ describe("POST /api/jobs/[id]/confirm", () => {
       segmentCount: 0,
       alreadyConfirmed: true,
     });
+    expect(kickedJobs).toEqual([]);
   });
 
   it("returns 400 for missing storyboard id", async () => {

@@ -164,6 +164,34 @@ npm run typecheck
   - `moderation.configured = false` 会导致 `ready = false`。
 - `.env.example` 已新增 `PROVIDER_KEY_ENCRYPTION_SECRET`，创建/轮换 provider key 时未配置会失败。
 
+### Backend/API 阻断项硬验证
+
+新增命令：
+
+```bash
+npm run verify:blockers
+```
+
+本轮结果：失败，符合当前真实库状态。
+
+输出摘要：
+
+- `paid_delivery`: BLOCKED
+  - 原因：没有找到 `credit_cost > 0` 且 `deliverable` 的真实付费任务。
+  - 下一步：创建或选择真实付费任务，跑 `npm run smoke:backend -- --job-id <paid-job-id>`，确认 `reserve` 和 `capture`。
+- `failure_compensation`: BLOCKED
+  - 原因：没有找到 `failed_released / failed_refunded` 且带 `release/refund` 证据的真实付费失败任务。
+  - 下一步：演练 provider/stitch/Post-QA 失败路径，确认 `release/refund` 与 `job_state_events`。
+- `audit_evidence`: PASS
+  - 真实库存在 `job:reopen_post_qa` 审计证据。
+  - 验收器已把 job 排障类敏感操作纳入审计证据范围。
+
+这个命令会在任一阻断项缺失时退出非 0。后续验收不再接受“文档说应该可以”作为通过证据，必须跑该命令或给出对应真实 job/audit 记录。
+
+详细补齐步骤见：
+
+- `docs/verification/backend-api-blockers.md`
+
 ## Admin Ops Closure 本轮完成内容
 
 ### Jobs
@@ -245,7 +273,7 @@ npm run typecheck
 | 0 成本试用任务 deliverable 后 smoke | 已通过 | 样本 job `credit_cost = 0`，不要求 capture |
 | 付费任务 deliverable 后 `credit_ledger.capture` | 未验收 | 需要新建或选择 `credit_cost > 0` 的真实任务跑 full smoke |
 | `failed_released / failed_refunded` 真实补偿回路 smoke | 未补 | 仍需真实任务演练 |
-| 运维动作后的 `admin_audit_logs` 真实库回查 | 未单独留档 | 自动化已覆盖，但缺本轮真实截图/SQL 留痕 |
+| 运维动作后的 `admin_audit_logs` 真实库回查 | 已有最小留痕 | `npm run verify:blockers` 已检测到 `job:reopen_post_qa` 审计证据；后续仍建议补 provider key 或补点类审计样本 |
 
 ## 这次记录真正暴露的问题
 
