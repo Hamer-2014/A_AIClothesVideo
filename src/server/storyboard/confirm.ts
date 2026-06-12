@@ -8,7 +8,9 @@ import type { CreditLedgerStore } from "@/lib/credits/types";
 import { getDb } from "@/lib/db/client";
 import { storyboards, videoJobAssets, videoJobs, videoSegments } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
+import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { CreemPromptModerationResult } from "@/lib/providers/creem/moderation";
+import { mvpShotTemplates } from "@/lib/templates/catalog";
 import { createDrizzleJobStore, type JobStore } from "@/server/jobs/state-machine";
 import { transitionJobStatus } from "@/server/jobs/state-machine";
 import { checkPrompt } from "@/server/moderation/check-prompt";
@@ -26,6 +28,9 @@ export interface StoryboardConfirmJobRecord {
   status: string;
   durationSeconds: number;
   creditCost: number;
+  billingMode: BillingMode;
+  generationProfile: GenerationProfile;
+  watermarkEnabled: boolean;
   reservedLedgerId?: string | null;
   isTest: boolean;
 }
@@ -52,6 +57,10 @@ export interface VideoSegmentRecord {
   providerCallLogId: string | null;
   videoKey: string | null;
   costEstimate: string;
+  generationProfile: GenerationProfile;
+  resolution: string;
+  audioEnabled: boolean;
+  watermarkEnabled: boolean;
   isTest: boolean;
   lockedBy: string | null;
   lockedUntil: Date | null;
@@ -69,6 +78,10 @@ export interface NewVideoSegmentRecord {
   templateId: string;
   prompt: string;
   inputAssetSnapshot: JsonValue;
+  generationProfile: GenerationProfile;
+  resolution: string;
+  audioEnabled: boolean;
+  watermarkEnabled: boolean;
   isTest: boolean;
 }
 
@@ -159,6 +172,34 @@ function assertDraftStoryboard(storyboard: StoryboardRecord) {
   }
 }
 
+function generationParametersForProfile(profile: GenerationProfile) {
+  if (profile === "trial_540p_watermarked") {
+    return {
+      resolution: "540p",
+      audioEnabled: false,
+    };
+  }
+
+  return {
+    resolution: profile === "paid_1080p_audio" ? "1080p" : "720p",
+    audioEnabled: true,
+  };
+}
+
+function assertTrialAllowedTemplates(parsed: ParsedStoryboard) {
+  const templatesById = new Map(
+    mvpShotTemplates.map((template) => [template.templateId, template]),
+  );
+  const hasNonTrialAllowedTemplate = parsed.segments.some((segment) => {
+    const template = templatesById.get(segment.templateId);
+    return !template?.isTrialAllowed;
+  });
+
+  if (hasNonTrialAllowedTemplate) {
+    throw new Error("Free trial storyboard contains non trial-allowed templates.");
+  }
+}
+
 export async function confirmStoryboard({
   jobStore = createDrizzleJobStore(),
   storyboardStore,
@@ -198,9 +239,13 @@ export async function confirmStoryboard({
       ? storyboard.selectedTemplateIds.filter((id): id is string => typeof id === "string")
       : [],
   });
+  if (job.billingMode === "free_trial") {
+    assertTrialAllowedTemplates(parsed);
+  }
   const assets = await storyboardStore.listJobAssets(jobId);
   const finalPromptSnapshot = buildFinalPromptSnapshot({ parsed, assets });
   const shouldReserveCredits = job.creditCost > 0;
+  const generationParameters = generationParametersForProfile(job.generationProfile);
 
   await transitionJobStatus({
     store: jobStore,
@@ -307,6 +352,10 @@ export async function confirmStoryboard({
       templateId: segment.templateId,
       prompt: segment.prompt,
       inputAssetSnapshot: assetSnapshotForSegment({ segment, assets }),
+      generationProfile: job.generationProfile,
+      resolution: generationParameters.resolution,
+      audioEnabled: generationParameters.audioEnabled,
+      watermarkEnabled: job.watermarkEnabled,
       isTest: job.isTest,
     })),
   );
@@ -406,6 +455,7 @@ export function createInMemoryStoryboardConfirmationStore({
     async createVideoSegments(input) {
       const now = new Date();
       const created = input.map((segment) => ({
+        ...segment,
         id: randomUUID(),
         status: "queued" as const,
         provider: null,
@@ -414,6 +464,10 @@ export function createInMemoryStoryboardConfirmationStore({
         providerCallLogId: null,
         videoKey: null,
         costEstimate: "0",
+        generationProfile: segment.generationProfile,
+        resolution: segment.resolution,
+        audioEnabled: segment.audioEnabled,
+        watermarkEnabled: segment.watermarkEnabled,
         lockedBy: null,
         lockedUntil: null,
         attemptCount: 0,
@@ -421,7 +475,6 @@ export function createInMemoryStoryboardConfirmationStore({
         nextRetryAt: null,
         createdAt: now,
         updatedAt: now,
-        ...segment,
       }));
       segments.push(...created);
       return created.map((segment) => ({ ...segment }));
@@ -455,6 +508,9 @@ export function createDrizzleStoryboardConfirmationStore(
           durationSeconds: videoJobs.durationSeconds,
           creditCost: videoJobs.creditCost,
           reservedLedgerId: videoJobs.reservedLedgerId,
+          billingMode: videoJobs.billingMode,
+          generationProfile: videoJobs.generationProfile,
+          watermarkEnabled: videoJobs.watermarkEnabled,
           isTest: videoJobs.isTest,
         })
         .from(videoJobs)

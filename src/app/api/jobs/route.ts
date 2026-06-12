@@ -21,8 +21,13 @@ interface CreateJobRouteDeps {
     assetIds: string[];
     durationSeconds: number;
     aspectRatio: string;
-    isTrial: boolean;
+    useFreeTrialIfAvailable?: boolean;
     isTest?: boolean;
+    requestContext?: {
+      ipAddress: string | null;
+      userAgent: string | null;
+      path: string | null;
+    };
   }) => Promise<{
     job: CreatedVideoJob;
     jobAssets: CreatedVideoJobAsset[];
@@ -37,6 +42,15 @@ function stringArray(value: unknown) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" ? value : Number.NaN;
+}
+
+function requestIp(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || null;
+  }
+
+  return request.headers.get("x-real-ip")?.trim() || null;
 }
 
 export async function handleCreateJobRequest(
@@ -55,7 +69,10 @@ export async function handleCreateJobRequest(
   const assetIds = stringArray(input.assetIds);
   const durationSeconds = numberValue(input.durationSeconds);
   const aspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "";
-  const isTrial = input.isTrial === true;
+  const useFreeTrialIfAvailable =
+    typeof input.useFreeTrialIfAvailable === "boolean"
+      ? input.useFreeTrialIfAvailable
+      : undefined;
   const isTest = input.isTest === true;
   const createJob =
     deps.createJob ??
@@ -71,8 +88,13 @@ export async function handleCreateJobRequest(
       assetIds,
       durationSeconds,
       aspectRatio,
-      isTrial,
+      useFreeTrialIfAvailable,
       isTest,
+      requestContext: {
+        ipAddress: requestIp(request),
+        userAgent: request.headers.get("user-agent"),
+        path: new URL(request.url).pathname,
+      },
     });
 
     return NextResponse.json(
@@ -108,8 +130,27 @@ export async function handleCreateJobRequest(
       return NextResponse.json({ error: "asset_not_found" }, { status: 404 });
     }
 
+    if (
+      error instanceof Error &&
+      error.message === "Free trial is not available."
+    ) {
+      return NextResponse.json(
+        {
+          error: "free_trial_unavailable",
+          message: "免费试用暂不可用，请选择付费生成。",
+        },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
-      { error: "job_creation_failed" },
+      {
+        error: "job_creation_failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Video job creation failed.",
+      },
       { status: 500 },
     );
   }

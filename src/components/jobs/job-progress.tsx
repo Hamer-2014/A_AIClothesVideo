@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { userFacingJobMessage } from "@/lib/jobs/user-facing-message";
+
 export interface JobProgressData {
     jobId?: string;
     status: string;
@@ -67,18 +69,6 @@ function shouldPoll(progress: JobProgressData) {
     !progress.downloadReady &&
     !["failed", "deliverable"].includes(progress.phase)
   );
-}
-
-export function userFacingJobMessage(message?: string | null) {
-  if (!message) {
-    return null;
-  }
-
-  if (/\b(EvoLink|APIMart|provider|task polling|status 4\d\d|status 5\d\d)\b/i.test(message)) {
-    return "生成服务暂时不可用，请稍后重试。";
-  }
-
-  return message;
 }
 
 export function JobProgress({

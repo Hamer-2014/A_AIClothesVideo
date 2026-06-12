@@ -35,6 +35,8 @@ describe("APIMart video provider", () => {
           "https://signed.example/detail.jpg",
         ],
         aspectRatio: "9:16",
+        resolution: "720p",
+        audio: true,
       },
       {
         fetch: fetchImpl,
@@ -58,7 +60,8 @@ describe("APIMart video provider", () => {
           model: "pixverse-v6",
           prompt: "Generate a front push-in.",
           duration: 8,
-          resolution: "540p",
+          resolution: "720p",
+          audio: true,
           size: "9:16",
           img_references: [
             "https://signed.example/front.jpg",
@@ -96,6 +99,8 @@ describe("APIMart video provider", () => {
         prompt: "Generate a front push-in.",
         imageUrls: ["https://signed.example/front.jpg"],
         aspectRatio: "9:16",
+        resolution: "540p",
+        audio: false,
       },
       {
         fetch: fetchImpl,
@@ -111,6 +116,12 @@ describe("APIMart video provider", () => {
       "https://api.apimart.ai/v1/videos/generations",
       expect.objectContaining({
         body: expect.stringContaining('"image_urls":["https://signed.example/front.jpg"]'),
+      }),
+    );
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.apimart.ai/v1/videos/generations",
+      expect.objectContaining({
+        body: expect.stringContaining('"audio":false'),
       }),
     );
   });
@@ -129,6 +140,7 @@ describe("APIMart video provider", () => {
               },
             ],
           },
+          cost: "0.1234",
         },
       });
     });
@@ -153,8 +165,37 @@ describe("APIMart video provider", () => {
       status: "succeeded",
       outputUrl: "https://upload.apimart.ai/f/video/result.mp4",
       errorMessage: null,
+      costEstimate: "0.1234",
       raw: expect.any(Object),
     });
+  });
+
+  it("extracts APIMart cost from top-level and usage fields", async () => {
+    const topLevel = await pollAPIMartTask("task_cost", {
+      fetch: async () =>
+        Response.json({
+          status: "completed",
+          output: { url: "https://provider.example/video.mp4" },
+          cost: 0.42,
+        }),
+      env: {
+        APIMART_API_KEY: "sk-test",
+      },
+    });
+    const usage = await pollAPIMartTask("task_usage_cost", {
+      fetch: async () =>
+        Response.json({
+          status: "completed",
+          output: { url: "https://provider.example/video.mp4" },
+          usage: { cost: "0.84" },
+        }),
+      env: {
+        APIMART_API_KEY: "sk-test",
+      },
+    });
+
+    expect(topLevel.costEstimate).toBe("0.42");
+    expect(usage.costEstimate).toBe("0.84");
   });
 
   it("normalizes failed APIMart task errors", async () => {

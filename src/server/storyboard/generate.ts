@@ -178,7 +178,6 @@ export async function generateStoryboardDraft({
   userId,
   selectedTemplateIds,
   userPrompt,
-  isTrial,
   templates,
   moderatePrompt,
   createStoryboard = createDeepSeekStoryboard,
@@ -192,7 +191,6 @@ export async function generateStoryboardDraft({
   userId: string;
   selectedTemplateIds: string[];
   userPrompt: string;
-  isTrial: boolean;
   templates: ShotTemplateDefinition[];
   moderatePrompt?: (input: {
     prompt: string;
@@ -207,7 +205,6 @@ export async function generateStoryboardDraft({
     jobId,
     userId,
     templates,
-    isTrial,
   });
 
   if (!detail) {

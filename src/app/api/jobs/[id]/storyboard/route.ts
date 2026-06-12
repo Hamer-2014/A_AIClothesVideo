@@ -31,7 +31,6 @@ interface GenerateStoryboardDeps {
     userId: string;
     selectedTemplateIds: string[];
     userPrompt: string;
-    isTrial: boolean;
   }) => Promise<StoryboardRouteResult>;
 }
 
@@ -56,7 +55,6 @@ function parseBody(body: unknown) {
   return {
     selectedTemplateIds,
     userPrompt,
-    isTrial: record.isTrial === true,
   };
 }
 
@@ -65,7 +63,6 @@ function defaultGenerateStoryboard(input: {
   userId: string;
   selectedTemplateIds: string[];
   userPrompt: string;
-  isTrial: boolean;
 }) {
   return generateStoryboardDraft({
     jobReadStore: createDrizzleVideoJobReadStore(),
@@ -75,7 +72,6 @@ function defaultGenerateStoryboard(input: {
     userId: input.userId,
     selectedTemplateIds: input.selectedTemplateIds,
     userPrompt: input.userPrompt,
-    isTrial: input.isTrial,
     templates: mvpShotTemplates,
   });
 }

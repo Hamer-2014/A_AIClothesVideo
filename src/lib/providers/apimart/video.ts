@@ -18,6 +18,8 @@ export interface APIMartVideoGenerationInput {
   prompt: string;
   imageUrls: string[];
   aspectRatio: string;
+  resolution?: string;
+  audio?: boolean;
 }
 
 export interface APIMartVideoGenerationResult {
@@ -34,6 +36,7 @@ export interface APIMartTaskResult {
   status: "queued" | "running" | "succeeded" | "failed";
   outputUrl: string | null;
   errorMessage: string | null;
+  costEstimate?: string | null;
   raw: JsonValue;
 }
 
@@ -175,6 +178,19 @@ function errorMessageFrom(raw: Record<string, unknown>) {
   );
 }
 
+function costEstimateFrom(raw: Record<string, unknown>) {
+  const data = asRecord(raw.data);
+  const usage = asRecord(raw.usage);
+  const candidates = [data.cost, raw.cost, usage.cost];
+  const cost = candidates.find(
+    (candidate): candidate is string | number =>
+      (typeof candidate === "string" && candidate.trim().length > 0) ||
+      typeof candidate === "number",
+  );
+
+  return typeof cost === "number" ? String(cost) : cost ?? null;
+}
+
 async function readJson(response: Response) {
   return asRecord(await response.json().catch(() => ({})));
 }
@@ -184,7 +200,8 @@ function buildGenerationBody(input: APIMartVideoGenerationInput, model: string) 
     model,
     prompt: input.prompt,
     duration: 8,
-    resolution: "540p",
+    resolution: input.resolution ?? "540p",
+    audio: input.audio ?? false,
     size: input.aspectRatio,
   };
 
@@ -254,6 +271,7 @@ export async function pollAPIMartTask(
     status: normalizeTaskStatus(raw.status ?? data.status),
     outputUrl: outputUrlFrom(raw),
     errorMessage: errorMessageFrom(raw),
+    costEstimate: costEstimateFrom(raw),
     raw: raw as JsonValue,
   };
 }

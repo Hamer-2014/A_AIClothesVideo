@@ -21,7 +21,6 @@ interface GetJobRouteDeps {
   getJob?: (input: {
     jobId: string;
     userId: string;
-    isTrial: boolean;
   }) => Promise<JobDetailResult>;
   store?: VideoJobReadStore;
 }
@@ -29,12 +28,10 @@ interface GetJobRouteDeps {
 async function defaultGetJob({
   jobId,
   userId,
-  isTrial,
   store = createDrizzleVideoJobReadStore(),
 }: {
   jobId: string;
   userId: string;
-  isTrial: boolean;
   store?: VideoJobReadStore;
 }) {
   return getVideoJobDetail({
@@ -42,7 +39,6 @@ async function defaultGetJob({
     jobId,
     userId,
     templates: mvpShotTemplates,
-    isTrial,
   });
 }
 
@@ -58,15 +54,13 @@ export async function handleGetJobRequest(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const isTrial = new URL(request.url).searchParams.get("trial") === "true";
   const getJob =
     deps.getJob ??
-    ((input: { jobId: string; userId: string; isTrial: boolean }) =>
+    ((input: { jobId: string; userId: string }) =>
       defaultGetJob({ ...input, store: deps.store }));
   const detail = await getJob({
     jobId: context.params.id,
     userId,
-    isTrial,
   });
 
   if (!detail) {
@@ -83,6 +77,9 @@ export async function handleGetJobRequest(
       durationSeconds: detail.job.durationSeconds,
       aspectRatio: detail.job.aspectRatio,
       creditCost: detail.job.creditCost,
+      billingMode: detail.job.billingMode,
+      generationProfile: detail.job.generationProfile,
+      watermarkEnabled: detail.job.watermarkEnabled,
     },
     assetCount: detail.assets.length,
     assets: detail.assets,

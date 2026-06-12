@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db/client";
 import type { JsonValue } from "@/lib/db/schema/common";
 import {
+  type billingModeValues,
   jobStateEvents,
   type jobStatusValues,
   videoJobs,
@@ -10,11 +11,13 @@ import {
 import { eq } from "drizzle-orm";
 
 export type JobStatus = (typeof jobStatusValues)[number];
+export type BillingMode = (typeof billingModeValues)[number];
 
 export interface JobRecord {
   id: string;
   userId: string;
   status: JobStatus;
+  billingMode?: BillingMode;
   userVisibleStatus?: string;
   failureReason?: string | null;
   lockedBy: string | null;
@@ -208,6 +211,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           id: videoJobs.id,
           userId: videoJobs.userId,
           status: videoJobs.status,
+          billingMode: videoJobs.billingMode,
           userVisibleStatus: videoJobs.userVisibleStatus,
           failureReason: videoJobs.failureReason,
           lockedBy: videoJobs.lockedBy,
@@ -251,6 +255,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           id: videoJobs.id,
           userId: videoJobs.userId,
           status: videoJobs.status,
+          billingMode: videoJobs.billingMode,
           userVisibleStatus: videoJobs.userVisibleStatus,
           failureReason: videoJobs.failureReason,
           lockedBy: videoJobs.lockedBy,

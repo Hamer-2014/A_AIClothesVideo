@@ -27,3 +27,14 @@ export const abuseEvents = pgTable("abuse_events", {
   details: jsonSnapshot("details"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const userAccessEvents = pgTable("user_access_events", {
+  ...id,
+  userId: text("user_id"),
+  eventType: text("event_type").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  path: text("path"),
+  metadata: jsonSnapshot("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

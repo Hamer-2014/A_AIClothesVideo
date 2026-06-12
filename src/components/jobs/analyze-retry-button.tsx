@@ -28,7 +28,6 @@ export function AnalyzeRetryButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: modeForDuration(durationSeconds),
-          isTrial: durationSeconds === 8,
         }),
       });
       const body = (await response.json().catch(() => null)) as

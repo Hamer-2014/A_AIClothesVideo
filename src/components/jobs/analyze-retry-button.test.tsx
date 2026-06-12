@@ -46,7 +46,6 @@ describe("AnalyzeRetryButton", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "standard",
-          isTrial: false,
         }),
       });
       expect(refresh).toHaveBeenCalledTimes(1);

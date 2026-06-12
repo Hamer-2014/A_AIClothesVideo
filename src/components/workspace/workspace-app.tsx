@@ -33,6 +33,9 @@ interface JobDetailResponse {
     durationSeconds: number;
     aspectRatio: string;
     creditCost: number;
+    billingMode: "free_trial" | "paid";
+    generationProfile: string;
+    watermarkEnabled: boolean;
   };
   assetCount: number;
   acceptable: boolean;
@@ -114,6 +117,17 @@ function warningLabel(warning: string) {
   }
 }
 
+function paidCreditCost(durationSeconds: 8 | 16 | 24) {
+  switch (durationSeconds) {
+    case 8:
+      return 70;
+    case 16:
+      return 130;
+    case 24:
+      return 190;
+  }
+}
+
 export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   const [assets, setAssets] = useState<UploadedAssetItem[]>([]);
   const [durationSeconds, setDurationSeconds] = useState<8 | 16 | 24>(8);
@@ -130,11 +144,10 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
+  const paidCost = paidCreditCost(durationSeconds);
 
   async function loadJobDetail(nextJobId: string, nextDurationSeconds: 8 | 16 | 24) {
-    const detailResponse = await fetch(
-      `/api/jobs/${nextJobId}?trial=${nextDurationSeconds === 8 ? "true" : "false"}`,
-    );
+    const detailResponse = await fetch(`/api/jobs/${nextJobId}`);
     const detailBody = await detailResponse.json();
 
     if (!detailResponse.ok) {
@@ -161,7 +174,6 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         mode: nextDurationSeconds === 8 ? "lite" : "standard",
-        isTrial: nextDurationSeconds === 8,
       }),
     });
 
@@ -222,7 +234,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     setAssets((current) => [...current, asset]);
   }
 
-  async function createJob() {
+  async function createJob(useFreeTrialIfAvailable: boolean) {
     const uploadedAssetIds = assets
       .filter((asset) => asset.status === "uploaded")
       .map((asset) => asset.assetId);
@@ -245,13 +257,17 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
         assetIds: uploadedAssetIds,
         durationSeconds,
         aspectRatio,
-        isTrial: durationSeconds === 8,
+        useFreeTrialIfAvailable,
       }),
     });
     const body = await response.json();
 
     if (!response.ok) {
-      setMessage("创建任务失败，请检查素材和规格。");
+      setMessage(
+        typeof body.message === "string"
+          ? body.message
+          : "创建任务失败，请检查素材和规格。",
+      );
       setBusyAction(null);
       return;
     }
@@ -306,7 +322,6 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
       body: JSON.stringify({
         selectedTemplateIds,
         userPrompt,
-        isTrial: durationSeconds === 8,
       }),
     });
     const body = await response.json();
@@ -383,13 +398,30 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
                 onDurationChange={setDurationSeconds}
               />
               <button
-                className="inline-flex h-11 items-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={busyAction !== null}
-                onClick={createJob}
+                onClick={() => createJob(false)}
                 type="button"
               >
-                {busyAction === "create-job" ? "创建中..." : "创建任务"}
+                {busyAction === "create-job"
+                  ? "创建中..."
+                  : `付费生成 · 扣 ${paidCost} 点`}
               </button>
+              {durationSeconds === 8 ? (
+                <div className="space-y-2 rounded-md border border-[var(--line)] bg-[var(--surface)] p-3">
+                  <button
+                    className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={busyAction !== null}
+                    onClick={() => createJob(true)}
+                    type="button"
+                  >
+                    免费试用
+                  </button>
+                  <p className="text-xs leading-5 text-[var(--muted)]">
+                    免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -483,9 +515,11 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
           creditCost={jobDetail?.job.creditCost ?? 0}
           disabled={!storyboardId || busyAction !== null}
           durationSeconds={durationSeconds}
-          moderationPendingMessage={
-            durationSeconds === 8
+        moderationPendingMessage={
+            jobDetail?.job.billingMode === "free_trial"
               ? "免费试用默认使用低风险模板与 lite 质检。"
+              : jobDetail?.job.billingMode === "paid"
+                ? "付费任务使用高分辨率有声生成与 standard 质检。"
               : "确认后先审核，再冻结点数并进入片段生成。"
           }
           onConfirm={confirmStoryboard}

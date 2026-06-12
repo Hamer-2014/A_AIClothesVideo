@@ -191,6 +191,10 @@ export async function submitQueuedSegment({
         prompt: segment.prompt,
         imageUrls,
         aspectRatio: job.aspectRatio,
+        resolution: segment.resolution,
+        audio: segment.audioEnabled,
+        watermarkEnabled: segment.watermarkEnabled,
+        generationProfile: segment.generationProfile,
       });
       break;
     } catch (error) {
@@ -207,6 +211,10 @@ export async function submitQueuedSegment({
           assetCount: imageUrls.length,
           attempt,
           maxAttempts: attempts,
+          generationProfile: segment.generationProfile,
+          resolution: segment.resolution,
+          audio: segment.audioEnabled,
+          watermarkEnabled: segment.watermarkEnabled,
         },
         durationMs: Date.now() - startedAt,
         status: "failed",
@@ -232,6 +240,10 @@ export async function submitQueuedSegment({
     requestSnapshot: {
       templateId: segment.templateId,
       assetCount: imageUrls.length,
+      generationProfile: segment.generationProfile,
+      resolution: segment.resolution,
+      audio: segment.audioEnabled,
+      watermarkEnabled: segment.watermarkEnabled,
     },
     responseSummary: providerResult.raw,
     durationMs: Date.now() - startedAt,
@@ -505,6 +517,7 @@ export async function pollSubmittedSegment({
   await segmentStore.updateSegment(segmentId, {
     status: "succeeded",
     videoKey,
+    ...(task.costEstimate ? { costEstimate: task.costEstimate } : {}),
   });
   const allSegments = await segmentStore.listSegmentsForJob(jobId);
   const allSucceeded = allSegments.every((jobSegment) =>

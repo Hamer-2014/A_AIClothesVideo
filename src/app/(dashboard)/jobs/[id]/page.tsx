@@ -4,9 +4,9 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { AnalyzeRetryButton } from "@/components/jobs/analyze-retry-button";
 import { JobContinuePanel } from "@/components/jobs/job-continue-panel";
 import { JobLivePanels } from "@/components/jobs/job-live-panels";
-import { userFacingJobMessage } from "@/components/jobs/job-progress";
 import { buildDashboardNav } from "@/app/app-shell";
 import { getServerSession } from "@/lib/auth/server";
+import { userFacingJobMessage } from "@/lib/jobs/user-facing-message";
 import { createPublicJobVideoUrl } from "@/server/files/job-download";
 import {
   createDrizzleVideoJobReadStore,
@@ -39,7 +39,6 @@ export default async function JobDetailPage({
       jobId: id,
       userId,
       templates: mvpShotTemplates,
-      isTrial: false,
     }),
     getVideoJobProgress({
       store: createDrizzleJobProgressStore(),

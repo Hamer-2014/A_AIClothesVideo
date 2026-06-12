@@ -59,6 +59,10 @@ function createStores() {
         providerCallLogId: null,
         videoKey: null,
         costEstimate: "0",
+        generationProfile: "trial_540p_watermarked",
+        resolution: "540p",
+        audioEnabled: false,
+        watermarkEnabled: true,
         isTest: false,
         lockedBy: null,
         lockedUntil: null,
@@ -117,6 +121,10 @@ function createStoresWithSegments(segmentIds: string[]) {
       providerCallLogId: null,
       videoKey: null,
       costEstimate: "0",
+      generationProfile: "paid_720p_audio" as const,
+      resolution: "720p",
+      audioEnabled: true,
+      watermarkEnabled: false,
       isTest: false,
       lockedBy: null,
       lockedUntil: null,
@@ -273,6 +281,42 @@ describe("video segment services", () => {
       purpose: "video_generation",
       status: "succeeded",
       providerTaskId: "task-1",
+    });
+  });
+
+  it("passes segment resolution, audio, watermark, and generation profile into video generation", async () => {
+    const stores = createStores();
+    const seenInputs: unknown[] = [];
+
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async (input) => {
+        seenInputs.push(input);
+        return {
+          provider: "apimart",
+          model: "pixverse-v6",
+          providerTaskId: "task-profile",
+          raw: { ok: true },
+        };
+      },
+    });
+
+    expect(seenInputs[0]).toMatchObject({
+      resolution: "540p",
+      audio: false,
+      watermarkEnabled: true,
+      generationProfile: "trial_540p_watermarked",
+    });
+    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      requestSnapshot: expect.objectContaining({
+        generationProfile: "trial_540p_watermarked",
+        resolution: "540p",
+        audio: false,
+        watermarkEnabled: true,
+      }),
     });
   });
 
@@ -461,6 +505,7 @@ describe("video segment services", () => {
         outputUrl: "https://provider.example/video.mp4",
         errorMessage: null,
         raw: { status: "succeeded" },
+        costEstimate: "0.333",
       }),
       storeProviderOutput: async ({ segmentId: id }) =>
         `jobs/${jobId}/segments/${id}/video.mp4`,
@@ -475,6 +520,7 @@ describe("video segment services", () => {
     expect(stores.segmentStore.listSegments()[0]).toMatchObject({
       status: "succeeded",
       videoKey: `jobs/${jobId}/segments/${segmentId}/video.mp4`,
+      costEstimate: "0.333",
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segment_succeeded");
   });

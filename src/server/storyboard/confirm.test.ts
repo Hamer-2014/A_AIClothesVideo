@@ -34,6 +34,9 @@ function createStores() {
         status: "storyboard_draft_ready",
         durationSeconds: 16,
         creditCost: 130,
+        billingMode: "paid",
+        generationProfile: "paid_720p_audio",
+        watermarkEnabled: false,
         isTest: false,
       },
     ],
@@ -142,6 +145,10 @@ describe("confirmStoryboard", () => {
         status: "queued",
         templateId: "front_push_in",
         prompt: "Slow push-in on the front garment.",
+        generationProfile: "paid_720p_audio",
+        resolution: "720p",
+        audioEnabled: true,
+        watermarkEnabled: false,
         isTest: false,
       }),
       expect.objectContaining({
@@ -151,6 +158,10 @@ describe("confirmStoryboard", () => {
         status: "queued",
         templateId: "front_pan",
         prompt: "Gentle pan across the front garment.",
+        generationProfile: "paid_720p_audio",
+        resolution: "720p",
+        audioEnabled: true,
+        watermarkEnabled: false,
         isTest: false,
       }),
     ]);
@@ -231,6 +242,9 @@ describe("confirmStoryboard", () => {
           status: "storyboard_draft_ready",
           durationSeconds: 8,
           creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
           isTest: false,
         },
       ],
@@ -299,8 +313,82 @@ describe("confirmStoryboard", () => {
         storyboardId,
         segmentIndex: 0,
         status: "queued",
+        generationProfile: "trial_540p_watermarked",
+        resolution: "540p",
+        audioEnabled: false,
+        watermarkEnabled: true,
       }),
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+  });
+
+  it("rejects non trial-allowed templates when confirming a free trial storyboard", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["fabric_macro"],
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "fabric_macro",
+                prompt: "Macro detail shot.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        storyboardStore: trialStoryboardStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: async () => ({
+          id: "mod-trial",
+          decision: "allow",
+          raw: { decision: "allow" },
+        }),
+      }),
+    ).rejects.toThrow("Free trial storyboard contains non trial-allowed templates.");
+
+    expect(trialStoryboardStore.listSegments()).toHaveLength(0);
+    expect(trialStoryboardStore.listStoryboards()[0]?.status).toBe("draft");
   });
 });

@@ -23,6 +23,9 @@ interface JobContinuePanelProps {
     durationSeconds: number;
     aspectRatio: string;
     creditCost: number;
+    billingMode: "free_trial" | "paid";
+    generationProfile: string;
+    watermarkEnabled: boolean;
   };
   recommendations: {
     recommended: Array<{
@@ -204,7 +207,6 @@ export function JobContinuePanel({
         body: JSON.stringify({
           selectedTemplateIds,
           userPrompt,
-          isTrial: job.durationSeconds === 8,
         }),
       });
       const body = await response.json();
@@ -324,8 +326,10 @@ export function JobContinuePanel({
         disabled={!storyboardId || busyAction !== null}
         durationSeconds={job.durationSeconds}
         moderationPendingMessage={
-          job.durationSeconds === 8
+          job.billingMode === "free_trial"
             ? "免费试用默认使用低风险模板与 lite 质检。"
+            : job.billingMode === "paid"
+              ? "付费任务使用高分辨率有声生成与 standard 质检。"
             : "确认后先审核，再冻结点数并进入片段生成。"
         }
         onConfirm={confirmStoryboard}

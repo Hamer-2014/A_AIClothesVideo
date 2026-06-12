@@ -36,6 +36,13 @@
       "when": 1781101800000,
       "tag": "0004_fix_user_id_columns_to_text",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781260800000,
+      "tag": "0005_trial_generation_profiles",
+      "breakpoints": true
     }
   ]
 }

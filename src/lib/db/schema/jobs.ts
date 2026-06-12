@@ -1,5 +1,6 @@
 import {
   integer,
+  boolean,
   pgEnum,
   pgTable,
   text,
@@ -66,6 +67,19 @@ export const stitchStatusEnum = pgEnum("stitch_status", stitchStatusValues);
 export const postQaModeValues = ["off", "lite", "standard", "strict"] as const;
 export const postQaModeEnum = pgEnum("post_qa_mode", postQaModeValues);
 
+export const billingModeValues = ["free_trial", "paid"] as const;
+export const billingModeEnum = pgEnum("billing_mode", billingModeValues);
+
+export const generationProfileValues = [
+  "trial_540p_watermarked",
+  "paid_720p_audio",
+  "paid_1080p_audio",
+] as const;
+export const generationProfileEnum = pgEnum(
+  "generation_profile",
+  generationProfileValues,
+);
+
 export const postQaStatusValues = [
   "queued",
   "running",
@@ -92,6 +106,12 @@ export const videoJobs = pgTable("video_jobs", {
   postQaRequired: text("post_qa_required").notNull().default("true"),
   postQaReason: text("post_qa_reason"),
   creditCost: integer("credit_cost").notNull().default(0),
+  billingMode: billingModeEnum("billing_mode").notNull().default("paid"),
+  generationProfile: generationProfileEnum("generation_profile")
+    .notNull()
+    .default("paid_720p_audio"),
+  watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
+  trialEligibilitySnapshot: jsonSnapshot("trial_eligibility_snapshot"),
   reservedLedgerId: uuid("reserved_ledger_id"),
   finalVideoKey: text("final_video_key"),
   coverKey: text("cover_key"),
@@ -139,8 +159,28 @@ export const videoSegments = pgTable("video_segments", {
   providerCallLogId: uuid("provider_call_log_id"),
   videoKey: text("video_key"),
   costEstimate: costEstimate(),
+  generationProfile: generationProfileEnum("generation_profile")
+    .notNull()
+    .default("paid_720p_audio"),
+  resolution: text("resolution").notNull().default("720p"),
+  audioEnabled: boolean("audio_enabled").notNull().default(true),
+  watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
   ...isTest,
   ...lockableJobFields,
+  ...timestamps,
+});
+
+export const freeTrialUsages = pgTable("free_trial_usages", {
+  ...id,
+  userId: text("user_id").notNull(),
+  videoJobId: uuid("video_job_id").notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow(),
+  durationSeconds: integer("duration_seconds").notNull(),
+  generationProfile: generationProfileEnum("generation_profile").notNull(),
+  resolution: text("resolution").notNull(),
+  watermarkEnabled: boolean("watermark_enabled").notNull().default(true),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
   ...timestamps,
 });
 

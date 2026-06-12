@@ -24,6 +24,9 @@ describe("get video job detail", () => {
           durationSeconds: 8,
           aspectRatio: "9:16",
           creditCost: 0,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
         },
       ],
       assets: [
@@ -104,7 +107,6 @@ describe("get video job detail", () => {
       jobId,
       userId,
       templates: mvpShotTemplates,
-      isTrial: false,
     });
 
     expect(detail).not.toBeNull();
@@ -144,6 +146,9 @@ describe("get video job detail", () => {
           durationSeconds: 8,
           aspectRatio: "9:16",
           creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
         },
       ],
       assets: [],
@@ -157,8 +162,93 @@ describe("get video job detail", () => {
         jobId,
         userId,
         templates: mvpShotTemplates,
-        isTrial: true,
       }),
     ).resolves.toBeNull();
+  });
+
+  it("uses job billing mode rather than caller supplied duration assumptions for trial recommendations", async () => {
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets: [
+        {
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+        {
+          assetId: "asset-detail",
+          role: "detail",
+          sortOrder: 1,
+        },
+      ],
+      analyses: [
+        {
+          assetId: "asset-front",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+        {
+          assetId: "asset-detail",
+          analysisJson: {
+            asset_role: "detail",
+            garment_category: "dress",
+            view_angle: "detail",
+            human_present: "no",
+            visible_details: ["fabric"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.job).toMatchObject({
+      billingMode: "paid",
+      generationProfile: "paid_720p_audio",
+      watermarkEnabled: false,
+    });
+    expect(detail?.recommendations.availableTemplateIds).toContain("fabric_macro");
   });
 });

@@ -7,7 +7,7 @@ import {
   analyzeVideoJobAssets,
   createDrizzleVideoJobAssetStore,
 } from "@/server/assets/job-analysis";
-import { createDrizzleJobStore } from "@/server/jobs/state-machine";
+import { createDrizzleJobStore, type JobStore } from "@/server/jobs/state-machine";
 
 type AnalyzeSession = {
   user?: {
@@ -26,8 +26,7 @@ interface AnalyzeJobRouteDeps {
   analyzeJob?: (input: {
     jobId: string;
     userId: string;
-    mode: VisionAnalysisMode;
-    isTrial: boolean;
+    mode?: VisionAnalysisMode;
   }) => Promise<AnalyzeJobResult>;
 }
 
@@ -38,17 +37,24 @@ async function defaultAnalyzeJob(): Promise<AnalyzeJobResult> {
 async function analyzeJobWithDrizzle(input: {
   jobId: string;
   userId: string;
-  mode: VisionAnalysisMode;
-  isTrial: boolean;
+  mode?: VisionAnalysisMode;
+  jobStore?: JobStore;
 }): Promise<AnalyzeJobResult> {
+  const jobStore = input.jobStore ?? createDrizzleJobStore();
+  const job = await jobStore.findJob(input.jobId);
+  if (!job || job.userId !== input.userId) {
+    throw new Error("Video job not found for user.");
+  }
+
+  const isTrial = job.billingMode === "free_trial";
   const result = await analyzeVideoJobAssets({
-    jobStore: createDrizzleJobStore(),
+    jobStore,
     jobAssetStore: createDrizzleVideoJobAssetStore(),
     jobId: input.jobId,
     userId: input.userId,
-    mode: input.mode,
+    mode: input.mode ?? (isTrial ? "lite" : "standard"),
     templates: mvpShotTemplates,
-    isTrial: input.isTrial,
+    isTrial,
   });
 
   return {
@@ -82,7 +88,6 @@ export async function handleAnalyzeJobRequest(
       jobId: context.params.id,
       userId,
       mode: parseMode((body as Record<string, unknown>).mode),
-      isTrial: (body as Record<string, unknown>).isTrial === true,
     });
 
     return NextResponse.json({

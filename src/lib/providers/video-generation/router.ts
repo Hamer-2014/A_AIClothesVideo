@@ -21,6 +21,10 @@ export interface VideoGenerationInput {
   prompt: string;
   imageUrls: string[];
   aspectRatio: string;
+  resolution?: string;
+  audio?: boolean;
+  watermarkEnabled?: boolean;
+  generationProfile?: string;
 }
 
 export interface VideoGenerationResult {
@@ -37,6 +41,7 @@ export interface VideoTaskResult {
   status: "queued" | "running" | "succeeded" | "failed";
   outputUrl: string | null;
   errorMessage: string | null;
+  costEstimate?: string | null;
   raw: JsonValue;
 }
 

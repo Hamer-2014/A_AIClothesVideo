@@ -27,6 +27,9 @@ function createReadStore() {
         durationSeconds: 8,
         aspectRatio: "9:16",
         creditCost: 0,
+        billingMode: "free_trial",
+        generationProfile: "trial_540p_watermarked",
+        watermarkEnabled: true,
       },
     ],
     assets: [{ assetId: "asset-front", role: "front", sortOrder: 0 }],
@@ -81,7 +84,6 @@ describe("generate storyboard draft", () => {
       userId,
       selectedTemplateIds: ["front_push_in"],
       userPrompt: "Show the front shape cleanly.",
-      isTrial: true,
       templates: mvpShotTemplates,
       moderatePrompt: async () => ({
         id: "mod_1",
@@ -150,7 +152,6 @@ describe("generate storyboard draft", () => {
         userId,
         selectedTemplateIds: ["back_display"],
         userPrompt: "Show back view.",
-        isTrial: true,
         templates: mvpShotTemplates,
         moderatePrompt: async () => {
           throw new Error("must not moderate");
@@ -188,7 +189,6 @@ describe("generate storyboard draft", () => {
         userId,
         selectedTemplateIds: ["front_push_in"],
         userPrompt: "Unsafe prompt.",
-        isTrial: true,
         templates: mvpShotTemplates,
         moderatePrompt: async () => ({
           id: "mod_2",
@@ -232,7 +232,6 @@ describe("generate storyboard draft", () => {
         userId,
         selectedTemplateIds: ["front_push_in"],
         userPrompt: "Show front view.",
-        isTrial: true,
         templates: mvpShotTemplates,
         moderatePrompt: async () => ({
           id: "mod_3",

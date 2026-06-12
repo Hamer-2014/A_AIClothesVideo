@@ -8,6 +8,7 @@ import {
   videoJobs,
 } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
+import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
 import { buildRecommendationsFromAnalyses } from "@/server/assets/analyze";
 import { parseAssetAnalysisJson } from "@/server/assets/analysis-schema";
@@ -22,6 +23,9 @@ export interface VideoJobSummary {
   durationSeconds: number;
   aspectRatio: string;
   creditCost: number;
+  billingMode: BillingMode;
+  generationProfile: GenerationProfile;
+  watermarkEnabled: boolean;
 }
 
 export interface VideoJobAssetSummary {
@@ -101,6 +105,9 @@ export function createDrizzleVideoJobReadStore(
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
           creditCost: videoJobs.creditCost,
+          billingMode: videoJobs.billingMode,
+          generationProfile: videoJobs.generationProfile,
+          watermarkEnabled: videoJobs.watermarkEnabled,
         })
         .from(videoJobs)
         .where(
@@ -163,13 +170,11 @@ export async function getVideoJobDetail({
   jobId,
   userId,
   templates,
-  isTrial,
 }: {
   store: VideoJobReadStore;
   jobId: string;
   userId: string;
   templates: ShotTemplateDefinition[];
-  isTrial: boolean;
 }) {
   const job = await store.findJob({ jobId, userId });
   if (!job) {
@@ -185,7 +190,7 @@ export async function getVideoJobDetail({
   const recommendationResult = buildRecommendationsFromAnalyses({
     analyses: parsedAnalyses,
     templates,
-    isTrial,
+    isTrial: job.billingMode === "free_trial",
   });
 
   return {
