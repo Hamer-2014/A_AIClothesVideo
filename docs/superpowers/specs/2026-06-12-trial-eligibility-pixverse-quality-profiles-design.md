@@ -1,72 +1,72 @@
-# Trial Eligibility And PixVerse Quality Profiles Design
+# 免费试用资格与 PixVerse 生成档位设计
 
-## Goal
+## 目标
 
-Fix the current overly broad trial behavior and introduce explicit APIMart PixVerse quality profiles:
+修正当前“所有 8 秒任务都被当成免费试用”的粗暴逻辑，并为 APIMart PixVerse V6 建立明确的试用/付费生成档位：
 
-- Free trial is no longer "every 8-second job is free".
-- The server decides whether a job is a free trial or paid.
-- Trial output uses APIMart PixVerse V6 at `540p`, watermarked, without audio.
-- Paid output starts with `720p + audio`.
-- `1080p + audio` is kept as a future paid high-quality profile, not the default.
-- User access IP is recorded in plain text for abuse review and operations.
+- 免费试用不再等于“所有 8 秒任务免费”。
+- 是否免费试用必须由服务端判定，前端不能决定。
+- 免费试用使用 APIMart PixVerse V6：`540p`、带水印、无音频。
+- 付费默认使用 APIMart PixVerse V6：`720p + audio`。
+- `1080p + audio` 仅作为未来高价档预留，本次不开放给普通用户。
+- 记录用户访问 IP，供管理员做风控和异常排查。
 
-## Current Problem
+## 当前问题
 
-The current frontend treats `durationSeconds === 8` as trial and sends `isTrial=true`.
-The backend also accepts `isTrial` from client input when creating jobs.
+当前前端把 `durationSeconds === 8` 当作试用，并向后端发送 `isTrial=true`。
+后端创建任务时也接受客户端传入的 `isTrial`。
 
-This is unsafe because the client is effectively deciding whether a job is free. It also blocks a normal paid 8-second SKU: after the trial is used, 8-second jobs should cost 70 credits.
+这等于让客户端决定任务是否免费，商业逻辑不安全。它还会阻塞正常的付费 8 秒 SKU：用户用完免费试用后，8 秒任务应该按 70 点收费。
 
-There is a second mismatch: APIMart PixVerse submission is currently hard-coded to `540p` and does not pass an `audio` parameter. The product now needs different generation parameters for trial and paid jobs.
+另一个问题是 APIMart PixVerse 提交参数当前固定为 `540p`，且没有传 `audio` 参数。现在产品需要按试用/付费任务使用不同的生成参数。
 
-## Product Rules
+## 产品规则
 
-### Trial Eligibility
+### 免费试用资格
 
-- Trial is limited to one 8-second job per user per rolling 24-hour window.
-- Trial requires the user to be logged in.
-- Trial should require verified email when the auth layer exposes a reliable verified-email signal.
-- Trial only applies to 8-second jobs.
-- Trial only allows low-risk templates where `isTrialAllowed = true`.
-- Trial jobs cost 0 credits.
-- Trial jobs do not reserve or capture credits.
-- Trial jobs use lite Post-QA.
-- Trial jobs are watermarked.
-- Trial jobs use APIMart PixVerse V6 with:
+- 每个用户滚动 24 小时内最多 1 次免费试用。
+- 免费试用必须登录。
+- 当 auth 层能稳定提供邮箱验证状态时，免费试用应要求邮箱已验证。
+- 免费试用只适用于 8 秒任务。
+- 免费试用只允许低风险模板，且模板必须满足 `isTrialAllowed = true`。
+- 免费试用任务消耗 0 点。
+- 免费试用任务不冻结点数，不正式扣点。
+- 免费试用任务使用 `lite` Post-QA。
+- 免费试用任务必须带水印。
+- 免费试用任务使用 APIMart PixVerse V6：
   - `resolution = 540p`
   - `audio = false`
 
-### Paid Generation
+### 付费生成
 
-- Paid 8-second jobs cost 70 credits.
-- Paid 16-second jobs cost 130 credits.
-- Paid 24-second jobs cost 190 credits.
-- Paid jobs reserve credits after prompt moderation and capture only after Post-QA passes.
-- Paid jobs use APIMart PixVerse V6 with:
+- 付费 8 秒任务消耗 70 点。
+- 付费 16 秒任务消耗 130 点。
+- 付费 24 秒任务消耗 190 点。
+- 付费任务在 prompt moderation 通过后冻结点数，Post-QA 通过后才正式扣点。
+- 付费任务使用 APIMart PixVerse V6：
   - `resolution = 720p`
   - `audio = true`
-- `1080p + audio` must not be enabled for normal users in this change. It can be introduced later as a separate higher-priced profile after real APIMart cost and failure-rate data exist.
+- `1080p + audio` 本次不能开放给普通用户。等 APIMart 真实成本、失败率、重试率有样本后，再作为更高价格档单独设计。
 
-## Data Model
+## 数据模型
 
-Add an explicit billing/generation profile instead of deriving trial from duration or credit cost.
+不要再从时长或点数反推是否试用。需要显式保存 billing/generation profile。
 
 ### `video_jobs`
 
-Add:
+新增字段：
 
-- `billing_mode`: text or enum, values:
+- `billing_mode`：text 或 enum，取值：
   - `free_trial`
   - `paid`
-- `generation_profile`: text or enum, values:
+- `generation_profile`：text 或 enum，取值：
   - `trial_540p_watermarked`
   - `paid_720p_audio`
-  - future: `paid_1080p_audio`
-- `watermark_enabled`: boolean
-- `trial_eligibility_snapshot`: JSON, nullable
+  - 未来预留：`paid_1080p_audio`
+- `watermark_enabled`：boolean
+- `trial_eligibility_snapshot`：JSON，可空
 
-The snapshot should include the decision inputs used at creation time:
+`trial_eligibility_snapshot` 保存创建任务时的判定输入，例如：
 
 ```json
 {
@@ -79,18 +79,18 @@ The snapshot should include the decision inputs used at creation time:
 
 ### `video_segments`
 
-Add segment-level generation settings, because provider submission happens per segment:
+新增片段级生成参数。因为真正提交给供应商的是 segment，不是 job：
 
 - `generation_profile`
 - `resolution`
 - `audio_enabled`
 - `watermark_enabled`
 
-These values should be copied from the job/profile when segments are created. Segment-level fields make provider requests auditable even if job-level defaults change later.
+这些字段在创建 segment 时从 job/profile 复制。这样即使未来 job 级默认配置变化，也能审计每个 segment 当时到底用了什么参数。
 
 ### `free_trial_usages`
 
-Add a table to make eligibility explicit:
+新增表，显式记录免费试用使用情况：
 
 - `id`
 - `user_id`
@@ -105,106 +105,114 @@ Add a table to make eligibility explicit:
 - `created_at`
 - `updated_at`
 
-Eligibility query:
+资格判断：
 
 ```text
-No free_trial_usages row for the same user_id where used_at >= now - 24 hours.
+同一 user_id 在 used_at >= now - 24 hours 的窗口内没有 free_trial_usages 记录。
 ```
 
-The row should be created transactionally with the trial job, or at the latest before the job enters generation, so repeated requests cannot race into multiple free trials.
+该记录应和试用 job 在同一个事务中创建；如果实现上做不到，也必须在任务进入生成前创建，避免重复请求并发拿到多个免费试用。
 
 ### `user_access_events`
 
-Add a lightweight user access log table:
+新增轻量访问记录表：
 
 - `id`
-- `user_id`, nullable for unauthenticated events
-- `event_type`, for example:
+- `user_id`，未登录时可空
+- `event_type`，例如：
   - `job_create`
   - `trial_eligibility_check`
   - `trial_granted`
   - `trial_denied`
   - `checkout_start`
-- `ip_address`, plain text
+- `ip_address`，明文 IP
 - `user_agent`
 - `path`
 - `metadata`
 - `created_at`
 
-Plain text IP is allowed for this product decision, but it is personal data. Access must be limited to admin/operator views, and the UI should present it as operational/security evidence, not general analytics.
+访问限制：
 
-Initial retention target: 90 days for `user_access_events`. Do not implement automatic deletion in this change unless it is cheap, but document the retention policy and keep the table isolated so cleanup can be added later.
+- `ip_address` 只能管理员查看。
+- operator、普通用户、公开 API 响应、用户侧页面都不能看到明文 IP。
+- 普通产品 UI、营销文案、任务详情页不需要特别提示“系统会采集 IP”。
+- 这不等于隐私政策可以隐瞒 IP 处理。隐私政策/服务条款里的必要披露不属于本 SPEC 的 UI 范围，不能为了转化率绕开合规披露。
 
-## Server-Side Flow
+保留策略：
 
-### Create Job
+- 初始目标保留 90 天。
+- 本次可以不实现自动清理任务，但表结构要独立，方便后续加清理脚本。
 
-The create job API should no longer trust client-provided `isTrial`.
+## 服务端流程
 
-Input should include:
+### 创建任务
+
+创建任务 API 不再信任客户端传入的 `isTrial`。
+
+请求输入只应包含：
 
 - `assetIds`
 - `durationSeconds`
 - `aspectRatio`
-- optional client preference such as `useFreeTrialIfAvailable`
+- 可选：`useFreeTrialIfAvailable`
 
-The server computes:
+服务端计算：
 
-1. Is duration 8 seconds?
-2. Has the user used a free trial within the last 24 hours?
-3. Is the request eligible for trial?
-4. If eligible and the client prefers trial, set:
+1. 是否 8 秒任务？
+2. 用户过去 24 小时内是否已经使用过免费试用？
+3. 当前请求是否满足试用资格？
+4. 如果满足资格，且用户选择优先使用免费试用，则设置：
    - `billing_mode = free_trial`
    - `credit_cost = 0`
    - `generation_profile = trial_540p_watermarked`
    - `watermark_enabled = true`
    - `post_qa_mode = lite`
-5. Otherwise set:
+5. 否则设置：
    - `billing_mode = paid`
    - `credit_cost = 70/130/190`
    - `generation_profile = paid_720p_audio`
    - `watermark_enabled = false`
    - `post_qa_mode = standard`
 
-If `useFreeTrialIfAvailable` is omitted, use the product default:
+如果 `useFreeTrialIfAvailable` 省略，使用产品默认：
 
-- For 8-second jobs, use trial if available.
-- For 16/24-second jobs, always paid.
+- 8 秒任务：如果免费试用可用，则使用免费试用。
+- 16/24 秒任务：始终付费。
 
-### Template And Storyboard
+### 模板与分镜
 
-Trial status must come from `video_jobs.billing_mode`, not from request query params.
+试用状态必须来自 `video_jobs.billing_mode`，不能来自 query 参数或客户端请求体。
 
-Trial jobs:
+免费试用任务：
 
-- only recommend/allow low-risk trial templates.
-- fail confirmation if selected templates are no longer trial-eligible.
+- 只推荐/允许低风险试用模板。
+- 如果确认分镜时模板已经不再满足试用资格，必须拒绝确认。
 
-Paid jobs:
+付费任务：
 
-- allow normal paid template rules.
+- 使用正常付费模板规则。
 
-### Confirm Storyboard
+### 确认分镜
 
-Before creating segments:
+创建 segment 前：
 
-- Re-check trial eligibility if `billing_mode = free_trial`.
-- If the trial was consumed by another job during the gap, convert the job to paid only if the UI explicitly supports that transition. Otherwise return a clear error and ask the user to restart as paid.
-- Create segment rows with copied generation settings.
+- 如果 `billing_mode = free_trial`，再次校验试用资格。
+- 如果创建任务到确认分镜之间试用资格已经被其他任务占用，只有在 UI 明确支持“转为付费”的情况下才允许转换；否则返回清晰错误，让用户重新以付费模式创建。
+- 创建 segment 时复制 job 的生成档位参数。
 
-Paid jobs reserve credits after Creem prompt moderation passes.
-Trial jobs skip credit reserve.
+付费任务在 Creem prompt moderation 通过后冻结点数。
+免费试用任务跳过点数冻结。
 
-### Submit Segment
+### 提交 Segment
 
-Extend video generation input with:
+扩展视频生成输入：
 
 - `resolution`
 - `audio`
 - `watermarkEnabled`
 - `generationProfile`
 
-For APIMart PixVerse V6 request body:
+APIMart PixVerse V6 请求体示例：
 
 ```json
 {
@@ -217,73 +225,85 @@ For APIMart PixVerse V6 request body:
 }
 ```
 
-APIMart does not create the product watermark by itself unless their API exposes a verified watermark parameter. If no provider-level watermark exists, watermarking must be done in the stitch/processing stage or by a separate post-process step before delivery.
+不要假设 APIMart 会自动加产品水印。只有在 APIMart 文档和真实调用确认支持水印参数后，才能把水印交给供应商处理。否则必须在 stitch/后处理阶段加水印，试用任务不能在无水印状态下进入 `deliverable`。
 
-### Cost Logging
+### 成本记录
 
-Provider cost must stop being recorded as zero when APIMart returns cost data.
+APIMart 返回成本信息时，不能继续把 provider cost 记为 0。
 
-When polling APIMart tasks, parse known cost fields such as:
+轮询 APIMart task 时解析这些可能字段：
 
 - `data.cost`
 - `cost`
 - `usage.cost`
 
-Write the value to:
+写入：
 
 - `provider_call_logs.cost_estimate`
 - `video_segments.cost_estimate`
 
-The implementation should tolerate missing cost fields, but missing cost must be visible in admin job detail as unknown rather than silently implying zero.
+如果供应商没有返回成本字段，系统可以继续运行，但后台必须显示为 unknown，不能静默当成 0 成本。
 
-## Access IP Recording
+## IP 访问记录
 
-Record plain text IP for job and trial-related operations.
+记录 job/trial 相关操作的明文 IP。
 
-Use the same extraction order as admin audit logs:
+IP 提取顺序沿用管理员审计日志：
 
-1. first value from `x-forwarded-for`
+1. `x-forwarded-for` 的第一个值
 2. `x-real-ip`
-3. null if absent
+3. 没有则为 null
 
-Record at least:
+至少记录：
 
-- job create
-- trial eligibility check
-- trial grant
-- trial deny
-- checkout start
+- 创建任务
+- 试用资格检查
+- 试用发放
+- 试用拒绝
+- 发起 checkout
 
-This is not a hard anti-abuse gate for MVP. The first version records evidence and allows admins to review suspicious patterns. Do not block multi-email behavior in this change.
+MVP 阶段这不是硬性反滥用拦截。第一版只记录证据，让管理员能够排查异常模式。本次不拦截多邮箱行为。
 
-## API/UI Behavior
+访问控制要求：
+
+- 明文 IP 只能通过管理员权限查看。
+- 不在普通用户 API 返回明文 IP。
+- 不在 operator 级后台页面显示明文 IP。
+- 不在用户侧页面、任务详情页、充值页、工作台里特别提示 IP 采集。
+- 管理员查看 IP 的操作如后续做导出或批量查询，应写入管理员审计日志。
+
+## API/UI 行为
 
 ### Workspace
 
-The UI should no longer present 8 seconds as always free.
+UI 不再把 8 秒固定展示为免费。
 
-Expected states:
+状态：
 
-- Trial available: 8-second option shows free trial messaging.
-- Trial unavailable: 8-second option shows 70 credits.
-- 16/24-second options always show paid credits.
+- 试用可用：8 秒选项展示免费试用。
+- 试用不可用：8 秒选项展示 70 点。
+- 16/24 秒始终展示付费点数。
 
-The UI should not send `isTrial`.
+UI 不发送 `isTrial`。
 
-### Job Detail
+### 用户任务详情
 
-Show:
+用户侧可以展示：
 
-- billing mode
-- credit cost
-- generation profile
-- resolution
-- audio enabled
-- watermark enabled
+- 是否免费试用/付费
+- 点数消耗
+- 是否带水印
+- 是否带音频
 
-### Admin
+用户侧不展示：
 
-Admin job detail should show segment-level:
+- 明文 IP
+- 风控访问记录
+- trial eligibility snapshot 的内部判定细节
+
+### 管理员后台
+
+管理员任务详情应展示 segment 级：
 
 - provider/model
 - resolution
@@ -292,42 +312,48 @@ Admin job detail should show segment-level:
 - generation profile
 - cost estimate
 
-Admin user or abuse view can later aggregate access events by IP address. This change only requires storage and minimal admin visibility if there is already a natural place to show it.
+管理员可以查看用户访问记录中的明文 IP，用于排查重复试用、异常注册、支付争议和成本攻击。
 
-## Error Handling
+operator 不查看明文 IP；如果现有 operator 权限需要排障，只能看脱敏信息，例如 `has_ip = true` 或 IP 前缀/哈希，不能看完整 IP。
 
-- If trial eligibility cannot be checked because the database is unavailable, fail closed for free trial and return a retryable error. Do not silently create a paid job unless the user explicitly chose paid.
-- If APIMart rejects `audio` or a resolution, surface provider failure and release credits for paid jobs through the existing failure path.
-- If watermark processing fails for a trial job, the job must not become deliverable without a watermark.
+## 错误处理
 
-## Tests
+- 如果数据库不可用导致试用资格无法检查，免费试用应 fail closed，返回可重试错误。不要静默创建付费任务，除非用户明确选择付费。
+- 如果 APIMart 拒绝 `audio` 或某个分辨率，走现有 provider failure 路径；付费任务必须释放冻结点数。
+- 如果试用任务水印处理失败，任务不能进入 `deliverable`。
 
-Required coverage:
+## 测试要求
 
-- Creating an 8-second job with no recent trial creates `free_trial`, `credit_cost = 0`, `trial_540p_watermarked`.
-- Creating an 8-second job when a trial exists within 24 hours creates paid job with `credit_cost = 70`.
-- Creating 16/24-second jobs is always paid.
-- Client-provided `isTrial=true` cannot force a free trial.
-- Trial confirmation rejects non-trial-eligible templates.
-- Trial segment creation copies `540p`, `audio=false`, `watermark=true`.
-- Paid segment creation copies `720p`, `audio=true`, `watermark=false`.
-- APIMart request body includes `resolution` and `audio`.
-- APIMart cost from poll response is stored when present.
-- User access event records plain text IP and user agent for job create/trial events.
+必须覆盖：
 
-## Non-Goals
+- 8 秒任务且过去 24 小时无试用记录时，创建 `free_trial`，`credit_cost = 0`，`generation_profile = trial_540p_watermarked`。
+- 8 秒任务但过去 24 小时已有试用记录时，创建付费任务，`credit_cost = 70`。
+- 16/24 秒任务始终付费。
+- 客户端传 `isTrial=true` 不能强制免费。
+- 免费试用确认分镜时拒绝非试用模板。
+- 免费试用 segment 创建时复制 `540p`、`audio=false`、`watermark=true`。
+- 付费 segment 创建时复制 `720p`、`audio=true`、`watermark=false`。
+- APIMart 请求体包含 `resolution` 和 `audio`。
+- APIMart poll 返回成本时能写入成本字段。
+- 创建任务/试用检查/试用发放/试用拒绝时记录明文 IP 和 user agent。
+- 普通用户 API 不返回明文 IP。
+- operator 不能查看明文 IP。
+- admin 可以查看明文 IP。
 
-- Do not implement multi-email blocking.
-- Do not add device fingerprinting.
-- Do not require phone verification.
-- Do not open `1080p + audio` to normal users.
-- Do not build a full fraud dashboard in this change.
-- Do not rely on frontend logic for billing decisions.
+## 非目标
 
-## Open Decisions
+- 本次不实现多邮箱注册拦截。
+- 本次不做设备指纹。
+- 本次不要求手机号验证。
+- 本次不向普通用户开放 `1080p + audio`。
+- 本次不做完整风控 dashboard。
+- 本次不依赖前端逻辑决定是否收费。
+- 本次不在产品 UI 中专门提示 IP 采集。
 
-No blocking open decisions. The current product decision is:
+## 已确认决策
 
-- Trial: rolling 24-hour per-user 8-second free trial, `540p`, watermarked, no audio.
-- Paid: `720p + audio`.
-- Plain text IP recording is accepted for MVP operational review.
+- 免费试用：每用户滚动 24 小时 1 次，8 秒，`540p`，带水印，无音频。
+- 付费默认：`720p + audio`。
+- 明文 IP 记录用于 MVP 运营/风控排查。
+- 明文 IP 只有管理员可见。
+- 普通产品 UI 不特别说明 IP 采集。
