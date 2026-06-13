@@ -57,10 +57,19 @@ async function loadPaidDeliveryCandidates(sql) {
         array[]::text[]
       ) as ledger_types,
       coalesce(max(jsonb_array_length(pqr.frame_keys::jsonb)), 0) as qa_frame_count,
+      coalesce(
+        array_remove(array_agg(distinct vs.provider), null),
+        array[]::text[]
+      ) as video_providers,
+      coalesce(
+        array_remove(array_agg(distinct vs.model), null),
+        array[]::text[]
+      ) as video_models,
       max(vj.updated_at) as updated_at
     from video_jobs vj
     left join credit_ledger cl on cl.related_job_id = vj.id
     left join post_qa_results pqr on pqr.video_job_id = vj.id
+    left join video_segments vs on vs.video_job_id = vj.id
     where vj.deleted_at is null
       and vj.credit_cost > 0
       and vj.status = 'deliverable'
@@ -76,6 +85,8 @@ async function loadPaidDeliveryCandidates(sql) {
     ledgerTypes: asStringArray(row.ledger_types),
     finalVideoKey: row.final_video_key,
     qaFrameCount: Number(row.qa_frame_count ?? 0),
+    videoProviders: asStringArray(row.video_providers),
+    videoModels: asStringArray(row.video_models),
     updatedAt: row.updated_at,
   }));
 }

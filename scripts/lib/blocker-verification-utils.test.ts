@@ -25,6 +25,8 @@ describe("blocker verification utils", () => {
         ledgerTypes: ["reserve", "capture"],
         finalVideoKey: "jobs/job-paid/stitched/final.mp4",
         qaFrameCount: 3,
+        videoProviders: ["apimart"],
+        videoModels: ["pixverse-v6"],
       },
     ]);
 
@@ -43,11 +45,31 @@ describe("blocker verification utils", () => {
         ledgerTypes: ["reserve"],
         finalVideoKey: "jobs/job-paid/stitched/final.mp4",
         qaFrameCount: 3,
+        videoProviders: ["apimart"],
+        videoModels: ["pixverse-v6"],
       },
     ]);
 
     expect(result.passed).toBe(false);
     expect(result.reason).toContain("capture");
+  });
+
+  it("fails paid delivery evidence when the public video provider is not PixVerse", () => {
+    const result = evaluatePaidDeliveryEvidence([
+      {
+        id: "job-paid",
+        status: "deliverable",
+        creditCost: 70,
+        ledgerTypes: ["reserve", "capture"],
+        finalVideoKey: "jobs/job-paid/stitched/final.mp4",
+        qaFrameCount: 3,
+        videoProviders: ["evolink"],
+        videoModels: ["veo3.1-fast-beta"],
+      },
+    ]);
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain("apimart/pixverse-v6");
   });
 
   it("passes failure compensation evidence for failed released jobs with release ledger", () => {

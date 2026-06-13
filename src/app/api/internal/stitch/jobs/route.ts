@@ -26,6 +26,7 @@ interface CreateStitchJobDeps {
     finalVideoKey: string;
     coverKey?: string | null;
     frameKeyPrefix?: string | null;
+    postQaMode: "off" | "lite" | "standard" | "strict";
     callbackUrl: string;
     cloudRun?: CloudRunStitchTriggerResult;
   }>;
@@ -107,6 +108,7 @@ export async function handleCreateStitchJobRequest(
           finalVideoKey: result.finalVideoKey,
           coverKey: result.coverKey,
           frameKeyPrefix: result.frameKeyPrefix,
+          postQaMode: result.postQaMode,
           callbackUrl: result.callbackUrl,
         });
       } catch {
@@ -125,6 +127,7 @@ export async function handleCreateStitchJobRequest(
           finalVideoKey: result.finalVideoKey,
           coverKey: result.coverKey,
           frameKeyPrefix: result.frameKeyPrefix,
+          postQaMode: result.postQaMode,
           callbackUrl: result.callbackUrl,
         });
       } catch {

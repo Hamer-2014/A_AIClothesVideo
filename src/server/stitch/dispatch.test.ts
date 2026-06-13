@@ -24,7 +24,14 @@ function stores() {
     },
   ]);
   const stitchStore = createInMemoryStitchStore({
-    jobs: [{ id: jobId, status: "segment_succeeded", isTest: false }],
+    jobs: [
+      {
+        id: jobId,
+        status: "segment_succeeded",
+        isTest: false,
+        postQaMode: "standard",
+      },
+    ],
     segments: [
       {
         id: "segment-1",
@@ -59,6 +66,7 @@ describe("stitch dispatch", () => {
 
     expect(result.cloudRun.accepted).toBe(true);
     expect(triggered).toHaveLength(1);
+    expect(triggered[0]).toMatchObject({ postQaMode: "standard" });
     expect(stitchStore.listStitchJobs()[0]?.status).toBe("running");
     expect(jobStore.listJobs()[0]?.status).toBe("stitching_running");
     expect(calls).toEqual(["running"]);
@@ -103,7 +111,14 @@ describe("stitch dispatch", () => {
       },
     ]);
     const stitchStore = createInMemoryStitchStore({
-      jobs: [{ id: jobId, status: "stitching_queued", isTest: false }],
+      jobs: [
+        {
+          id: jobId,
+          status: "stitching_queued",
+          isTest: false,
+          postQaMode: "lite",
+        },
+      ],
       segments: [
         {
           id: "segment-1",

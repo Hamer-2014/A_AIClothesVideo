@@ -5,11 +5,22 @@ export interface StitchPayload {
   finalVideoKey: string;
   coverKey: string | null;
   frameKeyPrefix: string | null;
+  postQaMode: "off" | "lite" | "standard" | "strict";
   callbackUrl: string;
 }
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function postQaModeValue(value: unknown): StitchPayload["postQaMode"] {
+  const normalized = stringValue(value);
+  return normalized === "off" ||
+    normalized === "standard" ||
+    normalized === "strict" ||
+    normalized === "lite"
+    ? normalized
+    : "lite";
 }
 
 export function parseStitchPayload(input: unknown): StitchPayload {
@@ -30,6 +41,7 @@ export function parseStitchPayload(input: unknown): StitchPayload {
     finalVideoKey: stringValue(record.finalVideoKey),
     coverKey: stringValue(record.coverKey) || null,
     frameKeyPrefix: stringValue(record.frameKeyPrefix) || null,
+    postQaMode: postQaModeValue(record.postQaMode),
     callbackUrl: stringValue(record.callbackUrl),
   };
 

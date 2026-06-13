@@ -63,6 +63,8 @@ declare module "*.mjs" {
       ledgerTypes?: string[];
       finalVideoKey?: string | null;
       qaFrameCount?: number;
+      videoProviders?: string[];
+      videoModels?: string[];
     }>,
   ): BlockerCheckResult;
 

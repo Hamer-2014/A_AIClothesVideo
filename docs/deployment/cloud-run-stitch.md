@@ -44,6 +44,7 @@ content-type: application/json
   "finalVideoKey": "jobs/video-job-id/stitched/final.mp4",
   "coverKey": "jobs/video-job-id/covers/cover.webp",
   "frameKeyPrefix": "jobs/video-job-id/qa/frames",
+  "postQaMode": "standard",
   "callbackUrl": "https://app.example.com/api/internal/stitch/callback"
 }
 ```
@@ -243,4 +244,4 @@ npm run smoke:backend
 
 - worker 不主动轮询数据库，只执行主应用触发的单个 job。
 - 当前封面 key 会随 callback 传递，但封面生成尚未单独实现；最终视频和 QA frames 是本阶段核心输出。
-- 抽帧策略当前为 3 帧骨架，后续需要根据 `post_qa_mode` 扩展。
+- 抽帧已按 `postQaMode` 分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 后续仍可扩展转场帧策略。

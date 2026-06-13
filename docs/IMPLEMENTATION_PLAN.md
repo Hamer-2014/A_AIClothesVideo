@@ -12,6 +12,39 @@
 
 ---
 
+## 当前真实进度快照（2026-06-13）
+
+> 下面快照优先级高于历史 checkbox。历史任务列表保留原始路线图用途；后续应逐步把 checkbox 同步为真实状态，避免“文档未勾选但代码已完成”的误判。
+
+### 已通过验证
+
+- 项目基础、数据库 schema、Drizzle 迁移、R2 上传、认证骨架、点数账本、Creem checkout/webhook 代码、Creem Prompt Moderation、模板规则、素材分析、DeepSeek 分镜、APIMart PixVerse V6 片段生成、worker tick、Cloud Run stitch-worker、Post-QA、前台工作台、任务页、账单页和管理员后台均已有代码落地。
+- 2026-06-13 本地验证通过：
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build`
+  - `npm run verify:blockers -- --json`
+- `verify:blockers` 当前要求：
+  - 至少一个 `credit_cost > 0` 的 paid deliverable 任务有 `reserve`、`capture`、final video、QA frames。
+  - paid delivery 的 `video_segments.provider/model` 必须包含 `apimart` / `pixverse-v6`。
+  - 至少一个付费失败补偿任务有 `release` 或 `refund`。
+  - 至少一个敏感后台操作写入 `admin_audit_logs`。
+- 开发者本地已生成 10+ 个视频，当前判断 APIMart PixVerse V6 链路稳定。
+
+### 本轮已收敛
+
+- MVP 产品口径改为：付费默认生成音频；免费试用默认无音频。
+- Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
+- stitch-worker 抽帧从固定 3 帧改为分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 转场帧策略仍是后续增强项。
+
+### 仍未完成或仍需生产验收
+
+- Creem 真实生产支付、税务配置和平台 review 仍需单独验收；不能用本地账务闭环替代真实收款闭环。
+- `model_routes` 表已存在，但公开视频生成运行时仍主要读取环境变量；若要后台动态切换模型，需要新增公开/备用/管理员任务的路由隔离。
+- Cloud Run 封面生成尚未单独实现；当前核心交付是 final video 与 QA frames。
+- 免费试用防滥用仍偏基础，设备指纹、OAuth provider ID、IP 维度策略需要继续加强。
+- 本地 10+ 视频稳定不等于用户验证完成；仍需 20-50 个目标卖家、100-300 个真实 SKU 的小规模公开 MVP 数据。
+
 ## 0. 实现边界
 
 本计划是 MVP 实现路线图，不是单次编码任务。项目包含多个独立子系统，后续执行时应按阶段拆分，每个阶段完成后再进入下一阶段。

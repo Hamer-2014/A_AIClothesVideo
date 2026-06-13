@@ -29,6 +29,12 @@ npm run verify:blockers -- --json
 - Verification command: `npm run verify:blockers -- --json`
 - Result: `passed = true`
 
+## 2026-06-13 更新
+
+- `verify:blockers` 的 paid delivery 检查已加上公开视频 provider/model 断言。
+- 付费交付样本必须同时证明 `video_segments.provider` 包含 `apimart`，且 `video_segments.model` 包含 `pixverse-v6`。
+- 这一步防止环境变量误配导致任务走错视频模型时仍被误判为商业闭环通过。
+
 ### 1. Paid Delivery
 
 必须存在至少一个真实数据库任务满足：
@@ -39,6 +45,8 @@ npm run verify:blockers -- --json
 - `credit_ledger` 中有该 job 的 `capture`
 - `video_jobs.final_video_key` 不为空
 - `post_qa_results.frame_keys` 至少 1 张
+- `video_segments.provider` 包含 `apimart`
+- `video_segments.model` 包含 `pixverse-v6`
 
 补齐方式：
 

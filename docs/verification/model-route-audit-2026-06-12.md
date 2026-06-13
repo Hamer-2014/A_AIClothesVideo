@@ -92,6 +92,11 @@ node scripts/generation-debug.mjs <paid-pixverse-job-id> status
 
 ## 剩余风险
 
-- `verify:blockers` 目前只验证商业闭环证据，不验证具体视频 provider/model。它不能防止环境误配导致公开视频任务走错 provider。
+- `verify:blockers` 已在 2026-06-13 加入 paid delivery 的 provider/model 断言，要求公开视频付费交付样本包含 `apimart` / `pixverse-v6` 证据。它可以发现已交付样本跑错模型，但仍不能替代生产环境变量发布前检查。
 - `model_routes` 表已经存在，但公开视频生成运行时代码当前主要读取环境变量，而不是强制读取数据库路由表。
 - 如果后续要允许后台切换模型路线，必须先加入“公开/备用/管理员任务”的路由隔离规则，并让 smoke 明确断言 provider/model。
+
+## 2026-06-13 本地稳定性补充
+
+- 开发者本地已生成 10+ 个视频，当前判断 APIMart PixVerse V6 链路稳定。
+- 该结论可降低公开视频默认路线的技术风险，但仍需继续记录真实 SKU、耗时、失败率、重试率和单任务毛利。

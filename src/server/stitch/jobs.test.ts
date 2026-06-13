@@ -40,6 +40,7 @@ function createStores() {
         id: jobId,
         status: "segment_succeeded",
         isTest: false,
+        postQaMode: "standard",
       },
     ],
     segments: [

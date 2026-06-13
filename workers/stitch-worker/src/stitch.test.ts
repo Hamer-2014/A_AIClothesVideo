@@ -14,6 +14,7 @@ describe("runStitchJob", () => {
         finalVideoKey: "jobs/job-1/stitched/final.mp4",
         coverKey: "jobs/job-1/covers/cover.webp",
         frameKeyPrefix: "jobs/job-1/qa/frames",
+        postQaMode: "lite",
         callbackUrl: "https://app.example.com/api/internal/stitch/callback",
       },
       config: {
@@ -74,6 +75,7 @@ describe("runStitchJob", () => {
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           coverKey: null,
           frameKeyPrefix: null,
+          postQaMode: "lite",
           callbackUrl: "https://app.example.com/api/internal/stitch/callback",
         },
         config: {
@@ -101,5 +103,51 @@ describe("runStitchJob", () => {
     ).rejects.toThrow("ffmpeg failed");
 
     expect(callbacks).toEqual(["failed:ffmpeg failed"]);
+  });
+
+  it("uses the post QA mode to choose frame count", async () => {
+    const frameCounts: number[] = [];
+
+    await runStitchJob({
+      payload: {
+        stitchJobId: "stitch-1",
+        videoJobId: "job-1",
+        segmentKeys: ["segments/a.mp4"],
+        finalVideoKey: "jobs/job-1/stitched/final.mp4",
+        coverKey: null,
+        frameKeyPrefix: "jobs/job-1/qa/frames",
+        postQaMode: "strict",
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      },
+      config: {
+        workerSecret: "secret",
+        callbackSecret: "callback-secret",
+        bucket: "bucket",
+        r2Endpoint: "https://account.r2.cloudflarestorage.com",
+        r2AccessKeyId: "access",
+        r2SecretAccessKey: "private",
+      },
+      createWorkDir: async () => "/tmp/stitch-1",
+      writeTextFile: async () => {},
+      downloadObject: async () => {},
+      uploadObject: async () => {},
+      stitchSegments: async () => {},
+      extractQaFrames: async ({ frameCount }) => {
+        frameCounts.push(frameCount ?? 0);
+        return [];
+      },
+      listExtractedQaFrames: async () => [
+        "/tmp/stitch-1/frames/frame-1.jpg",
+        "/tmp/stitch-1/frames/frame-2.jpg",
+        "/tmp/stitch-1/frames/frame-3.jpg",
+        "/tmp/stitch-1/frames/frame-4.jpg",
+        "/tmp/stitch-1/frames/frame-5.jpg",
+        "/tmp/stitch-1/frames/frame-6.jpg",
+      ],
+      sendCallback: async () => {},
+      cleanupWorkDir: async () => {},
+    });
+
+    expect(frameCounts).toEqual([6]);
   });
 });

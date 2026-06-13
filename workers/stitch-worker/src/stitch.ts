@@ -40,6 +40,19 @@ function frameKey(prefix: string, index: number) {
   return `${prefix.replace(/\/+$/, "")}/${index}.jpg`;
 }
 
+function frameCountForPostQaMode(mode: StitchPayload["postQaMode"]) {
+  switch (mode) {
+    case "off":
+      return 0;
+    case "standard":
+      return 5;
+    case "strict":
+      return 6;
+    case "lite":
+      return 3;
+  }
+}
+
 export async function runStitchJob({
   payload,
   config,
@@ -65,6 +78,7 @@ export async function runStitchJob({
   const frameDirectory = normalizedPath(workDir, "frames");
   const outputPath = normalizedPath(workDir, "final.mp4");
   const concatListPath = normalizedPath(workDir, "segments.txt");
+  const frameCount = frameCountForPostQaMode(payload.postQaMode);
 
   try {
     await mkdir(frameDirectory, { recursive: true });
@@ -80,15 +94,20 @@ export async function runStitchJob({
     await writeTextFile(concatListPath, buildConcatList(segmentPaths));
     await stitchSegments({ concatListPath, outputPath });
 
-    await extractQaFrames({
-      videoPath: outputPath,
-      frameDirectory,
-      frameCount: 3,
-    });
-    const localFramePaths = await listExtractedQaFrames({
-      frameDirectory,
-      frameCount: 3,
-    });
+    if (frameCount > 0) {
+      await extractQaFrames({
+        videoPath: outputPath,
+        frameDirectory,
+        frameCount,
+      });
+    }
+    const localFramePaths =
+      frameCount > 0
+        ? await listExtractedQaFrames({
+            frameDirectory,
+            frameCount,
+          })
+        : [];
     const frameKeys = payload.frameKeyPrefix
       ? localFramePaths.map((_, index) => frameKey(payload.frameKeyPrefix as string, index))
       : [];

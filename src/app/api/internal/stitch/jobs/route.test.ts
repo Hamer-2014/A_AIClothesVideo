@@ -38,6 +38,7 @@ describe("POST /api/internal/stitch/jobs", () => {
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           coverKey: "jobs/job-1/covers/cover.webp",
           frameKeyPrefix: "jobs/job-1/qa/frames",
+          postQaMode: "standard",
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
         triggerCloudRun: async (payload) => {
@@ -61,6 +62,7 @@ describe("POST /api/internal/stitch/jobs", () => {
       cloudRun: { accepted: true },
     });
     expect(triggered).toHaveLength(1);
+    expect(triggered[0]).toMatchObject({ postQaMode: "standard" });
     expect(markedRunning).toEqual(["stitch-1"]);
     expect(calls).toEqual(["mark-running", "trigger"]);
   });
@@ -83,6 +85,7 @@ describe("POST /api/internal/stitch/jobs", () => {
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           coverKey: "jobs/job-1/covers/cover.webp",
           frameKeyPrefix: "jobs/job-1/qa/frames",
+          postQaMode: "standard",
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
         markRunning: async () => {},

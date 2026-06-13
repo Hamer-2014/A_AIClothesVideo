@@ -5,6 +5,7 @@ export interface CloudRunStitchPayload {
   finalVideoKey: string;
   coverKey?: string | null;
   frameKeyPrefix?: string | null;
+  postQaMode: "off" | "lite" | "standard" | "strict";
   callbackUrl: string;
 }
 

@@ -16,6 +16,7 @@ describe("triggerCloudRunStitchJob", () => {
         finalVideoKey: "jobs/job-1/stitched/final.mp4",
         coverKey: "jobs/job-1/covers/cover.webp",
         frameKeyPrefix: "jobs/job-1/qa/frames",
+        postQaMode: "standard",
         callbackUrl: "https://app.example.com/api/internal/stitch/callback",
       },
       fetch: async (url, init) => {
@@ -48,6 +49,7 @@ describe("triggerCloudRunStitchJob", () => {
           videoJobId: "job-1",
           segmentKeys: [],
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          postQaMode: "lite",
           callbackUrl: "https://app.example.com/api/internal/stitch/callback",
         },
         fetch: async () =>

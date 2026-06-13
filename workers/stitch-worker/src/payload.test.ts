@@ -12,6 +12,7 @@ describe("parseStitchPayload", () => {
         finalVideoKey: " jobs/job-1/stitched/final.mp4 ",
         coverKey: " jobs/job-1/covers/cover.webp ",
         frameKeyPrefix: " jobs/job-1/qa/frames ",
+        postQaMode: " standard ",
         callbackUrl: " https://app.example.com/api/internal/stitch/callback ",
       }),
     ).toEqual({
@@ -21,8 +22,22 @@ describe("parseStitchPayload", () => {
       finalVideoKey: "jobs/job-1/stitched/final.mp4",
       coverKey: "jobs/job-1/covers/cover.webp",
       frameKeyPrefix: "jobs/job-1/qa/frames",
+      postQaMode: "standard",
       callbackUrl: "https://app.example.com/api/internal/stitch/callback",
     });
+  });
+
+  it("defaults missing or invalid post QA mode to lite", () => {
+    expect(
+      parseStitchPayload({
+        stitchJobId: "stitch-1",
+        videoJobId: "job-1",
+        segmentKeys: ["segment-a"],
+        finalVideoKey: "jobs/job-1/stitched/final.mp4",
+        postQaMode: "surprise",
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      }).postQaMode,
+    ).toBe("lite");
   });
 
   it("rejects empty segment lists", () => {

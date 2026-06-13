@@ -21,6 +21,7 @@ export interface StitchJobSourceRecord {
   id: string;
   status: string;
   isTest: boolean;
+  postQaMode: "off" | "lite" | "standard" | "strict";
 }
 
 export interface StitchSegmentRecord {
@@ -82,6 +83,7 @@ export interface StitchDispatchResult {
   finalVideoKey: string;
   coverKey?: string | null;
   frameKeyPrefix?: string | null;
+  postQaMode: "off" | "lite" | "standard" | "strict";
   callbackUrl: string;
 }
 
@@ -95,10 +97,12 @@ function buildDispatchResult({
   jobId,
   stitchJob,
   segmentKeys,
+  postQaMode,
 }: {
   jobId: string;
   stitchJob: StitchJobRecord;
   segmentKeys: string[];
+  postQaMode: "off" | "lite" | "standard" | "strict";
 }): StitchDispatchResult {
   const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
   if (!appUrl) {
@@ -114,6 +118,7 @@ function buildDispatchResult({
     finalVideoKey: buildFinalVideoKey(jobId),
     coverKey: buildCoverKey(jobId),
     frameKeyPrefix: `jobs/${jobId}/qa/frames`,
+    postQaMode,
     callbackUrl: `${appUrl}/api/internal/stitch/callback`,
   };
 }
@@ -169,6 +174,7 @@ export async function createStitchJobForVideo({
     jobId,
     stitchJob,
     segmentKeys: segmentKeys as string[],
+    postQaMode: job.postQaMode,
   });
 }
 
@@ -184,10 +190,16 @@ export async function getQueuedStitchJobPayloadForVideo({
     throw new Error("Queued stitch job not found.");
   }
 
+  const job = await stitchStore.findJob(jobId);
+  if (!job) {
+    throw new Error("Video job not found.");
+  }
+
   return buildDispatchResult({
     jobId,
     stitchJob,
     segmentKeys: asStringArray(stitchJob.segmentKeys),
+    postQaMode: job.postQaMode,
   });
 }
 
@@ -217,6 +229,7 @@ export async function triggerQueuedStitchJobForVideo({
     finalVideoKey: result.finalVideoKey,
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
+    postQaMode: result.postQaMode,
     callbackUrl: result.callbackUrl,
   });
 
@@ -255,6 +268,7 @@ export async function createAndTriggerStitchJobForVideo({
     finalVideoKey: result.finalVideoKey,
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
+    postQaMode: result.postQaMode,
     callbackUrl: result.callbackUrl,
   });
 
@@ -468,6 +482,7 @@ export function createDrizzleStitchStore(db: DbClient = getDb()): StitchStore {
           id: videoJobs.id,
           status: videoJobs.status,
           isTest: videoJobs.isTest,
+          postQaMode: videoJobs.postQaMode,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))
