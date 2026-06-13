@@ -83,6 +83,7 @@ export async function handleGetJobRequest(
     },
     assetCount: detail.assets.length,
     assets: detail.assets,
+    analyses: detail.analyses,
     acceptable: detail.acceptable,
     assetCompleteness: detail.assetCompleteness,
     recommendations: detail.recommendations,

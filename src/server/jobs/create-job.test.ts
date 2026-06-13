@@ -360,6 +360,29 @@ describe("create video job", () => {
     expect(store.listJobs()).toHaveLength(0);
   });
 
+  it("rejects assets that were presigned but not confirmed uploaded", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "pending_upload",
+        detectedRole: "front",
+      },
+    ]);
+
+    await expect(
+      createVideoJobWithAssets({
+        store,
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 8,
+        aspectRatio: "9:16",
+      }),
+    ).rejects.toThrow("One or more assets are not uploaded yet.");
+
+    expect(store.listJobs()).toHaveLength(0);
+  });
+
   it("rejects unsupported duration and aspect ratio", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

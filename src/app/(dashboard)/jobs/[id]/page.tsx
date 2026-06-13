@@ -17,6 +17,10 @@ import {
   getVideoJobProgress,
 } from "@/server/jobs/progress";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
+import {
+  createDrizzleUserBillingStore,
+  getUserBillingOverview,
+} from "@/server/billing/user-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +37,7 @@ export default async function JobDetailPage({
   }
 
   const { id } = await params;
-  const [detail, progress] = await Promise.all([
+  const [detail, progress, overview] = await Promise.all([
     getVideoJobDetail({
       store: createDrizzleVideoJobReadStore(),
       jobId: id,
@@ -43,6 +47,10 @@ export default async function JobDetailPage({
     getVideoJobProgress({
       store: createDrizzleJobProgressStore(),
       jobId: id,
+      userId,
+    }),
+    getUserBillingOverview({
+      store: createDrizzleUserBillingStore(),
       userId,
     }),
   ]);
@@ -67,6 +75,8 @@ export default async function JobDetailPage({
       title={`任务 ${detail.job.id.slice(0, 8)}`}
       subtitle="这里展示用户可理解的真实进度、质检状态和成片下载入口。"
       nav={buildDashboardNav("/jobs")}
+      user={session.user}
+      billing={overview.wallet}
       actions={
         <div className="flex flex-wrap items-center gap-3">
           {canRetryAnalyze ? (

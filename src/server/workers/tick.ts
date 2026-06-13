@@ -46,6 +46,15 @@ function failedStatusFor(status: JobStatus): JobStatus {
   }
 }
 
+function visibleStatusForPassed(status: JobStatus) {
+  switch (status) {
+    case "asset_analysis_queued":
+      return "assets_ready";
+    case "lite_check_queued":
+      return "lite_check_passed";
+  }
+}
+
 function handlerFor(status: JobStatus, handlers: WorkerTickHandlers) {
   switch (status) {
     case "lite_check_queued":
@@ -115,6 +124,7 @@ export async function runWorkerTick({
         jobId: job.id,
         toStatus: passedStatusFor(job.status),
         reason: "worker_tick_succeeded",
+        userVisibleStatus: visibleStatusForPassed(job.status),
         clearLock: true,
       });
       succeeded += 1;

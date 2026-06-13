@@ -1,5 +1,6 @@
 import type { AssetCompleteness } from "@/lib/templates/rules";
 import type { DetailType } from "@/lib/templates/types";
+import type { AssetRole } from "@/server/assets/analysis-schema";
 
 import type { ParsedAssetAnalysis } from "./analysis-schema";
 
@@ -21,6 +22,7 @@ function detailTypesFromVisibleDetails(details: string[]) {
 
 export function buildAssetCompletenessFromAnalyses(
   analyses: ParsedAssetAnalysis[],
+  declaredRoles: AssetRole[] = [],
 ): AssetCompleteness {
   const detailTypes = new Set<DetailType>();
 
@@ -33,11 +35,21 @@ export function buildAssetCompletenessFromAnalyses(
   }
 
   return {
-    hasFront: analyses.some((analysis) => analysis.assetRole === "front"),
-    hasBack: analyses.some((analysis) => analysis.assetRole === "back"),
-    hasSide: analyses.some((analysis) => analysis.assetRole === "side"),
-    hasDetail: analyses.some((analysis) => analysis.assetRole === "detail"),
-    hasScene: analyses.some((analysis) => analysis.assetRole === "scene"),
+    hasFront:
+      declaredRoles.includes("front") ||
+      analyses.some((analysis) => analysis.assetRole === "front"),
+    hasBack:
+      declaredRoles.includes("back") ||
+      analyses.some((analysis) => analysis.assetRole === "back"),
+    hasSide:
+      declaredRoles.includes("side") ||
+      analyses.some((analysis) => analysis.assetRole === "side"),
+    hasDetail:
+      declaredRoles.includes("detail") ||
+      analyses.some((analysis) => analysis.assetRole === "detail"),
+    hasScene:
+      declaredRoles.includes("scene") ||
+      analyses.some((analysis) => analysis.assetRole === "scene"),
     hasModelFront: analyses.some(
       (analysis) =>
         analysis.assetRole === "front" && analysis.humanPresent === "yes",
@@ -45,6 +57,8 @@ export function buildAssetCompletenessFromAnalyses(
     hasFlatLayOrWhiteBackground: analyses.some(
       (analysis) => analysis.quality.hasFlatLayOrWhiteBackground === true,
     ),
-    detailTypes: Array.from(detailTypes),
+    detailTypes: declaredRoles.includes("detail") && detailTypes.size === 0
+      ? ["fabric"]
+      : Array.from(detailTypes),
   };
 }

@@ -58,6 +58,9 @@ describe("worker tick", () => {
     expect(jobStore.listJobs().find((job) => job.id === "job-2")?.status).toBe(
       "asset_analysis_passed",
     );
+    expect(jobStore.listJobs().find((job) => job.id === "job-2")?.userVisibleStatus).toBe(
+      "assets_ready",
+    );
     expect(jobStore.listJobs().find((job) => job.id === "job-3")?.status).toBe(
       "asset_analysis_queued",
     );

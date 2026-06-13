@@ -7,6 +7,7 @@ import {
   analyzeVideoJobAssets,
   createDrizzleVideoJobAssetStore,
 } from "@/server/assets/job-analysis";
+import { userVisibleAssetAnalysisError } from "@/server/assets/analyze";
 import { createDrizzleJobStore, type JobStore } from "@/server/jobs/state-machine";
 
 type AnalyzeSession = {
@@ -99,12 +100,21 @@ export async function handleAnalyzeJobRequest(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    if (
+      error instanceof Error &&
+      error.message ===
+        "Invalid job status transition: asset_analysis_passed -> asset_analysis_running."
+    ) {
+      return NextResponse.json({
+        jobId: context.params.id,
+        availableTemplateIds: [],
+        alreadyAnalyzed: true,
+      });
+    }
+
     const body = {
       error: "asset_analysis_failed",
-      message:
-        error instanceof Error
-          ? error.message
-          : "素材分析失败，请稍后重试。",
+      message: userVisibleAssetAnalysisError(error),
     };
 
     return NextResponse.json(

@@ -17,6 +17,8 @@ interface TemplateCatalogItem {
   displayName: string;
   description: string;
   riskLevel: string;
+  requiredAssets?: string[];
+  detailTypes?: string[];
 }
 
 interface WorkspaceAppProps {
@@ -66,6 +68,18 @@ interface JobDetailResponse {
     }>;
     availableTemplateIds: string[];
   };
+  analyses: Array<{
+    assetId: string;
+    assetRole: string;
+    quality: {
+      isGarment: boolean;
+      isClear: boolean;
+      isSafe: boolean;
+      hasFlatLayOrWhiteBackground?: boolean;
+    };
+    confidence: string;
+    riskFlags: string[];
+  }>;
   latestStoryboard: {
     id: string;
     status: string;
@@ -128,6 +142,46 @@ function paidCreditCost(durationSeconds: 8 | 16 | 24) {
   }
 }
 
+function hasRequiredIntent(
+  requiredAsset: string,
+  uploadedRoles: Set<string>,
+) {
+  switch (requiredAsset) {
+    case "front":
+    case "back":
+    case "side":
+    case "detail":
+    case "scene":
+      return uploadedRoles.has(requiredAsset);
+    case "model_front":
+    case "flat_lay_or_white_background":
+      return uploadedRoles.has("front");
+    default:
+      return false;
+  }
+}
+
+function missingIntentReason(requiredAsset: string) {
+  switch (requiredAsset) {
+    case "front":
+      return "缺少正面图";
+    case "back":
+      return "缺少背面图";
+    case "side":
+      return "缺少侧面图";
+    case "detail":
+      return "缺少细节图";
+    case "scene":
+      return "缺少场景图";
+    case "model_front":
+      return "缺少模特正面图";
+    case "flat_lay_or_white_background":
+      return "需分析确认白底/平铺素材";
+    default:
+      return "素材不足";
+  }
+}
+
 export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   const [assets, setAssets] = useState<UploadedAssetItem[]>([]);
   const [durationSeconds, setDurationSeconds] = useState<8 | 16 | 24>(8);
@@ -142,9 +196,53 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   >([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [imagesUploading, setImagesUploading] = useState(false);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
   const paidCost = paidCreditCost(durationSeconds);
+  const hasUploadedAssets = assets.some((asset) => asset.status === "uploaded");
+  const uploadedRoles = useMemo(
+    () =>
+      new Set(
+        assets
+          .filter((asset) => asset.status === "uploaded")
+          .map((asset) => asset.intendedRole),
+      ),
+    [assets],
+  );
+  const materialWarnings = useMemo(() => {
+    if (!jobDetail) {
+      return [];
+    }
+
+    return (jobDetail.analyses ?? [])
+      .filter(
+        (analysis) =>
+          analysis.assetRole === "unknown" ||
+          !analysis.quality.isGarment ||
+          !analysis.quality.isClear,
+      )
+      .map((analysis) =>
+        !analysis.quality.isGarment
+          ? "有素材不像服装图，相关模板会被降级。"
+          : !analysis.quality.isClear
+            ? "有素材清晰度不足，生成前建议替换。"
+            : "有素材角色无法确认，生成前会按低置信处理。",
+      );
+  }, [jobDetail]);
+
+  function requiredTemplateCountForDuration(value: 8 | 16 | 24) {
+    return value === 8 ? 1 : value === 16 ? 2 : 3;
+  }
+
+  function defaultTemplateSelection(detailBody: JobDetailResponse, count: number) {
+    const ordered = [
+      ...detailBody.recommendations.recommended.map((item) => item.templateId),
+      ...detailBody.recommendations.optional.map((item) => item.templateId),
+      ...detailBody.recommendations.availableTemplateIds,
+    ];
+    return Array.from(new Set(ordered)).slice(0, count);
+  }
 
   async function loadJobDetail(nextJobId: string, nextDurationSeconds: 8 | 16 | 24) {
     const detailResponse = await fetch(`/api/jobs/${nextJobId}`);
@@ -156,9 +254,10 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     }
 
     setJobDetail(detailBody);
-    setSelectedTemplateIds(
-      detailBody.recommendations.availableTemplateIds.slice(0, requiredTemplateCount),
-    );
+    setSelectedTemplateIds(defaultTemplateSelection(
+      detailBody,
+      requiredTemplateCountForDuration(nextDurationSeconds),
+    ));
     setMessage(
       detailBody.job.failureReason ??
         detailBody.job.lastError ??
@@ -189,15 +288,41 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   }
 
   const templateCards = useMemo(() => {
+    const byId = new Map(templateCatalog.map((item) => [item.templateId, item]));
+
     if (!jobDetail) {
+      const estimated = templateCatalog.map((template) => {
+        const missingReasons = (template.requiredAssets ?? ["front"])
+          .filter((requiredAsset) => !hasRequiredIntent(requiredAsset, uploadedRoles))
+          .map(missingIntentReason);
+        const missingDetailReason =
+          template.detailTypes?.length && !uploadedRoles.has("detail")
+            ? ["缺少细节图"]
+            : [];
+
+        return {
+          templateId: template.templateId,
+          displayName: template.displayName,
+          description: template.description,
+          riskLevel: template.riskLevel,
+          selectable: missingReasons.length === 0 && missingDetailReason.length === 0,
+          selected: selectedTemplateIds.includes(template.templateId),
+          reasons: [...missingReasons, ...missingDetailReason],
+        };
+      });
+
       return {
-        recommended: [] as TemplateAvailabilityCard[],
-        optional: [] as TemplateAvailabilityCard[],
-        unavailable: [] as TemplateAvailabilityCard[],
+        recommended: estimated.filter(
+          (template) => template.selectable && template.riskLevel === "low",
+        ) as TemplateAvailabilityCard[],
+        optional: estimated.filter(
+          (template) => template.selectable && template.riskLevel !== "low",
+        ) as TemplateAvailabilityCard[],
+        unavailable: estimated.filter(
+          (template) => !template.selectable,
+        ) as TemplateAvailabilityCard[],
       };
     }
-
-    const byId = new Map(templateCatalog.map((item) => [item.templateId, item]));
 
     return {
       recommended: jobDetail.recommendations.recommended.map((item) => ({
@@ -228,13 +353,25 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
         reasons: item.reasons.map(reasonLabel),
       })),
     };
-  }, [jobDetail, selectedTemplateIds, templateCatalog]);
+  }, [jobDetail, selectedTemplateIds, templateCatalog, uploadedRoles]);
 
   function addUploadedAsset(asset: UploadedAssetItem) {
-    setAssets((current) => [...current, asset]);
+    setAssets((current) => [
+      ...current.filter((item) => item.intendedRole !== asset.intendedRole),
+      asset,
+    ]);
   }
 
-  async function createJob(useFreeTrialIfAvailable: boolean) {
+  function removeUploadedAsset(assetId: string) {
+    setAssets((current) => current.filter((asset) => asset.assetId !== assetId));
+  }
+
+  async function createAndAnalyzeJob(useFreeTrialIfAvailable: boolean) {
+    if (imagesUploading) {
+      setMessage("图片上传中，请稍候。");
+      return;
+    }
+
     const uploadedAssetIds = assets
       .filter((asset) => asset.status === "uploaded")
       .map((asset) => asset.assetId);
@@ -283,6 +420,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     }
 
     setBusyAction(null);
+    return { jobId: body.jobId as string, detail };
   }
 
   async function analyzeJob() {
@@ -309,18 +447,18 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     });
   }
 
-  async function generateStoryboard() {
-    if (!jobId || selectedTemplateIds.length !== requiredTemplateCount) {
-      setMessage(`请选择 ${requiredTemplateCount} 个模板后再生成分镜。`);
-      return;
-    }
-
-    setBusyAction("storyboard");
-    const response = await fetch(`/api/jobs/${jobId}/storyboard`, {
+  async function requestStoryboard({
+    targetJobId,
+    templateIds,
+  }: {
+    targetJobId: string;
+    templateIds: string[];
+  }) {
+    const response = await fetch(`/api/jobs/${targetJobId}/storyboard`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        selectedTemplateIds,
+        selectedTemplateIds: templateIds,
         userPrompt,
       }),
     });
@@ -334,6 +472,32 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
             ? "提示词未通过审核。"
             : "分镜生成失败。",
       );
+      return null;
+    }
+
+    return body as {
+      storyboardId: string;
+      segments: Array<{
+        index: number;
+        durationSeconds: number;
+        templateId: string;
+        prompt: string;
+      }>;
+    };
+  }
+
+  async function generateStoryboard() {
+    if (!jobId || selectedTemplateIds.length !== requiredTemplateCount) {
+      setMessage(`请选择 ${requiredTemplateCount} 个模板后再生成分镜。`);
+      return;
+    }
+
+    setBusyAction("storyboard");
+    const body = await requestStoryboard({
+      targetJobId: jobId,
+      templateIds: selectedTemplateIds,
+    });
+    if (!body) {
       setBusyAction(null);
       return;
     }
@@ -344,17 +508,18 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     setBusyAction(null);
   }
 
-  async function confirmStoryboard() {
-    if (!jobId || !storyboardId) {
-      return;
-    }
-
-    setBusyAction("confirm");
-    const response = await fetch(`/api/jobs/${jobId}/confirm`, {
+  async function confirmStoryboardById({
+    targetJobId,
+    targetStoryboardId,
+  }: {
+    targetJobId: string;
+    targetStoryboardId: string;
+  }) {
+    const response = await fetch(`/api/jobs/${targetJobId}/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        storyboardId,
+        storyboardId: targetStoryboardId,
       }),
     });
     const body = await response.json();
@@ -369,10 +534,27 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
               ? "点数不足，请先充值。"
               : body.error === "generation_submit_failed"
                 ? body.message ?? "提交视频生成失败，请稍后重试。"
-              : body.error === "storyboard_not_confirmable"
-                ? "这个分镜已经不能重复确认，请打开任务详情查看当前进度。"
-              : "确认分镜失败。",
+                : body.error === "storyboard_not_confirmable"
+                  ? "这个分镜已经不能重复确认，请打开任务详情查看当前进度。"
+                  : "确认分镜失败。",
       );
+      return null;
+    }
+
+    return body as { jobId: string };
+  }
+
+  async function confirmStoryboard() {
+    if (!jobId || !storyboardId) {
+      return;
+    }
+
+    setBusyAction("confirm");
+    const body = await confirmStoryboardById({
+      targetJobId: jobId,
+      targetStoryboardId: storyboardId,
+    });
+    if (!body) {
       setBusyAction(null);
       return;
     }
@@ -380,16 +562,62 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     window.location.href = `/jobs/${body.jobId}`;
   }
 
+  async function oneClickGenerate(useFreeTrialIfAvailable: boolean) {
+    setBusyAction("one-click");
+    const created = await createAndAnalyzeJob(useFreeTrialIfAvailable);
+    if (!created) {
+      setBusyAction(null);
+      return;
+    }
+
+    const templateIds = defaultTemplateSelection(
+      created.detail,
+      requiredTemplateCountForDuration(durationSeconds),
+    );
+    if (templateIds.length !== requiredTemplateCount) {
+      setMessage(`素材不足，无法自动选择 ${requiredTemplateCount} 个可用模板。`);
+      setBusyAction(null);
+      return;
+    }
+
+    const storyboard = await requestStoryboard({
+      targetJobId: created.jobId,
+      templateIds,
+    });
+    if (!storyboard) {
+      setBusyAction(null);
+      return;
+    }
+    setStoryboardId(storyboard.storyboardId);
+    setSegments(storyboard.segments);
+
+    const confirmed = await confirmStoryboardById({
+      targetJobId: created.jobId,
+      targetStoryboardId: storyboard.storyboardId,
+    });
+    if (!confirmed) {
+      setBusyAction(null);
+      return;
+    }
+
+    window.location.href = `/jobs/${confirmed.jobId}`;
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
       <section className="space-y-6">
         <div className="rounded-lg border border-[var(--line)] bg-white p-5">
-          <h2 className="text-base font-medium">上传与任务创建</h2>
+          <h2 className="text-base font-medium">生成设置与素材</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            先上传素材，再确认规格并创建完整视频任务。
+            先选规格和目标素材位。点击生成后会自动分析、推荐模板、生成分镜并提交任务。
           </p>
           <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <UploadPanel assets={assets} onUploaded={addUploadedAsset} />
+            <UploadPanel
+              assets={assets}
+              onRemoveUploaded={removeUploadedAsset}
+              onUploaded={addUploadedAsset}
+              onUploadingChange={setImagesUploading}
+            />
             <div className="space-y-5">
               <SpecSelector
                 aspectRatio={aspectRatio}
@@ -397,22 +625,27 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
                 onAspectRatioChange={setAspectRatio}
                 onDurationChange={setDurationSeconds}
               />
+              <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-3 text-xs leading-5 text-[var(--muted)]">
+                将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
+              </div>
               <button
                 className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={busyAction !== null}
-                onClick={() => createJob(false)}
+                disabled={busyAction !== null || imagesUploading}
+                onClick={() => oneClickGenerate(false)}
                 type="button"
               >
-                {busyAction === "create-job"
-                  ? "创建中..."
-                  : `付费生成 · 扣 ${paidCost} 点`}
+                {imagesUploading
+                  ? "图片上传中..."
+                  : busyAction === "one-click" || busyAction === "create-job" || busyAction === "analyze"
+                  ? "正在生成..."
+                  : `生成视频 · 将冻结 ${paidCost} 点`}
               </button>
               {durationSeconds === 8 ? (
                 <div className="space-y-2 rounded-md border border-[var(--line)] bg-[var(--surface)] p-3">
                   <button
                     className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={busyAction !== null}
-                    onClick={() => createJob(true)}
+                    disabled={busyAction !== null || imagesUploading}
+                    onClick={() => oneClickGenerate(true)}
                     type="button"
                   >
                     免费试用
@@ -473,6 +706,11 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
                   </p>
                 </div>
               </div>
+              {materialWarnings.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {Array.from(new Set(materialWarnings)).join(" ")}
+                </div>
+              ) : null}
               <TemplatePicker
                 onToggle={toggleTemplate}
                 optional={templateCards.optional}
@@ -481,9 +719,51 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
               />
             </div>
           ) : (
-            <p className="mt-5 text-sm text-[var(--muted)]">
-              创建任务后会自动分析素材，失败时可在这里重试。
-            </p>
+            <div className="mt-5 space-y-5">
+              {hasUploadedAssets ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                      Front
+                    </p>
+                    <p className="mt-2 text-sm">
+                      {uploadedRoles.has("front") ? "已上传" : "未上传"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                      Back
+                    </p>
+                    <p className="mt-2 text-sm">
+                      {uploadedRoles.has("back") ? "已上传" : "未上传"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                      Detail
+                    </p>
+                    <p className="mt-2 text-sm">
+                      {uploadedRoles.has("detail") ? "已上传" : "未上传"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--muted)]">
+                  创建任务后会自动分析素材，失败时可在这里重试。
+                </p>
+              )}
+              {hasUploadedAssets ? (
+                <p className="text-sm text-[var(--muted)]">
+                  基于已上传素材位预估模板，生成前会再次分析校验。
+                </p>
+              ) : null}
+              <TemplatePicker
+                onToggle={toggleTemplate}
+                optional={templateCards.optional}
+                recommended={templateCards.recommended}
+                unavailable={templateCards.unavailable}
+              />
+            </div>
           )}
         </div>
       </section>

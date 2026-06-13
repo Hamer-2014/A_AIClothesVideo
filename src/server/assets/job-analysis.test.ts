@@ -95,6 +95,80 @@ describe("video job asset analysis", () => {
     });
   });
 
+  it("preserves user fixed-slot roles when vision role detection is lower confidence", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "asset_analysis_queued",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const jobAssetStore = createInMemoryVideoJobAssetStore([
+      {
+        assetId: "asset-front",
+        originalKey: "users/user-1/assets/asset-front/original.jpg",
+        role: "front",
+        sortOrder: 0,
+      },
+      {
+        assetId: "asset-back",
+        originalKey: "users/user-1/assets/asset-back/original.jpg",
+        role: "back",
+        sortOrder: 1,
+      },
+      {
+        assetId: "asset-detail",
+        originalKey: "users/user-1/assets/asset-detail/original.jpg",
+        role: "detail",
+        sortOrder: 2,
+      },
+    ]);
+
+    const result = await analyzeVideoJobAssets({
+      jobStore,
+      jobAssetStore,
+      analysisStore: createInMemoryAssetAnalysisStore(),
+      providerCallLogStore: createInMemoryProviderCallLogStore(),
+      jobId,
+      userId,
+      mode: "standard",
+      templates: mvpShotTemplates,
+      isTrial: false,
+      createDownloadSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-5.4-mini",
+        analysisJson: {
+          asset_role: "front",
+          garment_category: "dress",
+          view_angle: "front",
+          human_present: "no",
+          visible_details: ["front_shape"],
+          not_visible_details: [],
+          quality: {
+            is_garment: true,
+            is_clear: true,
+            is_safe: true,
+            has_flat_lay_or_white_background: false,
+          },
+          confidence: "low",
+          risk_flags: ["role_uncertain"],
+        },
+        raw: { id: "misclassified" },
+      }),
+    });
+
+    expect(result.assetCompleteness.hasFront).toBe(true);
+    expect(result.assetCompleteness.hasBack).toBe(true);
+    expect(result.assetCompleteness.hasDetail).toBe(true);
+    expect(result.recommendations.availableTemplateIds).toContain("back_display");
+    expect(result.recommendations.availableTemplateIds).toContain("fabric_macro");
+  });
+
   it("rejects analysis when the job does not belong to the user", async () => {
     const jobStore = createInMemoryJobStore([
       {
@@ -163,6 +237,57 @@ describe("video job asset analysis", () => {
       userVisibleStatus: "failed",
       failureReason: "Video job has no attached assets.",
       lastError: "Video job has no attached assets.",
+    });
+  });
+
+  it("stores a readable retry message when the vision provider network fetch fails", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "asset_analysis_queued",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const providerCallLogStore = createInMemoryProviderCallLogStore();
+
+    await expect(
+      analyzeVideoJobAssets({
+        jobStore,
+        jobAssetStore: createInMemoryVideoJobAssetStore([
+          {
+            assetId: "asset-front",
+            originalKey: "users/user-1/assets/asset-front/original.jpg",
+            role: "front",
+            sortOrder: 0,
+          },
+        ]),
+        analysisStore: createInMemoryAssetAnalysisStore(),
+        providerCallLogStore,
+        jobId,
+        userId,
+        mode: "lite",
+        templates: mvpShotTemplates,
+        isTrial: true,
+        createDownloadSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        visionProvider: async () => {
+          throw new Error("fetch failed");
+        },
+      }),
+    ).rejects.toThrow("fetch failed");
+
+    expect(jobStore.listJobs()[0]).toMatchObject({
+      status: "asset_analysis_failed",
+      userVisibleStatus: "failed",
+      failureReason: "素材分析服务网络连接失败，请稍后重试。",
+      lastError: "素材分析服务网络连接失败，请稍后重试。",
+    });
+    expect(providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      videoJobId: jobId,
+      errorMessage: "fetch failed",
     });
   });
 });

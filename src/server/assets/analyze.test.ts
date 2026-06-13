@@ -224,6 +224,8 @@ describe("asset analysis workflow service", () => {
         analysisStore,
         providerCallLogStore,
         assetId,
+        userId: "22222222-2222-4222-8222-222222222222",
+        videoJobId: "33333333-3333-4333-8333-333333333333",
         mode: "strict",
         imageUrls: ["https://signed.example/front.jpg"],
         templates: mvpShotTemplates,
@@ -240,6 +242,8 @@ describe("asset analysis workflow service", () => {
       provider: "vision",
       model: "unknown",
       purpose: "strict_asset_review",
+      userId: "22222222-2222-4222-8222-222222222222",
+      videoJobId: "33333333-3333-4333-8333-333333333333",
       requestSnapshot: {
         assetId,
         imageCount: 1,

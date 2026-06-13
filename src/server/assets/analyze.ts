@@ -18,6 +18,7 @@ import { recommendShotTemplates } from "@/lib/templates/recommend";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
 
 import { parseAssetAnalysisJson, type ParsedAssetAnalysis } from "./analysis-schema";
+import type { AssetRole } from "./analysis-schema";
 import {
   buildAssetCompletenessFromAnalyses,
   isAssetAnalysisAcceptable,
@@ -142,6 +143,16 @@ function errorMessageFromUnknown(error: unknown) {
   return error instanceof Error ? error.message : "Unknown vision provider error.";
 }
 
+export function userVisibleAssetAnalysisError(error: unknown) {
+  const message = errorMessageFromUnknown(error);
+
+  if (message === "fetch failed") {
+    return "素材分析服务网络连接失败，请稍后重试。";
+  }
+
+  return message;
+}
+
 function summarizeAnalysis(analysis: ParsedAssetAnalysis): JsonValue {
   return {
     assetRole: analysis.assetRole,
@@ -169,15 +180,17 @@ export function buildRecommendationsFromAnalyses({
   analyses,
   templates,
   isTrial,
+  declaredRoles = [],
 }: {
   analyses: ParsedAssetAnalysis[];
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
+  declaredRoles?: AssetRole[];
 }) {
   const acceptableAnalyses = analyses.filter(isAssetAnalysisAcceptable);
   const acceptable = acceptableAnalyses.length > 0;
   const assetCompleteness = acceptable
-    ? buildAssetCompletenessFromAnalyses(acceptableAnalyses)
+    ? buildAssetCompletenessFromAnalyses(acceptableAnalyses, declaredRoles)
     : emptyAssetCompleteness();
   const recommendations = recommendShotTemplates({
     templates,
@@ -199,6 +212,7 @@ export async function analyzeAssetFromVisionResult({
   mode,
   templates,
   isTrial,
+  declaredRoles = [],
   visionJson,
 }: {
   store: AssetAnalysisStore;
@@ -207,6 +221,7 @@ export async function analyzeAssetFromVisionResult({
   mode: "lite" | "standard" | "strict";
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
+  declaredRoles?: AssetRole[];
   visionJson: unknown;
 }) {
   const analysis = parseAssetAnalysisJson(visionJson);
@@ -220,6 +235,7 @@ export async function analyzeAssetFromVisionResult({
     analyses: [analysis],
     templates,
     isTrial,
+    declaredRoles,
   });
 
   return {
@@ -235,6 +251,7 @@ export async function analyzeAssetWithVisionProvider({
   visionProvider = createVisionAssetAnalysis,
   assetId,
   userId,
+  videoJobId,
   mode,
   imageUrls,
   templates,
@@ -245,6 +262,7 @@ export async function analyzeAssetWithVisionProvider({
   visionProvider?: VisionAssetAnalysisProvider;
   assetId: string;
   userId?: string | null;
+  videoJobId?: string | null;
   mode: VisionAnalysisMode;
   imageUrls: string[];
   templates: ShotTemplateDefinition[];
@@ -267,6 +285,7 @@ export async function analyzeAssetWithVisionProvider({
       model: "unknown",
       purpose,
       userId: userId ?? null,
+      videoJobId: videoJobId ?? null,
       requestSnapshot,
       durationMs: Date.now() - startedAt,
       status: "failed",
@@ -286,6 +305,7 @@ export async function analyzeAssetWithVisionProvider({
       model: visionResult.model,
       purpose,
       userId: userId ?? null,
+      videoJobId: videoJobId ?? null,
       requestSnapshot,
       responseSummary: visionResult.analysisJson,
       durationMs: Date.now() - startedAt,
@@ -301,6 +321,7 @@ export async function analyzeAssetWithVisionProvider({
     model: visionResult.model,
     purpose,
     userId: userId ?? null,
+    videoJobId: videoJobId ?? null,
     requestSnapshot,
     responseSummary: summarizeAnalysis(analysis),
     durationMs: Date.now() - startedAt,

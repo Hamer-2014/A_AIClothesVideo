@@ -81,4 +81,45 @@ describe("POST /api/jobs/[id]/analyze", () => {
       message: "Vision provider response is missing JSON content.",
     });
   });
+
+  it("returns a retryable message for vision network failures", async () => {
+    const response = await handleAnalyzeJobRequest(
+      new Request("http://localhost/api/jobs/job-1/analyze", { method: "POST" }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        analyzeJob: async () => {
+          throw new Error("fetch failed");
+        },
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "asset_analysis_failed",
+      message: "素材分析服务网络连接失败，请稍后重试。",
+    });
+  });
+
+  it("treats duplicate analysis requests after a passed analysis as idempotent", async () => {
+    const response = await handleAnalyzeJobRequest(
+      new Request("http://localhost/api/jobs/job-1/analyze", { method: "POST" }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        analyzeJob: async () => {
+          throw new Error(
+            "Invalid job status transition: asset_analysis_passed -> asset_analysis_running.",
+          );
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      jobId: "job-1",
+      availableTemplateIds: [],
+      alreadyAnalyzed: true,
+    });
+  });
 });

@@ -251,4 +251,164 @@ describe("get video job detail", () => {
     });
     expect(detail?.recommendations.availableTemplateIds).toContain("fabric_macro");
   });
+
+  it("preserves declared fixed-slot roles when building job detail recommendations", async () => {
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets: [
+        { assetId: "asset-front", role: "front", sortOrder: 0 },
+        { assetId: "asset-back", role: "back", sortOrder: 1 },
+        { assetId: "asset-detail", role: "detail", sortOrder: 2 },
+      ],
+      analyses: [
+        {
+          assetId: "asset-front",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+        {
+          assetId: "asset-back",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "low",
+            risk_flags: ["role_uncertain"],
+          },
+        },
+        {
+          assetId: "asset-detail",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "low",
+            risk_flags: ["role_uncertain"],
+          },
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.assetCompleteness.hasBack).toBe(true);
+    expect(detail?.assetCompleteness.hasDetail).toBe(true);
+    expect(detail?.assetCompleteness.detailTypes).toEqual(["fabric"]);
+    expect(detail?.recommendations.availableTemplateIds).toContain("back_display");
+    expect(detail?.recommendations.availableTemplateIds).toContain("fabric_macro");
+  });
+
+  it("returns analysis quality summaries for uploaded asset warnings", async () => {
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets: [{ assetId: "asset-scene", role: "scene", sortOrder: 0 }],
+      analyses: [
+        {
+          assetId: "asset-scene",
+          analysisJson: {
+            asset_role: "background/scene image (no clothing item visible)",
+            garment_category: "unknown",
+            view_angle: "N/A",
+            human_present: "no",
+            visible_details: ["No clothing garment visible"],
+            not_visible_details: ["garment material"],
+            quality: {
+              is_garment: false,
+              is_clear: false,
+              is_safe: true,
+              has_flat_lay_or_white_background: false,
+            },
+            confidence: "low",
+            risk_flags: ["No garment visible"],
+          },
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.analyses).toEqual([
+      expect.objectContaining({
+        assetId: "asset-scene",
+        assetRole: "unknown",
+        confidence: "low",
+        quality: expect.objectContaining({
+          isGarment: false,
+          isClear: false,
+        }),
+        riskFlags: ["No garment visible"],
+      }),
+    ]);
+  });
 });

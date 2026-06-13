@@ -96,7 +96,7 @@ describe("JobProgress", () => {
   });
 
   it("labels queued and failed generation states clearly", () => {
-    const { rerender } = render(
+    render(
       <JobProgress
         key="failed"
         progress={{
@@ -119,7 +119,8 @@ describe("JobProgress", () => {
 
     expect(screen.getByText(/等待提交生成/)).toBeInTheDocument();
 
-    rerender(
+    cleanup();
+    render(
       <JobProgress
         progress={{
           status: "segment_failed",
@@ -191,5 +192,86 @@ describe("JobProgress", () => {
       cache: "no-store",
     });
     expect(screen.getByText(/片段 1\/1/)).toBeInTheDocument();
+  });
+
+  it("shows credit lifecycle copy for paid reserved and captured jobs", () => {
+    render(
+      <JobProgress
+        progress={{
+          status: "segments_queued",
+          phase: "generation",
+          message: null,
+          creditCost: 70,
+          billingMode: "paid",
+          creditStatus: "reserved",
+          segmentProgress: {
+            total: 1,
+            queued: 1,
+            generating: 0,
+            succeeded: 0,
+            failed: 0,
+          },
+          stitching: { status: "not_started" },
+          postQa: { status: "not_started" },
+          downloadReady: false,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("已冻结 70 点")).toBeInTheDocument();
+    expect(screen.getByText("质检通过后正式扣除。")).toBeInTheDocument();
+
+    cleanup();
+    render(
+      <JobProgress
+        progress={{
+          status: "deliverable",
+          phase: "deliverable",
+          message: null,
+          creditCost: 70,
+          billingMode: "paid",
+          creditStatus: "captured",
+          segmentProgress: {
+            total: 1,
+            queued: 0,
+            generating: 0,
+            succeeded: 1,
+            failed: 0,
+          },
+          stitching: { status: "succeeded" },
+          postQa: { status: "passed" },
+          downloadReady: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("已扣除 70 点")).toBeInTheDocument();
+  });
+
+  it("labels free trial jobs as zero-credit generation", () => {
+    render(
+      <JobProgress
+        progress={{
+          status: "segment_generating",
+          phase: "generation",
+          message: null,
+          creditCost: 0,
+          billingMode: "free_trial",
+          creditStatus: "trial",
+          segmentProgress: {
+            total: 1,
+            queued: 0,
+            generating: 1,
+            succeeded: 0,
+            failed: 0,
+          },
+          stitching: { status: "not_started" },
+          postQa: { status: "not_started" },
+          downloadReady: false,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("免费试用 · 不扣点数")).toBeInTheDocument();
   });
 });

@@ -29,6 +29,8 @@ export default async function BillingPage() {
       title="点数账单"
       subtitle="查看当前可用点数、订单和账本流水。支付申请未开通前，不伪造购买成功。"
       nav={buildDashboardNav("/billing")}
+      user={session.user}
+      billing={overview.wallet}
     >
       <CreditLedger
         wallet={overview.wallet}

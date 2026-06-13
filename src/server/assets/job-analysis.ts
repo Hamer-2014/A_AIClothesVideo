@@ -6,6 +6,7 @@ import { buildRecommendationsFromAnalyses } from "@/server/assets/analyze";
 import {
   analyzeAssetWithVisionProvider,
   createDrizzleAssetAnalysisStore,
+  userVisibleAssetAnalysisError,
   type AssetAnalysisStore,
   type VisionAssetAnalysisProvider,
 } from "@/server/assets/analyze";
@@ -13,13 +14,14 @@ import type { ProviderCallLogStore } from "@/lib/providers/log-call";
 import { createDrizzleProviderCallLogStore } from "@/lib/providers/log-call";
 import type { VisionAnalysisMode } from "@/lib/providers/vision/client";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
+import type { AssetRole } from "@/server/assets/analysis-schema";
 import type { JobStore } from "@/server/jobs/state-machine";
 import { transitionJobStatus } from "@/server/jobs/state-machine";
 
 export interface VideoJobAssetRecord {
   assetId: string;
   originalKey: string;
-  role: string;
+  role: AssetRole | string;
   sortOrder: number;
 }
 
@@ -71,7 +73,21 @@ export function createDrizzleVideoJobAssetStore(
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown asset analysis error.";
+  return userVisibleAssetAnalysisError(error);
+}
+
+function declaredRoleFromJobAsset(role: string): AssetRole | null {
+  return [
+    "front",
+    "back",
+    "side",
+    "detail",
+    "scene",
+    "logo",
+    "unknown",
+  ].includes(role)
+    ? (role as AssetRole)
+    : null;
 }
 
 async function failAnalysisJob({
@@ -166,6 +182,9 @@ export async function analyzeVideoJobAssets({
 
     const analyses = [];
     const records = [];
+    const declaredRoles = jobAssets
+      .map((asset) => declaredRoleFromJobAsset(asset.role))
+      .filter((role): role is AssetRole => Boolean(role) && role !== "unknown");
 
     for (const asset of jobAssets) {
       const signedUrl = await createDownloadSignedUrl({ key: asset.originalKey });
@@ -174,6 +193,7 @@ export async function analyzeVideoJobAssets({
         providerCallLogStore,
         assetId: asset.assetId,
         userId,
+        videoJobId: jobId,
         mode,
         imageUrls: [signedUrl],
         templates,
@@ -189,6 +209,7 @@ export async function analyzeVideoJobAssets({
       analyses,
       templates,
       isTrial,
+      declaredRoles,
     });
 
     if (manageJobStatus) {

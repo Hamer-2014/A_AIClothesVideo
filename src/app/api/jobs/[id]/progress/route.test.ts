@@ -2,6 +2,29 @@ import { describe, expect, it } from "vitest";
 
 import { handleGetJobProgressRequest } from "./route";
 
+const progressFixture = {
+  jobId: "job-1",
+  status: "segment_generating",
+  userVisibleStatus: "generating",
+  message: null,
+  phase: "generation",
+  segmentProgress: {
+    total: 1,
+    queued: 0,
+    generating: 1,
+    succeeded: 0,
+    failed: 0,
+  },
+  stitching: { status: "not_started" },
+  postQa: { status: "not_started" },
+  creditCost: 70,
+  billingMode: "paid",
+  creditStatus: "reserved",
+  downloadReady: false,
+  finalVideoKey: null,
+  coverKey: null,
+};
+
 describe("GET /api/jobs/[id]/progress", () => {
   it("returns 401 when unauthenticated", async () => {
     const response = await handleGetJobProgressRequest(
@@ -26,11 +49,7 @@ describe("GET /api/jobs/[id]/progress", () => {
           refreshed.push(jobId);
         },
         getProgress: async () => ({
-          jobId: "job-1",
-          status: "segment_generating",
-          userVisibleStatus: "generating",
-          message: null,
-          phase: "generation",
+          ...progressFixture,
           segmentProgress: {
             total: 2,
             queued: 0,
@@ -38,11 +57,6 @@ describe("GET /api/jobs/[id]/progress", () => {
             succeeded: 1,
             failed: 0,
           },
-          stitching: { status: "not_started" },
-          postQa: { status: "not_started" },
-          downloadReady: false,
-          finalVideoKey: null,
-          coverKey: null,
         }),
       },
     );
@@ -52,6 +66,7 @@ describe("GET /api/jobs/[id]/progress", () => {
     expect(await response.json()).toMatchObject({
       jobId: "job-1",
       phase: "generation",
+      creditStatus: "reserved",
       segmentProgress: { total: 2, generating: 1 },
     });
   });
@@ -65,25 +80,7 @@ describe("GET /api/jobs/[id]/progress", () => {
         refreshGeneration: async () => {
           throw new Error("APIMart poll timeout.");
         },
-        getProgress: async () => ({
-          jobId: "job-1",
-          status: "segment_generating",
-          userVisibleStatus: "generating",
-          message: null,
-          phase: "generation",
-          segmentProgress: {
-            total: 1,
-            queued: 0,
-            generating: 1,
-            succeeded: 0,
-            failed: 0,
-          },
-          stitching: { status: "not_started" },
-          postQa: { status: "not_started" },
-          downloadReady: false,
-          finalVideoKey: null,
-          coverKey: null,
-        }),
+        getProgress: async () => progressFixture,
       },
     );
 

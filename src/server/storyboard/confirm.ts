@@ -18,6 +18,7 @@ import {
   createDrizzleModerationResultStore,
   type ModerationResultStore,
 } from "@/server/moderation/results";
+import type { RequiredAssetKind } from "@/lib/templates/types";
 
 import { parseStoryboardJson, type ParsedStoryboard } from "./schema";
 import type { StoryboardRecord } from "./generate";
@@ -144,6 +145,43 @@ function finalPromptText(snapshot: ReturnType<typeof buildFinalPromptSnapshot>) 
   ].join("\n");
 }
 
+function rolesForRequiredAsset(kind: RequiredAssetKind) {
+  switch (kind) {
+    case "front":
+    case "back":
+    case "side":
+    case "detail":
+    case "scene":
+      return [kind];
+    case "model_front":
+    case "flat_lay_or_white_background":
+      return ["front"];
+  }
+}
+
+function assetsForSegmentTemplate({
+  segment,
+  assets,
+}: {
+  segment: ParsedStoryboard["segments"][number];
+  assets: StoryboardConfirmJobAssetRecord[];
+}) {
+  const template = mvpShotTemplates.find(
+    (item) => item.templateId === segment.templateId,
+  );
+  if (!template) {
+    return [];
+  }
+
+  const allowedRoles = new Set(
+    template.requiredAssets.flatMap((requiredAsset) =>
+      rolesForRequiredAsset(requiredAsset),
+    ),
+  );
+
+  return assets.filter((asset) => allowedRoles.has(asset.role));
+}
+
 function assetSnapshotForSegment({
   segment,
   assets,
@@ -151,10 +189,12 @@ function assetSnapshotForSegment({
   segment: ParsedStoryboard["segments"][number];
   assets: StoryboardConfirmJobAssetRecord[];
 }) {
+  const segmentAssets = assetsForSegmentTemplate({ segment, assets });
+
   return {
     segmentIndex: segment.index,
     templateId: segment.templateId,
-    assets: assets.map((asset) => ({
+    assets: segmentAssets.map((asset) => ({
       assetId: asset.assetId,
       role: asset.role,
       sortOrder: asset.sortOrder,

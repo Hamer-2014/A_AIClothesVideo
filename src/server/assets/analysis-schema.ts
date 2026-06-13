@@ -52,6 +52,8 @@ const assetRoleAliases: Record<string, AssetRole> = {
   clothing_product_photo: "front",
   product_clothing_item: "front",
   product_clothing_item_on_mannequin: "front",
+  none: "unknown",
+  "n/a": "unknown",
 };
 
 function normalizeHumanPresent(value: string): HumanPresent {
@@ -74,6 +76,61 @@ function normalizeAssetRole(value: string): AssetRole | string {
 
   if (aliased) {
     return aliased;
+  }
+
+  if (
+    normalized.includes("no clothing") ||
+    normalized.includes("no garment") ||
+    normalized.includes("none visible") ||
+    normalized.includes("no product") ||
+    normalized === "none"
+  ) {
+    return "unknown";
+  }
+
+  if (
+    normalized.includes("front-facing") ||
+    normalized.includes("front facing") ||
+    normalized.includes("front view") ||
+    normalized.includes("front-view") ||
+    normalized.startsWith("front")
+  ) {
+    return "front";
+  }
+
+  if (
+    normalized.includes("back-facing") ||
+    normalized.includes("back facing") ||
+    normalized.includes("back view") ||
+    normalized.includes("back-view") ||
+    normalized.startsWith("back")
+  ) {
+    return "back";
+  }
+
+  if (
+    normalized.includes("side view") ||
+    normalized.includes("side-view") ||
+    normalized.startsWith("side")
+  ) {
+    return "side";
+  }
+
+  if (
+    normalized.includes("detail") ||
+    normalized.includes("close-up") ||
+    normalized.includes("closeup") ||
+    normalized.includes("macro")
+  ) {
+    return "detail";
+  }
+
+  if (
+    normalized.includes("scene") ||
+    normalized.includes("background") ||
+    normalized.includes("environment")
+  ) {
+    return "scene";
   }
 
   if (

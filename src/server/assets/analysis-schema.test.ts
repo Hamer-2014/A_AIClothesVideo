@@ -113,6 +113,7 @@ describe("asset analysis schema", () => {
       "clothing_item",
       "garment_on_mannequin",
       "product_photo",
+      "front-facing product shot on mannequin",
     ];
 
     for (const assetRole of variants) {
@@ -135,6 +136,35 @@ describe("asset analysis schema", () => {
 
       expect(result.assetRole).toBe("front");
       expect(result.humanPresent).toBe("no");
+    }
+  });
+
+  it("normalizes no-garment provider asset_role variants into unknown instead of throwing", () => {
+    const variants = [
+      "none",
+      "background/scene image (no clothing item visible)",
+    ];
+
+    for (const assetRole of variants) {
+      const result = parseAssetAnalysisJson({
+        asset_role: assetRole,
+        garment_category: "unknown",
+        view_angle: "N/A",
+        human_present: "no",
+        visible_details: ["No clothing item is visible in the image."],
+        not_visible_details: ["garment material"],
+        quality: {
+          is_garment: false,
+          is_clear: false,
+          is_safe: true,
+          has_flat_lay_or_white_background: false,
+        },
+        confidence: "low",
+        risk_flags: ["No garment visible"],
+      });
+
+      expect(result.assetRole).toBe("unknown");
+      expect(result.quality.isGarment).toBe(false);
     }
   });
 });

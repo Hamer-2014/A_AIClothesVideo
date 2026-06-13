@@ -11,7 +11,7 @@ import type { JsonValue } from "@/lib/db/schema/common";
 import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
 import { buildRecommendationsFromAnalyses } from "@/server/assets/analyze";
-import { parseAssetAnalysisJson } from "@/server/assets/analysis-schema";
+import { parseAssetAnalysisJson, type AssetRole } from "@/server/assets/analysis-schema";
 
 export interface VideoJobSummary {
   id: string;
@@ -53,6 +53,20 @@ export interface VideoJobReadStore {
   listJobAssets(jobId: string): Promise<VideoJobAssetSummary[]>;
   listAnalyses(assetIds: string[]): Promise<VideoJobAnalysisSummary[]>;
   findLatestStoryboard(jobId: string): Promise<VideoJobStoryboardSummary | null>;
+}
+
+function declaredRoleFromJobAsset(role: string): AssetRole | null {
+  return [
+    "front",
+    "back",
+    "side",
+    "detail",
+    "scene",
+    "logo",
+    "unknown",
+  ].includes(role)
+    ? (role as AssetRole)
+    : null;
 }
 
 export function createInMemoryVideoJobReadStore({
@@ -185,18 +199,30 @@ export async function getVideoJobDetail({
   const analyses = await store.listAnalyses(assets.map((asset) => asset.assetId));
   const latestStoryboard = await store.findLatestStoryboard(jobId);
   const parsedAnalyses = analyses.map((analysis) =>
-    parseAssetAnalysisJson(analysis.analysisJson),
+    ({
+      assetId: analysis.assetId,
+      parsed: parseAssetAnalysisJson(analysis.analysisJson),
+    }),
   );
   const recommendationResult = buildRecommendationsFromAnalyses({
-    analyses: parsedAnalyses,
+    analyses: parsedAnalyses.map((analysis) => analysis.parsed),
     templates,
     isTrial: job.billingMode === "free_trial",
+    declaredRoles: assets
+      .map((asset) => declaredRoleFromJobAsset(asset.role))
+      .filter((role): role is AssetRole => Boolean(role) && role !== "unknown"),
   });
 
   return {
     job,
     assets,
-    analyses,
+    analyses: parsedAnalyses.map((analysis) => ({
+      assetId: analysis.assetId,
+      assetRole: analysis.parsed.assetRole,
+      quality: analysis.parsed.quality,
+      confidence: analysis.parsed.confidence,
+      riskFlags: analysis.parsed.riskFlags,
+    })),
     latestStoryboard,
     ...recommendationResult,
   };

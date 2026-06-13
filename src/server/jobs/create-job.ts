@@ -496,6 +496,10 @@ export async function createVideoJobWithAssets({
     throw new Error("One or more assets were not found for user.");
   }
 
+  if (ownedAssets.some((asset) => asset.status === "pending_upload")) {
+    throw new Error("One or more assets are not uploaded yet.");
+  }
+
   const shouldAttemptFreeTrial =
     durationSeconds === 8 && useFreeTrialIfAvailable === true;
   const recentTrialCount = shouldAttemptFreeTrial

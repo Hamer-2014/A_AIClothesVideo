@@ -12,6 +12,9 @@ export interface JobProgressRecord {
   failureReason: string | null;
   finalVideoKey: string | null;
   coverKey: string | null;
+  creditCost: number;
+  billingMode: string;
+  reservedLedgerId: string | null;
 }
 
 export interface SegmentProgressRecord {
@@ -76,6 +79,37 @@ function countSegments(segments: SegmentProgressRecord[]) {
   };
 }
 
+function creditStatusForJob(job: JobProgressRecord) {
+  if (job.billingMode === "free_trial" || job.creditCost === 0) {
+    return "trial";
+  }
+
+  if (job.status === "deliverable" || job.status === "post_qa_passed") {
+    return "captured";
+  }
+
+  if (job.status === "failed_released" || job.status === "failed_refunded") {
+    return "released";
+  }
+
+  if (job.reservedLedgerId || [
+    "credits_reserved",
+    "segments_queued",
+    "segment_generating",
+    "segment_succeeded",
+    "stitching_queued",
+    "stitching_running",
+    "stitched",
+    "post_qa_queued",
+    "post_qa_running",
+    "post_qa_failed",
+  ].includes(job.status)) {
+    return "reserved";
+  }
+
+  return "not_reserved";
+}
+
 export async function getVideoJobProgress({
   store,
   jobId,
@@ -105,6 +139,9 @@ export async function getVideoJobProgress({
     segmentProgress: countSegments(segments),
     stitching: { status: stitchJob?.status ?? "not_started" },
     postQa: { status: postQaResult?.status ?? "not_started" },
+    creditCost: job.creditCost,
+    billingMode: job.billingMode,
+    creditStatus: creditStatusForJob(job),
     downloadReady: job.status === "deliverable" && Boolean(job.finalVideoKey),
     finalVideoKey: job.finalVideoKey,
     coverKey: job.coverKey,
@@ -160,6 +197,9 @@ export function createDrizzleJobProgressStore(
           failureReason: videoJobs.failureReason,
           finalVideoKey: videoJobs.finalVideoKey,
           coverKey: videoJobs.coverKey,
+          creditCost: videoJobs.creditCost,
+          billingMode: videoJobs.billingMode,
+          reservedLedgerId: videoJobs.reservedLedgerId,
         })
         .from(videoJobs)
         .where(

@@ -58,4 +58,75 @@ describe("POST /api/uploads/presign", () => {
     });
     expect(body).not.toHaveProperty("key");
   });
+
+  it("creates fixed-slot asset records for a batch presign request", async () => {
+    const createdAssets: unknown[] = [];
+    const response = await handleUploadPresignRequest(
+      new Request("http://localhost/api/uploads/presign", {
+        method: "POST",
+        body: JSON.stringify({
+          files: [
+            {
+              fileName: "front.jpg",
+              mimeType: "image/jpeg",
+              fileSize: 1024,
+              intendedRole: "front",
+            },
+            {
+              fileName: "back.jpg",
+              mimeType: "image/jpeg",
+              fileSize: 2048,
+              intendedRole: "back",
+            },
+            {
+              fileName: "detail.jpg",
+              mimeType: "image/jpeg",
+              fileSize: 4096,
+              intendedRole: "detail",
+            },
+          ],
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createAsset: async (asset) => {
+          createdAssets.push(asset);
+          return {
+            id: asset.id,
+            key: asset.key,
+          };
+        },
+        createUploadSignedUrl: async ({ key, contentType }) => ({
+          url: `https://upload.example/${key}`,
+          headers: { "content-type": contentType },
+        }),
+      },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.files).toHaveLength(3);
+    expect(createdAssets).toEqual([
+      expect.objectContaining({
+        fileName: "front.jpg",
+        detectedRole: "front",
+        status: "pending_upload",
+      }),
+      expect.objectContaining({
+        fileName: "back.jpg",
+        detectedRole: "back",
+        status: "pending_upload",
+      }),
+      expect.objectContaining({
+        fileName: "detail.jpg",
+        detectedRole: "detail",
+        status: "pending_upload",
+      }),
+    ]);
+    expect(body.files.map((file: { intendedRole: string }) => file.intendedRole)).toEqual([
+      "front",
+      "back",
+      "detail",
+    ]);
+  });
 });

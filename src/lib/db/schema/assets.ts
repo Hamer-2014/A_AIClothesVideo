@@ -20,6 +20,7 @@ export const assetRoleValues = [
 export const assetRoleEnum = pgEnum("asset_role", assetRoleValues);
 
 export const assetStatusValues = [
+  "pending_upload",
   "uploaded",
   "analyzing",
   "ready",

@@ -178,6 +178,126 @@ describe("confirmStoryboard", () => {
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
   });
 
+  it("only attaches assets required by each segment template", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "storyboard_draft_ready",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const storyboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 16,
+          creditCost: 130,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        { videoJobId: jobId, assetId: "asset-front", role: "front", sortOrder: 0 },
+        { videoJobId: jobId, assetId: "asset-back", role: "back", sortOrder: 1 },
+        { videoJobId: jobId, assetId: "asset-detail", role: "detail", sortOrder: 2 },
+        { videoJobId: jobId, assetId: "asset-scene", role: "scene", sortOrder: 3 },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in", "back_display"],
+          storyboardJson: {
+            duration_seconds: 16,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+              {
+                index: 1,
+                duration_seconds: 8,
+                template_id: "back_display",
+                prompt: "Hold on the back garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:template-assets",
+    });
+
+    await confirmStoryboard({
+      jobStore,
+      storyboardStore,
+      creditStore,
+      moderationStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-1",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(storyboardStore.listSegments()).toEqual([
+      expect.objectContaining({
+        templateId: "front_push_in",
+        inputAssetSnapshot: {
+          segmentIndex: 0,
+          templateId: "front_push_in",
+          assets: [
+            {
+              assetId: "asset-front",
+              role: "front",
+              sortOrder: 0,
+            },
+          ],
+        },
+      }),
+      expect.objectContaining({
+        templateId: "back_display",
+        inputAssetSnapshot: {
+          segmentIndex: 1,
+          templateId: "back_display",
+          assets: [
+            {
+              assetId: "asset-back",
+              role: "back",
+              sortOrder: 1,
+            },
+          ],
+        },
+      }),
+    ]);
+  });
+
   it("blocks confirmation before reserving credits or creating segments when final prompt moderation flags", async () => {
     const stores = createStores();
     await grantTrialCredits({

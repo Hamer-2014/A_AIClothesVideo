@@ -2,20 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import { createInMemoryJobProgressStore, getVideoJobProgress } from "./progress";
 
+function jobFixture(overrides: Partial<Parameters<typeof createInMemoryJobProgressStore>[0]["jobs"][number]> = {}) {
+  return {
+    id: "job-1",
+    userId: "user-1",
+    status: "segment_generating",
+    userVisibleStatus: "generating",
+    lastError: null,
+    failureReason: null,
+    finalVideoKey: null,
+    coverKey: null,
+    creditCost: 70,
+    billingMode: "paid",
+    reservedLedgerId: null,
+    ...overrides,
+  };
+}
+
 describe("video job progress", () => {
   it("aggregates segment, stitch, and post-QA progress for the owner", async () => {
     const store = createInMemoryJobProgressStore({
       jobs: [
-        {
-          id: "job-1",
-          userId: "user-1",
-          status: "segment_generating",
-          userVisibleStatus: "generating",
-          lastError: null,
-          failureReason: null,
-          finalVideoKey: null,
-          coverKey: null,
-        },
+        jobFixture(),
       ],
       segments: [
         { videoJobId: "job-1", status: "succeeded" },
@@ -43,6 +51,9 @@ describe("video job progress", () => {
       },
       stitching: { status: "queued" },
       postQa: { status: "not_started" },
+      creditCost: 70,
+      billingMode: "paid",
+      creditStatus: "reserved",
       downloadReady: false,
       finalVideoKey: null,
       coverKey: null,
@@ -52,16 +63,14 @@ describe("video job progress", () => {
   it("returns null when the job does not belong to the user", async () => {
     const store = createInMemoryJobProgressStore({
       jobs: [
-        {
-          id: "job-1",
+        jobFixture({
           userId: "user-2",
           status: "deliverable",
           userVisibleStatus: "ready",
-          lastError: null,
-          failureReason: null,
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           coverKey: "jobs/job-1/covers/cover.webp",
-        },
+          reservedLedgerId: "ledger-1",
+        }),
       ],
       segments: [],
       stitchJobs: [],
@@ -76,16 +85,10 @@ describe("video job progress", () => {
   it("treats segments_queued as generation phase and reports queued segments", async () => {
     const store = createInMemoryJobProgressStore({
       jobs: [
-        {
-          id: "job-1",
-          userId: "user-1",
+        jobFixture({
           status: "segments_queued",
-          userVisibleStatus: "generating",
-          lastError: null,
-          failureReason: null,
-          finalVideoKey: null,
-          coverKey: null,
-        },
+          reservedLedgerId: "ledger-1",
+        }),
       ],
       segments: [
         { videoJobId: "job-1", status: "queued" },
@@ -111,6 +114,9 @@ describe("video job progress", () => {
       },
       stitching: { status: "not_started" },
       postQa: { status: "not_started" },
+      creditCost: 70,
+      billingMode: "paid",
+      creditStatus: "reserved",
       downloadReady: false,
       finalVideoKey: null,
       coverKey: null,
@@ -120,17 +126,13 @@ describe("video job progress", () => {
   it("returns the stored failure reason so the job page can explain failed generation", async () => {
     const store = createInMemoryJobProgressStore({
       jobs: [
-        {
-          id: "job-1",
-          userId: "user-1",
+        jobFixture({
           status: "segment_failed",
-          userVisibleStatus: "generating",
           lastError: "Provider task failed.",
           failureReason:
             "EvoLink failed: Service busy. Allocating resources, please retry later.",
-          finalVideoKey: null,
-          coverKey: null,
-        },
+          reservedLedgerId: "ledger-1",
+        }),
       ],
       segments: [{ videoJobId: "job-1", status: "failed" }],
       stitchJobs: [],
@@ -153,16 +155,11 @@ describe("video job progress", () => {
   it("keeps polling when the job failed but a provider segment is still generating", async () => {
     const store = createInMemoryJobProgressStore({
       jobs: [
-        {
-          id: "job-1",
-          userId: "user-1",
+        jobFixture({
           status: "segment_failed",
-          userVisibleStatus: "generating",
           lastError: "EvoLink task polling failed with status 404.",
-          failureReason: null,
-          finalVideoKey: null,
-          coverKey: null,
-        },
+          reservedLedgerId: "ledger-1",
+        }),
       ],
       segments: [{ videoJobId: "job-1", status: "generating" }],
       stitchJobs: [],
