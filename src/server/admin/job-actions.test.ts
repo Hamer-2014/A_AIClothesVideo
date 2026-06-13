@@ -45,6 +45,7 @@ function createRetryStores() {
         userId,
         status: "segment_failed",
         aspectRatio: "9:16",
+        creditCost: 70,
       },
     ],
     segments: [

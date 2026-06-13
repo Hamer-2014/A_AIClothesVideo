@@ -38,6 +38,9 @@ describe("runStitchJob", () => {
       stitchSegments: async ({ concatListPath, outputPath }) => {
         events.push(`stitch:${concatListPath}:${outputPath}`);
       },
+      extractCoverFrame: async ({ coverPath }) => {
+        events.push(`cover:${coverPath}`);
+      },
       extractQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
       listExtractedQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
       sendCallback: async ({ result: callbackResult }) => {
@@ -59,8 +62,67 @@ describe("runStitchJob", () => {
     expect(events).toContain(
       "upload:jobs/job-1/stitched/final.mp4:/tmp/stitch-1/final.mp4:video/mp4",
     );
+    expect(events).toContain("cover:/tmp/stitch-1/cover.webp");
+    expect(events).toContain(
+      "upload:jobs/job-1/covers/cover.webp:/tmp/stitch-1/cover.webp:image/webp",
+    );
     expect(events).toContain("callback:succeeded");
     expect(events).toContain("cleanup:/tmp/stitch-1");
+  });
+
+  it("continues delivery when cover extraction fails", async () => {
+    const callbacks: unknown[] = [];
+    const uploads: string[] = [];
+
+    const result = await runStitchJob({
+      payload: {
+        stitchJobId: "stitch-1",
+        videoJobId: "job-1",
+        segmentKeys: ["segments/a.mp4"],
+        finalVideoKey: "jobs/job-1/stitched/final.mp4",
+        coverKey: "jobs/job-1/covers/cover.webp",
+        frameKeyPrefix: "jobs/job-1/qa/frames",
+        postQaMode: "lite",
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      },
+      config: {
+        workerSecret: "secret",
+        callbackSecret: "callback-secret",
+        bucket: "bucket",
+        r2Endpoint: "https://account.r2.cloudflarestorage.com",
+        r2AccessKeyId: "access",
+        r2SecretAccessKey: "private",
+      },
+      createWorkDir: async () => "/tmp/stitch-1",
+      writeTextFile: async () => {},
+      downloadObject: async () => {},
+      uploadObject: async ({ key }) => {
+        uploads.push(key);
+      },
+      stitchSegments: async () => {},
+      extractCoverFrame: async () => {
+        throw new Error("cover failed");
+      },
+      extractQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
+      listExtractedQaFrames: async () => ["/tmp/stitch-1/frames/frame-1.jpg"],
+      sendCallback: async ({ result }) => {
+        callbacks.push(result);
+      },
+      cleanupWorkDir: async () => {},
+    });
+
+    expect(result).toMatchObject({
+      status: "succeeded",
+      finalVideoKey: "jobs/job-1/stitched/final.mp4",
+      coverKey: null,
+    });
+    expect(uploads).toContain("jobs/job-1/stitched/final.mp4");
+    expect(uploads).not.toContain("jobs/job-1/covers/cover.webp");
+    expect(callbacks[0]).toMatchObject({
+      status: "succeeded",
+      coverKey: null,
+      warnings: ["cover_generation_failed: cover failed"],
+    });
   });
 
   it("callbacks a failed result before rethrowing stitch errors", async () => {

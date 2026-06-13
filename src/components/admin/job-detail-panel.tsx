@@ -139,6 +139,11 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
         ])}
       />
 
+      <JsonBlock
+        title="Trial Eligibility"
+        data={detail.job.trialEligibilitySnapshot ?? null}
+      />
+
       <SectionTable
         title="素材分析"
         columns={["Asset", "Mode", "结果摘要"]}
@@ -257,6 +262,7 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
           "成本",
           "Fallback",
           "Response Summary",
+          "Route Snapshot",
         ]}
         emptyText="当前没有 provider call logs。"
         rows={detail.providerLogs.map((log) => [
@@ -268,6 +274,7 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
           log.costEstimate ?? "-",
           log.fallbackReason ?? "-",
           stringifyJson(log.responseSummary),
+          stringifyJson(log.routeSnapshot ?? null),
         ])}
       />
 

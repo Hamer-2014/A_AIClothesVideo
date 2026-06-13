@@ -42,7 +42,12 @@ export default async function JobsPage() {
       user={session.user}
       billing={overview.wallet}
     >
-      <JobList jobs={jobs} />
+      <JobList
+        jobs={jobs.map((job) => ({
+          ...job,
+          coverUrl: job.coverKey ? `/api/jobs/${job.id}/cover` : null,
+        }))}
+      />
     </DashboardShell>
   );
 }

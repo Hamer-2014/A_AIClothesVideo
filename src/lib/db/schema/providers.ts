@@ -95,6 +95,8 @@ export const providerCallLogs = pgTable("provider_call_logs", {
   ...id,
   provider: text("provider").notNull(),
   providerKeyId: uuid("provider_key_id"),
+  modelRouteId: uuid("model_route_id"),
+  routeSnapshot: jsonSnapshot("route_snapshot"),
   model: text("model").notNull(),
   purpose: providerPurposeEnum("purpose").notNull(),
   userId: text("user_id"),

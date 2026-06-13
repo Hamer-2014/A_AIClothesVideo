@@ -123,6 +123,14 @@ export async function createVideoGeneration(
   return getAdapter(provider).create(input, deps);
 }
 
+export async function createVideoGenerationForProvider(
+  provider: VideoGenerationProvider,
+  input: VideoGenerationInput,
+  deps: VideoGenerationRouterDeps = {},
+): Promise<VideoGenerationResult> {
+  return getAdapter(provider).create(input, deps);
+}
+
 export async function pollVideoGenerationTask(
   providerTaskId: string,
   deps: VideoGenerationRouterDeps = {},

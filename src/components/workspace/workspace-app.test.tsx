@@ -430,6 +430,7 @@ describe("WorkspaceApp", () => {
   });
 
   it("uses paid generation by default and only requests free trial from the free trial button", async () => {
+    window.localStorage.setItem("runwaytools_device_id", "device-existing");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -461,6 +462,7 @@ describe("WorkspaceApp", () => {
             durationSeconds: 8,
             aspectRatio: "9:16",
             useFreeTrialIfAvailable: false,
+            deviceFingerprint: "device-existing",
           }),
         }),
       );
@@ -491,6 +493,7 @@ describe("WorkspaceApp", () => {
             durationSeconds: 8,
             aspectRatio: "9:16",
             useFreeTrialIfAvailable: true,
+            deviceFingerprint: "device-existing",
           }),
         }),
       );

@@ -158,8 +158,55 @@ describe("POST /api/jobs", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
       error: "free_trial_unavailable",
-      message: "免费试用暂不可用，请选择付费生成。",
+      message: "当前环境暂时无法使用免费试用，可购买点数继续生成。",
     });
+  });
+
+  it("passes device fingerprint and account signals without exposing internal trial reasons", async () => {
+    const seenInputs: unknown[] = [];
+    const response = await handleCreateJobRequest(
+      new Request("http://localhost/api/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-1"],
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          useFreeTrialIfAvailable: true,
+          deviceFingerprint: "device-1",
+        }),
+        headers: {
+          "x-forwarded-for": "203.0.113.20",
+          "user-agent": "Vitest Browser",
+        },
+      }),
+      {
+        getSession: async () => ({
+          user: {
+            id: "user-1",
+            email: "seller@example.com",
+            emailVerified: true,
+          },
+        }),
+        createJob: async (input) => {
+          seenInputs.push(input);
+          throw new Error("Free trial is not available.");
+        },
+      },
+    );
+
+    expect(seenInputs[0]).toMatchObject({
+      email: "seller@example.com",
+      emailVerified: true,
+      deviceFingerprint: "device-1",
+    });
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toEqual({
+      error: "free_trial_unavailable",
+      message: "当前环境暂时无法使用免费试用，可购买点数继续生成。",
+    });
+    expect(JSON.stringify(body)).not.toContain("email_trial_used");
+    expect(JSON.stringify(body)).not.toContain("device");
   });
 
   it("passes request IP and user agent context to job creation", async () => {

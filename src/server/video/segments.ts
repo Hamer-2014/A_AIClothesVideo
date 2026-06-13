@@ -10,7 +10,7 @@ import {
   type ProviderCallLogStore,
 } from "@/lib/providers/log-call";
 import {
-  createVideoGeneration,
+  createVideoGenerationForProvider,
   pollVideoGenerationTask,
   pollVideoGenerationTaskForProvider,
   type VideoGenerationProvider,
@@ -27,12 +27,17 @@ import {
   transitionJobStatus,
 } from "@/server/jobs/state-machine";
 import type { VideoSegmentRecord } from "@/server/storyboard/confirm";
+import {
+  resolveModelRoute,
+  type ResolvedModelRoute,
+} from "@/server/providers/model-route-resolver";
 
 export interface VideoSegmentJobRecord {
   id: string;
   userId: string;
   status: string;
   aspectRatio: string;
+  creditCost: number;
 }
 
 export interface VideoSegmentAssetRecord {
@@ -142,7 +147,9 @@ export async function submitQueuedSegment({
   jobId,
   segmentId,
   createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
-  createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
+  createVideoGeneration: createVideoGenerationFn = createVideoGenerationForProvider,
+  resolveModelRoute: resolveModelRouteFn = resolveModelRoute,
+  appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
   maxSubmitAttempts = getMaxSubmitAttempts(),
 }: {
   jobStore?: JobStore;
@@ -152,8 +159,17 @@ export async function submitQueuedSegment({
   segmentId: string;
   createSignedUrl?: (input: { key: string }) => Promise<string>;
   createVideoGeneration?: (
+    provider: VideoGenerationProvider,
     input: VideoGenerationInput,
   ) => Promise<VideoGenerationResult>;
+  resolveModelRoute?: (input: {
+    purpose: "video_generation";
+    environment: string;
+    isPublicJob: true;
+    estimatedRevenueCredits: number;
+    estimatedCostUsd: number;
+  }) => Promise<ResolvedModelRoute>;
+  appEnvironment?: string;
   maxSubmitAttempts?: number;
 }) {
   const job = await segmentStore.findJob(jobId);
@@ -176,7 +192,38 @@ export async function submitQueuedSegment({
     createSignedUrl,
   });
   const startedAt = Date.now();
-  const selectedConfig = getConfiguredVideoGenerationIdentity();
+  let route: ResolvedModelRoute;
+  try {
+    route = await resolveModelRouteFn({
+      purpose: "video_generation",
+      environment: appEnvironment,
+      isPublicJob: true,
+      estimatedRevenueCredits: job.creditCost,
+      estimatedCostUsd: 0,
+    });
+  } catch (error) {
+      await providerCallLogStore.createCallLog({
+        provider: "route_unresolved",
+        model: "unknown",
+      purpose: "video_generation",
+      userId: job.userId,
+      videoJobId: jobId,
+      segmentId,
+      requestSnapshot: {
+        templateId: segment.templateId,
+        assetCount: imageUrls.length,
+        route: {
+          routeSource: "database",
+          error: errorMessage(error),
+        },
+      },
+      durationMs: Date.now() - startedAt,
+      status: "failed",
+      errorCode: "video_generation_route_unavailable",
+      errorMessage: errorMessage(error),
+    });
+    throw error;
+  }
 
   let providerResult: VideoGenerationResult | null = null;
   let lastSubmitError: unknown;
@@ -187,7 +234,7 @@ export async function submitQueuedSegment({
       await segmentStore.updateSegment(segmentId, {
         attemptCount: segment.attemptCount + attempt,
       });
-      providerResult = await createVideoGenerationFn({
+      providerResult = await createVideoGenerationFn(route.provider, {
         prompt: segment.prompt,
         imageUrls,
         aspectRatio: job.aspectRatio,
@@ -200,8 +247,11 @@ export async function submitQueuedSegment({
     } catch (error) {
       lastSubmitError = error;
       await providerCallLogStore.createCallLog({
-        provider: selectedConfig.provider,
-        model: selectedConfig.model,
+        provider: route.provider,
+        providerKeyId: route.providerKeyId,
+        modelRouteId: route.routeId,
+        routeSnapshot: route.routeSnapshot,
+        model: route.model,
         purpose: "video_generation",
         userId: job.userId,
         videoJobId: jobId,
@@ -215,6 +265,7 @@ export async function submitQueuedSegment({
           resolution: segment.resolution,
           audio: segment.audioEnabled,
           watermarkEnabled: segment.watermarkEnabled,
+          route: route.routeSnapshot,
         },
         durationMs: Date.now() - startedAt,
         status: "failed",
@@ -232,6 +283,9 @@ export async function submitQueuedSegment({
 
   const callLog = await providerCallLogStore.createCallLog({
     provider: providerResult.provider,
+    providerKeyId: route.providerKeyId,
+    modelRouteId: route.routeId,
+    routeSnapshot: route.routeSnapshot,
     model: providerResult.model,
     purpose: "video_generation",
     userId: job.userId,
@@ -244,6 +298,7 @@ export async function submitQueuedSegment({
       resolution: segment.resolution,
       audio: segment.audioEnabled,
       watermarkEnabled: segment.watermarkEnabled,
+      route: route.routeSnapshot,
     },
     responseSummary: providerResult.raw,
     durationMs: Date.now() - startedAt,
@@ -299,7 +354,9 @@ export async function kickQueuedSegmentsForJob({
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   jobId,
   createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
-  createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
+  createVideoGeneration: createVideoGenerationFn = createVideoGenerationForProvider,
+  resolveModelRoute: resolveModelRouteFn = resolveModelRoute,
+  appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
   maxSubmitAttempts = getMaxSubmitAttempts(),
 }: {
   jobStore?: JobStore;
@@ -308,8 +365,17 @@ export async function kickQueuedSegmentsForJob({
   jobId: string;
   createSignedUrl?: (input: { key: string }) => Promise<string>;
   createVideoGeneration?: (
+    provider: VideoGenerationProvider,
     input: VideoGenerationInput,
   ) => Promise<VideoGenerationResult>;
+  resolveModelRoute?: (input: {
+    purpose: "video_generation";
+    environment: string;
+    isPublicJob: true;
+    estimatedRevenueCredits: number;
+    estimatedCostUsd: number;
+  }) => Promise<ResolvedModelRoute>;
+  appEnvironment?: string;
   maxSubmitAttempts?: number;
 }): Promise<GenerationKickResult> {
   const segments = await segmentStore.listSegmentsForJob(jobId);
@@ -337,6 +403,8 @@ export async function kickQueuedSegmentsForJob({
         segmentId: segment.id,
         createSignedUrl,
         createVideoGeneration: createVideoGenerationFn,
+        resolveModelRoute: resolveModelRouteFn,
+        appEnvironment,
         maxSubmitAttempts,
       }),
     ),
@@ -398,7 +466,9 @@ export async function pollSubmittedSegment({
   segmentId,
   pollTask,
   createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
-  createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
+  createVideoGeneration: createVideoGenerationFn = createVideoGenerationForProvider,
+  resolveModelRoute: resolveModelRouteFn = resolveModelRoute,
+  appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   maxSubmitAttempts = getMaxSubmitAttempts(),
   maxTaskRegenerations = getMaxTaskRegenerations(),
@@ -415,8 +485,17 @@ export async function pollSubmittedSegment({
   ) => Promise<VideoTaskResult>;
   createSignedUrl?: (input: { key: string }) => Promise<string>;
   createVideoGeneration?: (
+    provider: VideoGenerationProvider,
     input: VideoGenerationInput,
   ) => Promise<VideoGenerationResult>;
+  resolveModelRoute?: (input: {
+    purpose: "video_generation";
+    environment: string;
+    isPublicJob: true;
+    estimatedRevenueCredits: number;
+    estimatedCostUsd: number;
+  }) => Promise<ResolvedModelRoute>;
+  appEnvironment?: string;
   maxSubmitAttempts?: number;
   maxTaskRegenerations?: number;
   storeProviderOutput: (input: {
@@ -462,6 +541,8 @@ export async function pollSubmittedSegment({
         segmentId,
         createSignedUrl,
         createVideoGeneration: createVideoGenerationFn,
+        resolveModelRoute: resolveModelRouteFn,
+        appEnvironment,
         maxSubmitAttempts,
       });
       return {
@@ -624,6 +705,7 @@ export function createDrizzleVideoSegmentStore(
           userId: videoJobs.userId,
           status: videoJobs.status,
           aspectRatio: videoJobs.aspectRatio,
+          creditCost: videoJobs.creditCost,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))

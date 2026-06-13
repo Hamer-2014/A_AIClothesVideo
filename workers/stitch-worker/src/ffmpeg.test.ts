@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildConcatList,
+  extractCoverFrame,
   extractQaFrames,
   listExtractedQaFrames,
   stitchSegments,
@@ -66,6 +67,36 @@ describe("ffmpeg helpers", () => {
     expect(commands[0]?.args).toContain("fps=1/3");
     expect(commands[0]?.args).toContain("-start_number");
     expect(commands[0]?.args).toContain("0");
+  });
+
+  it("extracts a webp cover frame at the default timestamp", async () => {
+    const commands: Array<{ command: string; args: string[] }> = [];
+
+    await extractCoverFrame({
+      videoPath: "/tmp/final.mp4",
+      coverPath: "/tmp/cover.webp",
+      runCommand: async (command, args) => {
+        commands.push({ command, args });
+      },
+    });
+
+    expect(commands).toEqual([
+      {
+        command: "ffmpeg",
+        args: [
+          "-y",
+          "-ss",
+          "00:00:04",
+          "-i",
+          "/tmp/final.mp4",
+          "-frames:v",
+          "1",
+          "-vf",
+          "scale=720:-1",
+          "/tmp/cover.webp",
+        ],
+      },
+    ]);
   });
 
   it("lists actual extracted frames instead of assuming numbering starts at zero", async () => {

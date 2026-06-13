@@ -36,6 +36,29 @@ describe("JobDeliverablePanel", () => {
     );
   });
 
+  it("shows the generated cover image before falling back to the video preview", () => {
+    render(
+      <JobDeliverablePanel
+        coverUrl="https://cdn.example.com/jobs/job-1/covers/cover.webp"
+        defaultFilename="runwaytools-job-1.mp4"
+        jobId="job-1"
+        previewUrl="https://cdn.example.com/jobs/job-1/stitched/final.mp4"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "视频封面" })).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/jobs/job-1/covers/cover.webp",
+    );
+    expect(
+      screen.queryByText("当前浏览器不支持视频预览。"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载成片" })).toHaveAttribute(
+      "href",
+      "/api/jobs/job-1/download?filename=runwaytools-job-1.mp4",
+    );
+  });
+
   it("keeps download available when the public preview URL is not configured", () => {
     render(
       <JobDeliverablePanel

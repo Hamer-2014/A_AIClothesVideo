@@ -33,6 +33,7 @@ function createStores() {
         userId,
         status: "segments_queued",
         aspectRatio: "9:16",
+        creditCost: 70,
       },
     ],
     segments: [
@@ -96,6 +97,7 @@ function createStoresWithSegments(segmentIds: string[]) {
         userId,
         status: "segments_queued",
         aspectRatio: "9:16",
+        creditCost: 70,
       },
     ],
     segments: segmentIds.map((id, index) => ({
@@ -162,7 +164,15 @@ describe("video segment services", () => {
       ...stores,
       jobId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      createVideoGeneration: async (input) => {
+      resolveModelRoute: async () => ({
+        routeId: "route-test",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-test",
+        source: "database",
+        routeSnapshot: { routeId: "route-test", routeSource: "database" },
+      }),
+      createVideoGeneration: async (_provider, input) => {
         active += 1;
         maxActive = Math.max(maxActive, active);
         started.push(input.prompt);
@@ -204,7 +214,15 @@ describe("video segment services", () => {
       ...stores,
       jobId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      createVideoGeneration: async (input) => {
+      resolveModelRoute: async () => ({
+        routeId: "route-test",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-test",
+        source: "database",
+        routeSnapshot: { routeId: "route-test", routeSource: "database" },
+      }),
+      createVideoGeneration: async (_provider, input) => {
         if (input.prompt === "Prompt 1") {
           throw new Error("EvoLink submit failed.");
         }
@@ -250,7 +268,15 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      createVideoGeneration: async (input) => ({
+      resolveModelRoute: async () => ({
+        routeId: "route-test",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-test",
+        source: "database",
+        routeSnapshot: { routeId: "route-test", routeSource: "database" },
+      }),
+      createVideoGeneration: async (_provider, input) => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",
         providerTaskId: "task-1",
@@ -293,7 +319,15 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      createVideoGeneration: async (input) => {
+      resolveModelRoute: async () => ({
+        routeId: "route-test",
+        provider: "apimart",
+        model: "pixverse-v6",
+        providerKeyId: "key-test",
+        source: "database",
+        routeSnapshot: { routeId: "route-test", routeSource: "database" },
+      }),
+      createVideoGeneration: async (_provider, input) => {
         seenInputs.push(input);
         return {
           provider: "apimart",
@@ -339,6 +373,14 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      resolveModelRoute: async () => ({
+        routeId: "route-apimart",
+        provider: "apimart",
+        model: "pixverse-v6",
+        providerKeyId: "key-apimart",
+        source: "database",
+        routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
+      }),
     });
 
     expect(result).toEqual({
@@ -355,6 +397,88 @@ describe("video segment services", () => {
     });
   });
 
+  it("resolves the database video_generation route before submitting a public segment", async () => {
+    const stores = createStores();
+    const seenRoutes: unknown[] = [];
+
+    const result = await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      resolveModelRoute: async (input) => {
+        seenRoutes.push(input);
+        return {
+          routeId: "route-1",
+          provider: "apimart",
+          model: "pixverse-v6",
+          providerKeyId: "key-1",
+          source: "database",
+          routeSnapshot: {
+            routeId: "route-1",
+            purpose: "video_generation",
+            environment: "production",
+            primaryProvider: "apimart",
+            primaryModel: "pixverse-v6",
+            routeSource: "database",
+          },
+        };
+      },
+      createVideoGeneration: async (provider, input) => ({
+        provider,
+        model: "pixverse-v6",
+        providerTaskId: `task-${input.prompt}`,
+        raw: { ok: true },
+      }),
+      appEnvironment: "production",
+    });
+
+    expect(result.providerTaskId).toBe("task-Slow front push-in.");
+    expect(seenRoutes[0]).toMatchObject({
+      purpose: "video_generation",
+      environment: "production",
+      isPublicJob: true,
+    });
+    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      provider: "apimart",
+      model: "pixverse-v6",
+      providerKeyId: "key-1",
+      requestSnapshot: expect.objectContaining({
+        route: expect.objectContaining({
+          routeId: "route-1",
+          routeSource: "database",
+        }),
+      }),
+    });
+  });
+
+  it("fails closed without calling provider when database route resolution fails", async () => {
+    const stores = createStores();
+    const createVideoGeneration = vi.fn();
+
+    await expect(
+      submitQueuedSegment({
+        ...stores,
+        jobId,
+        segmentId,
+        maxSubmitAttempts: 1,
+        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        resolveModelRoute: async () => {
+          throw new Error("No active model route for video_generation in production.");
+        },
+        createVideoGeneration,
+        appEnvironment: "production",
+      }),
+    ).rejects.toThrow("No active model route for video_generation in production.");
+
+    expect(createVideoGeneration).not.toHaveBeenCalled();
+    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      status: "failed",
+      errorCode: "video_generation_route_unavailable",
+      errorMessage: "No active model route for video_generation in production.",
+    });
+  });
+
   it("retries transient provider submission failures before marking submit failed", async () => {
     const stores = createStores();
     let attempts = 0;
@@ -365,6 +489,14 @@ describe("video segment services", () => {
       segmentId,
       maxSubmitAttempts: 3,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      resolveModelRoute: async () => ({
+        routeId: "route-retry",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-retry",
+        source: "database",
+        routeSnapshot: { routeId: "route-retry", routeSource: "database" },
+      }),
       createVideoGeneration: async () => {
         attempts += 1;
         if (attempts < 2) {
@@ -417,6 +549,14 @@ describe("video segment services", () => {
         segmentId,
         maxSubmitAttempts: 1,
         createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        resolveModelRoute: async () => ({
+          routeId: "route-apimart",
+          provider: "apimart",
+          model: "pixverse-v6",
+          providerKeyId: "key-apimart",
+          source: "database",
+          routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
+        }),
         createVideoGeneration: async () => {
           throw new Error("APIMart submit failed.");
         },
@@ -445,6 +585,14 @@ describe("video segment services", () => {
         segmentId,
         maxSubmitAttempts: 1,
         createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        resolveModelRoute: async () => ({
+          routeId: "route-apimart",
+          provider: "apimart",
+          model: "pixverse-v6",
+          providerKeyId: "key-apimart",
+          source: "database",
+          routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
+        }),
         createVideoGeneration: async () => {
           throw new Error("default provider submit failed.");
         },
@@ -472,6 +620,14 @@ describe("video segment services", () => {
         jobId,
         segmentId,
         createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        resolveModelRoute: async () => ({
+          routeId: "route-submit",
+          provider: "evolink",
+          model: "veo3.1-fast-beta",
+          providerKeyId: "key-submit",
+          source: "database",
+          routeSnapshot: { routeId: "route-submit", routeSource: "database" },
+        }),
         createVideoGeneration: async () => {
           attempts += 1;
           throw new Error(`submit failed ${attempts}`);
@@ -642,6 +798,14 @@ describe("video segment services", () => {
       segmentId,
       maxTaskRegenerations: 2,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      resolveModelRoute: async () => ({
+        routeId: "route-regen",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-regen",
+        source: "database",
+        routeSnapshot: { routeId: "route-regen", routeSource: "database" },
+      }),
       pollTask: async () => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",
@@ -698,6 +862,14 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      resolveModelRoute: async () => ({
+        routeId: "route-regen",
+        provider: "evolink",
+        model: "veo3.1-fast-beta",
+        providerKeyId: "key-regen",
+        source: "database",
+        routeSnapshot: { routeId: "route-regen", routeSource: "database" },
+      }),
       pollTask: async () => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",
@@ -783,3 +955,4 @@ describe("video segment services", () => {
     });
   });
 });
+

@@ -36,13 +36,16 @@
 - MVP 产品口径改为：付费默认生成音频；免费试用默认无音频。
 - Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
 - stitch-worker 抽帧从固定 3 帧改为分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 转场帧策略仍是后续增强项。
+- 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。
+- 2026-06-13 风险收敛子项目 B：公开视频 `video_generation` segment submit 先解析数据库 `model_routes`，route/provider/key 非 active 或 key 并发/日限/失败数不可用时 fail closed；`provider_call_logs` 新增 `model_route_id` 与 `route_snapshot`；`verify:blockers` 增强为要求 paid delivery 有 route snapshot 证据。
+- 2026-06-13 风险收敛子项目 C：Cloud Run `stitch-worker` 在 final mp4 后抽取 `jobs/{jobId}/covers/cover.webp`，封面生成失败只写 warning 且不阻断 final video / QA frames / callback；前台任务详情优先显示封面、无封面时回退视频预览，任务列表通过内部 cover API 的 R2 signed URL 展示可用封面缩略图。
 
 ### 仍未完成或仍需生产验收
 
 - Creem 真实生产支付、税务配置和平台 review 仍需单独验收；不能用本地账务闭环替代真实收款闭环。
-- `model_routes` 表已存在，但公开视频生成运行时仍主要读取环境变量；若要后台动态切换模型，需要新增公开/备用/管理员任务的路由隔离。
-- Cloud Run 封面生成尚未单独实现；当前核心交付是 final video 与 QA frames。
-- 免费试用防滥用仍偏基础，设备指纹、OAuth provider ID、IP 维度策略需要继续加强。
+- `model_routes` 已接入公开视频 `video_generation` segment submit；storyboard、vision、post_qa、moderation 暂未迁移到同一 resolver，避免一次性扩大运行时风险。
+- Cloud Run 封面生成已完成本地自动化验证；仍需使用部署后的新任务确认 R2 中实际出现 `jobs/{jobId}/covers/cover.webp`，并确认 `video_jobs.cover_key` / `stitch_jobs.cover_key` 随 callback 写入真实库。
+- 免费试用防滥用已从单一 userId rolling 24h 升级为多信号判断；OAuth account 信号服务层已支持，但用户 API route 仍需后续从 better-auth accounts 稳定读取 provider/account id 后传入。
 - 本地 10+ 视频稳定不等于用户验证完成；仍需 20-50 个目标卖家、100-300 个真实 SKU 的小规模公开 MVP 数据。
 
 ## 0. 实现边界

@@ -45,6 +45,7 @@ export function JobLivePanels({
         : initialPreviewUrl,
     [initialPreviewUrl, progress.finalVideoKey, publicVideoBaseUrl],
   );
+  const coverUrl = progress.coverKey ? `/api/jobs/${jobId}/cover` : null;
 
   return (
     <>
@@ -56,6 +57,7 @@ export function JobLivePanels({
 
       {progress.downloadReady ? (
         <JobDeliverablePanel
+          coverUrl={coverUrl}
           defaultFilename={defaultFilename}
           jobId={jobId}
           previewUrl={previewUrl}

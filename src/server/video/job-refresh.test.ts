@@ -83,12 +83,19 @@ function createStores() {
     },
   ]);
   const jobs: VideoSegmentJobRecord[] = [
-    { id: jobId, userId, status: "segment_generating", aspectRatio: "9:16" },
+    {
+      id: jobId,
+      userId,
+      status: "segment_generating",
+      aspectRatio: "9:16",
+      creditCost: 70,
+    },
     {
       id: otherJobId,
       userId,
       status: "segment_generating",
       aspectRatio: "9:16",
+      creditCost: 70,
     },
   ];
   const assets: VideoSegmentAssetRecord[] = [

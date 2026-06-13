@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { id, jsonSnapshot } from "./common";
 
@@ -35,6 +35,24 @@ export const userAccessEvents = pgTable("user_access_events", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   path: text("path"),
+  metadata: jsonSnapshot("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const trialAbuseSignals = pgTable("trial_abuse_signals", {
+  ...id,
+  userId: text("user_id").notNull(),
+  videoJobId: uuid("video_job_id"),
+  emailHash: text("email_hash"),
+  oauthProvider: text("oauth_provider"),
+  oauthAccountIdHash: text("oauth_account_id_hash"),
+  ipHash: text("ip_hash"),
+  deviceFingerprintHash: text("device_fingerprint_hash"),
+  userAgentHash: text("user_agent_hash"),
+  eventType: text("event_type").notNull(),
+  decision: text("decision").notNull(),
+  riskScore: integer("risk_score").notNull().default(0),
+  reasonCodes: jsonSnapshot("reason_codes").notNull().default([]),
   metadata: jsonSnapshot("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -22,6 +22,11 @@ describe("JobDetailPanel", () => {
             durationSeconds: 16,
             aspectRatio: "9:16",
             creditCost: 130,
+            trialEligibilitySnapshot: {
+              decision: "deny",
+              reasonCodes: ["email_trial_used"],
+              riskScore: 100,
+            },
             reservedLedgerId: "ledger-1",
             finalVideoKey: null,
             coverKey: null,
@@ -64,6 +69,11 @@ describe("JobDetailPanel", () => {
               segmentId: "segment-1",
               purpose: "video_generation",
               provider: "evolink",
+              modelRouteId: "route-1",
+              routeSnapshot: {
+                routeId: "route-1",
+                routeSource: "database",
+              },
               model: "veo3.1-fast-beta",
               status: "failed",
               durationMs: 4200,
@@ -102,6 +112,8 @@ describe("JobDetailPanel", () => {
     expect(screen.getByText("存在失败片段")).toBeInTheDocument();
     expect(screen.getByText("Segment 表")).toBeInTheDocument();
     expect(screen.getByText("Provider Logs 表")).toBeInTheDocument();
+    expect(screen.getByText("Trial Eligibility")).toBeInTheDocument();
+    expect(screen.getByText(/email_trial_used/)).toBeInTheDocument();
     expect(screen.getByText("State Events Timeline")).toBeInTheDocument();
     expect(screen.getByText("原始辅助数据")).toBeInTheDocument();
   });

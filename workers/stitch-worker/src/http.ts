@@ -8,6 +8,7 @@ export interface StitchResult {
   coverKey?: string | null;
   frameKeys?: string[];
   errorMessage?: string;
+  warnings?: string[];
 }
 
 export type StitchExecutor = (input: StitchPayload) => Promise<StitchResult>;

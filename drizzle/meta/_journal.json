@@ -50,6 +50,20 @@
       "when": 1781277360000,
       "tag": "0006_asset_pending_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781337600000,
+      "tag": "0007_trial_abuse_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781338200000,
+      "tag": "0008_provider_call_route_snapshot",
+      "breakpoints": true
     }
   ]
 }

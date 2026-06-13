@@ -50,6 +50,31 @@ export async function stitchSegments({
   ]);
 }
 
+export async function extractCoverFrame({
+  videoPath,
+  coverPath,
+  timestamp = "00:00:04",
+  runCommand = defaultRunCommand,
+}: {
+  videoPath: string;
+  coverPath: string;
+  timestamp?: string;
+  runCommand?: RunCommand;
+}) {
+  await runCommand("ffmpeg", [
+    "-y",
+    "-ss",
+    timestamp,
+    "-i",
+    videoPath,
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale=720:-1",
+    coverPath,
+  ]);
+}
+
 export async function extractQaFrames({
   videoPath,
   frameDirectory,

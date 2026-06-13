@@ -196,6 +196,7 @@ gcloud run services describe stitch-worker \
 - [ ] `POST /api/internal/stitch/jobs` 能创建 stitch job 并触发 Cloud Run。
 - [ ] Cloud Run 日志能看到 ffmpeg 执行。
 - [ ] R2 出现 `jobs/{jobId}/stitched/final.mp4`。
+- [ ] R2 出现 `jobs/{jobId}/covers/cover.webp`；如果封面生成失败，callback warning 中应能看到 `cover_generation_failed`，且 final video / QA frames 不应失败。
 - [ ] R2 出现 `jobs/{jobId}/qa/frames/{index}.jpg`。
 - [ ] 主应用收到 `/api/internal/stitch/callback` 并更新状态。
 
@@ -215,8 +216,10 @@ npm run smoke:stitch
 
 - Cloud Run 日志中出现 ffmpeg 执行记录。
 - R2 中出现 `jobs/{jobId}/stitched/final.mp4`。
+- R2 中出现 `jobs/{jobId}/covers/cover.webp`，并且主应用 `video_jobs.cover_key` / `stitch_jobs.cover_key` 保存该 key。
 - R2 中出现 `jobs/{jobId}/qa/frames/0.jpg` 等抽帧。
 - 主应用任务状态从 `stitching_running` 进入 `post_qa_queued`。
+- 用户任务列表和详情页通过 `/api/jobs/{jobId}/cover` 307 到 R2 signed URL 展示封面；不依赖公开 bucket URL。
 
 如需继续把后端链路追到 Post-QA 终态，再运行：
 
@@ -238,10 +241,10 @@ npm run smoke:backend
 
 - 数据库中的 `video_jobs` / `stitch_jobs` / `post_qa_results` 最终状态
 - `credit_ledger` 是否出现 `capture`
-- R2 最终视频与 QA frames 是否都存在
+- R2 最终视频、封面和 QA frames 是否都存在
 
 ## 当前限制
 
 - worker 不主动轮询数据库，只执行主应用触发的单个 job。
-- 当前封面 key 会随 callback 传递，但封面生成尚未单独实现；最终视频和 QA frames 是本阶段核心输出。
+- 封面从 final mp4 抽帧生成，不使用 AI 生成；封面失败只记录 warning，不阻断最终视频和 QA frames 交付。
 - 抽帧已按 `postQaMode` 分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 后续仍可扩展转场帧策略。

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createVideoGeneration,
+  createVideoGenerationForProvider,
   getVideoGenerationConfig,
   pollVideoGenerationTaskForProvider,
   pollVideoGenerationTask,
@@ -90,6 +91,38 @@ describe("video generation provider router", () => {
           VIDEO_GENERATION_MODEL: "pixverse-v6",
           APIMART_API_KEY: "sk-apimart",
           APIMART_BASE_URL: "https://api.apimart.ai",
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      provider: "apimart",
+      model: "pixverse-v6",
+      providerTaskId: "task-apimart",
+    });
+  });
+
+  it("routes submissions through an explicitly resolved provider", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      Response.json({
+        code: 200,
+        data: [{ status: "submitted", task_id: "task-apimart" }],
+      });
+
+    const result = await createVideoGenerationForProvider(
+      "apimart",
+      {
+        prompt: "front push-in",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        env: {
+          VIDEO_GENERATION_PROVIDER: "evolink",
+          APIMART_API_KEY: "sk-apimart",
+          APIMART_BASE_URL: "https://api.apimart.ai",
+          APIMART_PIXVERSE_MODEL: "pixverse-v6",
         },
       },
     );

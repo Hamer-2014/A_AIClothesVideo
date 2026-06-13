@@ -196,6 +196,97 @@ describe("create video job", () => {
     ]));
   });
 
+  it("rejects trial requests when email risk has already used a trial without creating a job", async () => {
+    const store = createInMemoryVideoJobCreationStore(
+      [
+        {
+          id: "asset-front",
+          userId,
+          status: "uploaded",
+          detectedRole: "front",
+        },
+      ],
+      {
+        trialEligibilityCounts: {
+          emailTrialCount: 1,
+        },
+      },
+    );
+
+    await expect(
+      createVideoJobWithAssets({
+        store,
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 8,
+        aspectRatio: "9:16",
+        useFreeTrialIfAvailable: true,
+        email: "seller@example.com",
+        emailVerified: true,
+        oauthAccounts: [{ provider: "google", providerAccountId: "google-1" }],
+        deviceFingerprint: "device-1",
+        requestContext: {
+          ipAddress: "203.0.113.10",
+          userAgent: "Vitest Browser",
+          path: "/api/jobs",
+        },
+        abuseHashSecret: "test-secret",
+        appEnvironment: "production",
+        now: new Date("2026-06-13T08:00:00.000Z"),
+      }),
+    ).rejects.toThrow("Free trial is not available.");
+
+    expect(store.listJobs()).toHaveLength(0);
+    expect(store.listTrialAbuseSignals()).toEqual([
+      expect.objectContaining({
+        decision: "deny",
+        eventType: "trial_denied",
+        reasonCodes: expect.arrayContaining(["email_trial_used"]),
+      }),
+    ]);
+  });
+
+  it("does not apply trial abuse checks to explicit paid jobs", async () => {
+    const store = createInMemoryVideoJobCreationStore(
+      [
+        {
+          id: "asset-front",
+          userId,
+          status: "uploaded",
+          detectedRole: "front",
+        },
+      ],
+      {
+        trialEligibilityCounts: {
+          emailTrialCount: 1,
+          ipSignalCount: 99,
+        },
+      },
+    );
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      email: "seller@example.com",
+      emailVerified: false,
+      deviceFingerprint: "device-1",
+      requestContext: {
+        ipAddress: "203.0.113.10",
+        userAgent: "Vitest Browser",
+        path: "/api/jobs",
+      },
+      abuseHashSecret: "test-secret",
+      appEnvironment: "production",
+    });
+
+    expect(result.job.billingMode).toBe("paid");
+    expect(store.listTrialAbuseSignals()).toHaveLength(0);
+  });
+
   it("always creates paid jobs for 16 and 24 second durations", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

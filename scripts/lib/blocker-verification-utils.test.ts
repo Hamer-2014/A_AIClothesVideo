@@ -8,6 +8,15 @@ import {
 } from "./blocker-verification-utils.mjs";
 
 describe("blocker verification utils", () => {
+  const paidDeliveryJob = (
+    job: {
+      id: string;
+      status: string;
+      creditCost: number;
+      [key: string]: unknown;
+    },
+  ) => job;
+
   it("fails paid delivery evidence when no paid jobs exist", () => {
     const result = evaluatePaidDeliveryEvidence([]);
 
@@ -18,7 +27,7 @@ describe("blocker verification utils", () => {
 
   it("requires reserve capture final video and QA frames for paid delivery evidence", () => {
     const result = evaluatePaidDeliveryEvidence([
-      {
+      paidDeliveryJob({
         id: "job-paid",
         status: "deliverable",
         creditCost: 70,
@@ -27,7 +36,8 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["apimart"],
         videoModels: ["pixverse-v6"],
-      },
+        videoRouteLogCount: 1,
+      }),
     ]);
 
     expect(result).toMatchObject({
@@ -38,7 +48,7 @@ describe("blocker verification utils", () => {
 
   it("fails paid delivery evidence when capture is missing", () => {
     const result = evaluatePaidDeliveryEvidence([
-      {
+      paidDeliveryJob({
         id: "job-paid",
         status: "deliverable",
         creditCost: 70,
@@ -47,7 +57,8 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["apimart"],
         videoModels: ["pixverse-v6"],
-      },
+        videoRouteLogCount: 1,
+      }),
     ]);
 
     expect(result.passed).toBe(false);
@@ -56,7 +67,7 @@ describe("blocker verification utils", () => {
 
   it("fails paid delivery evidence when the public video provider is not PixVerse", () => {
     const result = evaluatePaidDeliveryEvidence([
-      {
+      paidDeliveryJob({
         id: "job-paid",
         status: "deliverable",
         creditCost: 70,
@@ -65,11 +76,31 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["evolink"],
         videoModels: ["veo3.1-fast-beta"],
-      },
+        videoRouteLogCount: 1,
+      }),
     ]);
 
     expect(result.passed).toBe(false);
     expect(result.reason).toContain("apimart/pixverse-v6");
+  });
+
+  it("fails paid delivery evidence when route snapshot log is missing", () => {
+    const result = evaluatePaidDeliveryEvidence([
+      paidDeliveryJob({
+        id: "job-paid",
+        status: "deliverable",
+        creditCost: 70,
+        ledgerTypes: ["reserve", "capture"],
+        finalVideoKey: "jobs/job-paid/stitched/final.mp4",
+        qaFrameCount: 3,
+        videoProviders: ["apimart"],
+        videoModels: ["pixverse-v6"],
+        videoRouteLogCount: 0,
+      }),
+    ]);
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain("route snapshot");
   });
 
   it("passes failure compensation evidence for failed released jobs with release ledger", () => {

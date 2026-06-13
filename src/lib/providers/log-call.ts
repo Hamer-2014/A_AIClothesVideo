@@ -15,6 +15,8 @@ export interface ProviderCallLogRecord {
   id: string;
   provider: string;
   providerKeyId: string | null;
+  modelRouteId: string | null;
+  routeSnapshot: JsonValue | null;
   model: string;
   purpose: ProviderPurpose;
   userId: string | null;
@@ -36,6 +38,8 @@ export interface ProviderCallLogRecord {
 export interface NewProviderCallLog {
   provider: string;
   providerKeyId?: string | null;
+  modelRouteId?: string | null;
+  routeSnapshot?: JsonValue | null;
   model: string;
   purpose: ProviderPurpose;
   userId?: string | null;
@@ -60,6 +64,8 @@ function normalizeProviderCallLog(input: NewProviderCallLog) {
   return {
     provider: input.provider,
     providerKeyId: input.providerKeyId ?? null,
+    modelRouteId: input.modelRouteId ?? null,
+    routeSnapshot: input.routeSnapshot ?? null,
     model: input.model,
     purpose: input.purpose,
     userId: input.userId ?? null,

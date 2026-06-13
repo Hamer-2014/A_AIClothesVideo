@@ -1,8 +1,9 @@
 const paidNextSteps = [
   "Create or select a real job with credit_cost > 0.",
   "Run npm run smoke:backend -- --job-id <paid-job-id>.",
-  "Confirm credit_ledger contains reserve and capture for that job.",
-  "Confirm video generation provider/model is apimart/pixverse-v6.",
+    "Confirm credit_ledger contains reserve and capture for that job.",
+    "Confirm video generation provider/model is apimart/pixverse-v6.",
+    "Confirm provider_call_logs has model_route_id and route_snapshot for video_generation.",
 ];
 
 const failureNextSteps = [
@@ -27,6 +28,9 @@ function result({ passed, name, reason, jobId = null, evidence = null, nextSteps
   };
 }
 
+/**
+ * @param {Array<Record<string, any>>} jobs
+ */
 export function evaluatePaidDeliveryEvidence(jobs) {
   if (jobs.length === 0) {
     return result({
@@ -62,11 +66,15 @@ export function evaluatePaidDeliveryEvidence(jobs) {
       failures.push(`${job.id} missing apimart/pixverse-v6 video generation evidence`);
       continue;
     }
+    if (!job.videoRouteLogCount || job.videoRouteLogCount <= 0) {
+      failures.push(`${job.id} missing provider call route snapshot`);
+      continue;
+    }
 
     return result({
       name: "paid_delivery",
       passed: true,
-      reason: "Paid deliverable job has reserve, capture, final video, QA frames, and apimart/pixverse-v6 evidence.",
+      reason: "Paid deliverable job has reserve, capture, final video, QA frames, apimart/pixverse-v6 evidence, and provider route snapshot.",
       jobId: job.id,
       evidence: job,
     });

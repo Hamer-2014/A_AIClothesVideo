@@ -5,6 +5,7 @@ import path from "node:path";
 import type { WorkerConfig } from "./config.js";
 import { sendStitchCallback } from "./callback.js";
 import {
+  extractCoverFrame as defaultExtractCoverFrame,
   buildConcatList,
   extractQaFrames as defaultExtractQaFrames,
   listExtractedQaFrames as defaultListExtractedQaFrames,
@@ -22,6 +23,7 @@ interface RunStitchJobDeps {
   downloadObject?: (input: Required<Pick<ObjectTransferInput, "key" | "destinationPath">>) => Promise<void>;
   uploadObject?: (input: Required<Pick<ObjectTransferInput, "key" | "sourcePath" | "contentType">>) => Promise<void>;
   stitchSegments?: typeof defaultStitchSegments;
+  extractCoverFrame?: typeof defaultExtractCoverFrame;
   extractQaFrames?: typeof defaultExtractQaFrames;
   listExtractedQaFrames?: typeof defaultListExtractedQaFrames;
   sendCallback?: typeof sendStitchCallback;
@@ -59,6 +61,7 @@ export async function runStitchJob({
   createWorkDir = defaultCreateWorkDir,
   writeTextFile = writeFile,
   stitchSegments = defaultStitchSegments,
+  extractCoverFrame = defaultExtractCoverFrame,
   extractQaFrames = defaultExtractQaFrames,
   listExtractedQaFrames = defaultListExtractedQaFrames,
   sendCallback = sendStitchCallback,
@@ -76,6 +79,7 @@ export async function runStitchJob({
 
   const workDir = await createWorkDir();
   const frameDirectory = normalizedPath(workDir, "frames");
+  const coverPath = normalizedPath(workDir, "cover.webp");
   const outputPath = normalizedPath(workDir, "final.mp4");
   const concatListPath = normalizedPath(workDir, "segments.txt");
   const frameCount = frameCountForPostQaMode(payload.postQaMode);
@@ -93,6 +97,24 @@ export async function runStitchJob({
     );
     await writeTextFile(concatListPath, buildConcatList(segmentPaths));
     await stitchSegments({ concatListPath, outputPath });
+
+    const warnings: string[] = [];
+    let generatedCoverKey: string | null = null;
+    if (payload.coverKey) {
+      try {
+        await extractCoverFrame({
+          videoPath: outputPath,
+          coverPath,
+        });
+        generatedCoverKey = payload.coverKey;
+      } catch (error) {
+        warnings.push(
+          `cover_generation_failed: ${
+            error instanceof Error ? error.message : "Unknown cover error"
+          }`,
+        );
+      }
+    }
 
     if (frameCount > 0) {
       await extractQaFrames({
@@ -118,6 +140,14 @@ export async function runStitchJob({
       contentType: "video/mp4",
     });
 
+    if (generatedCoverKey) {
+      await upload({
+        key: generatedCoverKey,
+        sourcePath: coverPath,
+        contentType: "image/webp",
+      });
+    }
+
     await Promise.all(
       frameKeys.map((key, index) =>
         upload({
@@ -132,8 +162,9 @@ export async function runStitchJob({
       stitchJobId: payload.stitchJobId,
       status: "succeeded",
       finalVideoKey: payload.finalVideoKey,
-      coverKey: payload.coverKey,
+      coverKey: generatedCoverKey,
       frameKeys,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
     await sendCallback({
       callbackUrl: payload.callbackUrl,

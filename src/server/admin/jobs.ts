@@ -35,6 +35,7 @@ export interface AdminJobRecord {
   durationSeconds: number;
   aspectRatio: string;
   creditCost: number;
+  trialEligibilitySnapshot: unknown;
   reservedLedgerId: string | null;
   finalVideoKey: string | null;
   coverKey: string | null;
@@ -93,6 +94,8 @@ export interface AdminProviderLogRecord {
   segmentId: string | null;
   purpose: string;
   provider: string;
+  modelRouteId: string | null;
+  routeSnapshot: unknown;
   model: string;
   status: string;
   durationMs: number | null;
@@ -479,6 +482,7 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
           creditCost: videoJobs.creditCost,
+          trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
           reservedLedgerId: videoJobs.reservedLedgerId,
           finalVideoKey: videoJobs.finalVideoKey,
           coverKey: videoJobs.coverKey,
@@ -569,6 +573,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           segmentId: providerCallLogs.segmentId,
           purpose: providerCallLogs.purpose,
           provider: providerCallLogs.provider,
+          modelRouteId: providerCallLogs.modelRouteId,
+          routeSnapshot: providerCallLogs.routeSnapshot,
           model: providerCallLogs.model,
           status: providerCallLogs.status,
           durationMs: providerCallLogs.durationMs,

@@ -11,6 +11,7 @@ import {
   StoryboardConfirmation,
 } from "./storyboard-confirmation";
 import { UploadPanel, type UploadedAssetItem } from "./upload-panel";
+import { getOrCreateDeviceFingerprint } from "@/lib/abuse/device-fingerprint";
 
 interface TemplateCatalogItem {
   templateId: string;
@@ -395,6 +396,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
         durationSeconds,
         aspectRatio,
         useFreeTrialIfAvailable,
+        deviceFingerprint: getOrCreateDeviceFingerprint(),
       }),
     });
     const body = await response.json();

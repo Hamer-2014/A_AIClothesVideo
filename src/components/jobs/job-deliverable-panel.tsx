@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 interface JobDeliverablePanelProps {
+  coverUrl?: string | null;
   jobId: string;
   previewUrl: string | null;
   defaultFilename: string;
@@ -18,6 +19,7 @@ function safeFilename(value: string) {
 }
 
 export function JobDeliverablePanel({
+  coverUrl,
   jobId,
   previewUrl,
   defaultFilename,
@@ -63,7 +65,13 @@ export function JobDeliverablePanel({
           </div>
         </div>
       </div>
-      {previewUrl ? (
+      {coverUrl ? (
+        <img
+          alt="视频封面"
+          className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
+          src={coverUrl}
+        />
+      ) : previewUrl ? (
         <video
           className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
           controls

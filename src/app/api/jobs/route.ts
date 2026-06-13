@@ -11,6 +11,8 @@ import {
 type JobSession = {
   user?: {
     id?: string;
+    email?: string | null;
+    emailVerified?: boolean | null;
   };
 } | null;
 
@@ -28,6 +30,9 @@ interface CreateJobRouteDeps {
       userAgent: string | null;
       path: string | null;
     };
+    email?: string | null;
+    emailVerified?: boolean | null;
+    deviceFingerprint?: string | null;
   }) => Promise<{
     job: CreatedVideoJob;
     jobAssets: CreatedVideoJobAsset[];
@@ -74,6 +79,8 @@ export async function handleCreateJobRequest(
       ? input.useFreeTrialIfAvailable
       : undefined;
   const isTest = input.isTest === true;
+  const deviceFingerprint =
+    typeof input.deviceFingerprint === "string" ? input.deviceFingerprint : null;
   const createJob =
     deps.createJob ??
     ((jobInput) =>
@@ -90,6 +97,9 @@ export async function handleCreateJobRequest(
       aspectRatio,
       useFreeTrialIfAvailable,
       isTest,
+      email: session?.user?.email ?? null,
+      emailVerified: session?.user?.emailVerified ?? null,
+      deviceFingerprint,
       requestContext: {
         ipAddress: requestIp(request),
         userAgent: request.headers.get("user-agent"),
@@ -137,7 +147,7 @@ export async function handleCreateJobRequest(
       return NextResponse.json(
         {
           error: "free_trial_unavailable",
-          message: "免费试用暂不可用，请选择付费生成。",
+          message: "当前环境暂时无法使用免费试用，可购买点数继续生成。",
         },
         { status: 409 },
       );

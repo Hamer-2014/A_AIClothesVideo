@@ -10,6 +10,7 @@ import {
   userAccessEvents,
   videoJobAssets,
   videoJobs,
+  trialAbuseSignals,
 } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import type { assetRoleValues, assetStatusValues } from "@/lib/db/schema/assets";
@@ -19,6 +20,13 @@ import type {
   billingModeValues,
   generationProfileValues,
 } from "@/lib/db/schema/jobs";
+import {
+  evaluateTrialEligibility,
+  type TrialAbuseSignalInput,
+  type TrialEligibilityInput,
+  type TrialEligibilityStore,
+} from "@/server/abuse/trial-eligibility";
+import { hashAbuseSignal } from "@/server/abuse/hash";
 
 export type AssetRole = (typeof assetRoleValues)[number];
 export type AssetStatus = (typeof assetStatusValues)[number];
@@ -79,6 +87,9 @@ export interface FreeTrialUsageRecord {
   watermarkEnabled: boolean;
   provider: string;
   model: string;
+  emailHash?: string | null;
+  oauthProvider?: string | null;
+  oauthAccountIdHash?: string | null;
 }
 
 export interface UserAccessEventRecord {
@@ -115,6 +126,23 @@ export interface VideoJobCreationStore {
     userId: string;
     since: Date;
   }): Promise<number>;
+  countTrialUsagesByUserId(userId: string): Promise<number>;
+  countTrialUsagesByEmailHash(emailHash: string): Promise<number>;
+  countTrialUsagesByOauthAccount(
+    provider: string,
+    oauthAccountIdHash: string,
+  ): Promise<number>;
+  countRecentTrialSignalsByDevice(
+    deviceFingerprintHash: string,
+    since: Date,
+  ): Promise<number>;
+  countRecentTrialSignalsByIp(ipHash: string, since: Date): Promise<number>;
+  countRecentTrialSignalsByIpAndUserAgent(
+    ipHash: string,
+    userAgentHash: string,
+    since: Date,
+  ): Promise<number>;
+  createTrialAbuseSignal(input: TrialAbuseSignalInput): Promise<void>;
   createFreeTrialUsage(
     input: Omit<FreeTrialUsageRecord, "id">,
   ): Promise<FreeTrialUsageRecord>;
@@ -201,7 +229,18 @@ export function createInMemoryVideoJobCreationStore(
     trialUsages?: Array<{
       userId: string;
       usedAt: Date;
+      emailHash?: string | null;
+      oauthProvider?: string | null;
+      oauthAccountIdHash?: string | null;
     }>;
+    trialEligibilityCounts?: {
+      userTrialCount?: number;
+      emailTrialCount?: number;
+      oauthTrialCount?: number;
+      deviceSignalCount?: number;
+      ipSignalCount?: number;
+      ipUserAgentSignalCount?: number;
+    };
   } = {},
 ): VideoJobCreationStore & {
   listJobs: () => CreatedVideoJob[];
@@ -209,6 +248,7 @@ export function createInMemoryVideoJobCreationStore(
   listEvents: () => VideoJobCreationEvent[];
   listTrialUsages: () => FreeTrialUsageRecord[];
   listAccessEvents: () => UserAccessEventRecord[];
+  listTrialAbuseSignals: () => TrialAbuseSignalInput[];
 } {
   const ownedAssets = new Map(initialAssets.map((asset) => [asset.id, asset]));
   const jobs: CreatedVideoJob[] = [];
@@ -226,9 +266,14 @@ export function createInMemoryVideoJobCreationStore(
       watermarkEnabled: true,
       provider: "apimart",
       model: "pixverse-v6",
+      emailHash: usage.emailHash ?? null,
+      oauthProvider: usage.oauthProvider ?? null,
+      oauthAccountIdHash: usage.oauthAccountIdHash ?? null,
     }),
   );
   const accessEvents: UserAccessEventRecord[] = [];
+  const trialAbuseSignalRecords: TrialAbuseSignalInput[] = [];
+  const trialEligibilityCounts = options.trialEligibilityCounts ?? {};
 
   return {
     async findOwnedAssets({ userId, assetIds }) {
@@ -270,6 +315,42 @@ export function createInMemoryVideoJobCreationStore(
         (usage) => usage.userId === userId && usage.usedAt >= since,
       ).length;
     },
+    async countTrialUsagesByUserId(userId) {
+      return (
+        trialEligibilityCounts.userTrialCount ??
+        trialUsageRecords.filter((usage) => usage.userId === userId).length
+      );
+    },
+    async countTrialUsagesByEmailHash(emailHash) {
+      return (
+        trialEligibilityCounts.emailTrialCount ??
+        trialUsageRecords.filter(
+          (usage) => usage.emailHash === emailHash,
+        ).length
+      );
+    },
+    async countTrialUsagesByOauthAccount(provider, oauthAccountIdHash) {
+      return (
+        trialEligibilityCounts.oauthTrialCount ??
+        trialUsageRecords.filter(
+          (usage) =>
+            usage.oauthProvider === provider &&
+            usage.oauthAccountIdHash === oauthAccountIdHash,
+        ).length
+      );
+    },
+    async countRecentTrialSignalsByDevice() {
+      return trialEligibilityCounts.deviceSignalCount ?? 0;
+    },
+    async countRecentTrialSignalsByIp() {
+      return trialEligibilityCounts.ipSignalCount ?? 0;
+    },
+    async countRecentTrialSignalsByIpAndUserAgent() {
+      return trialEligibilityCounts.ipUserAgentSignalCount ?? 0;
+    },
+    async createTrialAbuseSignal(input) {
+      trialAbuseSignalRecords.push(input);
+    },
     async createFreeTrialUsage(input) {
       const record = {
         id: randomUUID(),
@@ -301,6 +382,9 @@ export function createInMemoryVideoJobCreationStore(
     },
     listAccessEvents() {
       return accessEvents;
+    },
+    listTrialAbuseSignals() {
+      return trialAbuseSignalRecords;
     },
   };
 }
@@ -411,6 +495,102 @@ export function createDrizzleVideoJobCreationStore(
 
       return rows.length;
     },
+    async countTrialUsagesByUserId(userId) {
+      const rows = await db
+        .select({ id: freeTrialUsages.id })
+        .from(freeTrialUsages)
+        .where(eq(freeTrialUsages.userId, userId));
+
+      return rows.length;
+    },
+    async countTrialUsagesByEmailHash(emailHash) {
+      const rows = await db
+        .select({ id: trialAbuseSignals.id })
+        .from(trialAbuseSignals)
+        .where(
+          and(
+            eq(trialAbuseSignals.emailHash, emailHash),
+            eq(trialAbuseSignals.eventType, "trial_granted"),
+          ),
+        );
+
+      return rows.length;
+    },
+    async countTrialUsagesByOauthAccount(provider, oauthAccountIdHash) {
+      const rows = await db
+        .select({ id: trialAbuseSignals.id })
+        .from(trialAbuseSignals)
+        .where(
+          and(
+            eq(trialAbuseSignals.oauthProvider, provider),
+            eq(trialAbuseSignals.oauthAccountIdHash, oauthAccountIdHash),
+            eq(trialAbuseSignals.eventType, "trial_granted"),
+          ),
+        );
+
+      return rows.length;
+    },
+    async countRecentTrialSignalsByDevice(deviceFingerprintHash, since) {
+      const rows = await db
+        .select({ id: trialAbuseSignals.id })
+        .from(trialAbuseSignals)
+        .where(
+          and(
+            eq(trialAbuseSignals.deviceFingerprintHash, deviceFingerprintHash),
+            eq(trialAbuseSignals.eventType, "trial_granted"),
+            gte(trialAbuseSignals.createdAt, since),
+          ),
+        );
+
+      return rows.length;
+    },
+    async countRecentTrialSignalsByIp(ipHash, since) {
+      const rows = await db
+        .select({ id: trialAbuseSignals.id })
+        .from(trialAbuseSignals)
+        .where(
+          and(
+            eq(trialAbuseSignals.ipHash, ipHash),
+            eq(trialAbuseSignals.eventType, "trial_granted"),
+            gte(trialAbuseSignals.createdAt, since),
+          ),
+        );
+
+      return rows.length;
+    },
+    async countRecentTrialSignalsByIpAndUserAgent(ipHash, userAgentHash, since) {
+      const rows = await db
+        .select({ id: trialAbuseSignals.id })
+        .from(trialAbuseSignals)
+        .where(
+          and(
+            eq(trialAbuseSignals.ipHash, ipHash),
+            eq(trialAbuseSignals.userAgentHash, userAgentHash),
+            eq(trialAbuseSignals.eventType, "trial_granted"),
+            gte(trialAbuseSignals.createdAt, since),
+          ),
+        );
+
+      return rows.length;
+    },
+    async createTrialAbuseSignal(input) {
+      await db.insert(trialAbuseSignals).values({
+        userId: input.userId,
+        videoJobId: input.videoJobId ?? null,
+        emailHash: input.emailHash ?? null,
+        oauthProvider: input.oauthProvider ?? null,
+        oauthAccountIdHash: input.oauthAccountIdHash ?? null,
+        ipHash: input.ipHash ?? null,
+        deviceFingerprintHash: input.deviceFingerprintHash ?? null,
+        userAgentHash: input.userAgentHash ?? null,
+        eventType: input.eventType,
+        decision: input.decision,
+        riskScore: input.riskScore,
+        reasonCodes: input.reasonCodes,
+        metadata: input.metadata ?? null,
+        createdAt: input.createdAt,
+      });
+    },
     async createFreeTrialUsage(input) {
       const [record] = await db
         .insert(freeTrialUsages)
@@ -472,6 +652,12 @@ export async function createVideoJobWithAssets({
   isTest = false,
   now = new Date(),
   requestContext,
+  email,
+  emailVerified,
+  oauthAccounts,
+  deviceFingerprint,
+  abuseHashSecret = process.env.ABUSE_HASH_SECRET,
+  appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
 }: {
   store: VideoJobCreationStore;
   userId: string;
@@ -483,6 +669,12 @@ export async function createVideoJobWithAssets({
   isTest?: boolean;
   now?: Date;
   requestContext?: RequestContext;
+  email?: string | null;
+  emailVerified?: boolean | null;
+  oauthAccounts?: TrialEligibilityInput["oauthAccounts"];
+  deviceFingerprint?: string | null;
+  abuseHashSecret?: string | null;
+  appEnvironment?: string;
 }) {
   const uniqueAssetIds = Array.from(new Set(assetIds));
   assertValidInput({ assetIds: uniqueAssetIds, durationSeconds, aspectRatio });
@@ -502,13 +694,38 @@ export async function createVideoJobWithAssets({
 
   const shouldAttemptFreeTrial =
     durationSeconds === 8 && useFreeTrialIfAvailable === true;
+  let trialEligibility:
+    | Awaited<ReturnType<typeof evaluateTrialEligibility>>
+    | null = null;
+
+  if (shouldAttemptFreeTrial) {
+    trialEligibility = await evaluateTrialEligibility({
+      store,
+      input: {
+        userId,
+        email,
+        emailVerified,
+        oauthAccounts,
+        ipAddress: requestContext?.ipAddress,
+        userAgent: requestContext?.userAgent,
+        deviceFingerprint,
+        now,
+      },
+      hashSecret: abuseHashSecret,
+      environment: appEnvironment,
+    });
+  }
+
   const recentTrialCount = shouldAttemptFreeTrial
     ? await store.countRecentFreeTrialUsages({
         userId,
         since: trialWindowStart(now),
       })
     : 0;
-  if (shouldAttemptFreeTrial && recentTrialCount > 0) {
+  if (
+    shouldAttemptFreeTrial &&
+    (recentTrialCount > 0 || trialEligibility?.decision !== "allow")
+  ) {
     await recordAccessEvent({
       store,
       userId,
@@ -518,6 +735,8 @@ export async function createVideoJobWithAssets({
         durationSeconds,
         requested: true,
         previousTrialCount: recentTrialCount,
+        riskScore: trialEligibility?.riskScore ?? 0,
+        reasonCodes: trialEligibility?.reasonCodes ?? [],
         decision: "denied",
       },
     });
@@ -529,6 +748,8 @@ export async function createVideoJobWithAssets({
       metadata: {
         durationSeconds,
         previousTrialCount: recentTrialCount,
+        riskScore: trialEligibility?.riskScore ?? 0,
+        reasonCodes: trialEligibility?.reasonCodes ?? [],
       },
     });
     throw new Error("Free trial is not available.");
@@ -539,8 +760,10 @@ export async function createVideoJobWithAssets({
   const trialEligibilitySnapshot =
     shouldAttemptFreeTrial
       ? ({
-          decision: billingMode === "free_trial" ? "granted" : "denied",
-          window: "rolling_24h",
+          decision: billingMode === "free_trial" ? "allow" : "deny",
+          riskScore: trialEligibility?.riskScore ?? 0,
+          reasonCodes: trialEligibility?.reasonCodes ?? [],
+          signals: trialEligibility?.signalSnapshot ?? null,
           previousTrialCount: recentTrialCount,
           checkedAt: now.toISOString(),
         } satisfies JsonValue)
@@ -555,7 +778,9 @@ export async function createVideoJobWithAssets({
       durationSeconds,
       requested: shouldAttemptFreeTrial,
       previousTrialCount: recentTrialCount,
-      decision: billingMode === "free_trial" ? "granted" : "denied",
+      riskScore: trialEligibility?.riskScore ?? 0,
+      reasonCodes: trialEligibility?.reasonCodes ?? [],
+      decision: billingMode === "free_trial" ? "allow" : "deny",
     },
   });
 
@@ -599,6 +824,48 @@ export async function createVideoJobWithAssets({
       watermarkEnabled: profile.watermarkEnabled,
       provider: "apimart",
       model: "pixverse-v6",
+    });
+    await store.createTrialAbuseSignal({
+      userId,
+      videoJobId: job.id,
+      emailHash:
+        typeof trialEligibility?.signalSnapshot === "object" &&
+        trialEligibility.signalSnapshot !== null &&
+        !Array.isArray(trialEligibility.signalSnapshot) &&
+        typeof trialEligibility.signalSnapshot.emailHash === "string"
+          ? trialEligibility.signalSnapshot.emailHash
+          : null,
+      oauthProvider:
+        typeof trialEligibility?.signalSnapshot === "object" &&
+        trialEligibility.signalSnapshot !== null &&
+        !Array.isArray(trialEligibility.signalSnapshot) &&
+        Array.isArray(trialEligibility.signalSnapshot.oauthAccounts) &&
+        typeof trialEligibility.signalSnapshot.oauthAccounts[0] === "object" &&
+        trialEligibility.signalSnapshot.oauthAccounts[0] !== null &&
+        !Array.isArray(trialEligibility.signalSnapshot.oauthAccounts[0]) &&
+        typeof trialEligibility.signalSnapshot.oauthAccounts[0].provider === "string"
+          ? trialEligibility.signalSnapshot.oauthAccounts[0].provider
+          : null,
+      oauthAccountIdHash:
+        typeof trialEligibility?.signalSnapshot === "object" &&
+        trialEligibility.signalSnapshot !== null &&
+        !Array.isArray(trialEligibility.signalSnapshot) &&
+        Array.isArray(trialEligibility.signalSnapshot.oauthAccounts) &&
+        typeof trialEligibility.signalSnapshot.oauthAccounts[0] === "object" &&
+        trialEligibility.signalSnapshot.oauthAccounts[0] !== null &&
+        !Array.isArray(trialEligibility.signalSnapshot.oauthAccounts[0]) &&
+        typeof trialEligibility.signalSnapshot.oauthAccounts[0].accountHash === "string"
+          ? trialEligibility.signalSnapshot.oauthAccounts[0].accountHash
+          : null,
+      ipHash: hashAbuseSignal(requestContext?.ipAddress, abuseHashSecret ?? ""),
+      deviceFingerprintHash: hashAbuseSignal(deviceFingerprint, abuseHashSecret ?? ""),
+      userAgentHash: hashAbuseSignal(requestContext?.userAgent, abuseHashSecret ?? ""),
+      eventType: "trial_granted",
+      decision: "allow",
+      riskScore: trialEligibility?.riskScore ?? 0,
+      reasonCodes: trialEligibility?.reasonCodes ?? [],
+      metadata: trialEligibility?.signalSnapshot ?? null,
+      createdAt: now,
     });
     await recordAccessEvent({
       store,

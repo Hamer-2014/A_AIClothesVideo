@@ -82,4 +82,39 @@ describe("JobLivePanels", () => {
       "https://cdn.example.com/jobs/job-1/stitched/final.mp4",
     );
   });
+
+  it("uses the generated cover URL when progress includes a cover key", () => {
+    render(
+      <JobLivePanels
+        defaultFilename="runwaytools-job-1.mp4"
+        initialPreviewUrl={null}
+        initialProgress={{
+          jobId: "job-1",
+          status: "deliverable",
+          userVisibleStatus: "ready",
+          message: null,
+          phase: "deliverable",
+          segmentProgress: {
+            total: 1,
+            queued: 0,
+            generating: 0,
+            succeeded: 1,
+            failed: 0,
+          },
+          stitching: { status: "succeeded" },
+          postQa: { status: "passed" },
+          downloadReady: true,
+          finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          coverKey: "jobs/job-1/covers/cover.webp",
+        }}
+        jobId="job-1"
+        publicVideoBaseUrl="https://cdn.example.com"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "视频封面" })).toHaveAttribute(
+      "src",
+      "/api/jobs/job-1/cover",
+    );
+  });
 });
