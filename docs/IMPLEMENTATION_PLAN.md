@@ -31,13 +31,14 @@
 - `verify:blockers` 当前要求：
   - 至少一个 `credit_cost > 0` 的 paid deliverable 任务有 `reserve`、`capture`、final video、QA frames。
   - paid delivery 的 `video_segments.provider/model` 必须包含 `apimart` / `pixverse-v6`。
+  - paid delivery 的 `provider_call_logs.provider/model` 必须包含 `apimart` / `pixverse-v6`，不再要求 route snapshot。
   - 至少一个付费失败补偿任务有 `release` 或 `refund`。
   - 至少一个敏感后台操作写入 `admin_audit_logs`。
 - 开发者本地已生成 10+ 个视频，当前判断 APIMart PixVerse V6 链路稳定。
 
 ### 本轮已收敛
 
-- MVP 产品口径改为：付费默认生成音频；免费试用默认无音频。
+- MVP 产品口径改为：免费试用低分辨率、无音频、带水印；付费默认高分辨率、无水印、包含音频，用户侧不暴露供应商具体分辨率。
 - Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
 - stitch-worker 抽帧从固定 3 帧改为分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 转场帧策略仍是后续增强项。
 - 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。

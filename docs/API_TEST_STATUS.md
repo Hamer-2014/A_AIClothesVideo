@@ -2,7 +2,7 @@
 
 > 目的：把这次真实跑过什么、哪里成功、哪里失败、失败卡在哪，写成可复核记录，避免把“代码写了”误当成“闭环验收完成”。
 
-更新时间：2026-06-13
+更新时间：2026-06-14
 
 ## 结论先说
 
@@ -10,12 +10,27 @@
 - 2026-06-13 Env-only Video Generation Config 已开始替换子项目 B 的 DB route 口径：公开视频 `video_generation` 的 provider/model/key 以环境变量为准，`model_routes/provider_keys` 不再决定视频生成运行时配置。
 - 2026-06-13 MVP 风险收敛子项目 C 已完成本地自动化验证：Cloud Run worker 从 final mp4 抽取 `cover.webp` 并上传 R2，封面失败不阻断 final video / QA frames；前台任务详情优先显示封面，任务列表通过内部 cover API 的 R2 signed URL 显示封面缩略图。
 - 2026-06-13 SPEC Acceptance Follow-up 代码修复已完成本地定点验证：免费试用 grant hash 复用同一 dev fallback secret、Cloud Run cover 上传失败降级为 warning。旧 `model_routes` public fallback 验收口径已被 env-only 视频生成配置取代。
-- 2026-06-13 SPEC Acceptance Follow-up 真实阻断验证仍未通过：旧失败原因依赖 `provider_call_logs.model_route_id` / `route_snapshot`；env-only 后应改查 `video_segments.provider/model` 和 `provider_call_logs.provider/model`，不能再要求 route snapshot。
+- 2026-06-14 Env-only blocker verifier alignment 已把 `verify:blockers` paid delivery 证据改为 `video_segments.provider/model` 与 `provider_call_logs.provider/model`；不再要求 `provider_call_logs.model_route_id` / `route_snapshot`。
 - Admin Ops Closure 的代码改动已完成，`/admin/jobs`、`/admin/jobs/[id]`、Provider / Template / Billing 页面和敏感动作 reason / audit 约束都已落地。
 - 本轮本地验证已通过：
   - `npm run typecheck`
   - `npm test`
   - `npm run build`
+
+## 2026-06-14 Env-only blocker verifier alignment
+
+本轮完成：
+
+- `verify:blockers` paid delivery 证据改为检查 `video_segments.provider/model` 与 `provider_call_logs.provider/model`。
+- 不再要求 `provider_call_logs.model_route_id` / `route_snapshot`。
+- 付费闭环断言未降低：仍要求 `credit_cost > 0`、`reserve`、`capture`、final video 和 QA frames。
+- 免费试用/付费生成口径收敛：免费试用为低分辨率、无音频、带水印；付费默认为高分辨率、无水印、包含音频；普通用户侧不暴露供应商具体分辨率。
+
+仍未完成：
+
+- 本轮未跑新 paid env-only smoke；需要真实数据库、R2、APIMart、Cloud Run、worker 凭证和新的 paid job id。
+- Cloud Run cover 真实部署 smoke 仍需新任务证据，不能用旧本地样本替代。
+- Creem 真实 checkout/webhook review 仍是待生产验收项，不能写成已完成。
 
 ## 2026-06-13 SPEC Acceptance Follow-up
 
@@ -41,7 +56,7 @@ npm run verify:blockers -- --json
 - worker 定点测试：`2` 个 test files、`10` 个 tests 通过。
 - route/segment/log 定点测试：`3` 个 test files、`27` 个 tests 通过。
 - `npm run db:migrate`：迁移执行成功。
-- `npm run verify:blockers -- --json`：按旧 DB-route 标准失败，`paid_delivery` 未通过；现有 paid deliverable 样本 `0d3540c0-6dda-4ba7-841a-c12a45632148`、`516ac34b-0a2f-49e0-b584-96800d6cb899`、`5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06` 的 `videoRouteLogCount = 0`，缺少 `provider_call_logs.model_route_id` 与 `route_snapshot`。env-only 后该失败项应改为 provider/model 证据检查。
+- 历史结果：`npm run verify:blockers -- --json` 曾按旧 DB-route 标准失败，`paid_delivery` 未通过；现有 paid deliverable 样本 `0d3540c0-6dda-4ba7-841a-c12a45632148`、`516ac34b-0a2f-49e0-b584-96800d6cb899`、`5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06` 当时缺少 route snapshot 证据。该旧失败项已被 2026-06-14 env-only provider/model 证据口径取代。
 
 剩余必须补的真实验收：
 

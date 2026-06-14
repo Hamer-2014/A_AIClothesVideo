@@ -29,7 +29,16 @@ npm run verify:blockers -- --json
 - Verification command: `npm run verify:blockers -- --json`
 - Result: `passed = true`
 
-## 2026-06-13 更新
+## 2026-06-14 更新
+
+- `verify:blockers` 的 paid delivery 检查已改为 env-only 视频生成证据口径。
+- 付费交付样本必须同时证明：
+  - `video_segments.provider/model` 包含 `apimart` / `pixverse-v6`
+  - `provider_call_logs.provider/model` 包含 `apimart` / `pixverse-v6`
+- 不要求 `provider_call_logs.model_route_id` 或 `route_snapshot`，因为公开视频生成运行时已经改为 env-only。
+- 付费闭环断言未降低：仍要求 `credit_cost > 0`、`reserve`、`capture`、final video 和 QA frames。
+
+## 2026-06-13 历史更新
 
 - `verify:blockers` 的 paid delivery 检查已加上公开视频 provider/model 断言。
 - 付费交付样本必须同时证明 `video_segments.provider` 包含 `apimart`，且 `video_segments.model` 包含 `pixverse-v6`。
@@ -47,6 +56,9 @@ npm run verify:blockers -- --json
 - `post_qa_results.frame_keys` 至少 1 张
 - `video_segments.provider` 包含 `apimart`
 - `video_segments.model` 包含 `pixverse-v6`
+- `provider_call_logs.purpose = video_generation`
+- `provider_call_logs.provider` 包含 `apimart`
+- `provider_call_logs.model` 包含 `pixverse-v6`
 
 补齐方式：
 

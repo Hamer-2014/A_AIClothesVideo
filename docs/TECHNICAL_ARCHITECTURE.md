@@ -120,9 +120,10 @@ MVP 开发阶段直接接入真实 Creem 和真实模型服务，不做 mock 成
 - 存储业务数据。
 - 作为任务状态机的唯一真实来源。
 - 存储点数账本。
-- 存储模型路由配置。
 - 存储模型调用日志。
 - 存储管理员审计日志。
+
+MVP 公开视频生成 provider/model/key 只由环境变量决定。数据库 `model_routes` / `provider_keys` 不决定公开视频生成链路。
 
 原则：
 
@@ -482,6 +483,8 @@ PRD 已列出核心实体。技术实现时建议按以下边界设计。
 - `prompt_moderation_results`
 
 MVP 视频生成采用 env-only 配置：`VIDEO_GENERATION_PROVIDER` 决定 `apimart` 或 `evolink`，`VIDEO_GENERATION_MODEL` 决定模型名，厂商 key 从 `APIMART_API_KEY` 或 `EVOLINK_API_KEY` 读取。`model_routes` / `provider_keys` 不参与公开视频生成 provider/model/key 决策；如未来恢复企业级多 provider 路由，需要另开独立设计并同步后台、审计和迁移策略。
+
+当前生成档位：免费试用为低分辨率、无音频、带水印；付费默认为高分辨率、无水印、包含音频。用户侧不暴露供应商具体分辨率或模型细节。
 
 `provider_call_logs` 继续用于调用观测、排障和成本追踪。
 
@@ -922,7 +925,7 @@ MVP 至少需要后台可见指标：
 - 不在 Vercel Function 内跑 ffmpeg。
 - 不支持自由时长。
 - 不开放 4K 公开售卖。
-- 不默认生成音频。
+- 不把更高分辨率有声档公开售卖给普通用户。
 - 不允许普通用户关闭 Post-QA 质检。
 - 不把 EvoLink fast 放入公开自动 fallback，除非运营明确切换并重新验收毛利与成功率。
 - 不绕过 Creem Prompt Moderation 直接提交图片/视频生成。
