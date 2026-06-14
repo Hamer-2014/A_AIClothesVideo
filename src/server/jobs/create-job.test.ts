@@ -287,6 +287,47 @@ describe("create video job", () => {
     expect(store.listTrialAbuseSignals()).toHaveLength(0);
   });
 
+  it("uses the same dev fallback abuse hash secret for trial check and granted signals", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: true,
+      email: "seller@example.com",
+      emailVerified: true,
+      deviceFingerprint: "device-1",
+      requestContext: {
+        ipAddress: "203.0.113.10",
+        userAgent: "Vitest Browser",
+        path: "/api/jobs",
+      },
+      abuseHashSecret: null,
+      appEnvironment: "development",
+      now: new Date("2026-06-13T08:00:00.000Z"),
+    });
+
+    const signals = store.listTrialAbuseSignals();
+    const check = signals.find((signal) => signal.eventType === "trial_check");
+    const granted = signals.find((signal) => signal.eventType === "trial_granted");
+
+    expect(check).toBeTruthy();
+    expect(granted).toBeTruthy();
+    expect(granted?.ipHash).toBe(check?.ipHash);
+    expect(granted?.deviceFingerprintHash).toBe(check?.deviceFingerprintHash);
+    expect(granted?.userAgentHash).toBe(check?.userAgentHash);
+  });
+
   it("always creates paid jobs for 16 and 24 second durations", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

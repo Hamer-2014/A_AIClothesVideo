@@ -48,7 +48,7 @@ const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
   "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.";
 const postQaSystemInstruction =
-  "Review stitched clothing product video frames for generation quality. Return only JSON with passed, failure_category, checks, risk_flags, summary. Set passed to true only when the garment remains consistent, frames are clear, safe, and suitable for a product marketing video.";
+  "Review stitched clothing product video frames for delivery quality and safety. Return only JSON with passed, failure_category, checks, risk_flags, summary. Fail only for blocking delivery problems: garment mismatch or invented details, product cannot be recognized, severe blur/distortion/artifacts, black/bad frames, unsafe content, sexualized child imagery, exploitation, privacy-sensitive content, or adultized child presentation. Do not fail for subjective brand preference or broad ad-policy uncertainty. For childrenswear/kids apparel, ordinary child models, child context, lifestyle scenes, outdoor/street scenes, and minor_present/child_model risk flags are not a failure reason by itself when the presentation is safe and the garment remains recognizable. Slight motion blur is acceptable when the garment can still be assessed. If only soft suitability concerns exist, set passed true and include them as risk_flags/summary warnings instead of failure_category.";
 const assetAnalysisJsonSchema = {
   type: "object",
   additionalProperties: false,

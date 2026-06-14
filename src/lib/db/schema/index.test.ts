@@ -25,7 +25,6 @@ const requiredTables = [
   "orders",
   "modelProviders",
   "providerKeys",
-  "modelRoutes",
   "providerCallLogs",
   "promptModerationResults",
   "adminAuditLogs",
@@ -67,6 +66,7 @@ describe("database schema", () => {
     for (const tableName of requiredTables) {
       expect(schema[tableName]).toBeDefined();
     }
+    expect(schema).not.toHaveProperty("modelRoutes");
   });
 
   it("exports required job states", () => {

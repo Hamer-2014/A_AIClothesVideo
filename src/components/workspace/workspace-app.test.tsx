@@ -13,7 +13,7 @@ vi.mock("./upload-panel", () => ({
     onUploaded: (asset: {
       assetId: string;
       fileName: string;
-      intendedRole: "front" | "back" | "detail";
+      intendedRole: "front" | "back" | "detail" | "scene";
       status: "uploaded";
     }) => void;
     onUploadingChange: (uploading: boolean) => void;
@@ -58,6 +58,19 @@ vi.mock("./upload-panel", () => ({
       >
         mock-upload-detail
       </button>
+      <button
+        onClick={() =>
+          onUploaded({
+            assetId: "asset-scene",
+            fileName: "scene.jpg",
+            intendedRole: "scene",
+            status: "uploaded",
+          })
+        }
+        type="button"
+      >
+        mock-upload-scene
+      </button>
       <button onClick={() => onUploadingChange(true)} type="button">
         mock-uploading
       </button>
@@ -98,10 +111,30 @@ vi.mock("./template-picker", () => ({
 
 vi.mock("./storyboard-confirmation", () => ({
   StoryboardConfirmation: ({
+    creditCost,
+    disabled,
     moderationPendingMessage,
+    onConfirm,
+    segments,
   }: {
+    creditCost: number;
+    disabled?: boolean;
     moderationPendingMessage?: string | null;
-  }) => <div>{moderationPendingMessage ?? "storyboard-confirmation"}</div>,
+    onConfirm: () => void;
+    segments: Array<{ prompt: string }>;
+  }) => (
+    <div>
+      <h3>分镜确认</h3>
+      <p>{creditCost} 点</p>
+      <p>{moderationPendingMessage ?? "storyboard-confirmation"}</p>
+      {segments.map((segment) => (
+        <p key={segment.prompt}>{segment.prompt}</p>
+      ))}
+      <button disabled={disabled} onClick={onConfirm} type="button">
+        确认分镜并生成
+      </button>
+    </div>
+  ),
 }));
 
 const templateCatalog = [
@@ -125,6 +158,13 @@ const templateCatalog = [
     riskLevel: "medium",
     requiredAssets: ["detail"],
     detailTypes: ["fabric"],
+  },
+  {
+    templateId: "scene_lifestyle_showcase",
+    displayName: "场景氛围展示",
+    description: "使用场景图作为背景参考",
+    riskLevel: "medium",
+    requiredAssets: ["front", "scene"],
   },
 ];
 
@@ -529,6 +569,156 @@ describe("WorkspaceApp", () => {
     expect(screen.getByText("基于已上传素材位预估模板，生成前会再次分析校验。")).toBeInTheDocument();
   });
 
+  it("keeps storyboard confirmation and manual draft controls out of the default workspace", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    expect(screen.queryByText("分镜确认")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 点")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "生成分镜草稿" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "确认分镜并生成" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not show non-garment warnings for scene assets", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            status: "asset_analysis_queued",
+            userVisibleStatus: "analyzing_assets",
+            assetCount: 1,
+          }),
+          {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobId: "job-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            job: {
+              id: "job-1",
+              status: "asset_analysis_passed",
+              userVisibleStatus: "assets_ready",
+              lastError: null,
+              failureReason: null,
+              durationSeconds: 8,
+              aspectRatio: "9:16",
+              creditCost: 70,
+              billingMode: "paid",
+              generationProfile: "paid_720p_audio",
+              watermarkEnabled: false,
+            },
+            assetCount: 2,
+            acceptable: true,
+            assetCompleteness: {
+              hasFront: true,
+              hasBack: false,
+              hasSide: false,
+              hasDetail: false,
+              hasScene: true,
+              hasModelFront: false,
+              hasFlatLayOrWhiteBackground: true,
+              detailTypes: [],
+            },
+            recommendations: {
+              recommended: [{ templateId: "front_push_in", riskLevel: "low", riskWarnings: [] }],
+              optional: [],
+              unavailable: [],
+              availableTemplateIds: ["front_push_in"],
+            },
+            analyses: [
+              {
+                assetId: "asset-front",
+                declaredRole: "front",
+                assetRole: "front",
+                quality: {
+                  isGarment: true,
+                  isClear: true,
+                  isSafe: true,
+                  hasFlatLayOrWhiteBackground: true,
+                },
+                confidence: "high",
+                riskFlags: [],
+              },
+              {
+                assetId: "asset-scene",
+                declaredRole: "scene",
+                assetRole: "unknown",
+                quality: {
+                  isGarment: false,
+                  isClear: true,
+                  isSafe: true,
+                  hasFlatLayOrWhiteBackground: false,
+                },
+                confidence: "low",
+                riskFlags: ["environmental scene"],
+              },
+            ],
+            latestStoryboard: null,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            storyboardId: "storyboard-1",
+            segments: [
+              {
+                index: 0,
+                durationSeconds: 8,
+                templateId: "front_push_in",
+                prompt: "front prompt",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "generation_route_unavailable",
+            message: "视频生成服务未完成模型路由配置，请联系管理员检查 development 环境的 video_generation route。",
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("正面慢推近")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText("有素材不像服装图，相关模板会被降级。"),
+    ).not.toBeInTheDocument();
+  });
+
   it("runs the default one-click generation chain after upload", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -663,6 +853,324 @@ describe("WorkspaceApp", () => {
       );
     });
     expect(window.location.href).toBe("/jobs/job-1");
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: location,
+    });
+  });
+
+  it("keeps manual storyboard preview available behind advanced settings after analysis", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            status: "asset_analysis_queued",
+            userVisibleStatus: "analyzing_assets",
+            assetCount: 1,
+          }),
+          {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobId: "job-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            job: {
+              id: "job-1",
+              status: "asset_analysis_passed",
+              userVisibleStatus: "assets_ready",
+              lastError: null,
+              failureReason: null,
+              durationSeconds: 8,
+              aspectRatio: "9:16",
+              creditCost: 70,
+              billingMode: "paid",
+              generationProfile: "paid_720p_audio",
+              watermarkEnabled: false,
+            },
+            assetCount: 1,
+            acceptable: true,
+            assetCompleteness: {
+              hasFront: true,
+              hasBack: false,
+              hasSide: false,
+              hasDetail: false,
+              hasScene: false,
+              hasModelFront: false,
+              hasFlatLayOrWhiteBackground: true,
+              detailTypes: [],
+            },
+            recommendations: {
+              recommended: [{ templateId: "front_push_in", riskLevel: "low", riskWarnings: [] }],
+              optional: [],
+              unavailable: [],
+              availableTemplateIds: ["front_push_in"],
+            },
+            analyses: [],
+            latestStoryboard: null,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "prompt_moderation_unavailable",
+          }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            storyboardId: "storyboard-1",
+            segments: [
+              {
+                index: 0,
+                durationSeconds: 8,
+                templateId: "front_push_in",
+                prompt: "manual preview prompt",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            storyboardId: "storyboard-1",
+            status: "segment_generating",
+            reservedLedgerId: "ledger-1",
+            segmentCount: 1,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    const location = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "" },
+    });
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+
+    await screen.findByText("审核服务暂时不可用，请稍后再试。");
+    expect(
+      screen.queryByRole("button", { name: "生成分镜草稿" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("高级设置 / 手动预览分镜"));
+    fireEvent.click(screen.getByRole("button", { name: "生成分镜草稿" }));
+
+    await screen.findByText("manual preview prompt");
+    fireEvent.click(screen.getByRole("button", { name: "确认分镜并生成" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        6,
+        "/api/jobs/job-1/confirm",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            storyboardId: "storyboard-1",
+          }),
+        }),
+      );
+      expect(window.location.href).toBe("/jobs/job-1");
+    });
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: location,
+    });
+  });
+
+  it("prefers the scene template for one-click generation when a scene asset is available", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            status: "asset_analysis_queued",
+            userVisibleStatus: "analyzing_assets",
+            assetCount: 2,
+          }),
+          {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobId: "job-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            job: {
+              id: "job-1",
+              status: "asset_analysis_passed",
+              userVisibleStatus: "assets_ready",
+              lastError: null,
+              failureReason: null,
+              durationSeconds: 8,
+              aspectRatio: "9:16",
+              creditCost: 70,
+              billingMode: "paid",
+              generationProfile: "paid_720p_audio",
+              watermarkEnabled: false,
+            },
+            assetCount: 2,
+            acceptable: true,
+            assetCompleteness: {
+              hasFront: true,
+              hasBack: false,
+              hasSide: false,
+              hasDetail: false,
+              hasScene: true,
+              hasModelFront: false,
+              hasFlatLayOrWhiteBackground: false,
+              detailTypes: [],
+            },
+            recommendations: {
+              recommended: [
+                { templateId: "front_push_in", riskLevel: "low", riskWarnings: [] },
+              ],
+              optional: [
+                {
+                  templateId: "scene_lifestyle_showcase",
+                  riskLevel: "medium",
+                  riskWarnings: [],
+                },
+              ],
+              unavailable: [],
+              availableTemplateIds: ["front_push_in", "scene_lifestyle_showcase"],
+            },
+            analyses: [
+              {
+                assetId: "asset-front",
+                declaredRole: "front",
+                assetRole: "front",
+                quality: {
+                  isGarment: true,
+                  isClear: true,
+                  isSafe: true,
+                },
+                confidence: "high",
+                riskFlags: [],
+              },
+              {
+                assetId: "asset-scene",
+                declaredRole: "scene",
+                assetRole: "unknown",
+                quality: {
+                  isGarment: false,
+                  isClear: true,
+                  isSafe: true,
+                },
+                confidence: "low",
+                riskFlags: [],
+              },
+            ],
+            latestStoryboard: null,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            storyboardId: "storyboard-1",
+            segments: [
+              {
+                index: 0,
+                durationSeconds: 8,
+                templateId: "scene_lifestyle_showcase",
+                prompt: "scene prompt",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            storyboardId: "storyboard-1",
+            status: "segment_generating",
+            reservedLedgerId: "ledger-1",
+            segmentCount: 1,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    const location = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "" },
+    });
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-scene" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        4,
+        "/api/jobs/job-1/storyboard",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            selectedTemplateIds: ["scene_lifestyle_showcase"],
+            userPrompt: "保持服装版型稳定，适合商品页宣传。",
+          }),
+        }),
+      );
+    });
+
     Object.defineProperty(window, "location", {
       configurable: true,
       value: location,

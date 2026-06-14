@@ -105,7 +105,6 @@ function canGenerateStoryboard(status: string) {
   return [
     "asset_analysis_passed",
     "storyboard_draft_ready",
-    "asset_analysis_running",
   ].includes(status);
 }
 
@@ -283,9 +282,9 @@ export function JobContinuePanel({
   return (
     <section className="space-y-5 rounded-lg border border-[var(--line)] bg-white p-5">
       <div>
-        <h2 className="text-base font-medium">继续任务</h2>
+        <h2 className="text-base font-medium">继续生成</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-          在任务页直接继续分镜与确认流程，不必再回工作台。
+          这个任务还停在生成前，你可以补充生成意图后继续。
         </p>
       </div>
 

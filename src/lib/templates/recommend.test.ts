@@ -148,4 +148,58 @@ describe("shot template recommendation rules", () => {
       riskWarnings: expect.arrayContaining(["strict_review_required"]),
     });
   });
+
+  it("only makes the scene lifestyle template available when a scene asset exists", () => {
+    const withoutScene = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        hasFront: true,
+        hasBack: false,
+        hasSide: false,
+        hasDetail: false,
+        hasScene: false,
+        hasModelFront: false,
+        hasFlatLayOrWhiteBackground: false,
+        detailTypes: [],
+      },
+      isTrial: false,
+    });
+
+    expect(withoutScene.availableTemplateIds).not.toContain(
+      "scene_lifestyle_showcase",
+    );
+    expect(withoutScene.unavailable).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          templateId: "scene_lifestyle_showcase",
+          reasons: expect.arrayContaining(["scene_asset_required"]),
+        }),
+      ]),
+    );
+
+    const withScene = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        hasFront: true,
+        hasBack: false,
+        hasSide: false,
+        hasDetail: false,
+        hasScene: true,
+        hasModelFront: false,
+        hasFlatLayOrWhiteBackground: false,
+        detailTypes: [],
+      },
+      isTrial: false,
+    });
+
+    expect(withScene.availableTemplateIds).toContain("scene_lifestyle_showcase");
+    expect(withScene.optional).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          templateId: "scene_lifestyle_showcase",
+          riskLevel: "medium",
+        }),
+      ]),
+    );
+  });
 });

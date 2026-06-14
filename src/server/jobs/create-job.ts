@@ -22,6 +22,7 @@ import type {
 } from "@/lib/db/schema/jobs";
 import {
   evaluateTrialEligibility,
+  resolveAbuseHashSecret,
   type TrialAbuseSignalInput,
   type TrialEligibilityInput,
   type TrialEligibilityStore,
@@ -814,6 +815,11 @@ export async function createVideoJobWithAssets({
   });
 
   if (billingMode === "free_trial") {
+    const resolvedAbuseHashSecret = resolveAbuseHashSecret({
+      hashSecret: abuseHashSecret,
+      environment: appEnvironment,
+    });
+
     await store.createFreeTrialUsage({
       userId,
       videoJobId: job.id,
@@ -857,9 +863,18 @@ export async function createVideoJobWithAssets({
         typeof trialEligibility.signalSnapshot.oauthAccounts[0].accountHash === "string"
           ? trialEligibility.signalSnapshot.oauthAccounts[0].accountHash
           : null,
-      ipHash: hashAbuseSignal(requestContext?.ipAddress, abuseHashSecret ?? ""),
-      deviceFingerprintHash: hashAbuseSignal(deviceFingerprint, abuseHashSecret ?? ""),
-      userAgentHash: hashAbuseSignal(requestContext?.userAgent, abuseHashSecret ?? ""),
+      ipHash: hashAbuseSignal(
+        requestContext?.ipAddress,
+        resolvedAbuseHashSecret ?? "",
+      ),
+      deviceFingerprintHash: hashAbuseSignal(
+        deviceFingerprint,
+        resolvedAbuseHashSecret ?? "",
+      ),
+      userAgentHash: hashAbuseSignal(
+        requestContext?.userAgent,
+        resolvedAbuseHashSecret ?? "",
+      ),
       eventType: "trial_granted",
       decision: "allow",
       riskScore: trialEligibility?.riskScore ?? 0,

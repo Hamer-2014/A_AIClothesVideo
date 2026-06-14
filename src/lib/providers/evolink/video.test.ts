@@ -12,6 +12,77 @@ describe("EvoLink video provider", () => {
     expect(() => getEvoLinkVideoConfig({})).toThrow(
       EvoLinkProviderUnavailableError,
     );
+    expect(() => getEvoLinkVideoConfig({})).toThrow("EVOLINK_API_KEY");
+  });
+
+  it("uses EVOLINK_API_KEY and VIDEO_GENERATION_MODEL from env by default", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(JSON.stringify({ task_id: "task-env-key" }), {
+        status: 200,
+      });
+    });
+
+    await createEvoLinkVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        env: {
+          EVOLINK_API_KEY: "sk-env-evolink",
+          EVOLINK_BASE_URL: "https://api.evolink.example",
+          VIDEO_GENERATION_MODEL: "veo-env-model",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.evolink.example/v1/videos/generations",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-env-evolink",
+        }),
+        body: expect.stringContaining('"model":"veo-env-model"'),
+      }),
+    );
+  });
+
+  it("allows explicit API key and model overrides for tests", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response(JSON.stringify({ task_id: "task-override-key" }), {
+        status: 200,
+      });
+    });
+
+    await createEvoLinkVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        apiKey: "sk-override-evolink",
+        model: "veo-override-model",
+        env: {
+          EVOLINK_API_KEY: "sk-env-should-not-be-used",
+          EVOLINK_BASE_URL: "https://api.evolink.example",
+          VIDEO_GENERATION_MODEL: "veo-env-model",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.evolink.example/v1/videos/generations",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-override-evolink",
+        }),
+        body: expect.stringContaining('"model":"veo-override-model"'),
+      }),
+    );
   });
 
   it("submits a video generation task to EvoLink", async () => {
@@ -36,7 +107,7 @@ describe("EvoLink video provider", () => {
         env: {
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example",
-          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
         },
       },
     );
@@ -69,7 +140,7 @@ describe("EvoLink video provider", () => {
     });
   });
 
-  it("prefers VIDEO_GENERATION_MODEL over EVOLINK_VIDEO_MODEL", async () => {
+  it("prefers VIDEO_GENERATION_MODEL over the EvoLink default model", async () => {
     const fetchImpl = vi.fn(async () => {
       return new Response(JSON.stringify({ task_id: "task-generic-model" }), {
         status: 200,
@@ -87,8 +158,7 @@ describe("EvoLink video provider", () => {
         env: {
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example",
-          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
-          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
+          VIDEO_GENERATION_MODEL: "veo-env-generic-model",
         },
       },
     );
@@ -96,10 +166,10 @@ describe("EvoLink video provider", () => {
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://api.evolink.example/v1/videos/generations",
       expect.objectContaining({
-        body: expect.stringContaining('"model":"veo3.1-fast-beta"'),
+        body: expect.stringContaining('"model":"veo-env-generic-model"'),
       }),
     );
-    expect(result.model).toBe("veo3.1-fast-beta");
+    expect(result.model).toBe("veo-env-generic-model");
   });
 
   it("accepts a base url that was mistakenly configured as the full generations endpoint", async () => {
@@ -124,7 +194,7 @@ describe("EvoLink video provider", () => {
         env: {
           EVOLINK_API_KEY: "sk-test",
           EVOLINK_BASE_URL: "https://api.evolink.example/v1/videos/generations",
-          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
         },
       },
     );
@@ -154,7 +224,7 @@ describe("EvoLink video provider", () => {
       env: {
         EVOLINK_API_KEY: "sk-test",
         EVOLINK_BASE_URL: "https://api.evolink.example",
-        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+        VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
       },
     });
 
@@ -192,7 +262,7 @@ describe("EvoLink video provider", () => {
       env: {
         EVOLINK_API_KEY: "sk-test",
         EVOLINK_BASE_URL: "https://api.evolink.example",
-        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+        VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
       },
     });
 
@@ -228,7 +298,7 @@ describe("EvoLink video provider", () => {
       env: {
         EVOLINK_API_KEY: "sk-test",
         EVOLINK_BASE_URL: "https://api.evolink.example",
-        EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
+        VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
       },
     });
 

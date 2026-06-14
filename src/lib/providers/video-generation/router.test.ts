@@ -9,12 +9,17 @@ import {
 } from "./router";
 
 describe("video generation provider router", () => {
-  it("routes EvoLink submissions with VIDEO_GENERATION_MODEL taking precedence", async () => {
+  it("routes EvoLink submissions with env API key and VIDEO_GENERATION_MODEL", async () => {
     const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const requestsWithHeaders: Array<{ authorization: string | null }> = [];
     const fetchImpl: typeof fetch = async (url, init) => {
+      const headers = new Headers(init?.headers);
       requests.push({
         url: String(url),
         body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+      });
+      requestsWithHeaders.push({
+        authorization: headers.get("Authorization"),
       });
 
       return Response.json({ task_id: "task-generic-model" });
@@ -30,39 +35,25 @@ describe("video generation provider router", () => {
         fetch: fetchImpl,
         env: {
           VIDEO_GENERATION_PROVIDER: "evolink",
-          VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
-          EVOLINK_API_KEY: "sk-test",
+          VIDEO_GENERATION_MODEL: "veo-env-model",
+          EVOLINK_API_KEY: "sk-env-evolink",
           EVOLINK_BASE_URL: "https://api.evolink.example",
-          EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
         },
       },
     );
 
     expect(result).toMatchObject({
       provider: "evolink",
-      model: "veo3.1-fast-beta",
+      model: "veo-env-model",
       providerTaskId: "task-generic-model",
     });
-    expect(requests[0]?.body.model).toBe("veo3.1-fast-beta");
-  });
-
-  it("falls back to legacy EVOLINK_VIDEO_MODEL for compatibility", () => {
-    const config = getVideoGenerationConfig({
-      VIDEO_GENERATION_PROVIDER: "evolink",
-      EVOLINK_API_KEY: "sk-test",
-      EVOLINK_VIDEO_MODEL: "veo3.1-fast-beta",
-    });
-
-    expect(config).toMatchObject({
-      provider: "evolink",
-      model: "veo3.1-fast-beta",
-    });
+    expect(requests[0]?.body.model).toBe("veo-env-model");
+    expect(requestsWithHeaders[0]?.authorization).toBe("Bearer sk-env-evolink");
   });
 
   it("defaults to APIMart PixVerse when VIDEO_GENERATION_PROVIDER is not set", () => {
     const config = getVideoGenerationConfig({
       APIMART_API_KEY: "sk-test",
-      APIMART_PIXVERSE_MODEL: "pixverse-v6",
     });
 
     expect(config).toMatchObject({
@@ -78,7 +69,8 @@ describe("video generation provider router", () => {
         data: [{ status: "submitted", task_id: "task-apimart" }],
       });
 
-    const result = await createVideoGeneration(
+    const result = await createVideoGenerationForProvider(
+      "apimart",
       {
         prompt: "front push-in",
         imageUrls: ["https://signed.example/front.jpg"],
@@ -89,7 +81,7 @@ describe("video generation provider router", () => {
         env: {
           VIDEO_GENERATION_PROVIDER: "apimart",
           VIDEO_GENERATION_MODEL: "pixverse-v6",
-          APIMART_API_KEY: "sk-apimart",
+          APIMART_API_KEY: "sk-env-apimart",
           APIMART_BASE_URL: "https://api.apimart.ai",
         },
       },
@@ -120,9 +112,9 @@ describe("video generation provider router", () => {
         fetch: fetchImpl,
         env: {
           VIDEO_GENERATION_PROVIDER: "evolink",
-          APIMART_API_KEY: "sk-apimart",
+          VIDEO_GENERATION_MODEL: "pixverse-v6",
+          APIMART_API_KEY: "sk-env-apimart",
           APIMART_BASE_URL: "https://api.apimart.ai",
-          APIMART_PIXVERSE_MODEL: "pixverse-v6",
         },
       },
     );
@@ -162,15 +154,15 @@ describe("video generation provider router", () => {
       fetch: fetchImpl,
       env: {
         VIDEO_GENERATION_PROVIDER: "evolink",
-        VIDEO_GENERATION_MODEL: "veo3.1-fast-beta",
-        EVOLINK_API_KEY: "sk-test",
+        VIDEO_GENERATION_MODEL: "veo-env-model",
+        EVOLINK_API_KEY: "sk-env-evolink",
         EVOLINK_BASE_URL: "https://api.evolink.example",
       },
     });
 
     expect(result).toMatchObject({
       provider: "evolink",
-      model: "veo3.1-fast-beta",
+      model: "veo-env-model",
       providerTaskId: "task-1",
       status: "succeeded",
       outputUrl: "https://provider.example/video.mp4",
@@ -199,9 +191,9 @@ describe("video generation provider router", () => {
         fetch: fetchImpl,
         env: {
           VIDEO_GENERATION_PROVIDER: "evolink",
-          APIMART_API_KEY: "sk-apimart",
+          VIDEO_GENERATION_MODEL: "pixverse-v6",
+          APIMART_API_KEY: "sk-env-apimart",
           APIMART_BASE_URL: "https://api.apimart.example",
-          EVOLINK_API_KEY: "sk-evolink",
           EVOLINK_BASE_URL: "https://api.evolink.example",
         },
       },

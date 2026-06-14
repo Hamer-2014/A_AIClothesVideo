@@ -26,17 +26,20 @@ describe("POST /api/admin/provider-keys/[id]/rotate", () => {
     expect(response.status).toBe(403);
   });
 
-  it("rejects short reasons", async () => {
+  it("returns gone for authenticated users because provider keys are env-only", async () => {
     const response = await handleRotateProviderKeyRequest(
       request({ plainKey: "sk-test", reason: "short" }),
       { params: { id: "key-1" } },
       { getAdminSession: async () => admin },
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({
+      error: "provider_keys_retired",
+    });
   });
 
-  it("maps operator rotation denial to forbidden", async () => {
+  it("returns gone before accepting any provider key rotation workflow", async () => {
     const response = await handleRotateProviderKeyRequest(
       request({ plainKey: "sk-test", reason: "operator attempt" }),
       { params: { id: "key-1" } },
@@ -46,46 +49,22 @@ describe("POST /api/admin/provider-keys/[id]/rotate", () => {
           email: "ops@example.com",
           role: "operator",
         }),
-        rotateKey: async () => {
-          throw new Error("Actor cannot rotate provider keys.");
-        },
       },
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(410);
   });
 
-  it("reports missing provider key encryption configuration", async () => {
-    const response = await handleRotateProviderKeyRequest(
-      request({ plainKey: "sk-test", reason: "missing encryption" }),
-      { params: { id: "key-1" } },
-      {
-        getAdminSession: async () => admin,
-        rotateKey: async () => {
-          throw new Error(
-            "PROVIDER_KEY_ENCRYPTION_SECRET must be at least 32 characters.",
-          );
-        },
-      },
-    );
-
-    expect(response.status).toBe(503);
-  });
-
-  it("does not return plain or encrypted keys", async () => {
+  it("does not parse or return submitted secrets", async () => {
     const response = await handleRotateProviderKeyRequest(
       request({ plainKey: "sk-rotated-secret", reason: "rotate key" }),
       { params: { id: "key-1" } },
       {
         getAdminSession: async () => admin,
-        rotateKey: async () => ({
-          id: "key-1",
-          keyPreview: "sk-r...cret",
-        }),
       },
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(410);
     const serialized = JSON.stringify(await response.json());
     expect(serialized).not.toContain("sk-rotated-secret");
     expect(serialized).not.toContain("encrypted");

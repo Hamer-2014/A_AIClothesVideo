@@ -80,6 +80,11 @@ function createStores() {
         userId,
         originalKey: "users/user-1/assets/asset-front/original.jpg",
       },
+      {
+        id: "asset-scene",
+        userId,
+        originalKey: "users/user-1/assets/asset-scene/original.jpg",
+      },
     ],
   });
   const providerCallLogStore = createInMemoryProviderCallLogStore();
@@ -164,15 +169,7 @@ describe("video segment services", () => {
       ...stores,
       jobId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-test",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-test",
-        source: "database",
-        routeSnapshot: { routeId: "route-test", routeSource: "database" },
-      }),
-      createVideoGeneration: async (_provider, input) => {
+      createVideoGeneration: async (input) => {
         active += 1;
         maxActive = Math.max(maxActive, active);
         started.push(input.prompt);
@@ -214,15 +211,7 @@ describe("video segment services", () => {
       ...stores,
       jobId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-test",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-test",
-        source: "database",
-        routeSnapshot: { routeId: "route-test", routeSource: "database" },
-      }),
-      createVideoGeneration: async (_provider, input) => {
+      createVideoGeneration: async (input) => {
         if (input.prompt === "Prompt 1") {
           throw new Error("EvoLink submit failed.");
         }
@@ -268,15 +257,7 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-test",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-test",
-        source: "database",
-        routeSnapshot: { routeId: "route-test", routeSource: "database" },
-      }),
-      createVideoGeneration: async (_provider, input) => ({
+      createVideoGeneration: async (input) => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",
         providerTaskId: "task-1",
@@ -306,8 +287,116 @@ describe("video segment services", () => {
       model: "veo3.1-fast-beta",
       purpose: "video_generation",
       status: "succeeded",
+      providerKeyId: null,
+      modelRouteId: null,
+      routeSnapshot: null,
       providerTaskId: "task-1",
+      requestSnapshot: expect.objectContaining({
+        configSource: "env",
+      }),
     });
+  });
+
+  it("does not submit the same queued segment twice when concurrent workers race", async () => {
+    const stores = createStores();
+    let providerCalls = 0;
+
+    const results = await Promise.allSettled([
+      submitQueuedSegment({
+        ...stores,
+        jobId,
+        segmentId,
+        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        createVideoGeneration: async () => {
+          providerCalls += 1;
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return {
+            provider: "apimart",
+            model: "pixverse-v6",
+            providerTaskId: "task-race",
+            raw: { ok: true },
+          };
+        },
+      }),
+      submitQueuedSegment({
+        ...stores,
+        jobId,
+        segmentId,
+        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        createVideoGeneration: async () => {
+          providerCalls += 1;
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return {
+            provider: "apimart",
+            model: "pixverse-v6",
+            providerTaskId: "task-race-duplicate",
+            raw: { ok: true },
+          };
+        },
+      }),
+    ]);
+
+    expect(results).toEqual([
+      expect.objectContaining({ status: "fulfilled" }),
+      expect.objectContaining({ status: "rejected" }),
+    ]);
+    expect(providerCalls).toBe(1);
+    expect(stores.segmentStore.listSegments()[0]).toMatchObject({
+      status: "generating",
+      providerTaskId: "task-race",
+    });
+    expect(stores.providerCallLogStore.listCallLogs()).toHaveLength(1);
+  });
+
+  it("clears stale job errors after submitting a retried queued segment", async () => {
+    const stores = createStores();
+    await stores.jobStore.updateJobStatus(jobId, {
+      status: "segments_queued",
+      lastError: "No active model route for video_generation in development.",
+      failureReason: "No active model route for video_generation in development.",
+    });
+
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async () => ({
+        provider: "apimart",
+        model: "pixverse-v6",
+        providerTaskId: "task-retried",
+        raw: { ok: true },
+      }),
+    });
+
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "segment_generating",
+      lastError: null,
+      failureReason: null,
+    });
+  });
+
+  it("does not pass database provider key or route model into generation", async () => {
+    const stores = createStores();
+    const seenDeps: unknown[] = [];
+
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async (_input, deps) => {
+        seenDeps.push(deps);
+        return {
+          provider: "apimart",
+          model: "pixverse-v6-env",
+          providerTaskId: "task-env-key",
+          raw: { ok: true },
+        };
+      },
+    });
+
+    expect(seenDeps[0]).toBeUndefined();
   });
 
   it("passes segment resolution, audio, watermark, and generation profile into video generation", async () => {
@@ -319,15 +408,7 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-test",
-        provider: "apimart",
-        model: "pixverse-v6",
-        providerKeyId: "key-test",
-        source: "database",
-        routeSnapshot: { routeId: "route-test", routeSource: "database" },
-      }),
-      createVideoGeneration: async (_provider, input) => {
+      createVideoGeneration: async (input) => {
         seenInputs.push(input);
         return {
           provider: "apimart",
@@ -346,6 +427,7 @@ describe("video segment services", () => {
     });
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       requestSnapshot: expect.objectContaining({
+        configSource: "env",
         generationProfile: "trial_540p_watermarked",
         resolution: "540p",
         audio: false,
@@ -354,10 +436,54 @@ describe("video segment services", () => {
     });
   });
 
-  it("uses the configured APIMart provider through the default generation router", async () => {
+  it("labels garment and scene reference images in the provider prompt", async () => {
+    const stores = createStores();
+    await stores.segmentStore.updateSegment(segmentId, {
+      templateId: "scene_lifestyle_showcase",
+      inputAssetSnapshot: {
+        assets: [
+          { assetId: "asset-front", role: "front", sortOrder: 0 },
+          { assetId: "asset-scene", role: "scene", sortOrder: 1 },
+        ],
+      },
+    });
+    const seenInputs: unknown[] = [];
+
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async (input) => {
+        seenInputs.push(input);
+        return {
+          provider: "apimart",
+          model: "pixverse-v6",
+          providerTaskId: "task-scene",
+          raw: { ok: true },
+        };
+      },
+    });
+
+    expect(seenInputs[0]).toMatchObject({
+      imageUrls: [
+        "https://signed.example/users/user-1/assets/asset-front/original.jpg",
+        "https://signed.example/users/user-1/assets/asset-scene/original.jpg",
+      ],
+      prompt: expect.stringContaining("Image 1 is the garment reference"),
+    });
+    expect((seenInputs[0] as { prompt: string }).prompt).toContain(
+      "Image 2 is the scene/background reference",
+    );
+    expect((seenInputs[0] as { prompt: string }).prompt).toContain(
+      "Use scene/background reference only for environment, lighting, and mood",
+    );
+  });
+
+  it("uses the APIMart provider selected by env-only router", async () => {
     vi.stubEnv("VIDEO_GENERATION_PROVIDER", "apimart");
     vi.stubEnv("VIDEO_GENERATION_MODEL", "pixverse-v6");
-    vi.stubEnv("APIMART_API_KEY", "sk-test");
+    vi.stubEnv("APIMART_API_KEY", "sk-env-apimart");
     vi.stubEnv("APIMART_BASE_URL", "https://api.apimart.example");
     const stores = createStores();
     const fetchImpl = vi.fn(async () =>
@@ -373,14 +499,6 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-apimart",
-        provider: "apimart",
-        model: "pixverse-v6",
-        providerKeyId: "key-apimart",
-        source: "database",
-        routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
-      }),
     });
 
     expect(result).toEqual({
@@ -397,86 +515,59 @@ describe("video segment services", () => {
     });
   });
 
-  it("resolves the database video_generation route before submitting a public segment", async () => {
+  it("submits through the env-only generation function without route metadata", async () => {
     const stores = createStores();
-    const seenRoutes: unknown[] = [];
+    const seenInputs: unknown[] = [];
 
     const result = await submitQueuedSegment({
       ...stores,
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async (input) => {
-        seenRoutes.push(input);
+      createVideoGeneration: async (input) => {
+        seenInputs.push(input);
         return {
-          routeId: "route-1",
-          provider: "apimart",
-          model: "pixverse-v6",
-          providerKeyId: "key-1",
-          source: "database",
-          routeSnapshot: {
-            routeId: "route-1",
-            purpose: "video_generation",
-            environment: "production",
-            primaryProvider: "apimart",
-            primaryModel: "pixverse-v6",
-            routeSource: "database",
-          },
-        };
-      },
-      createVideoGeneration: async (provider, input) => ({
-        provider,
+        provider: "apimart",
         model: "pixverse-v6",
         providerTaskId: `task-${input.prompt}`,
         raw: { ok: true },
-      }),
-      appEnvironment: "production",
+        };
+      },
     });
 
     expect(result.providerTaskId).toBe("task-Slow front push-in.");
-    expect(seenRoutes[0]).toMatchObject({
-      purpose: "video_generation",
-      environment: "production",
-      isPublicJob: true,
-    });
+    expect(seenInputs[0]).toMatchObject({ prompt: "Slow front push-in." });
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       provider: "apimart",
       model: "pixverse-v6",
-      providerKeyId: "key-1",
+      providerKeyId: null,
+      modelRouteId: null,
+      routeSnapshot: null,
       requestSnapshot: expect.objectContaining({
-        route: expect.objectContaining({
-          routeId: "route-1",
-          routeSource: "database",
-        }),
+        configSource: "env",
       }),
     });
   });
 
-  it("fails closed without calling provider when database route resolution fails", async () => {
+  it("continues to submit when no database route dependency is provided", async () => {
     const stores = createStores();
-    const createVideoGeneration = vi.fn();
+    const createVideoGeneration = vi.fn(async () => ({
+      provider: "apimart" as const,
+      model: "pixverse-v6",
+      providerTaskId: "task-env",
+      raw: { ok: true },
+    }));
 
-    await expect(
-      submitQueuedSegment({
-        ...stores,
-        jobId,
-        segmentId,
-        maxSubmitAttempts: 1,
-        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-        resolveModelRoute: async () => {
-          throw new Error("No active model route for video_generation in production.");
-        },
-        createVideoGeneration,
-        appEnvironment: "production",
-      }),
-    ).rejects.toThrow("No active model route for video_generation in production.");
-
-    expect(createVideoGeneration).not.toHaveBeenCalled();
-    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
-      status: "failed",
-      errorCode: "video_generation_route_unavailable",
-      errorMessage: "No active model route for video_generation in production.",
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      maxSubmitAttempts: 1,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration,
     });
+
+    expect(createVideoGeneration).toHaveBeenCalledOnce();
   });
 
   it("retries transient provider submission failures before marking submit failed", async () => {
@@ -489,14 +580,6 @@ describe("video segment services", () => {
       segmentId,
       maxSubmitAttempts: 3,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-retry",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-retry",
-        source: "database",
-        routeSnapshot: { routeId: "route-retry", routeSource: "database" },
-      }),
       createVideoGeneration: async () => {
         attempts += 1;
         if (attempts < 2) {
@@ -537,7 +620,7 @@ describe("video segment services", () => {
     ]);
   });
 
-  it("records submit failures against the configured provider instead of always EvoLink", async () => {
+  it("records env-only submit failure logs without route or provider key fields", async () => {
     vi.stubEnv("VIDEO_GENERATION_PROVIDER", "apimart");
     vi.stubEnv("VIDEO_GENERATION_MODEL", "pixverse-v6");
     const stores = createStores();
@@ -549,14 +632,6 @@ describe("video segment services", () => {
         segmentId,
         maxSubmitAttempts: 1,
         createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-        resolveModelRoute: async () => ({
-          routeId: "route-apimart",
-          provider: "apimart",
-          model: "pixverse-v6",
-          providerKeyId: "key-apimart",
-          source: "database",
-          routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
-        }),
         createVideoGeneration: async () => {
           throw new Error("APIMart submit failed.");
         },
@@ -565,17 +640,20 @@ describe("video segment services", () => {
 
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       provider: "apimart",
+      providerKeyId: null,
+      modelRouteId: null,
+      routeSnapshot: null,
       model: "pixverse-v6",
       status: "failed",
       errorCode: "video_generation_submit_failed",
       errorMessage: "APIMart submit failed.",
+      requestSnapshot: expect.objectContaining({
+        configSource: "env",
+      }),
     });
   });
 
-  it("records submit failures against APIMart when no provider is explicitly configured", async () => {
-    vi.stubEnv("VIDEO_GENERATION_PROVIDER", "");
-    vi.stubEnv("VIDEO_GENERATION_MODEL", "");
-    vi.stubEnv("APIMART_PIXVERSE_MODEL", "pixverse-v6");
+  it("requeues a claimed segment when signing input assets fails before provider submit", async () => {
     const stores = createStores();
 
     await expect(
@@ -583,28 +661,19 @@ describe("video segment services", () => {
         ...stores,
         jobId,
         segmentId,
-        maxSubmitAttempts: 1,
-        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-        resolveModelRoute: async () => ({
-          routeId: "route-apimart",
-          provider: "apimart",
-          model: "pixverse-v6",
-          providerKeyId: "key-apimart",
-          source: "database",
-          routeSnapshot: { routeId: "route-apimart", routeSource: "database" },
-        }),
+        createSignedUrl: async () => {
+          throw new Error("R2 signing failed.");
+        },
         createVideoGeneration: async () => {
-          throw new Error("default provider submit failed.");
+          throw new Error("provider should not be called");
         },
       }),
-    ).rejects.toThrow("default provider submit failed.");
+    ).rejects.toThrow("R2 signing failed.");
 
-    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
-      provider: "apimart",
-      model: "pixverse-v6",
-      status: "failed",
-      errorCode: "video_generation_submit_failed",
-      errorMessage: "default provider submit failed.",
+    expect(stores.segmentStore.listSegments()[0]).toMatchObject({
+      status: "queued",
+      providerTaskId: null,
+      lastError: "R2 signing failed.",
     });
   });
 
@@ -620,14 +689,6 @@ describe("video segment services", () => {
         jobId,
         segmentId,
         createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-        resolveModelRoute: async () => ({
-          routeId: "route-submit",
-          provider: "evolink",
-          model: "veo3.1-fast-beta",
-          providerKeyId: "key-submit",
-          source: "database",
-          routeSnapshot: { routeId: "route-submit", routeSource: "database" },
-        }),
         createVideoGeneration: async () => {
           attempts += 1;
           throw new Error(`submit failed ${attempts}`);
@@ -683,10 +744,10 @@ describe("video segment services", () => {
 
   it("polls using the provider persisted on the segment instead of the current env provider", async () => {
     vi.stubEnv("VIDEO_GENERATION_PROVIDER", "evolink");
-    vi.stubEnv("APIMART_API_KEY", "sk-apimart");
     vi.stubEnv("APIMART_BASE_URL", "https://api.apimart.example");
-    vi.stubEnv("EVOLINK_API_KEY", "sk-evolink");
     vi.stubEnv("EVOLINK_BASE_URL", "https://api.evolink.example");
+    vi.stubEnv("APIMART_API_KEY", "sk-env-apimart");
+    vi.stubEnv("EVOLINK_API_KEY", "sk-env-evolink");
     const stores = createStores();
     const fetchImpl = vi.fn(async (url) => {
       if (String(url).includes("evolink")) {
@@ -707,13 +768,18 @@ describe("video segment services", () => {
       });
     });
     vi.stubGlobal("fetch", fetchImpl);
-    await stores.segmentStore.updateSegment(segmentId, {
-      status: "generating",
-      provider: "apimart",
-      model: "pixverse-v6",
-      providerTaskId: "task-apimart",
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async () => ({
+        provider: "apimart",
+        model: "pixverse-v6",
+        providerTaskId: "task-apimart",
+        raw: { ok: true },
+      }),
     });
-    await stores.jobStore.updateJobStatus(jobId, { status: "segment_generating" });
 
     const result = await pollSubmittedSegment({
       ...stores,
@@ -731,7 +797,56 @@ describe("video segment services", () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://api.apimart.example/v1/tasks/task-apimart",
-      expect.any(Object),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-env-apimart",
+        }),
+      }),
+    );
+  });
+
+  it("polls provider tasks with env-only auth and no provider key lookup", async () => {
+    vi.stubEnv("APIMART_API_KEY", "sk-env-poll");
+    const stores = createStores();
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      createVideoGeneration: async () => ({
+        provider: "apimart",
+        model: "pixverse-v6",
+        providerTaskId: "task-env-poll",
+        raw: { ok: true },
+      }),
+    });
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        code: 200,
+        data: {
+          id: "task-env-poll",
+          status: "processing",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+
+    await pollSubmittedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      storeProviderOutput: async () => {
+        throw new Error("should not store running output");
+      },
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.apimart.ai/v1/tasks/task-env-poll",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-env-poll",
+        }),
+      }),
     );
   });
 
@@ -798,14 +913,6 @@ describe("video segment services", () => {
       segmentId,
       maxTaskRegenerations: 2,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-regen",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-regen",
-        source: "database",
-        routeSnapshot: { routeId: "route-regen", routeSource: "database" },
-      }),
       pollTask: async () => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",
@@ -862,14 +969,6 @@ describe("video segment services", () => {
       jobId,
       segmentId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
-      resolveModelRoute: async () => ({
-        routeId: "route-regen",
-        provider: "evolink",
-        model: "veo3.1-fast-beta",
-        providerKeyId: "key-regen",
-        source: "database",
-        routeSnapshot: { routeId: "route-regen", routeSource: "database" },
-      }),
       pollTask: async () => ({
         provider: "evolink",
         model: "veo3.1-fast-beta",

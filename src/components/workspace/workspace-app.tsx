@@ -71,6 +71,7 @@ interface JobDetailResponse {
   };
   analyses: Array<{
     assetId: string;
+    declaredRole?: string;
     assetRole: string;
     quality: {
       isGarment: boolean;
@@ -198,10 +199,13 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [imagesUploading, setImagesUploading] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
   const paidCost = paidCreditCost(durationSeconds);
   const hasUploadedAssets = assets.some((asset) => asset.status === "uploaded");
+  const showAdvancedManualControls =
+    advancedOpen || Boolean(storyboardId) || segments.length > 0;
   const uploadedRoles = useMemo(
     () =>
       new Set(
@@ -216,13 +220,17 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
       return [];
     }
 
+    const garmentRoles = new Set(["front", "back", "side", "detail", "unknown"]);
     return (jobDetail.analyses ?? [])
-      .filter(
-        (analysis) =>
-          analysis.assetRole === "unknown" ||
-          !analysis.quality.isGarment ||
-          !analysis.quality.isClear,
-      )
+      .filter((analysis) => {
+        const effectiveRole = analysis.declaredRole ?? analysis.assetRole;
+        return (
+          garmentRoles.has(effectiveRole) &&
+          (effectiveRole === "unknown" ||
+            !analysis.quality.isGarment ||
+            !analysis.quality.isClear)
+        );
+      })
       .map((analysis) =>
         !analysis.quality.isGarment
           ? "有素材不像服装图，相关模板会被降级。"
@@ -237,7 +245,18 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   }
 
   function defaultTemplateSelection(detailBody: JobDetailResponse, count: number) {
+    const availableTemplateIds = new Set(detailBody.recommendations.availableTemplateIds);
+    const sceneTemplateIds = detailBody.assetCompleteness.hasScene
+      ? templateCatalog
+          .filter(
+            (template) =>
+              template.requiredAssets?.includes("scene") &&
+              availableTemplateIds.has(template.templateId),
+          )
+          .map((template) => template.templateId)
+      : [];
     const ordered = [
+      ...sceneTemplateIds,
       ...detailBody.recommendations.recommended.map((item) => item.templateId),
       ...detailBody.recommendations.optional.map((item) => item.templateId),
       ...detailBody.recommendations.availableTemplateIds,
@@ -254,18 +273,32 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
       return null;
     }
 
-    setJobDetail(detailBody);
+    const typedDetailBody = detailBody as JobDetailResponse;
+
+    setJobDetail(typedDetailBody);
     setSelectedTemplateIds(defaultTemplateSelection(
-      detailBody,
+      typedDetailBody,
       requiredTemplateCountForDuration(nextDurationSeconds),
     ));
+    if (typedDetailBody.latestStoryboard?.status === "draft") {
+      setStoryboardId(typedDetailBody.latestStoryboard.id);
+      setSegments(
+        typedDetailBody.latestStoryboard.storyboardJson.segments.map((segment) => ({
+          index: segment.index,
+          durationSeconds: segment.duration_seconds,
+          templateId: segment.template_id,
+          prompt: segment.prompt,
+        })),
+      );
+      setAdvancedOpen(true);
+    }
     setMessage(
-      detailBody.job.failureReason ??
-        detailBody.job.lastError ??
-        "素材分析完成，请确认模板。",
+      typedDetailBody.job.failureReason ??
+        typedDetailBody.job.lastError ??
+        "素材分析完成，正在按推荐方案继续生成。",
     );
 
-    return detailBody as JobDetailResponse;
+    return typedDetailBody;
   }
 
   async function runAnalyzeJob(nextJobId: string, nextDurationSeconds: 8 | 16 | 24) {
@@ -387,6 +420,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     setJobDetail(null);
     setStoryboardId(null);
     setSegments([]);
+    setAdvancedOpen(false);
 
     const response = await fetch("/api/jobs", {
       method: "POST",
@@ -774,39 +808,58 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
         <div className="rounded-lg border border-[var(--line)] bg-white p-5">
           <h2 className="text-base font-medium">生成意图</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            输入卖点、场景或风格偏好。所有文本都会先经过 Creem Moderation。
+            可选填写卖点、场景或风格偏好。所有文本都会先经过 Creem Moderation。
           </p>
           <textarea
             className="mt-4 min-h-40 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setUserPrompt(event.target.value)}
             value={userPrompt}
           />
-          <button
-            className="mt-4 inline-flex h-11 items-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!jobDetail || busyAction !== null}
-            onClick={generateStoryboard}
-            type="button"
-          >
-            {busyAction === "storyboard" ? "生成中..." : "生成分镜草稿"}
-          </button>
         </div>
 
-        <StoryboardConfirmation
-          aspectRatio={aspectRatio}
-          confirming={busyAction === "confirm"}
-          creditCost={jobDetail?.job.creditCost ?? 0}
-          disabled={!storyboardId || busyAction !== null}
-          durationSeconds={durationSeconds}
-        moderationPendingMessage={
-            jobDetail?.job.billingMode === "free_trial"
-              ? "免费试用默认使用低风险模板与 lite 质检。"
-              : jobDetail?.job.billingMode === "paid"
-                ? "付费任务使用高分辨率有声生成与 standard 质检。"
-              : "确认后先审核，再冻结点数并进入片段生成。"
-          }
-          onConfirm={confirmStoryboard}
-          segments={segments}
-        />
+        <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+          <button
+            className="text-left text-base font-medium"
+            onClick={() => setAdvancedOpen((current) => !current)}
+            type="button"
+          >
+            高级设置 / 手动预览分镜
+          </button>
+          {showAdvancedManualControls ? (
+            <div className="mt-4 space-y-5">
+              <p className="text-sm leading-6 text-[var(--muted)]">
+                默认会自动选择推荐模板并提交生成；只有需要手动预览或改模板时再展开这里。
+              </p>
+              <button
+                className="inline-flex h-11 items-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!jobDetail || busyAction !== null}
+                onClick={generateStoryboard}
+                type="button"
+              >
+                {busyAction === "storyboard" ? "生成中..." : "生成分镜草稿"}
+              </button>
+
+              {storyboardId || segments.length > 0 ? (
+                <StoryboardConfirmation
+                  aspectRatio={aspectRatio}
+                  confirming={busyAction === "confirm"}
+                  creditCost={jobDetail?.job.creditCost ?? paidCost}
+                  disabled={!storyboardId || busyAction !== null}
+                  durationSeconds={durationSeconds}
+                  moderationPendingMessage={
+                    jobDetail?.job.billingMode === "free_trial"
+                      ? "免费试用默认使用低风险模板与 lite 质检。"
+                      : jobDetail?.job.billingMode === "paid"
+                        ? "付费任务使用高分辨率有声生成与 standard 质检。"
+                      : "确认后先审核，再冻结点数并进入片段生成。"
+                  }
+                  onConfirm={confirmStoryboard}
+                  segments={segments}
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </section>
 
         {message ? (
           <div className="rounded-lg border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">

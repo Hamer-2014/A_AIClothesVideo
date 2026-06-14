@@ -264,4 +264,132 @@ describe("generate storyboard draft", () => {
       status: "succeeded",
     });
   });
+
+  it("sends asset summary and selected template definitions to DeepSeek", async () => {
+    const capturedPrompts: string[] = [];
+    const readStore = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets: [
+        { assetId: "asset-front", role: "front", sortOrder: 0 },
+        { assetId: "asset-scene", role: "scene", sortOrder: 1 },
+      ],
+      analyses: [
+        {
+          assetId: "asset-front",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+        {
+          assetId: "asset-scene",
+          analysisJson: {
+            asset_role: "background scene",
+            garment_category: "unknown",
+            view_angle: "scene",
+            human_present: "no",
+            visible_details: ["street background"],
+            not_visible_details: ["garment"],
+            quality: {
+              is_garment: false,
+              is_clear: true,
+              is_safe: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+      ],
+    });
+
+    await generateStoryboardDraft({
+      jobReadStore: readStore,
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      storyboardStore: createInMemoryStoryboardStore(),
+      providerCallLogStore: createInMemoryProviderCallLogStore(),
+      moderationResultStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      selectedTemplateIds: ["scene_lifestyle_showcase"],
+      userPrompt: "Use the uploaded street scene as background.",
+      templates: mvpShotTemplates,
+      moderatePrompt: async () => ({
+        id: "mod-scene",
+        decision: "allow",
+        raw: { id: "mod-scene" },
+      }),
+      createStoryboard: async (input) => {
+        capturedPrompts.push(input.userPrompt);
+        return {
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "scene_lifestyle_showcase",
+                prompt: "Use image 1 as garment reference and image 2 as scene reference.",
+              },
+            ],
+          },
+          raw: { id: "chatcmpl_scene_storyboard" },
+        };
+      },
+    });
+
+    const prompt = JSON.parse(capturedPrompts[0] ?? "{}");
+    expect(prompt.asset_summary).toMatchObject({
+      has_front: true,
+      has_scene: true,
+      scene_usage: "background/reference only",
+    });
+    expect(prompt.selected_template_definitions).toEqual([
+      expect.objectContaining({
+        template_id: "scene_lifestyle_showcase",
+        required_assets: ["front", "scene"],
+        base_prompt_intent: expect.stringContaining("scene image"),
+        system_constraints: expect.arrayContaining([
+          expect.stringContaining("scene image only as background"),
+        ]),
+      }),
+    ]);
+  });
 });

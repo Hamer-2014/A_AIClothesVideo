@@ -194,4 +194,189 @@ describe("runPostQaCheck", () => {
       lastError: "Quality/visual artifacts",
     });
   });
+
+  it("does not fail childrenswear QA when minor_present is the only concern", async () => {
+    const stores = await createStores();
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-vision",
+        qaJson: {
+          passed: false,
+          failure_category: "Brand policy uncertainty",
+          risk_flags: ["minor_present"],
+          checks: [
+            {
+              name: "safety",
+              passed: false,
+              notes: "Child model present; brand policy may vary.",
+            },
+          ],
+          summary: "Child model appears in a childrenswear product context.",
+        },
+        raw: { id: "resp-qa-minor-present" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "deliverable",
+      ledgerType: "capture",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "deliverable",
+      failureReason: null,
+    });
+    expect(stores.postQaStore.listResults()[0]).toMatchObject({
+      status: "passed",
+      failureCategory: null,
+    });
+  });
+
+  it("does not fail childrenswear QA for soft brand suitability concerns in ordinary scenes", async () => {
+    const stores = await createStores();
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-vision",
+        qaJson: {
+          passed: false,
+          failure_category: "policy_or_brand_suitability",
+          risk_flags: ["child_model", "outdoor_street_scene", "slight_motion_blur"],
+          checks: [
+            {
+              name: "Garment consistency across frames",
+              passed: true,
+              notes: "Dress remains visually consistent in color and silhouette.",
+            },
+            {
+              name: "Frame clarity and quality",
+              passed: true,
+              notes: "Frames are clear enough to assess the garment.",
+            },
+            {
+              name: "Product marketing suitability",
+              passed: false,
+              notes:
+                "Child model and outdoor street setting may limit broad product-ad suitability depending on brand policy.",
+            },
+            {
+              name: "Safety and appropriateness",
+              passed: true,
+              notes: "No explicit safety issues observed.",
+            },
+          ],
+          summary:
+            "Garment appears consistent and well-presented, but brand policy may vary for child model in an outdoor scene.",
+        },
+        raw: { id: "resp-qa-soft-brand-suitability" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "deliverable",
+      ledgerType: "capture",
+    });
+    expect(stores.postQaStore.listResults()[0]).toMatchObject({
+      status: "passed",
+      failureCategory: null,
+    });
+  });
+
+  it("still fails childrenswear QA when blurry quality issues are present", async () => {
+    const stores = await createStores();
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-vision",
+        qaJson: {
+          passed: false,
+          failure_category: "Quality/visual artifacts",
+          risk_flags: ["minor_present", "slightly_blurry"],
+          checks: [
+            {
+              name: "visual_clarity",
+              passed: false,
+              notes: "Product is blurry enough to limit marketing readiness.",
+            },
+          ],
+          summary: "Child model appears, but the product is blurry.",
+        },
+        raw: { id: "resp-qa-blurry" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: "release",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      failureReason: "Quality/visual artifacts",
+    });
+  });
+
+  it("still fails childrenswear QA when safety concerns are present", async () => {
+    const stores = await createStores();
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "standard",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-vision",
+        qaJson: {
+          passed: false,
+          failure_category: "unsafe_child_content",
+          risk_flags: ["child_model", "sexualized_child_imagery"],
+          checks: [
+            {
+              name: "safety",
+              passed: false,
+              notes: "Unsafe child presentation is present.",
+            },
+          ],
+          summary: "The childrenswear video contains unsafe child content.",
+        },
+        raw: { id: "resp-qa-unsafe-child" },
+      }),
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: "release",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      failureReason: "unsafe_child_content",
+    });
+  });
 });

@@ -92,7 +92,9 @@ describe("UploadPanel", () => {
         previewUrl: "blob:front-preview",
       });
     });
-    expect(onUploadingChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => {
+      expect(onUploadingChange).toHaveBeenLastCalledWith(false);
+    });
   });
 
   it("clears a selected uploaded slot when the user removes it", () => {

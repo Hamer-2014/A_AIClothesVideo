@@ -301,4 +301,53 @@ describe("vision provider client", () => {
       failure_category: null,
     });
   });
+
+  it("instructs post-QA not to fail childrenswear only because a child model is present", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_MODEL_STANDARD", "gpt-5.4-mini");
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json({
+        output: [
+          {
+            type: "message",
+            status: "completed",
+            role: "assistant",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  passed: true,
+                  failure_category: null,
+                  checks: [],
+                  risk_flags: ["minor_present"],
+                  summary: "Child model appears in a childrenswear product context.",
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    };
+
+    await createVisionPostQaCheck(
+      {
+        mode: "standard",
+        frameUrls: ["https://signed.example/frame-0.jpg"],
+      },
+      { fetch: fetchMock },
+    );
+
+    const body = JSON.parse(calls[0]?.[1]?.body as string);
+    const instruction = body.input[0].content[0].text;
+    expect(instruction).toContain("childrenswear");
+    expect(instruction).toContain("minor_present");
+    expect(instruction).toContain("not a failure reason by itself");
+    expect(instruction).toContain("sexualized");
+    expect(instruction).toContain("exploitation");
+    expect(instruction).toContain("privacy-sensitive");
+  });
 });

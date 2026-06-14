@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { eq } from "drizzle-orm";
+
 import { getDb } from "@/lib/db/client";
 import { providerCallLogs } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
@@ -58,6 +60,7 @@ export interface NewProviderCallLog {
 
 export interface ProviderCallLogStore {
   createCallLog(input: NewProviderCallLog): Promise<ProviderCallLogRecord>;
+  findCallLog?(callLogId: string): Promise<ProviderCallLogRecord | null>;
 }
 
 function normalizeProviderCallLog(input: NewProviderCallLog) {
@@ -103,6 +106,9 @@ export function createInMemoryProviderCallLogStore(): ProviderCallLogStore & {
     listCallLogs() {
       return logs;
     },
+    async findCallLog(callLogId) {
+      return logs.find((log) => log.id === callLogId) ?? null;
+    },
   };
 }
 
@@ -123,6 +129,15 @@ export function createDrizzleProviderCallLogStore(
       }
 
       return record as ProviderCallLogRecord;
+    },
+    async findCallLog(callLogId) {
+      const [record] = await db
+        .select()
+        .from(providerCallLogs)
+        .where(eq(providerCallLogs.id, callLogId))
+        .limit(1);
+
+      return (record as ProviderCallLogRecord | undefined) ?? null;
     },
   };
 }

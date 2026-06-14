@@ -478,12 +478,12 @@ PRD 已列出核心实体。技术实现时建议按以下边界设计。
 ### 7.6 模型与供应商
 
 - `model_providers`
-- `provider_keys`
-- `model_routes`
 - `provider_call_logs`
 - `prompt_moderation_results`
 
-API Key 必须加密存储。后台不显示完整 Key。
+MVP 视频生成采用 env-only 配置：`VIDEO_GENERATION_PROVIDER` 决定 `apimart` 或 `evolink`，`VIDEO_GENERATION_MODEL` 决定模型名，厂商 key 从 `APIMART_API_KEY` 或 `EVOLINK_API_KEY` 读取。`model_routes` / `provider_keys` 不参与公开视频生成 provider/model/key 决策；如未来恢复企业级多 provider 路由，需要另开独立设计并同步后台、审计和迁移策略。
+
+`provider_call_logs` 继续用于调用观测、排障和成本追踪。
 
 ### 7.7 审计与风控
 
@@ -889,8 +889,7 @@ MVP 后台应支持：
 - 点数调整。
 - 封禁/解封用户。
 - 修改模板状态。
-- 修改模型路由。
-- 修改 provider key 状态。
+- 修改视频生成 env 配置不经过后台；若未来恢复模型路由或 provider key 后台管理，其敏感操作必须写审计日志。
 
 ## 16. 监控与告警
 

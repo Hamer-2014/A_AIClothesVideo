@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { buildAdminNav } from "@/app/app-shell";
-import { AdminActionForm } from "@/components/admin/action-form";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { ProviderTable } from "@/components/admin/provider-table";
 import { getAdminSession } from "@/server/auth/admin-session";
@@ -24,144 +23,28 @@ export default async function AdminProvidersPage() {
 
   return (
     <AdminShell
-      title="供应商与路由"
-      subtitle="这里只显示 key preview，不显示完整密钥；主要用于暂停 key、检查路由和定位供应商状态。"
+      title="视频供应商配置"
+      subtitle="视频生成已改为 env-only：provider、model 和 API key 只从运行环境变量读取，后台不再提供 key 或 model route 切换。"
       nav={buildAdminNav("/admin/providers")}
     >
       <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-2">
-          <AdminActionForm
-            description="新增 provider key。完整 key 只提交一次，服务端加密保存，页面不会回显。"
-            endpoint="/api/admin/provider-keys"
-            fields={[
-              {
-                name: "providerId",
-                label: "Provider ID",
-                placeholder: "输入 provider id",
-              },
-              {
-                name: "label",
-                label: "Label",
-                placeholder: "EvoLink staging",
-              },
-              {
-                name: "environment",
-                label: "Environment",
-                defaultValue: "staging",
-              },
-              {
-                name: "plainKey",
-                label: "Plain Key",
-                placeholder: "只提交一次，不会回显",
-              },
-              {
-                name: "dailyCostLimit",
-                label: "Daily Cost Limit",
-                defaultValue: "20.00",
-              },
-              {
-                name: "concurrentLimit",
-                label: "Concurrent Limit",
-                type: "number",
-                defaultValue: "1",
-              },
-              {
-                name: "status",
-                label: "初始状态",
-                type: "select",
-                defaultValue: "paused",
-                options: [
-                  { label: "paused", value: "paused" },
-                  { label: "active", value: "active" },
-                  { label: "exhausted", value: "exhausted" },
-                  { label: "error", value: "error" },
-                ],
-              },
-            ]}
-            submitLabel="新增 Key"
-            title="Create Provider Key"
-          />
-
-          {overview.keys.map((key) => (
-            <AdminActionForm
-              description={`更新 ${key.label} 的状态。operator 无权执行，必须由 admin 提交。`}
-              endpoint={`/api/admin/provider-keys/${key.id}/status`}
-              fields={[
-                {
-                  name: "status",
-                  label: "目标状态",
-                  type: "select",
-                  defaultValue: key.status,
-                  options: [
-                    { label: "active", value: "active" },
-                    { label: "paused", value: "paused" },
-                    { label: "exhausted", value: "exhausted" },
-                    { label: "error", value: "error" },
-                  ],
-                },
-              ]}
-              key={key.id}
-              submitLabel="更新 Key 状态"
-              title={`Key ${key.label}`}
-            />
-          ))}
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          {overview.keys.map((key) => (
-            <AdminActionForm
-              description={`轮换 ${key.label}。完整 key 只提交一次，服务端加密保存，页面不会回显。`}
-              endpoint={`/api/admin/provider-keys/${key.id}/rotate`}
-              fields={[
-                {
-                  name: "plainKey",
-                  label: "New Plain Key",
-                  placeholder: "只提交一次，不会回显",
-                },
-              ]}
-              key={`${key.id}-rotate`}
-              submitLabel="轮换 Key"
-              title={`Rotate ${key.label}`}
-            />
-          ))}
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          {overview.routes.map((route) => (
-            <AdminActionForm
-              description={`调整 ${route.purpose} 的主模型和路由状态。`}
-              endpoint={`/api/admin/model-routes/${route.id}`}
-              fields={[
-                {
-                  name: "status",
-                  label: "目标状态",
-                  type: "select",
-                  defaultValue: route.status,
-                  options: [
-                    { label: "active", value: "active" },
-                    { label: "paused", value: "paused" },
-                    { label: "exhausted", value: "exhausted" },
-                    { label: "error", value: "error" },
-                  ],
-                },
-                {
-                  name: "primaryModel",
-                  label: "主模型",
-                  defaultValue: route.primaryModel,
-                },
-                {
-                  name: "minMarginPercent",
-                  label: "最小毛利率",
-                  type: "number",
-                  defaultValue: String(route.minMarginPercent),
-                },
-              ]}
-              key={route.id}
-              submitLabel="更新路由"
-              title={`Route ${route.purpose}`}
-            />
-          ))}
-        </div>
+        <section className="rounded-lg border border-[var(--line)] bg-white px-5 py-4">
+          <h3 className="text-base font-medium">Env-only 配置</h3>
+          <div className="mt-3 grid gap-3 text-sm text-[var(--muted)] md:grid-cols-2">
+            <div>
+              <div className="font-medium text-[var(--ink)]">当前生效入口</div>
+              <p className="mt-1">
+                `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL`，以及所选 provider 的 API key。
+              </p>
+            </div>
+            <div>
+              <div className="font-medium text-[var(--ink)]">后台状态</div>
+              <p className="mt-1">
+                数据库 provider/key 记录仅用于历史排障查看，不再驱动视频生成，也不能在后台写入或轮换。
+              </p>
+            </div>
+          </div>
+        </section>
 
         <ProviderTable
           providers={overview.providers}

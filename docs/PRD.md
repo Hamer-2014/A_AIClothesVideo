@@ -717,8 +717,6 @@ PRD 级核心实体：
 - `credit_ledger`
 - `orders`
 - `model_providers`
-- `provider_keys`
-- `model_routes`
 - `provider_call_logs`
 - `prompt_moderation_results`
 - `job_state_events`
@@ -729,6 +727,7 @@ PRD 级核心实体：
 
 - 点数必须用流水账，不只改余额。
 - 片段必须单独建表，不藏在任务 JSON。
+- MVP 视频生成 provider/model/key 只由环境变量决定：`VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL`、当前 provider 对应的 `APIMART_API_KEY` 或 `EVOLINK_API_KEY`。数据库 `model_routes` / `provider_keys` 不决定公开视频生成链路。
 - 模型调用必须单独记录，不只写错误日志。
 - Prompt moderation 必须单独记录，方便 Creem review、申诉和合规审计。
 - 模板必须版本化，不改旧模板影响历史任务复现。

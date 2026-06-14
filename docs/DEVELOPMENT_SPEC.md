@@ -163,13 +163,13 @@ VISION_MODEL_STANDARD=
 VISION_MODEL_STRICT=
 OPENAI_MODERATION_MODEL=omni-moderation-latest
 
-EVOLINK_API_KEY=
 EVOLINK_BASE_URL=
-EVOLINK_VIDEO_MODEL=veo3.1-fast-beta
+EVOLINK_API_KEY=
 
-APIMART_API_KEY=
 APIMART_BASE_URL=
-APIMART_PIXVERSE_MODEL=pixverse-v6
+APIMART_API_KEY=
+VIDEO_GENERATION_PROVIDER=apimart
+VIDEO_GENERATION_MODEL=pixverse-v6
 ```
 
 ### 1.2 环境隔离
@@ -182,10 +182,10 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 要求：
 
-- 每个环境使用不同 provider key。
+- 每个环境使用不同 provider key，并通过环境变量配置。
 - staging 允许真实调用，但任务必须标记 `is_test = true`。
 - production 内部测试任务仍需标记 `is_test = true`。
-- provider/key 需要每日成本上限、并发上限、失败暂停策略。
+- MVP 不提供后台 provider/model/key 热切换；视频生成 provider/model/key 只读 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL`、`APIMART_API_KEY` / `EVOLINK_API_KEY`。
 
 ### 1.3 验收
 
@@ -295,8 +295,6 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 模型：
 
 - `model_providers`
-- `provider_keys`
-- `model_routes`
 - `provider_call_logs`
 - `prompt_moderation_results`
 
@@ -639,24 +637,21 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 - [ ] 模型调用写 `provider_call_logs`。
 - [ ] 素材不合格时不会继续生成。
 
-## 10. 模型路由与 Provider Key SPEC
+## 10. Env-only 视频生成与 Provider 调用 SPEC
 
 ### 10.1 目标
 
-建立可配置 provider router，支持真实模型调用、成本上限、fallback 和调用日志。
+MVP 视频生成使用环境变量选择 provider/model/key，支持真实模型调用和调用日志。不要保留半生效的后台 model route 或 provider key 切换入口。
 
 ### 10.2 文件边界
 
 建议创建：
 
 - `src/lib/providers/router.ts`
-- `src/lib/providers/keys.ts`
 - `src/lib/providers/log-call.ts`
 - `src/lib/providers/deepseek/client.ts`
 - `src/lib/providers/evolink/client.ts`
 - `src/lib/providers/apimart/client.ts`
-- `src/app/admin/providers/page.tsx`
-- `src/app/admin/model-routes/page.tsx`
 
 ### 10.3 purpose
 
@@ -674,17 +669,13 @@ APIMART_PIXVERSE_MODEL=pixverse-v6
 
 ### 10.4 任务
 
-- [ ] Key 加密存储。
-- [ ] 后台不显示完整 Key。
-- [ ] provider/key 状态：active / paused / exhausted / error。
-- [ ] route 支持 primary/fallback。
-- [ ] fallback 前计算毛利阈值。
-- [ ] 低于 45% 毛利不能自动 fallback。
-- [ ] 实验模型不进入公开自动 fallback。
+- [ ] `VIDEO_GENERATION_PROVIDER` 必须为 `apimart` 或 `evolink`。
+- [ ] `VIDEO_GENERATION_MODEL` 必须配置。
+- [ ] `apimart` 必须配置 `APIMART_API_KEY`。
+- [ ] `evolink` 必须配置 `EVOLINK_API_KEY`。
+- [ ] `PROVIDER_KEY_ENCRYPTION_SECRET` 不是 MVP 视频生成必需项。
 - [ ] 每次调用写日志。
-- [ ] 每个 key 配置每日成本上限。
-- [ ] 每个 key 配置并发上限。
-- [ ] 失败率过高时自动暂停或进入 error。
+- [ ] `provider_call_logs` 可记录 provider/model；route 相关字段为空或标记 env 配置来源。
 
 ### 10.5 验收
 

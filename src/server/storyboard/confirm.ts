@@ -114,6 +114,19 @@ function buildFinalPromptSnapshot({
   parsed: ParsedStoryboard;
   assets: StoryboardConfirmJobAssetRecord[];
 }) {
+  const hasSceneAsset = assets.some((asset) => asset.role === "scene");
+  const systemConstraints = [
+    "Do not invent clothing details absent from provided assets.",
+    "Do not show back views unless a back asset is present.",
+    "Do not create detail closeups unless detail assets are present.",
+    ...(hasSceneAsset
+      ? [
+          "Use scene assets only as background, lighting, and mood reference.",
+          "Do not copy people, faces, logos, storefront names, or readable text from scene assets.",
+        ]
+      : []),
+  ];
+
   return {
     durationSeconds: parsed.durationSeconds,
     segmentPrompts: parsed.segments.map((segment) => ({
@@ -122,11 +135,7 @@ function buildFinalPromptSnapshot({
       templateId: segment.templateId,
       prompt: segment.prompt,
     })),
-    systemConstraints: [
-      "Do not invent clothing details absent from provided assets.",
-      "Do not show back views unless a back asset is present.",
-      "Do not create detail closeups unless detail assets are present.",
-    ],
+    systemConstraints,
     inputAssets: assets.map((asset) => ({
       assetId: asset.assetId,
       role: asset.role,
@@ -212,16 +221,28 @@ function assertDraftStoryboard(storyboard: StoryboardRecord) {
   }
 }
 
+const debugResolutionValues = new Set(["360p", "540p", "720p", "1080p"]);
+
+function debugResolutionOverride(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const value = env.VIDEO_GENERATION_DEBUG_RESOLUTION?.trim();
+  return value && debugResolutionValues.has(value) ? value : null;
+}
+
 function generationParametersForProfile(profile: GenerationProfile) {
+  const resolutionOverride = debugResolutionOverride();
   if (profile === "trial_540p_watermarked") {
     return {
-      resolution: "540p",
+      resolution: resolutionOverride ?? "540p",
       audioEnabled: false,
     };
   }
 
   return {
-    resolution: profile === "paid_1080p_audio" ? "1080p" : "720p",
+    resolution:
+      resolutionOverride ??
+      (profile === "paid_1080p_audio" ? "1080p" : "720p"),
     audioEnabled: true,
   };
 }

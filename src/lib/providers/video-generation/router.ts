@@ -48,6 +48,8 @@ export interface VideoTaskResult {
 interface VideoGenerationRouterDeps {
   fetch?: typeof fetch;
   env?: Record<string, string | undefined>;
+  apiKey?: string;
+  model?: string;
 }
 
 interface VideoGenerationAdapter {

@@ -14,11 +14,12 @@ const expectedIds = [
   "print_closeup",
   "back_display",
   "front_to_back_cut",
+  "scene_lifestyle_showcase",
   "minimal_studio",
 ];
 
 describe("MVP shot template catalog", () => {
-  it("defines the 12 MVP templates exactly once", () => {
+  it("defines the 13 MVP templates exactly once", () => {
     const ids = mvpShotTemplates.map((template) => template.templateId);
 
     expect(ids).toEqual(expectedIds);
@@ -61,6 +62,20 @@ describe("MVP shot template catalog", () => {
     ).toMatchObject({
       riskLevel: "medium_high",
       requiresStrictReview: true,
+    });
+  });
+
+  it("defines a scene template that requires front and scene assets", () => {
+    expect(
+      mvpShotTemplates.find(
+        (template) => template.templateId === "scene_lifestyle_showcase",
+      ),
+    ).toMatchObject({
+      status: "active",
+      riskLevel: "medium",
+      requiredAssets: ["front", "scene"],
+      isTrialAllowed: false,
+      requiresStrictReview: false,
     });
   });
 });

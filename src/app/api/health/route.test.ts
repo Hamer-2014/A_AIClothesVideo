@@ -30,7 +30,9 @@ describe("GET /api/health", () => {
     vi.stubEnv("VISION_API_KEY", "vision-key");
     vi.stubEnv("VISION_MODEL_STANDARD", "gpt-4.1-mini");
     vi.stubEnv("VIDEO_GENERATION_PROVIDER", "apimart");
+    vi.stubEnv("VIDEO_GENERATION_MODEL", "pixverse-v6");
     vi.stubEnv("APIMART_API_KEY", "apimart-key");
+    vi.stubEnv("PROVIDER_KEY_ENCRYPTION_SECRET", "");
 
     const response = await GET();
     const body = await response.json();
@@ -78,7 +80,9 @@ describe("GET /api/health", () => {
     vi.stubEnv("VISION_API_KEY", "");
     vi.stubEnv("VISION_MODEL_STANDARD", "");
     vi.stubEnv("VIDEO_GENERATION_PROVIDER", "apimart");
+    vi.stubEnv("VIDEO_GENERATION_MODEL", "");
     vi.stubEnv("APIMART_API_KEY", "");
+    vi.stubEnv("PROVIDER_KEY_ENCRYPTION_SECRET", "");
 
     const response = await GET();
     const body = await response.json();
@@ -88,7 +92,11 @@ describe("GET /api/health", () => {
     expect(body.ready).toBe(false);
     expect(body.summary.missing).toContain("DATABASE_URL");
     expect(body.summary.missing).toContain("CLOUD_RUN_STITCH_URL");
+    expect(body.summary.missing).toContain("VIDEO_GENERATION_MODEL");
+    expect(body.summary.missing).toContain("APIMART_API_KEY");
+    expect(body.summary.missing).not.toContain("PROVIDER_KEY_ENCRYPTION_SECRET");
     expect(JSON.stringify(body)).not.toContain("secret");
     expect(JSON.stringify(body)).not.toContain("postgres://");
   });
 });
+

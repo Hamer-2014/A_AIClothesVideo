@@ -70,6 +70,24 @@ function defaultKickGeneration(input: { jobId: string }) {
   });
 }
 
+function isModelRouteUnavailable(message: string | null | undefined) {
+  return (
+    typeof message === "string" &&
+    (message.startsWith("No active model route for video_generation in ") ||
+      message.startsWith("No active provider key for video_generation route") ||
+      message === "Model route provider is not active." ||
+      message === "Model route provider was not found." ||
+      message === "Model route is missing primary provider.")
+  );
+}
+
+function modelRouteUnavailableMessage(message: string | null | undefined) {
+  const environmentMatch = message?.match(/ in ([^.]+)\.$/);
+  const environment = environmentMatch?.[1] ?? "当前";
+
+  return `视频生成服务未完成模型路由配置，请联系管理员检查 ${environment} 环境的 video_generation route。`;
+}
+
 export async function handleConfirmStoryboardRequest(
   request: Request,
   context: { params: { id: string } },
@@ -112,11 +130,16 @@ export async function handleConfirmStoryboardRequest(
     } satisfies ConfirmStoryboardResult;
 
     if (generationKick.status === "failed") {
+      const routeUnavailable = isModelRouteUnavailable(generationKick.errorMessage);
       return NextResponse.json(
         {
-          error: "generation_submit_failed",
+          error: routeUnavailable
+            ? "generation_route_unavailable"
+            : "generation_submit_failed",
           message:
-            generationKick.errorMessage ?? "Immediate video generation submit failed.",
+            routeUnavailable
+              ? modelRouteUnavailableMessage(generationKick.errorMessage)
+              : generationKick.errorMessage ?? "Immediate video generation submit failed.",
           ...responseBody,
         },
         { status: 502 },

@@ -1,7 +1,7 @@
 import type { JsonValue } from "@/lib/db/schema/common";
 
 export class APIMartVideoProviderUnavailableError extends Error {
-  constructor(message = "APIMart video provider is not configured.") {
+  constructor(message = "APIMart video provider is not configured. Set APIMART_API_KEY.") {
     super(message);
     this.name = "APIMartVideoProviderUnavailableError";
   }
@@ -43,6 +43,8 @@ export interface APIMartTaskResult {
 interface APIMartClientDeps {
   fetch?: typeof fetch;
   env?: Record<string, string | undefined>;
+  apiKey?: string;
+  model?: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -62,8 +64,9 @@ function normalizeBaseUrl(value: string) {
 
 export function getAPIMartVideoConfig(
   env: Record<string, string | undefined> = process.env,
+  overrides: { apiKey?: string; model?: string } = {},
 ): APIMartVideoConfig {
-  const apiKey = env.APIMART_API_KEY;
+  const apiKey = overrides.apiKey?.trim() || env.APIMART_API_KEY?.trim();
   if (!apiKey) {
     throw new APIMartVideoProviderUnavailableError();
   }
@@ -73,8 +76,8 @@ export function getAPIMartVideoConfig(
     apiKey,
     baseUrl: normalizeBaseUrl(env.APIMART_BASE_URL?.trim() || "https://api.apimart.ai"),
     model:
+      overrides.model?.trim() ||
       env.VIDEO_GENERATION_MODEL?.trim() ||
-      env.APIMART_PIXVERSE_MODEL?.trim() ||
       "pixverse-v6",
   };
 }
@@ -201,6 +204,7 @@ function buildGenerationBody(input: APIMartVideoGenerationInput, model: string) 
     prompt: input.prompt,
     duration: 8,
     resolution: input.resolution ?? "540p",
+    //resolution: "360p",
     audio: input.audio ?? false,
     size: input.aspectRatio,
   };
@@ -218,7 +222,10 @@ export async function createAPIMartVideoGeneration(
   input: APIMartVideoGenerationInput,
   deps: APIMartClientDeps = {},
 ): Promise<APIMartVideoGenerationResult> {
-  const config = getAPIMartVideoConfig(deps.env);
+  const config = getAPIMartVideoConfig(deps.env, {
+    apiKey: deps.apiKey,
+    model: deps.model,
+  });
   const fetchImpl = deps.fetch ?? fetch;
   const response = await fetchImpl(`${config.baseUrl}/v1/videos/generations`, {
     method: "POST",
@@ -246,7 +253,10 @@ export async function pollAPIMartTask(
   providerTaskId: string,
   deps: APIMartClientDeps = {},
 ): Promise<APIMartTaskResult> {
-  const config = getAPIMartVideoConfig(deps.env);
+  const config = getAPIMartVideoConfig(deps.env, {
+    apiKey: deps.apiKey,
+    model: deps.model,
+  });
   const fetchImpl = deps.fetch ?? fetch;
   const response = await fetchImpl(
     `${config.baseUrl}/v1/tasks/${encodeURIComponent(providerTaskId)}`,

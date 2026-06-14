@@ -113,6 +113,40 @@ describe("POST /api/jobs/[id]/confirm", () => {
     });
   });
 
+  it("uses an operator-facing message when model route configuration is missing", async () => {
+    const response = await handleConfirmStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ storyboardId: "storyboard-1" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        confirmStoryboard: async (input) => ({
+          jobId: input.jobId,
+          storyboardId: input.storyboardId,
+          status: "segments_queued",
+          reservedLedgerId: "ledger-1",
+          segmentCount: 1,
+        }),
+        kickGeneration: async () => ({
+          status: "failed",
+          submittedCount: 0,
+          failedCount: 1,
+          segmentIds: ["segment-1"],
+          providerTaskIds: [],
+          errorMessage: "No active model route for video_generation in development.",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      error: "generation_route_unavailable",
+      message: "视频生成服务未完成模型路由配置，请联系管理员检查 development 环境的 video_generation route。",
+    });
+  });
+
   it("returns the current generation state when a storyboard was already confirmed", async () => {
     const kickedJobs: string[] = [];
     const response = await handleConfirmStoryboardRequest(

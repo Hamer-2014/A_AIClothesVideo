@@ -28,6 +28,8 @@ export function StoryboardConfirmation({
   confirming,
   moderationPendingMessage,
 }: StoryboardConfirmationProps) {
+  const hasDraft = segments.length > 0;
+
   return (
     <section className="space-y-5 rounded-lg border border-[var(--line)] bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -40,11 +42,11 @@ export function StoryboardConfirmation({
         <div className="space-y-1 text-right text-sm">
           <p>{durationSeconds} 秒</p>
           <p className="text-[var(--muted)]">{aspectRatio}</p>
-          <p className="font-medium">{creditCost} 点</p>
+          {hasDraft ? <p className="font-medium">{creditCost} 点</p> : null}
         </div>
       </div>
       <div className="space-y-3">
-        {segments.length === 0 ? (
+        {!hasDraft ? (
           <p className="text-sm text-[var(--muted)]">尚未生成分镜草稿。</p>
         ) : (
           segments.map((segment) => (

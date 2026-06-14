@@ -64,6 +64,13 @@
       "when": 1781338200000,
       "tag": "0008_provider_call_route_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781438400000,
+      "tag": "0009_drop_model_routes",
+      "breakpoints": true
     }
   ]
 }

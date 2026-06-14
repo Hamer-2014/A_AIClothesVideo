@@ -1,7 +1,7 @@
 import type { JsonValue } from "@/lib/db/schema/common";
 
 export class EvoLinkProviderUnavailableError extends Error {
-  constructor(message = "EvoLink video provider is not configured.") {
+  constructor(message = "EvoLink video provider is not configured. Set EVOLINK_API_KEY.") {
     super(message);
     this.name = "EvoLinkProviderUnavailableError";
   }
@@ -40,6 +40,8 @@ export interface EvoLinkTaskResult {
 interface EvoLinkClientDeps {
   fetch?: typeof fetch;
   env?: Record<string, string | undefined>;
+  apiKey?: string;
+  model?: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -128,8 +130,9 @@ function outputUrlFrom(raw: Record<string, unknown>) {
 
 export function getEvoLinkVideoConfig(
   env: Record<string, string | undefined> = process.env,
+  overrides: { apiKey?: string; model?: string } = {},
 ): EvoLinkVideoConfig {
-  const apiKey = env.EVOLINK_API_KEY;
+  const apiKey = overrides.apiKey?.trim() || env.EVOLINK_API_KEY?.trim();
   if (!apiKey) {
     throw new EvoLinkProviderUnavailableError();
   }
@@ -141,8 +144,8 @@ export function getEvoLinkVideoConfig(
       env.EVOLINK_BASE_URL?.trim() || "https://api.evolink.ai",
     ),
     model:
+      overrides.model?.trim() ||
       env.VIDEO_GENERATION_MODEL?.trim() ||
-      env.EVOLINK_VIDEO_MODEL?.trim() ||
       "veo3.1-fast-beta",
   };
 }
@@ -173,7 +176,10 @@ export async function createEvoLinkVideoGeneration(
   input: EvoLinkVideoGenerationInput,
   deps: EvoLinkClientDeps = {},
 ): Promise<EvoLinkVideoGenerationResult> {
-  const config = getEvoLinkVideoConfig(deps.env);
+  const config = getEvoLinkVideoConfig(deps.env, {
+    apiKey: deps.apiKey,
+    model: deps.model,
+  });
   const fetchImpl = deps.fetch ?? fetch;
   const response = await fetchImpl(`${config.baseUrl}/v1/videos/generations`, {
     method: "POST",
@@ -207,7 +213,10 @@ export async function pollEvoLinkTask(
   providerTaskId: string,
   deps: EvoLinkClientDeps = {},
 ): Promise<EvoLinkTaskResult> {
-  const config = getEvoLinkVideoConfig(deps.env);
+  const config = getEvoLinkVideoConfig(deps.env, {
+    apiKey: deps.apiKey,
+    model: deps.model,
+  });
   const fetchImpl = deps.fetch ?? fetch;
   const response = await fetchImpl(
     `${config.baseUrl}/v1/tasks/${encodeURIComponent(providerTaskId)}`,

@@ -7,13 +7,47 @@
 ## 结论先说
 
 - 2026-06-13 MVP 风险收敛子项目 A 已完成本地自动化验证：免费试用防滥用从 userId rolling 24h 升级为 user/email/device/IP/user-agent 多信号判断，新增 `trial_abuse_signals` 审计表，生产缺 `ABUSE_HASH_SECRET` fail closed，普通用户 API 不返回内部 reason codes。
-- 2026-06-13 MVP 风险收敛子项目 B 已完成本地自动化验证：公开视频 `video_generation` 运行时改由数据库 `model_routes` 解析，provider call log 写入 route snapshot；隔离 worktree 缺 `DATABASE_URL` 时 `verify:blockers -- --json` 未完成，未降低断言。
+- 2026-06-13 Env-only Video Generation Config 已开始替换子项目 B 的 DB route 口径：公开视频 `video_generation` 的 provider/model/key 以环境变量为准，`model_routes/provider_keys` 不再决定视频生成运行时配置。
 - 2026-06-13 MVP 风险收敛子项目 C 已完成本地自动化验证：Cloud Run worker 从 final mp4 抽取 `cover.webp` 并上传 R2，封面失败不阻断 final video / QA frames；前台任务详情优先显示封面，任务列表通过内部 cover API 的 R2 signed URL 显示封面缩略图。
+- 2026-06-13 SPEC Acceptance Follow-up 代码修复已完成本地定点验证：免费试用 grant hash 复用同一 dev fallback secret、Cloud Run cover 上传失败降级为 warning。旧 `model_routes` public fallback 验收口径已被 env-only 视频生成配置取代。
+- 2026-06-13 SPEC Acceptance Follow-up 真实阻断验证仍未通过：旧失败原因依赖 `provider_call_logs.model_route_id` / `route_snapshot`；env-only 后应改查 `video_segments.provider/model` 和 `provider_call_logs.provider/model`，不能再要求 route snapshot。
 - Admin Ops Closure 的代码改动已完成，`/admin/jobs`、`/admin/jobs/[id]`、Provider / Template / Billing 页面和敏感动作 reason / audit 约束都已落地。
 - 本轮本地验证已通过：
   - `npm run typecheck`
   - `npm test`
   - `npm run build`
+
+## 2026-06-13 SPEC Acceptance Follow-up
+
+本轮完成：
+
+- `trial_check` 与 `trial_granted` 在 development 且未显式配置 `ABUSE_HASH_SECRET` 时共用 `dev-abuse-hash-secret-do-not-use-in-production`，避免免费试用 grant 信号与 eligibility 信号 hash 不一致。
+- `stitch-worker` 已覆盖封面抽帧失败和封面上传失败两种非核心交付失败；两者都会保留 final video / QA frames / success callback，并在 callback 中写 warning。
+- 旧 `model_routes` public fallback 不再作为 MVP 视频生成运行时路径；公开视频 provider/model/key 由环境变量决定。
+
+已跑定点验证：
+
+```bash
+npx vitest run src/server/abuse/hash.test.ts src/server/abuse/trial-eligibility.test.ts src/server/jobs/create-job.test.ts
+npx vitest run workers/stitch-worker/src/ffmpeg.test.ts workers/stitch-worker/src/stitch.test.ts
+npx vitest run src/server/providers/model-route-resolver.test.ts src/server/video/segments.test.ts src/lib/providers/log-call.test.ts
+npm run db:migrate
+npm run verify:blockers -- --json
+```
+
+结果：
+
+- abuse/job 定点测试：`3` 个 test files、`27` 个 tests 通过。
+- worker 定点测试：`2` 个 test files、`10` 个 tests 通过。
+- route/segment/log 定点测试：`3` 个 test files、`27` 个 tests 通过。
+- `npm run db:migrate`：迁移执行成功。
+- `npm run verify:blockers -- --json`：按旧 DB-route 标准失败，`paid_delivery` 未通过；现有 paid deliverable 样本 `0d3540c0-6dda-4ba7-841a-c12a45632148`、`516ac34b-0a2f-49e0-b584-96800d6cb899`、`5bb8f149-8e20-4d7f-b2b6-82d9db7ceb06` 的 `videoRouteLogCount = 0`，缺少 `provider_call_logs.model_route_id` 与 `route_snapshot`。env-only 后该失败项应改为 provider/model 证据检查。
+
+剩余必须补的真实验收：
+
+- 使用当前 env-only 视频生成配置创建新的 `credit_cost > 0` paid job，跑到 `deliverable`。
+- 运行 `npm run smoke:backend -- --job-id <new-paid-job-id>`。
+- 再运行 `npm run verify:blockers -- --json`，要求 `passed = true` 且 paid delivery evidence 包含 `video_segments.provider/model` 与 `provider_call_logs.provider/model`。
 
 ## 2026-06-13 MVP Risk Closure - 子项目 A 免费试用防滥用
 
@@ -42,9 +76,11 @@ npm run typecheck
 
 - OAuth account 信号服务层和 store 接口已支持；当前 `/api/jobs` route 仍未从 better-auth `accounts` 表读取 provider/account id，后续应补一个 auth/account lookup，而不是伪造 session 字段。
 
-## 2026-06-13 MVP Risk Closure - 子项目 B model_routes 运行时收敛
+## 2026-06-13 MVP Risk Closure - 子项目 B 历史记录：model_routes 运行时收敛
 
-本轮完成：
+以下为历史记录，已被 2026-06-13 Env-only Video Generation Config 取代；不要再按本节配置公开视频生成 provider/model/key。
+
+本轮曾完成：
 
 - 新增 `src/server/providers/model-route-resolver.ts`，只收敛 `video_generation`，公开视频任务禁止解析 `experimental_video`。
 - `submitQueuedSegment` 提交前解析 DB route，route paused、provider paused、key paused/exhausted/error、并发满、日成本达到上限、failureCount >= 5 均 fail closed。
@@ -66,7 +102,7 @@ npm run typecheck
 
 剩余注意：
 
-- 历史 paid delivery 样本若没有 `provider_call_logs.model_route_id/route_snapshot`，增强后的 `npm run verify:blockers -- --json` 会按新标准失败；需要新建或选择迁移后的 paid deliverable 样本重新验收。
+- 历史 paid delivery 样本若没有 `provider_call_logs.model_route_id/route_snapshot`，旧 DB-route 标准会失败；env-only 后该标准应改为检查 `video_segments.provider/model` 与 `provider_call_logs.provider/model`。
 
 本轮验收命令状态：
 
@@ -118,7 +154,7 @@ npx vitest run src/server/files/job-cover.test.ts src/app/api/jobs/[id]/cover/ro
 - `npm run typecheck`：通过。
 - `npm run test`：通过，`127` 个 test files、`507` 个 tests。
 - `npm run build`：通过。
-- `npm run verify:blockers -- --json`：未完成，隔离 worktree 未注入 `.env` / `.env.local`，脚本加载 `0` 个 env 后报 `DATABASE_URL is required.`；仍保持 paid delivery route snapshot 新断言，没有降级为 mock 验收。
+- `npm run verify:blockers -- --json`：未完成，隔离 worktree 未注入 `.env` / `.env.local`，脚本加载 `0` 个 env 后报 `DATABASE_URL is required.`；env-only 后应检查 paid delivery provider/model 证据，不再坚持 route snapshot 断言。
 - `npm run smoke:stitch`、`npm run smoke:backend -- --job-id <new-paid-job-id>`：未运行；当前会需要真实部署环境、R2 凭证、数据库连接和新 job id。
 
 ## 本轮真实验收样本
@@ -265,7 +301,7 @@ npm run typecheck
 - `GET /api/health` 现在区分 `creemPayment` 与 `moderation`：
   - `creemPayment.status = pending` 可用于标记 Creem 真实支付验收后置。
   - `moderation.configured = false` 会导致 `ready = false`。
-- `.env.example` 已新增 `PROVIDER_KEY_ENCRYPTION_SECRET`，创建/轮换 provider key 时未配置会失败。
+- `GET /api/health` 视频生成检查改为要求 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL` 和当前 provider 对应的 `APIMART_API_KEY` / `EVOLINK_API_KEY`；不再把 `PROVIDER_KEY_ENCRYPTION_SECRET` 作为视频生成必需项。
 
 ### Backend/API 阻断项硬验证
 

@@ -4,6 +4,8 @@
 
 ## 结论
 
+> 2026-06-13 更新：本审计中的 DB model route 方案已被 Env-only Video Generation Config 取代。MVP 视频生成 provider/model/key 只读取 `.env.local` / 部署平台环境变量：`VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL`、当前 provider 对应的 `APIMART_API_KEY` 或 `EVOLINK_API_KEY`。`model_routes` / `provider_keys` 不再决定公开视频生成运行时配置，`PROVIDER_KEY_ENCRYPTION_SECRET` 也不是视频生成必需项。
+
 当前最新决策：由于 EvoLink Veo 稳定性不足，公开视频生成默认先试用：
 
 - Provider：`apimart`
@@ -24,32 +26,49 @@ Paid closure 验收中出现两个真实付费样本：
 
 ## 根因
 
-本次最新收敛后，代码默认行为与 `.env.example` 均偏向 APIMart PixVerse：
+本节为历史记录，已废弃。曾经的收敛方案是让公开视频生成的 provider/model/key 以数据库为准：
 
-- `VIDEO_GENERATION_PROVIDER` 未配置时默认 `apimart`。
-- APIMart 模型默认值为 `pixverse-v6`。
-- `.env.example` 中 `VIDEO_GENERATION_PROVIDER=apimart`。
-- `.env.example` 中 `VIDEO_GENERATION_MODEL=pixverse-v6`。
+- `model_routes` 决定 `video_generation` 使用的 provider 和 model。
+- `provider_keys.encrypted_key` 保存厂商 API key。
+- 运行时用 `PROVIDER_KEY_ENCRYPTION_SECRET` 解密 provider key。
+- `.env` 不再保存 `APIMART_API_KEY`、`EVOLINK_API_KEY` 或视频生成模型变量。
 
-本地真实验收环境曾被 `.env.local` 覆盖为：
+当前 MVP 正确做法相反：在 `.env.local` / 部署平台环境变量中配置：
 
 ```text
 VIDEO_GENERATION_PROVIDER=apimart
 VIDEO_GENERATION_MODEL=pixverse-v6
+APIMART_API_KEY=<provider key>
+APIMART_BASE_URL=https://api.apimart.ai
+
+EVOLINK_API_KEY=<provider key if using evolink>
+EVOLINK_BASE_URL=https://api.evolink.ai
 ```
 
-这解释了 paid delivery 样本为什么走 APIMart/PixVerse。该路线现在被接受为默认试用路线，但必须继续验证毛利。
+不要再依赖 `model_routes` / `provider_keys` 配置公开视频生成。
+
+历史 DB-route 方案曾要求本地真实验收环境只保留非密钥 endpoint 与解密 secret：
+
+```text
+APIMART_BASE_URL=https://api.apimart.ai
+EVOLINK_BASE_URL=https://api.evolink.ai
+PROVIDER_KEY_ENCRYPTION_SECRET=<local secret>
+```
+
+当前 env-only 方案下，paid delivery 样本走 APIMart/PixVerse 的依据应来自环境变量、`video_segments.provider/model` 和 `provider_call_logs.provider/model`，不是 route snapshot。
 
 ## 已收敛项
 
 - PRD、技术架构、实现计划、开发 SPEC 中公开视频主模型已统一为 APIMart `pixverse-v6`。
-- 路由代码未显式配置 provider 时默认选择 `apimart`。
-- 测试样例已覆盖 APIMart 默认路由。
-- 本地 `.env.local` 已调整为：
+- 路由代码不再通过 `model_routes` 选择公开视频 provider/model。
+- 测试样例应覆盖 env-only provider/model/key 检查。
+- 本地 `.env.local` 应调整为：
 
 ```text
 VIDEO_GENERATION_PROVIDER=apimart
 VIDEO_GENERATION_MODEL=pixverse-v6
+APIMART_API_KEY=<local provider key>
+APIMART_BASE_URL=https://api.apimart.ai
 ```
 
 注意：`.env.local` 不进入 Git。Vercel、staging、production 环境变量需要人工同步检查。
@@ -61,15 +80,11 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 ```text
 VIDEO_GENERATION_PROVIDER=apimart
 VIDEO_GENERATION_MODEL=pixverse-v6
-APIMART_PIXVERSE_MODEL=pixverse-v6
+APIMART_API_KEY=<configured>
+APIMART_BASE_URL=https://api.apimart.ai
 ```
 
-可以保留 EvoLink key 作为备用，但不要把默认 provider 切回 EvoLink，除非已经重新验收稳定性和成本：
-
-```text
-EVOLINK_API_KEY=<optional fallback candidate>
-EVOLINK_VIDEO_MODEL=veo3.1-fast-beta
-```
+备用 provider key 不再进入 `provider_keys` 决定公开视频生成；切换 provider 时通过环境变量调整 `VIDEO_GENERATION_PROVIDER` 和对应 key。
 
 ## 后续验收方法
 
@@ -93,7 +108,7 @@ node scripts/generation-debug.mjs <paid-pixverse-job-id> status
 ## 剩余风险
 
 - `verify:blockers` 已在 2026-06-13 加入 paid delivery 的 provider/model 断言，要求公开视频付费交付样本包含 `apimart` / `pixverse-v6` 证据。它可以发现已交付样本跑错模型，但仍不能替代生产环境变量发布前检查。
-- `model_routes` 表已经存在，但公开视频生成运行时代码当前主要读取环境变量，而不是强制读取数据库路由表。
+- `model_routes` 属于历史 DB-route 方案；当前 MVP 运行时不应依赖它决定公开视频生成 provider/model/key。
 - 如果后续要允许后台切换模型路线，必须先加入“公开/备用/管理员任务”的路由隔离规则，并让 smoke 明确断言 provider/model。
 
 ## 2026-06-13 本地稳定性补充

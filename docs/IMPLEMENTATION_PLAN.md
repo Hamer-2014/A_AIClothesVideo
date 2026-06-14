@@ -23,7 +23,11 @@
   - `npm run typecheck`
   - `npm run test`
   - `npm run build`
-  - `npm run verify:blockers -- --json`
+- 2026-06-13 SPEC Acceptance Follow-up 定点验证通过：
+  - `npx vitest run src/server/abuse/hash.test.ts src/server/abuse/trial-eligibility.test.ts src/server/jobs/create-job.test.ts`
+  - `npx vitest run workers/stitch-worker/src/ffmpeg.test.ts workers/stitch-worker/src/stitch.test.ts`
+  - `npx vitest run src/server/providers/model-route-resolver.test.ts src/server/video/segments.test.ts src/lib/providers/log-call.test.ts`
+- `npm run verify:blockers -- --json` 当前仍需按 env-only 口径重新验收：paid delivery 应检查 `video_segments.provider/model` 与 `provider_call_logs.provider/model`，不再要求 `provider_call_logs.model_route_id` / `route_snapshot`。
 - `verify:blockers` 当前要求：
   - 至少一个 `credit_cost > 0` 的 paid deliverable 任务有 `reserve`、`capture`、final video、QA frames。
   - paid delivery 的 `video_segments.provider/model` 必须包含 `apimart` / `pixverse-v6`。
@@ -37,14 +41,15 @@
 - Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
 - stitch-worker 抽帧从固定 3 帧改为分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 转场帧策略仍是后续增强项。
 - 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。
-- 2026-06-13 风险收敛子项目 B：公开视频 `video_generation` segment submit 先解析数据库 `model_routes`，route/provider/key 非 active 或 key 并发/日限/失败数不可用时 fail closed；`provider_call_logs` 新增 `model_route_id` 与 `route_snapshot`；`verify:blockers` 增强为要求 paid delivery 有 route snapshot 证据。
+- 2026-06-13 Env-only Video Generation Config：公开视频 `video_generation` 的 provider/model/key 改为只读取环境变量；health check 检查 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL` 和当前 provider 对应的 `APIMART_API_KEY` / `EVOLINK_API_KEY`，不再要求 `PROVIDER_KEY_ENCRYPTION_SECRET` 才能生成视频。
 - 2026-06-13 风险收敛子项目 C：Cloud Run `stitch-worker` 在 final mp4 后抽取 `jobs/{jobId}/covers/cover.webp`，封面生成失败只写 warning 且不阻断 final video / QA frames / callback；前台任务详情优先显示封面、无封面时回退视频预览，任务列表通过内部 cover API 的 R2 signed URL 展示可用封面缩略图。
 
 ### 仍未完成或仍需生产验收
 
 - Creem 真实生产支付、税务配置和平台 review 仍需单独验收；不能用本地账务闭环替代真实收款闭环。
-- `model_routes` 已接入公开视频 `video_generation` segment submit；storyboard、vision、post_qa、moderation 暂未迁移到同一 resolver，避免一次性扩大运行时风险。
-- Cloud Run 封面生成已完成本地自动化验证；仍需使用部署后的新任务确认 R2 中实际出现 `jobs/{jobId}/covers/cover.webp`，并确认 `video_jobs.cover_key` / `stitch_jobs.cover_key` 随 callback 写入真实库。
+- 公开视频 `video_generation` 不再使用 DB `model_routes/provider_keys` 决定 provider/model/key；生产发布前必须确认对应环境变量已配置，旧 route snapshot 验收口径不再适用。
+- storyboard、vision、post_qa、moderation 暂未迁移到同一 resolver，避免一次性扩大运行时风险。
+- Cloud Run 封面生成已覆盖抽帧失败和上传失败降级；仍需使用部署后的新任务确认 R2 中实际出现 `jobs/{jobId}/covers/cover.webp`，并确认 `video_jobs.cover_key` / `stitch_jobs.cover_key` 随 callback 写入真实库。
 - 免费试用防滥用已从单一 userId rolling 24h 升级为多信号判断；OAuth account 信号服务层已支持，但用户 API route 仍需后续从 better-auth accounts 稳定读取 provider/account id 后传入。
 - 本地 10+ 视频稳定不等于用户验证完成；仍需 20-50 个目标卖家、100-300 个真实 SKU 的小规模公开 MVP 数据。
 
@@ -138,8 +143,6 @@
   - `orders`
 - [ ] 创建模型与供应商表：
   - `model_providers`
-  - `provider_keys`
-  - `model_routes`
   - `provider_call_logs`
   - `prompt_moderation_results`
 - [ ] 创建审计与风控表：
@@ -297,19 +300,9 @@
 
 **任务：**
 
-- [ ] 建立 provider/key 管理。
-- [ ] Key 加密存储。
-- [ ] 为 provider/key 配置每日成本上限、并发上限和失败暂停策略。
-- [ ] 支持 development / staging / production 不同 key。
-- [ ] 建立 model route：
-  - `content_safety`
-  - `lite_asset_check`
-  - `standard_asset_analysis`
-  - `strict_asset_review`
-  - `creem_prompt_moderation`
-  - `storyboard`
-  - `video_generation`
-  - `post_qa`
+- [ ] MVP 视频生成 provider/model/key 使用 env-only 配置，不做后台 provider/key 管理和 model route 热切换。
+- [ ] 每个 deployment environment 在平台环境变量中配置不同厂商 key。
+- [ ] 如果未来需要 provider/key 成本上限、并发上限、失败暂停或 fallback，另开企业级多 provider 路由设计，不在本 MVP 中保留半生效入口。
 - [ ] 接入 DeepSeek `deepseek-v4-flash`。
 - [ ] 接入默认 GPT 视觉模型。
 - [ ] 接入 APIMart `pixverse-v6`。

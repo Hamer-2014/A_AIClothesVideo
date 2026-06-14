@@ -78,7 +78,7 @@ export function ProviderTable({ providers, keys, routes }: ProviderTableProps) {
       />
 
       <SectionTable
-        title="Provider Keys"
+        title="Provider Keys (read-only legacy)"
         columns={[
           "Label",
           "Provider ID",
@@ -89,7 +89,7 @@ export function ProviderTable({ providers, keys, routes }: ProviderTableProps) {
           "Concurrency",
           "Failure Count",
         ]}
-        emptyText="当前没有 provider key。"
+        emptyText="当前没有历史 provider key。"
         rows={keys.map((key) => [
           key.label,
           key.providerId,
@@ -103,7 +103,7 @@ export function ProviderTable({ providers, keys, routes }: ProviderTableProps) {
       />
 
       <SectionTable
-        title="Model Routes"
+        title="Model Routes (retired)"
         columns={[
           "Purpose",
           "环境",
@@ -113,7 +113,7 @@ export function ProviderTable({ providers, keys, routes }: ProviderTableProps) {
           "Min Margin",
           "Public Fallback",
         ]}
-        emptyText="当前没有 model route。"
+        emptyText="model_routes 已退役；视频生成只读取环境变量。"
         rows={routes.map((route) => [
           route.purpose,
           route.environment,

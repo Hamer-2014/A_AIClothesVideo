@@ -109,6 +109,9 @@ export async function retryVideoSegmentByAdmin({
     reason: "admin_retry_segment",
     actorType: "admin",
     actorId: actor.userId,
+    errorMessage: null,
+    failureReason: null,
+    clearLock: true,
     eventSnapshot: { segmentId, reason: normalizedReason },
   });
   await transitionJobStatus({
@@ -118,6 +121,9 @@ export async function retryVideoSegmentByAdmin({
     reason: "admin_retry_segment_requeued",
     actorType: "admin",
     actorId: actor.userId,
+    errorMessage: null,
+    failureReason: null,
+    clearLock: true,
     eventSnapshot: { segmentId },
   });
   await writeAdminAuditLog({

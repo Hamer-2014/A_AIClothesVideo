@@ -7,6 +7,7 @@ import {
 import {
   createDrizzleVideoSegmentStore,
   submitQueuedSegment,
+  VideoSegmentAlreadyClaimedError,
 } from "@/server/video/segments";
 
 interface SubmitSegmentDeps {
@@ -84,8 +85,9 @@ export async function handleSubmitSegmentRequest(
     }
 
     if (
-      error instanceof Error &&
-      error.message === "Video segment is not queued."
+      error instanceof VideoSegmentAlreadyClaimedError ||
+      (error instanceof Error &&
+        error.message === "Video segment is not queued.")
     ) {
       return NextResponse.json(
         { error: "segment_not_queued" },

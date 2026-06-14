@@ -187,6 +187,36 @@ export const mvpShotTemplates: ShotTemplateDefinition[] = [
     requiresStrictReview: true,
   },
   {
+    templateId: "scene_lifestyle_showcase",
+    version: 1,
+    status: "active",
+    riskLevel: "medium",
+    displayName: "场景氛围展示",
+    description: "使用正面服装图和场景图生成氛围化展示。",
+    requiredAssets: ["front", "scene"],
+    blockedConditions: [
+      "garment_change",
+      "scene_logo_or_text_copying",
+      "people_from_scene_copying",
+    ],
+    allowedMotion: ["subtle_camera_motion", "soft_light_shift", "slow_push_in"],
+    basePromptIntent:
+      "Create a lifestyle product video using the garment from the front image and the uploaded scene image as background and atmosphere reference.",
+    systemConstraints: [
+      ...frontConstraints,
+      "Use the scene image only as background, lighting, and mood reference.",
+      "Do not copy people, faces, logos, storefront names, or readable text from the scene image.",
+      "Do not show the back side.",
+    ],
+    postQaChecks: [
+      "garment_consistency",
+      "background_safety",
+      "no_scene_people_or_text_copying",
+    ],
+    isTrialAllowed: false,
+    requiresStrictReview: false,
+  },
+  {
     templateId: "minimal_studio",
     version: 1,
     status: "active",

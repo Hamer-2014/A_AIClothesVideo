@@ -51,7 +51,7 @@ function errorMessage(error: unknown) {
 
 function parseQaJson(value: JsonValue) {
   const record = asRecord(value);
-  const passed = record.passed;
+  const passed = normalizeQaPassed(record);
   const failureCategory = record.failure_category;
 
   if (typeof passed !== "boolean") {
@@ -60,9 +60,120 @@ function parseQaJson(value: JsonValue) {
 
   return {
     passed,
-    failureCategory:
-      typeof failureCategory === "string" ? failureCategory : null,
+    failureCategory: passed
+      ? null
+      : typeof failureCategory === "string"
+        ? failureCategory
+        : null,
   };
+}
+
+function normalizeQaPassed(record: Record<string, unknown>) {
+  const passed = record.passed;
+  if (passed !== false) {
+    return passed;
+  }
+
+  const flags = Array.isArray(record.risk_flags)
+    ? record.risk_flags.filter((flag): flag is string => typeof flag === "string")
+    : [];
+  const failureCategory =
+    typeof record.failure_category === "string" ? record.failure_category : "";
+  const summary = typeof record.summary === "string" ? record.summary : "";
+  const text = `${failureCategory} ${summary}`.toLowerCase();
+  const normalizedFlags = flags.map((flag) => flag.toLowerCase().trim());
+  const softSuitabilityFlags = new Set([
+    "minor_present",
+    "child_present",
+    "child_model",
+    "children_present",
+    "outdoor_scene",
+    "outdoor_street_scene",
+    "street_scene",
+    "lifestyle_scene",
+    "brand_policy_uncertainty",
+    "policy_or_brand_suitability",
+    "slight_motion_blur",
+    "slightly_blurry",
+    "minor_motion_blur",
+  ]);
+  const blockingFlags = [
+    "unsafe",
+    "sexualized",
+    "adultized",
+    "exploitation",
+    "privacy",
+    "garment_mismatch",
+    "product_unrecognizable",
+    "severe_blur",
+    "severely_blurry",
+    "severe_distortion",
+    "distorted_body",
+    "bad_frame",
+    "black_frame",
+  ];
+  const hasOnlySoftSuitabilityFlags =
+    normalizedFlags.length > 0 &&
+    normalizedFlags.every((flag) => softSuitabilityFlags.has(flag));
+  const hasBlockingFlag = normalizedFlags.some((flag) =>
+    blockingFlags.some((blockingFlag) => flag.includes(blockingFlag)),
+  );
+  const hasBlockingText = blockingFlags.some((blockingFlag) =>
+    text.includes(blockingFlag.replace(/_/g, " ")),
+  );
+  const isPolicyOrSuitabilityOnly =
+    text.includes("brand policy") ||
+    text.includes("policy uncertainty") ||
+    text.includes("policy may vary") ||
+    text.includes("policy_or_brand_suitability") ||
+    text.includes("product-ad suitability") ||
+    text.includes("marketing suitability") ||
+    text.includes("ordinary product marketing");
+
+  if (
+    hasOnlySoftSuitabilityFlags &&
+    isPolicyOrSuitabilityOnly &&
+    !hasBlockingFlag &&
+    !hasBlockingText &&
+    checksDoNotContainBlockingFailure(record)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function checksDoNotContainBlockingFailure(record: Record<string, unknown>) {
+  const checks = Array.isArray(record.checks) ? record.checks.map(asRecord) : [];
+  const blockingCheckNames = [
+    "garment",
+    "consistency",
+    "clarity",
+    "quality",
+    "safety",
+    "appropriateness",
+  ];
+
+  return checks.every((check) => {
+    if (check.passed !== false) {
+      return true;
+    }
+
+    const name = typeof check.name === "string" ? check.name.toLowerCase() : "";
+    const notes = typeof check.notes === "string" ? check.notes.toLowerCase() : "";
+    const checkText = `${name} ${notes}`;
+    const isSoftPolicyConcern =
+      checkText.includes("brand policy") ||
+      checkText.includes("policy may vary") ||
+      checkText.includes("policy uncertainty") ||
+      checkText.includes("child model present");
+
+    if (isSoftPolicyConcern) {
+      return true;
+    }
+
+    return !blockingCheckNames.some((blockingName) => name.includes(blockingName));
+  });
 }
 
 async function defaultPostQaVisionProvider({

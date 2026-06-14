@@ -76,21 +76,6 @@ export const providerKeys = pgTable("provider_keys", {
   ...softDelete,
 });
 
-export const modelRoutes = pgTable("model_routes", {
-  ...id,
-  purpose: providerPurposeEnum("purpose").notNull(),
-  environment: text("environment").notNull().default("development"),
-  primaryProviderId: uuid("primary_provider_id"),
-  primaryModel: text("primary_model").notNull(),
-  fallbackProviderId: uuid("fallback_provider_id"),
-  fallbackModel: text("fallback_model"),
-  status: providerStatusEnum("status").notNull().default("paused"),
-  minMarginPercent: integer("min_margin_percent").notNull().default(45),
-  allowPublicFallback: text("allow_public_fallback").notNull().default("false"),
-  metadata: jsonSnapshot("metadata"),
-  ...timestamps,
-});
-
 export const providerCallLogs = pgTable("provider_call_logs", {
   ...id,
   provider: text("provider").notNull(),

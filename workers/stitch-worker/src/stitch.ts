@@ -141,11 +141,20 @@ export async function runStitchJob({
     });
 
     if (generatedCoverKey) {
-      await upload({
-        key: generatedCoverKey,
-        sourcePath: coverPath,
-        contentType: "image/webp",
-      });
+      try {
+        await upload({
+          key: generatedCoverKey,
+          sourcePath: coverPath,
+          contentType: "image/webp",
+        });
+      } catch (error) {
+        warnings.push(
+          `cover_upload_failed: ${
+            error instanceof Error ? error.message : "Unknown cover upload error"
+          }`,
+        );
+        generatedCoverKey = null;
+      }
     }
 
     await Promise.all(

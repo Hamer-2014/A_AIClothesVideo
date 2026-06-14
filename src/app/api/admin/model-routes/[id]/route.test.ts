@@ -19,7 +19,7 @@ describe("POST /api/admin/model-routes/[id]", () => {
     expect(response.status).toBe(403);
   });
 
-  it("updates model route", async () => {
+  it("returns gone for authenticated users because DB model routes are retired", async () => {
     const response = await handleUpdateModelRouteRequest(
       new Request("http://localhost/api/admin/model-routes/route-1", {
         method: "POST",
@@ -38,27 +38,16 @@ describe("POST /api/admin/model-routes/[id]", () => {
           email: "admin@example.com",
           role: "admin",
         }),
-        updateRoute: async (input) => ({
-          id: input.routeId,
-          status: input.status,
-          primaryModel: input.primaryModel,
-          minMarginPercent: input.minMarginPercent,
-          allowPublicFallback: input.allowPublicFallback,
-        }),
       },
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(410);
     expect(await response.json()).toEqual({
-      id: "route-1",
-      status: "active",
-      primaryModel: "veo3.1-fast-beta",
-      minMarginPercent: 50,
-      allowPublicFallback: false,
+      error: "model_routes_retired",
     });
   });
 
-  it("rejects missing, whitespace-only, and short reasons", async () => {
+  it("does not validate retired route payloads", async () => {
     for (const reason of ["", "   ", "short"]) {
       const response = await handleUpdateModelRouteRequest(
         new Request("http://localhost/api/admin/model-routes/route-1", {
@@ -78,7 +67,7 @@ describe("POST /api/admin/model-routes/[id]", () => {
         },
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(410);
     }
   });
 });

@@ -24,7 +24,7 @@ describe("POST /api/admin/provider-keys", () => {
     expect(response.status).toBe(403);
   });
 
-  it("rejects short reasons", async () => {
+  it("returns gone for authenticated users because provider keys are env-only", async () => {
     const response = await handleCreateProviderKeyRequest(
       request({
         providerId: "provider-1",
@@ -39,10 +39,13 @@ describe("POST /api/admin/provider-keys", () => {
       { getAdminSession: async () => admin },
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({
+      error: "provider_keys_retired",
+    });
   });
 
-  it("maps operator creation denial to forbidden", async () => {
+  it("returns gone before accepting any provider key creation workflow", async () => {
     const response = await handleCreateProviderKeyRequest(
       request({
         providerId: "provider-1",
@@ -60,41 +63,13 @@ describe("POST /api/admin/provider-keys", () => {
           email: "ops@example.com",
           role: "operator",
         }),
-        createKey: async () => {
-          throw new Error("Actor cannot create provider keys.");
-        },
       },
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(410);
   });
 
-  it("reports missing provider key encryption configuration", async () => {
-    const response = await handleCreateProviderKeyRequest(
-      request({
-        providerId: "provider-1",
-        label: "main",
-        environment: "staging",
-        plainKey: "sk-test",
-        dailyCostLimit: "20",
-        concurrentLimit: 1,
-        status: "paused",
-        reason: "missing encryption",
-      }),
-      {
-        getAdminSession: async () => admin,
-        createKey: async () => {
-          throw new Error(
-            "PROVIDER_KEY_ENCRYPTION_SECRET must be at least 32 characters.",
-          );
-        },
-      },
-    );
-
-    expect(response.status).toBe(503);
-  });
-
-  it("does not return plain or encrypted keys", async () => {
+  it("does not parse or return submitted secrets", async () => {
     const response = await handleCreateProviderKeyRequest(
       request({
         providerId: "provider-1",
@@ -108,14 +83,10 @@ describe("POST /api/admin/provider-keys", () => {
       }),
       {
         getAdminSession: async () => admin,
-        createKey: async () => ({
-          id: "key-1",
-          keyPreview: "sk-t...cret",
-        }),
       },
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(410);
     const serialized = JSON.stringify(await response.json());
     expect(serialized).not.toContain("sk-test-secret");
     expect(serialized).not.toContain("encrypted");

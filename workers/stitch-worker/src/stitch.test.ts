@@ -125,6 +125,62 @@ describe("runStitchJob", () => {
     });
   });
 
+  it("continues delivery when cover upload fails", async () => {
+    const uploads: string[] = [];
+    const callbacks: unknown[] = [];
+
+    const result = await runStitchJob({
+      payload: {
+        stitchJobId: "stitch-1",
+        videoJobId: "job-1",
+        segmentKeys: ["segments/a.mp4"],
+        finalVideoKey: "jobs/job-1/stitched/final.mp4",
+        coverKey: "jobs/job-1/covers/cover.webp",
+        frameKeyPrefix: "jobs/job-1/qa/frames",
+        postQaMode: "lite",
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      },
+      config: {
+        workerSecret: "secret",
+        callbackSecret: "callback-secret",
+        bucket: "bucket",
+        r2Endpoint: "https://account.r2.cloudflarestorage.com",
+        r2AccessKeyId: "access",
+        r2SecretAccessKey: "private",
+      },
+      createWorkDir: async () => "/tmp/stitch-1",
+      writeTextFile: async () => {},
+      downloadObject: async () => {},
+      uploadObject: async ({ key }) => {
+        uploads.push(key);
+        if (key.endsWith("cover.webp")) {
+          throw new Error("cover upload failed");
+        }
+      },
+      stitchSegments: async () => {},
+      extractCoverFrame: async () => {},
+      extractQaFrames: async () => ["/tmp/stitch-1/frames/frame-0.jpg"],
+      listExtractedQaFrames: async () => ["/tmp/stitch-1/frames/frame-0.jpg"],
+      sendCallback: async ({ result }) => {
+        callbacks.push(result);
+      },
+      cleanupWorkDir: async () => {},
+    });
+
+    expect(result).toMatchObject({
+      status: "succeeded",
+      finalVideoKey: "jobs/job-1/stitched/final.mp4",
+      coverKey: null,
+    });
+    expect(uploads).toContain("jobs/job-1/stitched/final.mp4");
+    expect(uploads).toContain("jobs/job-1/covers/cover.webp");
+    expect(callbacks[0]).toMatchObject({
+      status: "succeeded",
+      coverKey: null,
+      warnings: ["cover_upload_failed: cover upload failed"],
+    });
+  });
+
   it("callbacks a failed result before rethrowing stitch errors", async () => {
     const callbacks: string[] = [];
 

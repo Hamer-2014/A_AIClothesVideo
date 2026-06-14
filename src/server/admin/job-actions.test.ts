@@ -141,6 +141,31 @@ describe("admin job actions", () => {
     });
   });
 
+  it("clears stale job errors when requeueing a failed segment", async () => {
+    const stores = createRetryStores();
+    const auditStore = createInMemoryAdminAuditStore();
+    await stores.jobStore.updateJobStatus(jobId, {
+      status: "segment_failed",
+      lastError: "No active model route for video_generation in development.",
+      failureReason: "No active model route for video_generation in development.",
+    });
+
+    await retryVideoSegmentByAdmin({
+      ...stores,
+      auditStore,
+      actor,
+      jobId,
+      segmentId,
+      reason: "retry after route configuration",
+    });
+
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "segments_queued",
+      lastError: null,
+      failureReason: null,
+    });
+  });
+
   it("marks a reserved job undeliverable and releases credits", async () => {
     const creditStore = createInMemoryCreditLedgerStore();
     await grantTrialCredits({

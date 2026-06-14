@@ -143,16 +143,62 @@ function userPromptForStoryboard({
   selectedTemplateIds,
   availableTemplateIds,
   userPrompt,
+  assetCompleteness,
+  templates,
 }: {
   durationSeconds: number;
   selectedTemplateIds: string[];
   availableTemplateIds: string[];
   userPrompt: string;
+  assetCompleteness: {
+    hasFront: boolean;
+    hasBack: boolean;
+    hasSide: boolean;
+    hasDetail: boolean;
+    hasScene: boolean;
+    hasModelFront: boolean;
+    hasFlatLayOrWhiteBackground: boolean;
+    detailTypes: string[];
+  };
+  templates: ShotTemplateDefinition[];
 }) {
+  const templatesById = new Map(
+    templates.map((template) => [template.templateId, template]),
+  );
+
   return JSON.stringify({
     duration_seconds: durationSeconds,
     selected_template_ids: selectedTemplateIds,
     available_template_ids: availableTemplateIds,
+    asset_summary: {
+      has_front: assetCompleteness.hasFront,
+      has_back: assetCompleteness.hasBack,
+      has_side: assetCompleteness.hasSide,
+      has_detail: assetCompleteness.hasDetail,
+      has_scene: assetCompleteness.hasScene,
+      has_model_front: assetCompleteness.hasModelFront,
+      has_flat_lay_or_white_background:
+        assetCompleteness.hasFlatLayOrWhiteBackground,
+      detail_types: assetCompleteness.detailTypes,
+      scene_usage: assetCompleteness.hasScene
+        ? "background/reference only"
+        : "not available",
+    },
+    selected_template_definitions: selectedTemplateIds.flatMap((templateId) => {
+      const template = templatesById.get(templateId);
+      if (!template) {
+        return [];
+      }
+
+      return [
+        {
+          template_id: template.templateId,
+          required_assets: template.requiredAssets,
+          base_prompt_intent: template.basePromptIntent,
+          system_constraints: template.systemConstraints,
+        },
+      ];
+    }),
     user_prompt: userPrompt,
     output_schema: {
       duration_seconds: "number",
@@ -245,6 +291,8 @@ export async function generateStoryboardDraft({
     selectedTemplateIds,
     availableTemplateIds: detail.recommendations.availableTemplateIds,
     userPrompt,
+    assetCompleteness: detail.assetCompleteness,
+    templates,
   });
 
   let providerResult: DeepSeekStoryboardResult;

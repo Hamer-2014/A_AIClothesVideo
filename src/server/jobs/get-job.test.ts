@@ -401,6 +401,7 @@ describe("get video job detail", () => {
     expect(detail?.analyses).toEqual([
       expect.objectContaining({
         assetId: "asset-scene",
+        declaredRole: "scene",
         assetRole: "unknown",
         confidence: "low",
         quality: expect.objectContaining({

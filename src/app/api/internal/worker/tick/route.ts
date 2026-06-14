@@ -19,6 +19,7 @@ import {
   defaultStoreProviderOutput,
   pollSubmittedSegment,
   submitQueuedSegment,
+  VideoSegmentAlreadyClaimedError,
 } from "@/server/video/segments";
 import { runGenerationWorkerTick } from "@/server/workers/generation-tick";
 import { runPostQaWorkerTick } from "@/server/workers/post-qa-tick";
@@ -91,12 +92,19 @@ async function defaultRunTick(): Promise<WorkerTickResult> {
       submitSegments: async (job) => {
         const segments = await segmentStore.listSegmentsForJob(job.id);
         for (const segment of segments.filter((item) => item.status === "queued")) {
-          await submitQueuedSegment({
-            jobStore,
-            segmentStore,
-            jobId: job.id,
-            segmentId: segment.id,
-          });
+          try {
+            await submitQueuedSegment({
+              jobStore,
+              segmentStore,
+              jobId: job.id,
+              segmentId: segment.id,
+            });
+          } catch (error) {
+            if (error instanceof VideoSegmentAlreadyClaimedError) {
+              continue;
+            }
+            throw error;
+          }
         }
       },
       pollSegments: async (job) => {

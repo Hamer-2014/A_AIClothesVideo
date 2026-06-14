@@ -12,6 +12,79 @@ describe("APIMart video provider", () => {
     expect(() => getAPIMartVideoConfig({})).toThrow(
       APIMartVideoProviderUnavailableError,
     );
+    expect(() => getAPIMartVideoConfig({})).toThrow("APIMART_API_KEY");
+  });
+
+  it("uses APIMART_API_KEY and VIDEO_GENERATION_MODEL from env by default", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        code: 200,
+        data: [{ status: "submitted", task_id: "task_env_key" }],
+      }),
+    );
+
+    await createAPIMartVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        env: {
+          APIMART_API_KEY: "sk-env-apimart",
+          APIMART_BASE_URL: "https://api.apimart.ai",
+          VIDEO_GENERATION_MODEL: "pixverse-v6-env",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.apimart.ai/v1/videos/generations",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-env-apimart",
+        }),
+        body: expect.stringContaining('"model":"pixverse-v6-env"'),
+      }),
+    );
+  });
+
+  it("allows explicit API key and model overrides for tests", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        code: 200,
+        data: [{ status: "submitted", task_id: "task_override_key" }],
+      }),
+    );
+
+    await createAPIMartVideoGeneration(
+      {
+        prompt: "Generate a front push-in.",
+        imageUrls: ["https://signed.example/front.jpg"],
+        aspectRatio: "9:16",
+      },
+      {
+        fetch: fetchImpl,
+        apiKey: "sk-override-apimart",
+        model: "pixverse-v6-override",
+        env: {
+          APIMART_API_KEY: "sk-env-should-not-be-used",
+          APIMART_BASE_URL: "https://api.apimart.ai",
+          VIDEO_GENERATION_MODEL: "pixverse-v6-env",
+        },
+      },
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.apimart.ai/v1/videos/generations",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-override-apimart",
+        }),
+        body: expect.stringContaining('"model":"pixverse-v6-override"'),
+      }),
+    );
   });
 
   it("submits a PixVerse video generation task to APIMart", async () => {
@@ -43,7 +116,7 @@ describe("APIMart video provider", () => {
         env: {
           APIMART_API_KEY: "sk-test",
           APIMART_BASE_URL: "https://api.apimart.ai/v1/videos/generations",
-          APIMART_PIXVERSE_MODEL: "pixverse-v6",
+          VIDEO_GENERATION_MODEL: "pixverse-v6",
         },
       },
     );
@@ -150,7 +223,7 @@ describe("APIMart video provider", () => {
       env: {
         APIMART_API_KEY: "sk-test",
         APIMART_BASE_URL: "https://api.apimart.ai/v1/videos/generations",
-        APIMART_PIXVERSE_MODEL: "pixverse-v6",
+        VIDEO_GENERATION_MODEL: "pixverse-v6",
       },
     });
 

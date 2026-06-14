@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { grantTrialCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
@@ -92,6 +92,10 @@ function createStores() {
 }
 
 describe("confirmStoryboard", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("moderates the final prompt, reserves credits, confirms storyboard, and creates video segments", async () => {
     const stores = createStores();
     await grantTrialCredits({
@@ -176,6 +180,41 @@ describe("confirmStoryboard", () => {
       }),
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+  });
+
+  it("uses an explicit debug resolution override when creating video segments", async () => {
+    vi.stubEnv("VIDEO_GENERATION_DEBUG_RESOLUTION", "360p");
+    const stores = createStores();
+    await grantTrialCredits({
+      store: stores.creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:debug-resolution",
+    });
+
+    await confirmStoryboard({
+      ...stores,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-debug-resolution",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(stores.storyboardStore.listSegments()).toEqual([
+      expect.objectContaining({
+        generationProfile: "paid_720p_audio",
+        resolution: "360p",
+      }),
+      expect.objectContaining({
+        generationProfile: "paid_720p_audio",
+        resolution: "360p",
+      }),
+    ]);
   });
 
   it("only attaches assets required by each segment template", async () => {
@@ -296,6 +335,110 @@ describe("confirmStoryboard", () => {
         },
       }),
     ]);
+  });
+
+  it("attaches front and scene assets for the scene lifestyle template", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "storyboard_draft_ready",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const storyboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        { videoJobId: jobId, assetId: "asset-front", role: "front", sortOrder: 0 },
+        { videoJobId: jobId, assetId: "asset-scene", role: "scene", sortOrder: 1 },
+        { videoJobId: jobId, assetId: "asset-back", role: "back", sortOrder: 2 },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["scene_lifestyle_showcase"],
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "scene_lifestyle_showcase",
+                prompt: "Show the garment in the uploaded street scene.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 100,
+      reason: "test setup",
+      idempotencyKey: "grant:scene-template-assets",
+    });
+
+    await confirmStoryboard({
+      jobStore,
+      storyboardStore,
+      creditStore,
+      moderationStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-scene",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(storyboardStore.listSegments()[0]).toMatchObject({
+      templateId: "scene_lifestyle_showcase",
+      inputAssetSnapshot: {
+        segmentIndex: 0,
+        templateId: "scene_lifestyle_showcase",
+        assets: [
+          { assetId: "asset-front", role: "front", sortOrder: 0 },
+          { assetId: "asset-scene", role: "scene", sortOrder: 1 },
+        ],
+      },
+    });
+    expect(storyboardStore.listStoryboards()[0]?.finalPromptSnapshot).toMatchObject({
+      inputAssets: [
+        { assetId: "asset-front", role: "front", sortOrder: 0 },
+        { assetId: "asset-scene", role: "scene", sortOrder: 1 },
+        { assetId: "asset-back", role: "back", sortOrder: 2 },
+      ],
+      systemConstraints: expect.arrayContaining([
+        "Use scene assets only as background, lighting, and mood reference.",
+      ]),
+    });
   });
 
   it("blocks confirmation before reserving credits or creating segments when final prompt moderation flags", async () => {

@@ -92,7 +92,7 @@ function emailDomain(email: string | null | undefined) {
   return atIndex >= 0 ? normalized?.slice(atIndex + 1) ?? null : null;
 }
 
-function resolveHashSecret({
+export function resolveAbuseHashSecret({
   hashSecret,
   environment,
 }: {
@@ -164,7 +164,7 @@ export async function evaluateTrialEligibility({
   const now = input.now ?? new Date();
   const reasonCodes: string[] = [];
   let riskScore = 0;
-  const secret = resolveHashSecret({ hashSecret, environment });
+  const secret = resolveAbuseHashSecret({ hashSecret, environment });
 
   if (!secret) {
     reasonCodes.push("missing_abuse_hash_secret");

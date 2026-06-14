@@ -51,24 +51,38 @@ function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
   };
 }
 
-function videoGenerationProviderKeys(env: EnvSource) {
-  const provider = trimEnv(env, "VIDEO_GENERATION_PROVIDER").toLowerCase() || "apimart";
-
-  if (provider === "evolink") {
-    return ["EVOLINK_API_KEY"];
-  }
+function buildAiProvidersCheck(env: EnvSource): RuntimeHealthCheck {
+  const required = [
+    "DEEPSEEK_API_KEY",
+    "VISION_PROVIDER",
+    "VISION_API_KEY",
+    "VISION_MODEL_STANDARD",
+    "VIDEO_GENERATION_PROVIDER",
+    "VIDEO_GENERATION_MODEL",
+  ];
+  const provider = trimEnv(env, "VIDEO_GENERATION_PROVIDER").toLowerCase();
 
   if (provider === "apimart") {
-    return ["APIMART_API_KEY"];
+    required.push("APIMART_API_KEY");
+  } else if (provider === "evolink") {
+    required.push("EVOLINK_API_KEY");
   }
 
-  return ["VIDEO_GENERATION_PROVIDER_UNSUPPORTED"];
+  const missing = required.filter((key) => !trimEnv(env, key));
+  if (provider && provider !== "apimart" && provider !== "evolink") {
+    missing.push("VIDEO_GENERATION_PROVIDER");
+  }
+
+  return {
+    configured: missing.length === 0,
+    missing,
+    status: missing.length === 0 ? "ready" : "missing",
+  };
 }
 
 export function getRuntimeHealth(
   env: EnvSource = process.env,
 ): Omit<RuntimeHealthReport, "timestamp"> {
-  const videoGenerationKeys = videoGenerationProviderKeys(env);
   const checks = {
     database: buildCheck(env, ["DATABASE_URL"]),
     auth: buildCheck(env, ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]),
@@ -89,13 +103,7 @@ export function getRuntimeHealth(
     billing: buildCheck(env, []),
     moderation: buildCheck(env, ["CREEM_MODERATION_API_KEY"]),
     creemPayment: buildOptionalPaymentCheck(env),
-    aiProviders: buildCheck(env, [
-      "DEEPSEEK_API_KEY",
-      "VISION_PROVIDER",
-      "VISION_API_KEY",
-      "VISION_MODEL_STANDARD",
-      ...videoGenerationKeys,
-    ]),
+    aiProviders: buildAiProvidersCheck(env),
   };
 
   const readinessChecks = Object.entries(checks).filter(

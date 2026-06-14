@@ -213,11 +213,16 @@ export async function getVideoJobDetail({
       .filter((role): role is AssetRole => Boolean(role) && role !== "unknown"),
   });
 
+  const declaredRoleByAssetId = new Map(
+    assets.map((asset) => [asset.assetId, asset.role]),
+  );
+
   return {
     job,
     assets,
     analyses: parsedAnalyses.map((analysis) => ({
       assetId: analysis.assetId,
+      declaredRole: declaredRoleByAssetId.get(analysis.assetId) ?? "unknown",
       assetRole: analysis.parsed.assetRole,
       quality: analysis.parsed.quality,
       confidence: analysis.parsed.confidence,

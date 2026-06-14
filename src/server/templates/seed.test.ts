@@ -15,7 +15,7 @@ describe("shot template seed and status service", () => {
     await seedShotTemplates({ store, templates: mvpShotTemplates });
     await seedShotTemplates({ store, templates: mvpShotTemplates });
 
-    expect(store.listTemplates()).toHaveLength(12);
+    expect(store.listTemplates()).toHaveLength(mvpShotTemplates.length);
     expect(
       store.listTemplates().filter((template) => template.templateId === "front_pan"),
     ).toHaveLength(1);
