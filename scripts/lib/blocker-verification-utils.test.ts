@@ -36,7 +36,9 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["apimart"],
         videoModels: ["pixverse-v6"],
-        videoRouteLogCount: 1,
+        providerLogProviders: ["apimart"],
+        providerLogModels: ["pixverse-v6"],
+        videoProviderLogCount: 1,
       }),
     ]);
 
@@ -57,7 +59,9 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["apimart"],
         videoModels: ["pixverse-v6"],
-        videoRouteLogCount: 1,
+        providerLogProviders: ["apimart"],
+        providerLogModels: ["pixverse-v6"],
+        videoProviderLogCount: 1,
       }),
     ]);
 
@@ -76,7 +80,9 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["evolink"],
         videoModels: ["veo3.1-fast-beta"],
-        videoRouteLogCount: 1,
+        providerLogProviders: ["apimart"],
+        providerLogModels: ["pixverse-v6"],
+        videoProviderLogCount: 1,
       }),
     ]);
 
@@ -84,9 +90,9 @@ describe("blocker verification utils", () => {
     expect(result.reason).toContain("apimart/pixverse-v6");
   });
 
-  it("fails paid delivery evidence when route snapshot log is missing", () => {
+  it("passes paid delivery evidence with env-only provider/model logs and no route snapshot", () => {
     const result = evaluatePaidDeliveryEvidence([
-      paidDeliveryJob({
+      {
         id: "job-paid",
         status: "deliverable",
         creditCost: 70,
@@ -95,12 +101,35 @@ describe("blocker verification utils", () => {
         qaFrameCount: 3,
         videoProviders: ["apimart"],
         videoModels: ["pixverse-v6"],
-        videoRouteLogCount: 0,
-      }),
+        providerLogProviders: ["apimart"],
+        providerLogModels: ["pixverse-v6"],
+        videoProviderLogCount: 1,
+      },
+    ]);
+
+    expect(result.passed).toBe(true);
+    expect(result.reason).toContain("env-only apimart/pixverse-v6");
+  });
+
+  it("fails paid delivery evidence when provider call log provider/model evidence is missing", () => {
+    const result = evaluatePaidDeliveryEvidence([
+      {
+        id: "job-paid",
+        status: "deliverable",
+        creditCost: 70,
+        ledgerTypes: ["reserve", "capture"],
+        finalVideoKey: "jobs/job-paid/stitched/final.mp4",
+        qaFrameCount: 3,
+        videoProviders: ["apimart"],
+        videoModels: ["pixverse-v6"],
+        providerLogProviders: [],
+        providerLogModels: [],
+        videoProviderLogCount: 0,
+      },
     ]);
 
     expect(result.passed).toBe(false);
-    expect(result.reason).toContain("route snapshot");
+    expect(result.reason).toContain("provider call log");
   });
 
   it("passes failure compensation evidence for failed released jobs with release ledger", () => {
