@@ -1,0 +1,40 @@
+name: RunwayTools Sync to Deploy Repo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove files not needed for deployment
+        run: |
+          rm -rf .git
+          rm -rf docs
+          rm -rf tests
+          rm -rf .github
+          rm -f README-internal.md          
+
+      - name: Init git and push to deploy repo
+        env:
+          DEPLOY_REPO_TOKEN: ${{ secrets.MIRROR_FGT }}
+        run: |
+          git init
+          git checkout -b main
+          git config user.name "changhong-bot"
+          git config user.email "947629232@qq.com"
+
+          git add .
+          git commit -m "sync from source repo ${GITHUB_SHA}"
+
+          git remote add origin https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/Haha372-art/video_tools.git
+          git push origin main --force        
