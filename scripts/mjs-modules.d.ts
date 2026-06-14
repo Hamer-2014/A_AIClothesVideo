@@ -65,6 +65,9 @@ declare module "*.mjs" {
       qaFrameCount?: number;
       videoProviders?: string[];
       videoModels?: string[];
+      providerLogProviders?: string[];
+      providerLogModels?: string[];
+      videoProviderLogCount?: number;
     }>,
   ): BlockerCheckResult;
 

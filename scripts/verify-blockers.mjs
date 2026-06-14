@@ -65,11 +65,27 @@ async function loadPaidDeliveryCandidates(sql) {
         array_remove(array_agg(distinct vs.model), null),
         array[]::text[]
       ) as video_models,
+      coalesce(
+        array_remove(
+          array_agg(distinct pcl.provider) filter (
+            where pcl.purpose = 'video_generation'
+          ),
+          null
+        ),
+        array[]::text[]
+      ) as provider_log_providers,
+      coalesce(
+        array_remove(
+          array_agg(distinct pcl.model) filter (
+            where pcl.purpose = 'video_generation'
+          ),
+          null
+        ),
+        array[]::text[]
+      ) as provider_log_models,
       count(distinct pcl.id) filter (
         where pcl.purpose = 'video_generation'
-          and pcl.model_route_id is not null
-          and pcl.route_snapshot is not null
-      ) as video_route_log_count,
+      ) as video_provider_log_count,
       max(vj.updated_at) as updated_at
     from video_jobs vj
     left join credit_ledger cl on cl.related_job_id = vj.id
@@ -93,7 +109,9 @@ async function loadPaidDeliveryCandidates(sql) {
     qaFrameCount: Number(row.qa_frame_count ?? 0),
     videoProviders: asStringArray(row.video_providers),
     videoModels: asStringArray(row.video_models),
-    videoRouteLogCount: Number(row.video_route_log_count ?? 0),
+    providerLogProviders: asStringArray(row.provider_log_providers),
+    providerLogModels: asStringArray(row.provider_log_models),
+    videoProviderLogCount: Number(row.video_provider_log_count ?? 0),
     updatedAt: row.updated_at,
   }));
 }
