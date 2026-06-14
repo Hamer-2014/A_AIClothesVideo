@@ -204,7 +204,6 @@ function buildGenerationBody(input: APIMartVideoGenerationInput, model: string) 
     prompt: input.prompt,
     duration: 8,
     resolution: input.resolution ?? "540p",
-    //resolution: "360p",
     audio: input.audio ?? false,
     size: input.aspectRatio,
   };
