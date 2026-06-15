@@ -411,11 +411,7 @@ async function getOrCreateVideoSegments({
 }
 
 function assertDraftStoryboard(storyboard: StoryboardRecord) {
-  if (storyboard.status === "confirmed") {
-    throw new Error("Storyboard is already confirmed.");
-  }
-
-  if (storyboard.status !== "draft") {
+  if (storyboard.status !== "draft" && storyboard.status !== "confirmed") {
     throw new Error("Storyboard is not confirmable.");
   }
 }
@@ -660,10 +656,13 @@ export async function confirmStoryboard({
     generationParameters,
   });
 
-  const confirmedStoryboard = await storyboardStore.confirmStoryboard({
-    storyboardId,
-    finalPromptSnapshot,
-  });
+  const confirmedStoryboard =
+    storyboard.status === "confirmed"
+      ? storyboard
+      : await storyboardStore.confirmStoryboard({
+          storyboardId,
+          finalPromptSnapshot,
+        });
 
   if (shouldReserveCredits && reserveResult) {
     await transitionIfNotReached({

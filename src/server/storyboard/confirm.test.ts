@@ -650,6 +650,72 @@ describe("confirmStoryboard", () => {
     ]);
   });
 
+  it("resumes a confirmed storyboard with existing segments after final status transition failure", async () => {
+    const stores = createStores();
+    await grantTrialCredits({
+      store: stores.creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:confirmed-retry-gap",
+    });
+    const failingJobStore = {
+      ...stores.jobStore,
+      async createStateEvent(
+        input: Parameters<typeof stores.jobStore.createStateEvent>[0],
+      ) {
+        if (input.toStatus === "segments_queued") {
+          throw new Error("segments queued event failed");
+        }
+
+        return stores.jobStore.createStateEvent(input);
+      },
+    };
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobStore: failingJobStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: async () => ({
+          id: "mod-confirmed-gap",
+          decision: "allow",
+          raw: { decision: "allow" },
+        }),
+      }),
+    ).rejects.toThrow("segments queued event failed");
+
+    expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("confirmed");
+    expect(stores.storyboardStore.listSegments()).toHaveLength(2);
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("credits_reserved");
+
+    const result = await confirmStoryboard({
+      ...stores,
+      jobStore: stores.jobStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-confirmed-gap-retry",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "segments_queued",
+      segmentCount: 2,
+    });
+    expect(stores.storyboardStore.listSegments()).toHaveLength(2);
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
+  });
+
   it("allows trial jobs with zero credit cost to confirm storyboard without reserving credits", async () => {
     const stores = createStores();
     const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
