@@ -358,6 +358,7 @@ async function getOrCreateVideoSegments({
   assets,
   finalPromptSnapshot,
   job,
+  storyboardStatus,
   generationParameters,
 }: {
   storyboardStore: StoryboardConfirmationStore;
@@ -367,46 +368,129 @@ async function getOrCreateVideoSegments({
   assets: StoryboardConfirmJobAssetRecord[];
   finalPromptSnapshot: FinalPromptSnapshot;
   job: StoryboardConfirmJobRecord;
+  storyboardStatus: StoryboardRecord["status"];
   generationParameters: ReturnType<typeof generationParametersForProfile>;
 }) {
   const existingSegments = await storyboardStore.listSegmentsForStoryboard({
     storyboardId,
     jobId,
   });
+  const expectedIndexes = new Set(parsed.segments.map((segment) => segment.index));
+  const completeExistingSegments = completeSegmentsForExpectedIndexes({
+    existingSegments,
+    expectedIndexes,
+  });
 
   if (existingSegments.length > 0) {
-    const expectedIndexes = new Set(
-      parsed.segments.map((segment) => segment.index),
-    );
-    const reusableSegments = existingSegments.filter((segment) =>
-      expectedIndexes.has(segment.segmentIndex),
-    );
-
-    if (reusableSegments.length === parsed.segments.length) {
-      return reusableSegments.sort((a, b) => a.segmentIndex - b.segmentIndex);
+    if (completeExistingSegments) {
+      return completeExistingSegments;
     }
 
-    throw new Error("Existing storyboard segments are incomplete.");
+    throw new Error(
+      storyboardStatus === "confirmed"
+        ? "Confirmed storyboard is missing complete video segments."
+        : "Existing storyboard segments are incomplete.",
+    );
   }
 
-  return storyboardStore.createVideoSegments(
-    parsed.segments.map((segment) => ({
-      videoJobId: jobId,
-      storyboardId,
-      segmentIndex: segment.index,
-      templateId: segment.templateId,
-      prompt: segment.prompt,
-      inputAssetSnapshot: assetSnapshotForSegment({
-        segment,
-        assets,
-        finalPromptSnapshot,
-      }),
-      generationProfile: job.generationProfile,
-      resolution: generationParameters.resolution,
-      audioEnabled: generationParameters.audioEnabled,
-      watermarkEnabled: job.watermarkEnabled,
-      isTest: job.isTest,
-    })),
+  if (storyboardStatus === "confirmed") {
+    throw new Error("Confirmed storyboard is missing complete video segments.");
+  }
+
+  const newSegments = parsed.segments.map((segment) => ({
+    videoJobId: jobId,
+    storyboardId,
+    segmentIndex: segment.index,
+    templateId: segment.templateId,
+    prompt: segment.prompt,
+    inputAssetSnapshot: assetSnapshotForSegment({
+      segment,
+      assets,
+      finalPromptSnapshot,
+    }),
+    generationProfile: job.generationProfile,
+    resolution: generationParameters.resolution,
+    audioEnabled: generationParameters.audioEnabled,
+    watermarkEnabled: job.watermarkEnabled,
+    isTest: job.isTest,
+  }));
+
+  let createdSegments: VideoSegmentRecord[];
+  try {
+    createdSegments = await storyboardStore.createVideoSegments(newSegments);
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw error;
+    }
+
+    createdSegments = [];
+  }
+
+  const completeCreatedSegments = completeSegmentsForExpectedIndexes({
+    existingSegments: createdSegments,
+    expectedIndexes,
+  });
+  if (completeCreatedSegments) {
+    return completeCreatedSegments;
+  }
+
+  const reloadedSegments = await storyboardStore.listSegmentsForStoryboard({
+    storyboardId,
+    jobId,
+  });
+  const completeReloadedSegments = completeSegmentsForExpectedIndexes({
+    existingSegments: reloadedSegments,
+    expectedIndexes,
+  });
+  if (completeReloadedSegments) {
+    return completeReloadedSegments;
+  }
+
+  throw new Error("Existing storyboard segments are incomplete.");
+}
+
+function completeSegmentsForExpectedIndexes({
+  existingSegments,
+  expectedIndexes,
+}: {
+  existingSegments: VideoSegmentRecord[];
+  expectedIndexes: Set<number>;
+}) {
+  if (existingSegments.length !== expectedIndexes.size) {
+    return null;
+  }
+
+  const byIndex = new Map<number, VideoSegmentRecord>();
+  for (const segment of existingSegments) {
+    if (!expectedIndexes.has(segment.segmentIndex)) {
+      return null;
+    }
+    if (byIndex.has(segment.segmentIndex)) {
+      return null;
+    }
+    byIndex.set(segment.segmentIndex, segment);
+  }
+
+  if (byIndex.size !== expectedIndexes.size) {
+    return null;
+  }
+
+  return Array.from(byIndex.values()).sort(
+    (a, b) => a.segmentIndex - b.segmentIndex,
+  );
+}
+
+function isUniqueViolation(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const record = error as { code?: unknown; cause?: unknown };
+  return (
+    record.code === "23505" ||
+    (typeof record.cause === "object" &&
+      record.cause !== null &&
+      (record.cause as { code?: unknown }).code === "23505")
   );
 }
 
@@ -653,6 +737,7 @@ export async function confirmStoryboard({
     assets,
     finalPromptSnapshot,
     job,
+    storyboardStatus: storyboard.status,
     generationParameters,
   });
 

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   integer,
   boolean,
@@ -5,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -144,31 +146,39 @@ export const storyboards = pgTable("storyboards", {
   ...timestamps,
 });
 
-export const videoSegments = pgTable("video_segments", {
-  ...id,
-  videoJobId: uuid("video_job_id").notNull(),
-  storyboardId: uuid("storyboard_id"),
-  segmentIndex: integer("segment_index").notNull(),
-  status: segmentStatusEnum("status").notNull().default("queued"),
-  templateId: text("template_id").notNull(),
-  prompt: text("prompt").notNull(),
-  inputAssetSnapshot: jsonSnapshot("input_asset_snapshot").notNull(),
-  provider: text("provider"),
-  model: text("model"),
-  providerTaskId: text("provider_task_id"),
-  providerCallLogId: uuid("provider_call_log_id"),
-  videoKey: text("video_key"),
-  costEstimate: costEstimate(),
-  generationProfile: generationProfileEnum("generation_profile")
-    .notNull()
-    .default("paid_720p_audio"),
-  resolution: text("resolution").notNull().default("720p"),
-  audioEnabled: boolean("audio_enabled").notNull().default(true),
-  watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
-  ...isTest,
-  ...lockableJobFields,
-  ...timestamps,
-});
+export const videoSegments = pgTable(
+  "video_segments",
+  {
+    ...id,
+    videoJobId: uuid("video_job_id").notNull(),
+    storyboardId: uuid("storyboard_id"),
+    segmentIndex: integer("segment_index").notNull(),
+    status: segmentStatusEnum("status").notNull().default("queued"),
+    templateId: text("template_id").notNull(),
+    prompt: text("prompt").notNull(),
+    inputAssetSnapshot: jsonSnapshot("input_asset_snapshot").notNull(),
+    provider: text("provider"),
+    model: text("model"),
+    providerTaskId: text("provider_task_id"),
+    providerCallLogId: uuid("provider_call_log_id"),
+    videoKey: text("video_key"),
+    costEstimate: costEstimate(),
+    generationProfile: generationProfileEnum("generation_profile")
+      .notNull()
+      .default("paid_720p_audio"),
+    resolution: text("resolution").notNull().default("720p"),
+    audioEnabled: boolean("audio_enabled").notNull().default(true),
+    watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
+    ...isTest,
+    ...lockableJobFields,
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("video_segments_storyboard_segment_unique")
+      .on(table.storyboardId, table.segmentIndex)
+      .where(sql`${table.storyboardId} is not null`),
+  ],
+);
 
 export const freeTrialUsages = pgTable("free_trial_usages", {
   ...id,

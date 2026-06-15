@@ -71,6 +71,13 @@
       "when": 1781438400000,
       "tag": "0009_drop_model_routes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781534400000,
+      "tag": "0010_video_segments_storyboard_segment_unique",
+      "breakpoints": true
     }
   ]
 }

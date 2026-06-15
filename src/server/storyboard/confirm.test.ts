@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { grantTrialCredits } from "@/lib/credits/ledger";
@@ -8,6 +10,8 @@ import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 import {
   confirmStoryboard,
   createInMemoryStoryboardConfirmationStore,
+  type NewVideoSegmentRecord,
+  type VideoSegmentRecord,
 } from "./confirm";
 
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -89,6 +93,88 @@ function createStores() {
     creditStore,
     moderationStore,
   };
+}
+
+async function allowModeration() {
+  return {
+    id: "mod-allow",
+    decision: "allow" as const,
+    raw: { decision: "allow" },
+  };
+}
+
+async function grantPaidJobCredits(stores: ReturnType<typeof createStores>) {
+  await grantTrialCredits({
+    store: stores.creditStore,
+    userId,
+    amount: 200,
+    reason: "test setup",
+    idempotencyKey: `grant:${randomUUID()}`,
+  });
+}
+
+async function seedExistingSegments(
+  store: ReturnType<typeof createStores>["storyboardStore"],
+  segments: NewVideoSegmentRecord[],
+) {
+  await store.createVideoSegments(segments);
+}
+
+function segmentInput(
+  segmentIndex: number,
+  templateId = segmentIndex === 0 ? "front_push_in" : "front_pan",
+): NewVideoSegmentRecord {
+  return {
+    videoJobId: jobId,
+    storyboardId,
+    segmentIndex,
+    templateId,
+    prompt:
+      segmentIndex === 0
+        ? "Slow push-in on the front garment."
+        : "Gentle pan across the front garment.",
+    inputAssetSnapshot: {
+      segmentIndex,
+      templateId,
+      assets: [{ assetId: "asset-front", role: "front", sortOrder: 0 }],
+    },
+    generationProfile: "paid_720p_audio",
+    resolution: "720p",
+    audioEnabled: true,
+    watermarkEnabled: false,
+    isTest: false,
+  };
+}
+
+function markStoryboardConfirmed(stores: ReturnType<typeof createStores>) {
+  const storyboard = stores.storyboardStore.listStoryboards()[0];
+  if (!storyboard) {
+    throw new Error("Missing test storyboard.");
+  }
+
+  return stores.storyboardStore.confirmStoryboard({
+    storyboardId: storyboard.id,
+    finalPromptSnapshot: {
+      version: "global_intent_constraints_v1",
+      durationSeconds: 16,
+      globalHardConstraints: [],
+      globalUserIntent: {
+        sourcePromptSummary: null,
+        styleIntent: null,
+        sellingPoints: [],
+        negativeIntent: [],
+      },
+      segmentPrompts: [],
+      systemConstraints: [],
+      inputAssets: [],
+      assetFactsSnapshot: {
+        hasBack: false,
+        hasDetail: false,
+        hasScene: false,
+      },
+      templatePolicySnapshot: {},
+    },
+  });
 }
 
 describe("confirmStoryboard", () => {
@@ -714,6 +800,123 @@ describe("confirmStoryboard", () => {
       "trial_grant",
       "reserve",
     ]);
+  });
+
+  it("rejects a confirmed storyboard with no segments", async () => {
+    const stores = createStores();
+    await grantPaidJobCredits(stores);
+    await markStoryboardConfirmed(stores);
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow(
+      "Confirmed storyboard is missing complete video segments.",
+    );
+
+    expect(stores.storyboardStore.listSegments()).toHaveLength(0);
+  });
+
+  it("rejects a confirmed storyboard with partial segments", async () => {
+    const stores = createStores();
+    await grantPaidJobCredits(stores);
+    await markStoryboardConfirmed(stores);
+    await seedExistingSegments(stores.storyboardStore, [segmentInput(0)]);
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow(
+      "Confirmed storyboard is missing complete video segments.",
+    );
+
+    expect(stores.storyboardStore.listSegments()).toHaveLength(1);
+  });
+
+  it("rejects a draft storyboard with partial existing segments", async () => {
+    const stores = createStores();
+    await grantPaidJobCredits(stores);
+    await seedExistingSegments(stores.storyboardStore, [segmentInput(0)]);
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow("Existing storyboard segments are incomplete.");
+
+    expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("draft");
+    expect(stores.storyboardStore.listSegments()).toHaveLength(1);
+  });
+
+  it("rejects existing storyboard segments with unexpected indexes", async () => {
+    const stores = createStores();
+    await grantPaidJobCredits(stores);
+    await seedExistingSegments(stores.storyboardStore, [
+      segmentInput(0),
+      segmentInput(1),
+      segmentInput(2, "front_pan"),
+    ]);
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow("Existing storyboard segments are incomplete.");
+
+    expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("draft");
+    expect(stores.storyboardStore.listSegments()).toHaveLength(3);
+  });
+
+  it("requeries and reuses complete segments when segment creation returns empty after a conflict", async () => {
+    const stores = createStores();
+    await grantPaidJobCredits(stores);
+    let createAttempts = 0;
+    const conflictStoryboardStore = {
+      ...stores.storyboardStore,
+      async createVideoSegments(input: NewVideoSegmentRecord[]) {
+        createAttempts += 1;
+        await seedExistingSegments(stores.storyboardStore, input);
+        return [] as VideoSegmentRecord[];
+      },
+    };
+
+    const result = await confirmStoryboard({
+      ...stores,
+      storyboardStore: conflictStoryboardStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: allowModeration,
+    });
+
+    expect(result).toMatchObject({
+      status: "segments_queued",
+      segmentCount: 2,
+    });
+    expect(createAttempts).toBe(1);
+    expect(stores.storyboardStore.listSegments()).toEqual([
+      expect.objectContaining({ segmentIndex: 0 }),
+      expect.objectContaining({ segmentIndex: 1 }),
+    ]);
+    expect(stores.storyboardStore.listSegments()).toHaveLength(2);
   });
 
   it("allows trial jobs with zero credit cost to confirm storyboard without reserving credits", async () => {
