@@ -98,6 +98,7 @@ describe("confirmStoryboard", () => {
 
   it("moderates the final prompt, reserves credits, confirms storyboard, and creates video segments", async () => {
     const stores = createStores();
+    const moderatedPrompts: string[] = [];
     await grantTrialCredits({
       store: stores.creditStore,
       userId,
@@ -111,11 +112,14 @@ describe("confirmStoryboard", () => {
       jobId,
       userId,
       storyboardId,
-      moderatePrompt: async () => ({
-        id: "mod-1",
-        decision: "allow",
-        raw: { decision: "allow" },
-      }),
+      moderatePrompt: async (input) => {
+        moderatedPrompts.push(input.prompt);
+        return {
+          id: "mod-1",
+          decision: "allow",
+          raw: { decision: "allow" },
+        };
+      },
     });
 
     expect(result).toEqual({
@@ -128,7 +132,18 @@ describe("confirmStoryboard", () => {
     expect(stores.storyboardStore.listStoryboards()[0]).toMatchObject({
       status: "confirmed",
       finalPromptSnapshot: {
+        version: "global_intent_constraints_v1",
         durationSeconds: 16,
+        globalHardConstraints: expect.arrayContaining([
+          expect.stringContaining("Do not invent garment details"),
+          expect.stringContaining("Do not show the back side"),
+        ]),
+        globalUserIntent: {
+          sourcePromptSummary: null,
+          styleIntent: null,
+          sellingPoints: [],
+          negativeIntent: [],
+        },
         segmentPrompts: [
           expect.objectContaining({
             templateId: "front_push_in",
@@ -139,8 +154,17 @@ describe("confirmStoryboard", () => {
             prompt: "Gentle pan across the front garment.",
           }),
         ],
+        assetFactsSnapshot: {
+          hasBack: false,
+          hasDetail: false,
+          hasScene: false,
+        },
       },
     });
+    expect(moderatedPrompts[0]).toContain("GLOBAL HARD CONSTRAINTS:");
+    expect(moderatedPrompts[0]).toContain("GLOBAL USER INTENT:");
+    expect(moderatedPrompts[0]).toContain("- Clean ecommerce product video.");
+    expect(moderatedPrompts[0]).toContain("SEGMENT 1 (front_push_in):");
     expect(stores.storyboardStore.listSegments()).toEqual([
       expect.objectContaining({
         videoJobId: jobId,
@@ -149,6 +173,11 @@ describe("confirmStoryboard", () => {
         status: "queued",
         templateId: "front_push_in",
         prompt: "Slow push-in on the front garment.",
+        inputAssetSnapshot: expect.objectContaining({
+          promptCompiler: expect.objectContaining({
+            version: "global_intent_constraints_v1",
+          }),
+        }),
         generationProfile: "paid_720p_audio",
         resolution: "720p",
         audioEnabled: true,
@@ -162,6 +191,11 @@ describe("confirmStoryboard", () => {
         status: "queued",
         templateId: "front_pan",
         prompt: "Gentle pan across the front garment.",
+        inputAssetSnapshot: expect.objectContaining({
+          promptCompiler: expect.objectContaining({
+            version: "global_intent_constraints_v1",
+          }),
+        }),
         generationProfile: "paid_720p_audio",
         resolution: "720p",
         audioEnabled: true,
@@ -308,7 +342,7 @@ describe("confirmStoryboard", () => {
     expect(storyboardStore.listSegments()).toEqual([
       expect.objectContaining({
         templateId: "front_push_in",
-        inputAssetSnapshot: {
+        inputAssetSnapshot: expect.objectContaining({
           segmentIndex: 0,
           templateId: "front_push_in",
           assets: [
@@ -318,11 +352,17 @@ describe("confirmStoryboard", () => {
               sortOrder: 0,
             },
           ],
-        },
+          promptCompiler: expect.objectContaining({
+            version: "global_intent_constraints_v1",
+            globalHardConstraints: expect.arrayContaining([
+              expect.stringContaining("Do not invent garment details"),
+            ]),
+          }),
+        }),
       }),
       expect.objectContaining({
         templateId: "back_display",
-        inputAssetSnapshot: {
+        inputAssetSnapshot: expect.objectContaining({
           segmentIndex: 1,
           templateId: "back_display",
           assets: [
@@ -332,7 +372,10 @@ describe("confirmStoryboard", () => {
               sortOrder: 1,
             },
           ],
-        },
+          promptCompiler: expect.objectContaining({
+            version: "global_intent_constraints_v1",
+          }),
+        }),
       }),
     ]);
   });
@@ -493,6 +536,118 @@ describe("confirmStoryboard", () => {
 
     expect(stores.storyboardStore.listSegments()).toHaveLength(0);
     expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("draft");
+  });
+
+  it("keeps storyboard retryable when segment creation fails after credit reserve", async () => {
+    const stores = createStores();
+    await grantTrialCredits({
+      store: stores.creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:segment-create-failure",
+    });
+
+    const failingStoryboardStore = {
+      ...stores.storyboardStore,
+      async createVideoSegments() {
+        throw new Error("segment insert failed");
+      },
+    };
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        storyboardStore: failingStoryboardStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: async () => ({
+          id: "mod-segment-failure",
+          decision: "allow",
+          raw: { decision: "allow" },
+        }),
+      }),
+    ).rejects.toThrow("segment insert failed");
+
+    expect(stores.storyboardStore.listStoryboards()[0]).toMatchObject({
+      status: "draft",
+      finalPromptSnapshot: null,
+    });
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
+  });
+
+  it("reuses existing segments when retrying after storyboard confirmation fails", async () => {
+    const stores = createStores();
+    await grantTrialCredits({
+      store: stores.creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:confirm-failure-retry",
+    });
+    let shouldFailConfirm = true;
+    const flakyStoryboardStore = {
+      ...stores.storyboardStore,
+      async confirmStoryboard(input: {
+        storyboardId: string;
+        finalPromptSnapshot: unknown;
+      }) {
+        if (shouldFailConfirm) {
+          shouldFailConfirm = false;
+          throw new Error("storyboard confirm failed");
+        }
+
+        return stores.storyboardStore.confirmStoryboard(
+          input as Parameters<typeof stores.storyboardStore.confirmStoryboard>[0],
+        );
+      },
+    };
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        storyboardStore: flakyStoryboardStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: async () => ({
+          id: "mod-confirm-failure",
+          decision: "allow",
+          raw: { decision: "allow" },
+        }),
+      }),
+    ).rejects.toThrow("storyboard confirm failed");
+
+    expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("draft");
+    expect(stores.storyboardStore.listSegments()).toHaveLength(2);
+
+    const result = await confirmStoryboard({
+      ...stores,
+      storyboardStore: flakyStoryboardStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-confirm-retry",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "segments_queued",
+      segmentCount: 2,
+    });
+    expect(stores.storyboardStore.listStoryboards()[0]?.status).toBe("confirmed");
+    expect(stores.storyboardStore.listSegments()).toHaveLength(2);
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
   });
 
   it("allows trial jobs with zero credit cost to confirm storyboard without reserving credits", async () => {

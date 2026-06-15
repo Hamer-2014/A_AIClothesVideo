@@ -28,6 +28,8 @@ import {
 } from "@/server/jobs/state-machine";
 import type { VideoSegmentRecord } from "@/server/storyboard/confirm";
 
+import { compileVideoPromptForSegment } from "./prompt-compiler";
+
 export interface VideoSegmentJobRecord {
   id: string;
   userId: string;
@@ -90,6 +92,8 @@ function getMaxTaskRegenerations() {
   );
 }
 
+type JsonObject = { [key: string]: JsonValue };
+
 export class VideoSegmentAlreadyClaimedError extends Error {
   constructor() {
     super("Video segment is already claimed.");
@@ -125,45 +129,6 @@ function assetIdsFromSnapshot(snapshot: JsonValue) {
     .filter((assetId): assetId is string => typeof assetId === "string");
 }
 
-function assetRolesFromSnapshot(snapshot: JsonValue) {
-  const record = asRecord(snapshot);
-  const list = Array.isArray(record.assets) ? record.assets : [];
-
-  return list
-    .map((item) => asRecord(item).role)
-    .filter((role): role is string => typeof role === "string");
-}
-
-function promptWithAssetRoleInstructions({
-  prompt,
-  inputAssetSnapshot,
-}: {
-  prompt: string;
-  inputAssetSnapshot: JsonValue;
-}) {
-  const roles = assetRolesFromSnapshot(inputAssetSnapshot);
-  if (!roles.includes("scene")) {
-    return prompt;
-  }
-
-  const roleLines = roles.map((role, index) => {
-    const imageNumber = index + 1;
-    if (role === "scene") {
-      return `Image ${imageNumber} is the scene/background reference.`;
-    }
-
-    return `Image ${imageNumber} is the garment reference (${role}).`;
-  });
-
-  return [
-    ...roleLines,
-    "Use scene/background reference only for environment, lighting, and mood.",
-    "Preserve garment color, shape, pattern, and visible construction from the garment reference image.",
-    "Do not copy people, faces, logos, storefront names, or readable text from the scene/background reference.",
-    prompt,
-  ].join("\n");
-}
-
 async function signedUrlsForSegment({
   segment,
   store,
@@ -181,6 +146,54 @@ async function signedUrlsForSegment({
       .sort((a, b) => assetIds.indexOf(a.id) - assetIds.indexOf(b.id))
       .map((asset) => createSignedUrl({ key: asset.originalKey })),
   );
+}
+
+function promptCompilerSnapshot(inputAssetSnapshot: JsonValue) {
+  return asRecord(inputAssetSnapshot).promptCompiler;
+}
+
+function compiledPromptRequestSnapshot(
+  compiledPrompt: ReturnType<typeof compileVideoPromptForSegment>,
+): JsonObject {
+  return {
+    compiledPromptVersion: compiledPrompt.compiledPromptVersion,
+    globalHardConstraints: compiledPrompt.globalHardConstraints,
+    globalUserIntent: jsonObjectFromRecord(compiledPrompt.globalUserIntent),
+    segmentInstruction: compiledPrompt.segmentInstruction,
+    compiledPromptSections: compiledPrompt.compiledPromptSections,
+  };
+}
+
+function jsonObjectFromRecord(value: Record<string, unknown> | null): JsonObject {
+  if (!value) {
+    return {};
+  }
+
+  const result: JsonObject = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    if (
+      item === null ||
+      typeof item === "string" ||
+      typeof item === "number" ||
+      typeof item === "boolean"
+    ) {
+      result[key] = item;
+      continue;
+    }
+
+    if (Array.isArray(item)) {
+      result[key] = item.filter(
+        (entry): entry is string | number | boolean | null =>
+          entry === null ||
+          typeof entry === "string" ||
+          typeof entry === "number" ||
+          typeof entry === "boolean",
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function submitQueuedSegment({
@@ -235,9 +248,19 @@ export async function submitQueuedSegment({
   }
   const startedAt = Date.now();
   const envIdentity = getEnvVideoGenerationIdentity();
+  const compiledPrompt = compileVideoPromptForSegment({
+    finalPromptSnapshot: promptCompilerSnapshot(segment.inputAssetSnapshot),
+    segment: {
+      prompt: segment.prompt,
+      segmentIndex: segment.segmentIndex,
+      templateId: segment.templateId,
+    },
+    inputAssetSnapshot: segment.inputAssetSnapshot,
+  });
   let providerResult: VideoGenerationResult | null = null;
   let lastSubmitError: unknown;
   const attempts = Math.max(1, maxSubmitAttempts);
+  let successfulAttempt: number | null = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -245,10 +268,7 @@ export async function submitQueuedSegment({
         attemptCount: segment.attemptCount + attempt,
       });
       providerResult = await createVideoGenerationFn({
-        prompt: promptWithAssetRoleInstructions({
-          prompt: segment.prompt,
-          inputAssetSnapshot: segment.inputAssetSnapshot,
-        }),
+        prompt: compiledPrompt.prompt,
         imageUrls,
         aspectRatio: job.aspectRatio,
         resolution: segment.resolution,
@@ -256,6 +276,7 @@ export async function submitQueuedSegment({
         watermarkEnabled: segment.watermarkEnabled,
         generationProfile: segment.generationProfile,
       });
+      successfulAttempt = attempt;
       break;
     } catch (error) {
       lastSubmitError = error;
@@ -279,6 +300,7 @@ export async function submitQueuedSegment({
           audio: segment.audioEnabled,
           watermarkEnabled: segment.watermarkEnabled,
           configSource: "env",
+          ...compiledPromptRequestSnapshot(compiledPrompt),
         },
         durationMs: Date.now() - startedAt,
         status: "failed",
@@ -311,11 +333,14 @@ export async function submitQueuedSegment({
     requestSnapshot: {
       templateId: segment.templateId,
       assetCount: imageUrls.length,
+      attempt: successfulAttempt ?? attempts,
+      maxAttempts: attempts,
       generationProfile: segment.generationProfile,
       resolution: segment.resolution,
       audio: segment.audioEnabled,
       watermarkEnabled: segment.watermarkEnabled,
       configSource: "env",
+      ...compiledPromptRequestSnapshot(compiledPrompt),
     },
     responseSummary: providerResult.raw,
     durationMs: Date.now() - startedAt,

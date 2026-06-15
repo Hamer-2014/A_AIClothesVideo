@@ -392,4 +392,174 @@ describe("generate storyboard draft", () => {
       }),
     ]);
   });
+
+  it("sends system-owned global constraints and user intent to DeepSeek", async () => {
+    const capturedPrompts: string[] = [];
+
+    await generateStoryboardDraft({
+      jobReadStore: createReadStore(),
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      storyboardStore: createInMemoryStoryboardStore(),
+      providerCallLogStore: createInMemoryProviderCallLogStore(),
+      moderationResultStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      selectedTemplateIds: ["front_push_in"],
+      userPrompt: "想要高级独立站商品页风格，突出裙摆廓形和面料质感，不要真人走秀。",
+      templates: mvpShotTemplates,
+      moderatePrompt: async () => ({
+        id: "mod-global-intent",
+        decision: "allow",
+        raw: { id: "mod-global-intent" },
+      }),
+      createStoryboard: async (input) => {
+        capturedPrompts.push(input.userPrompt);
+        return {
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow front push-in.",
+              },
+            ],
+          },
+          raw: { id: "chatcmpl_global_intent" },
+        };
+      },
+    });
+
+    const prompt = JSON.parse(capturedPrompts[0] ?? "{}");
+    expect(prompt.global_hard_constraints).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Do not invent garment details"),
+        expect.stringContaining("Do not show the back side"),
+      ]),
+    );
+    expect(prompt.global_user_intent).toMatchObject({
+      styleIntent: "premium clean ecommerce product video",
+      sellingPoints: expect.arrayContaining([
+        "emphasize visible garment silhouette",
+        "emphasize visible fabric texture from the provided garment images",
+      ]),
+      negativeIntent: expect.arrayContaining(["avoid runway-walk presentation"]),
+    });
+    expect(prompt.instructions).toEqual(
+      expect.arrayContaining([
+        "Return only segment prompts.",
+        "Do not create, output, or rewrite global constraints.",
+        "Every segment prompt must obey global_hard_constraints.",
+      ]),
+    );
+  });
+
+  it("rejects DeepSeek storyboard prompts that violate generated hard constraints", async () => {
+    await expect(
+      generateStoryboardDraft({
+        jobReadStore: createReadStore(),
+        jobStore: createInMemoryJobStore([
+          {
+            id: jobId,
+            userId,
+            status: "asset_analysis_passed",
+            lockedBy: null,
+            lockedUntil: null,
+            attemptCount: 0,
+            lastError: null,
+          },
+        ]),
+        storyboardStore: createInMemoryStoryboardStore(),
+        providerCallLogStore: createInMemoryProviderCallLogStore(),
+        moderationResultStore: createInMemoryModerationResultStore(),
+        jobId,
+        userId,
+        selectedTemplateIds: ["front_push_in"],
+        userPrompt: "Show the front shape cleanly.",
+        templates: mvpShotTemplates,
+        moderatePrompt: async () => ({
+          id: "mod-invalid-storyboard",
+          decision: "allow",
+          raw: { id: "mod-invalid-storyboard" },
+        }),
+        createStoryboard: async () => ({
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Turn around to show the back side of the garment.",
+              },
+            ],
+          },
+          raw: { id: "chatcmpl_invalid_storyboard" },
+        }),
+      }),
+    ).rejects.toThrow("Storyboard prompt violates global hard constraints.");
+  });
+
+  it("rejects Chinese storyboard prompts that ask for unavailable back or detail views", async () => {
+    await expect(
+      generateStoryboardDraft({
+        jobReadStore: createReadStore(),
+        jobStore: createInMemoryJobStore([
+          {
+            id: jobId,
+            userId,
+            status: "asset_analysis_passed",
+            lockedBy: null,
+            lockedUntil: null,
+            attemptCount: 0,
+            lastError: null,
+          },
+        ]),
+        storyboardStore: createInMemoryStoryboardStore(),
+        providerCallLogStore: createInMemoryProviderCallLogStore(),
+        moderationResultStore: createInMemoryModerationResultStore(),
+        jobId,
+        userId,
+        selectedTemplateIds: ["front_push_in"],
+        userPrompt: "Show the front shape cleanly.",
+        templates: mvpShotTemplates,
+        moderatePrompt: async () => ({
+          id: "mod-invalid-chinese-storyboard",
+          decision: "allow",
+          raw: { id: "mod-invalid-chinese-storyboard" },
+        }),
+        createStoryboard: async () => ({
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "镜头转身展示背面，并做面料细节特写。",
+              },
+            ],
+          },
+          raw: { id: "chatcmpl_invalid_chinese_storyboard" },
+        }),
+      }),
+    ).rejects.toThrow("Storyboard prompt violates global hard constraints.");
+  });
 });

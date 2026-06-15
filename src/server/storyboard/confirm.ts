@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import { reserveCredits, type CreditLedgerResult } from "@/lib/credits/ledger";
@@ -19,9 +19,27 @@ import {
   type ModerationResultStore,
 } from "@/server/moderation/results";
 import type { RequiredAssetKind } from "@/lib/templates/types";
+import { COMPILED_PROMPT_VERSION } from "@/server/video/prompt-compiler";
 
+import {
+  assetFactsSnapshotFromAssets,
+  buildGlobalHardConstraints,
+} from "./global-constraints";
+import {
+  buildGlobalUserIntent,
+  formatGlobalUserIntentForPrompt,
+  type GlobalUserIntent,
+} from "./global-intent";
 import { parseStoryboardJson, type ParsedStoryboard } from "./schema";
 import type { StoryboardRecord } from "./generate";
+
+type ConfirmFlowStatus =
+  | "storyboard_draft_ready"
+  | "storyboard_confirmed"
+  | "prompt_moderation_running"
+  | "prompt_moderation_passed"
+  | "credits_reserved"
+  | "segments_queued";
 
 export interface StoryboardConfirmJobRecord {
   id: string;
@@ -104,7 +122,90 @@ export interface StoryboardConfirmationStore {
     jobId: string;
     reservedLedgerId: string;
   }): Promise<void>;
+  listSegmentsForStoryboard(input: {
+    storyboardId: string;
+    jobId: string;
+  }): Promise<VideoSegmentRecord[]>;
   createVideoSegments(input: NewVideoSegmentRecord[]): Promise<VideoSegmentRecord[]>;
+}
+
+type JsonObject = { [key: string]: JsonValue };
+
+type GlobalUserIntentSnapshot = JsonObject & {
+  sourcePromptSummary: string | null;
+  styleIntent: string | null;
+  sellingPoints: string[];
+  negativeIntent: string[];
+};
+
+type AssetFactsSnapshot = JsonObject & {
+  hasBack: boolean;
+  hasDetail: boolean;
+  hasScene: boolean;
+};
+
+type FinalPromptSnapshot = JsonObject & {
+  version: typeof COMPILED_PROMPT_VERSION;
+  durationSeconds: number;
+  globalHardConstraints: string[];
+  globalUserIntent: GlobalUserIntentSnapshot;
+  segmentPrompts: Array<{
+    index: number;
+    durationSeconds: number;
+    templateId: string;
+    prompt: string;
+  }>;
+  systemConstraints: string[];
+  inputAssets: Array<{
+    assetId: string;
+    role: string;
+    sortOrder: number;
+  }>;
+  assetFactsSnapshot: AssetFactsSnapshot;
+  templatePolicySnapshot: JsonObject;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function globalUserIntentSnapshot(intent: GlobalUserIntent): GlobalUserIntentSnapshot {
+  return {
+    sourcePromptSummary: intent.sourcePromptSummary,
+    styleIntent: intent.styleIntent,
+    sellingPoints: intent.sellingPoints,
+    negativeIntent: intent.negativeIntent,
+  };
+}
+
+function readGlobalUserIntent(value: unknown): GlobalUserIntentSnapshot {
+  const record = asRecord(value);
+
+  return {
+    sourcePromptSummary:
+      typeof record.sourcePromptSummary === "string"
+        ? record.sourcePromptSummary
+        : null,
+    styleIntent:
+      typeof record.styleIntent === "string" ? record.styleIntent : null,
+    sellingPoints: readStringArray(record.sellingPoints),
+    negativeIntent: readStringArray(record.negativeIntent),
+  };
 }
 
 function buildFinalPromptSnapshot({
@@ -113,13 +214,28 @@ function buildFinalPromptSnapshot({
 }: {
   parsed: ParsedStoryboard;
   assets: StoryboardConfirmJobAssetRecord[];
-}) {
-  const hasSceneAsset = assets.some((asset) => asset.role === "scene");
+}): FinalPromptSnapshot {
+  const assetFactsSnapshot = assetFactsSnapshotFromAssets(assets);
+  const rawStoryboard = asRecord(parsed.raw);
+  const globalHardConstraints = buildGlobalHardConstraints({
+    hasBackAsset: assetFactsSnapshot.hasBack,
+    hasDetailAsset: assetFactsSnapshot.hasDetail,
+    hasSceneAsset: assetFactsSnapshot.hasScene,
+  });
+  const globalUserIntent =
+    Object.keys(asRecord(rawStoryboard.globalUserIntent)).length > 0
+      ? readGlobalUserIntent(rawStoryboard.globalUserIntent)
+      : globalUserIntentSnapshot(
+          buildGlobalUserIntent({
+            userPrompt: null,
+            hasDetailAsset: assetFactsSnapshot.hasDetail,
+          }),
+        );
   const systemConstraints = [
     "Do not invent clothing details absent from provided assets.",
     "Do not show back views unless a back asset is present.",
     "Do not create detail closeups unless detail assets are present.",
-    ...(hasSceneAsset
+    ...(assetFactsSnapshot.hasScene
       ? [
           "Use scene assets only as background, lighting, and mood reference.",
           "Do not copy people, faces, logos, storefront names, or readable text from scene assets.",
@@ -128,7 +244,10 @@ function buildFinalPromptSnapshot({
   ];
 
   return {
+    version: COMPILED_PROMPT_VERSION,
     durationSeconds: parsed.durationSeconds,
+    globalHardConstraints,
+    globalUserIntent,
     segmentPrompts: parsed.segments.map((segment) => ({
       index: segment.index,
       durationSeconds: segment.durationSeconds,
@@ -141,16 +260,28 @@ function buildFinalPromptSnapshot({
       role: asset.role,
       sortOrder: asset.sortOrder,
     })),
-  } satisfies JsonValue;
+    assetFactsSnapshot,
+    templatePolicySnapshot: {
+      selectedTemplateIds: parsed.segments.map((segment) => segment.templateId),
+      disabledReasons: {},
+    },
+  };
 }
 
-function finalPromptText(snapshot: ReturnType<typeof buildFinalPromptSnapshot>) {
+function finalPromptText(snapshot: FinalPromptSnapshot) {
   return [
+    "GLOBAL HARD CONSTRAINTS:",
+    ...snapshot.globalHardConstraints.map((constraint) => `- ${constraint}`),
+    "",
+    "GLOBAL USER INTENT:",
+    ...formatGlobalUserIntentForPrompt(snapshot.globalUserIntent).map(
+      (intent) => `- ${intent}`,
+    ),
+    "",
     ...snapshot.segmentPrompts.map(
       (segment) =>
-        `Segment ${segment.index + 1} (${segment.templateId}): ${segment.prompt}`,
+        `SEGMENT ${segment.index + 1} (${segment.templateId}): ${segment.prompt}`,
     ),
-    ...snapshot.systemConstraints.map((constraint) => `Constraint: ${constraint}`),
   ].join("\n");
 }
 
@@ -194,9 +325,11 @@ function assetsForSegmentTemplate({
 function assetSnapshotForSegment({
   segment,
   assets,
+  finalPromptSnapshot,
 }: {
   segment: ParsedStoryboard["segments"][number];
   assets: StoryboardConfirmJobAssetRecord[];
+  finalPromptSnapshot: FinalPromptSnapshot;
 }) {
   const segmentAssets = assetsForSegmentTemplate({ segment, assets });
 
@@ -208,7 +341,73 @@ function assetSnapshotForSegment({
       role: asset.role,
       sortOrder: asset.sortOrder,
     })),
-  } satisfies JsonValue;
+    promptCompiler: {
+      version: finalPromptSnapshot.version,
+      globalHardConstraints: finalPromptSnapshot.globalHardConstraints,
+      globalUserIntent: finalPromptSnapshot.globalUserIntent,
+      assetFactsSnapshot: finalPromptSnapshot.assetFactsSnapshot,
+    },
+  } satisfies JsonObject;
+}
+
+async function getOrCreateVideoSegments({
+  storyboardStore,
+  storyboardId,
+  jobId,
+  parsed,
+  assets,
+  finalPromptSnapshot,
+  job,
+  generationParameters,
+}: {
+  storyboardStore: StoryboardConfirmationStore;
+  storyboardId: string;
+  jobId: string;
+  parsed: ParsedStoryboard;
+  assets: StoryboardConfirmJobAssetRecord[];
+  finalPromptSnapshot: FinalPromptSnapshot;
+  job: StoryboardConfirmJobRecord;
+  generationParameters: ReturnType<typeof generationParametersForProfile>;
+}) {
+  const existingSegments = await storyboardStore.listSegmentsForStoryboard({
+    storyboardId,
+    jobId,
+  });
+
+  if (existingSegments.length > 0) {
+    const expectedIndexes = new Set(
+      parsed.segments.map((segment) => segment.index),
+    );
+    const reusableSegments = existingSegments.filter((segment) =>
+      expectedIndexes.has(segment.segmentIndex),
+    );
+
+    if (reusableSegments.length === parsed.segments.length) {
+      return reusableSegments.sort((a, b) => a.segmentIndex - b.segmentIndex);
+    }
+
+    throw new Error("Existing storyboard segments are incomplete.");
+  }
+
+  return storyboardStore.createVideoSegments(
+    parsed.segments.map((segment) => ({
+      videoJobId: jobId,
+      storyboardId,
+      segmentIndex: segment.index,
+      templateId: segment.templateId,
+      prompt: segment.prompt,
+      inputAssetSnapshot: assetSnapshotForSegment({
+        segment,
+        assets,
+        finalPromptSnapshot,
+      }),
+      generationProfile: job.generationProfile,
+      resolution: generationParameters.resolution,
+      audioEnabled: generationParameters.audioEnabled,
+      watermarkEnabled: job.watermarkEnabled,
+      isTest: job.isTest,
+    })),
+  );
 }
 
 function assertDraftStoryboard(storyboard: StoryboardRecord) {
@@ -228,6 +427,70 @@ function debugResolutionOverride(
 ) {
   const value = env.VIDEO_GENERATION_DEBUG_RESOLUTION?.trim();
   return value && debugResolutionValues.has(value) ? value : null;
+}
+
+const confirmFlowOrder: ConfirmFlowStatus[] = [
+  "storyboard_draft_ready",
+  "storyboard_confirmed",
+  "prompt_moderation_running",
+  "prompt_moderation_passed",
+  "credits_reserved",
+  "segments_queued",
+];
+
+async function currentJobStatus({
+  jobStore,
+  jobId,
+}: {
+  jobStore: JobStore;
+  jobId: string;
+}) {
+  const job = await jobStore.findJob(jobId);
+  if (!job) {
+    throw new Error(`Video job not found: ${jobId}.`);
+  }
+
+  return job.status;
+}
+
+function hasReachedStatus(currentStatus: string, targetStatus: ConfirmFlowStatus) {
+  const currentIndex = confirmFlowOrder.indexOf(currentStatus as ConfirmFlowStatus);
+  const targetIndex = confirmFlowOrder.indexOf(targetStatus);
+
+  return currentIndex >= targetIndex && targetIndex >= 0;
+}
+
+async function transitionIfNotReached({
+  jobStore,
+  jobId,
+  toStatus,
+  reason,
+  actorType,
+  actorId,
+  eventSnapshot,
+}: {
+  jobStore: JobStore;
+  jobId: string;
+  toStatus: ConfirmFlowStatus;
+  reason: string;
+  actorType?: "user" | "system";
+  actorId?: string;
+  eventSnapshot?: JsonValue;
+}) {
+  const status = await currentJobStatus({ jobStore, jobId });
+  if (hasReachedStatus(status, toStatus)) {
+    return;
+  }
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus,
+    reason,
+    ...(actorType ? { actorType } : {}),
+    ...(actorId ? { actorId } : {}),
+    ...(eventSnapshot ? { eventSnapshot } : {}),
+  });
 }
 
 function generationParametersForProfile(profile: GenerationProfile) {
@@ -308,8 +571,8 @@ export async function confirmStoryboard({
   const shouldReserveCredits = job.creditCost > 0;
   const generationParameters = generationParametersForProfile(job.generationProfile);
 
-  await transitionJobStatus({
-    store: jobStore,
+  await transitionIfNotReached({
+    jobStore,
     jobId,
     toStatus: "storyboard_confirmed",
     reason: "storyboard_confirmed",
@@ -317,8 +580,8 @@ export async function confirmStoryboard({
     actorId: userId,
     eventSnapshot: { storyboardId },
   });
-  await transitionJobStatus({
-    store: jobStore,
+  await transitionIfNotReached({
+    jobStore,
     jobId,
     toStatus: "prompt_moderation_running",
     reason: "final_prompt_moderation_started",
@@ -358,8 +621,8 @@ export async function confirmStoryboard({
     throw new Error("Final prompt moderation blocked video generation.");
   }
 
-  await transitionJobStatus({
-    store: jobStore,
+  await transitionIfNotReached({
+    jobStore,
     jobId,
     toStatus: "prompt_moderation_passed",
     reason: "final_prompt_moderation_passed",
@@ -386,14 +649,25 @@ export async function confirmStoryboard({
     });
   }
 
+  const segments = await getOrCreateVideoSegments({
+    storyboardStore,
+    storyboardId,
+    jobId,
+    parsed,
+    assets,
+    finalPromptSnapshot,
+    job,
+    generationParameters,
+  });
+
   const confirmedStoryboard = await storyboardStore.confirmStoryboard({
     storyboardId,
     finalPromptSnapshot,
   });
 
   if (shouldReserveCredits && reserveResult) {
-    await transitionJobStatus({
-      store: jobStore,
+    await transitionIfNotReached({
+      jobStore,
       jobId,
       toStatus: "credits_reserved",
       reason: "credits_reserved",
@@ -405,24 +679,8 @@ export async function confirmStoryboard({
     });
   }
 
-  const segments = await storyboardStore.createVideoSegments(
-    parsed.segments.map((segment) => ({
-      videoJobId: jobId,
-      storyboardId,
-      segmentIndex: segment.index,
-      templateId: segment.templateId,
-      prompt: segment.prompt,
-      inputAssetSnapshot: assetSnapshotForSegment({ segment, assets }),
-      generationProfile: job.generationProfile,
-      resolution: generationParameters.resolution,
-      audioEnabled: generationParameters.audioEnabled,
-      watermarkEnabled: job.watermarkEnabled,
-      isTest: job.isTest,
-    })),
-  );
-
-  await transitionJobStatus({
-    store: jobStore,
+  await transitionIfNotReached({
+    jobStore,
     jobId,
     toStatus: shouldReserveCredits ? "segments_queued" : "credits_reserved",
     reason: shouldReserveCredits ? "segments_created" : "trial_segments_prepared",
@@ -434,8 +692,8 @@ export async function confirmStoryboard({
   });
 
   if (!shouldReserveCredits) {
-    await transitionJobStatus({
-      store: jobStore,
+    await transitionIfNotReached({
+      jobStore,
       jobId,
       toStatus: "segments_queued",
       reason: "trial_segments_created",
@@ -512,6 +770,15 @@ export function createInMemoryStoryboardConfirmationStore({
         throw new Error(`Video job not found: ${id}.`);
       }
       jobRecords.set(id, { ...job, reservedLedgerId });
+    },
+    async listSegmentsForStoryboard({ storyboardId: id, jobId: videoJobId }) {
+      return segments
+        .filter(
+          (segment) =>
+            segment.storyboardId === id && segment.videoJobId === videoJobId,
+        )
+        .sort((a, b) => a.segmentIndex - b.segmentIndex)
+        .map((segment) => ({ ...segment }));
     },
     async createVideoSegments(input) {
       const now = new Date();
@@ -603,7 +870,8 @@ export function createDrizzleStoryboardConfirmationStore(
           sortOrder: videoJobAssets.sortOrder,
         })
         .from(videoJobAssets)
-        .where(eq(videoJobAssets.videoJobId, jobId));
+        .where(eq(videoJobAssets.videoJobId, jobId))
+        .orderBy(asc(videoJobAssets.sortOrder));
     },
     async confirmStoryboard({ storyboardId, finalPromptSnapshot }) {
       const [storyboard] = await db
@@ -627,6 +895,18 @@ export function createDrizzleStoryboardConfirmationStore(
         .update(videoJobs)
         .set({ reservedLedgerId })
         .where(eq(videoJobs.id, jobId));
+    },
+    async listSegmentsForStoryboard({ storyboardId, jobId }) {
+      return db
+        .select()
+        .from(videoSegments)
+        .where(
+          and(
+            eq(videoSegments.storyboardId, storyboardId),
+            eq(videoSegments.videoJobId, jobId),
+          ),
+        )
+        .orderBy(asc(videoSegments.segmentIndex)) as Promise<VideoSegmentRecord[]>;
     },
     async createVideoSegments(input) {
       if (input.length === 0) {

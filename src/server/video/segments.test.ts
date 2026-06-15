@@ -192,7 +192,12 @@ describe("video segment services", () => {
       segmentIds: ["segment-1", "segment-2", "segment-3"],
       providerTaskIds: ["task-0", "task-1", "task-2"],
     });
-    expect(started).toEqual(["Prompt 0", "Prompt 1", "Prompt 2"]);
+    expect(started).toHaveLength(3);
+    expect(started[0]).toContain("GLOBAL HARD CONSTRAINTS:");
+    expect(started[0]).toContain("GLOBAL USER INTENT:");
+    expect(started[0]).toContain("SEGMENT INSTRUCTION:\nPrompt 0");
+    expect(started[1]).toContain("SEGMENT INSTRUCTION:\nPrompt 1");
+    expect(started[2]).toContain("SEGMENT INSTRUCTION:\nPrompt 2");
     expect(maxActive).toBeGreaterThan(1);
     expect(stores.segmentStore.listSegments()).toEqual(
       expect.arrayContaining([
@@ -212,7 +217,7 @@ describe("video segment services", () => {
       jobId,
       createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
       createVideoGeneration: async (input) => {
-        if (input.prompt === "Prompt 1") {
+        if (input.prompt.includes("SEGMENT INSTRUCTION:\nPrompt 1")) {
           throw new Error("EvoLink submit failed.");
         }
 
@@ -293,6 +298,17 @@ describe("video segment services", () => {
       providerTaskId: "task-1",
       requestSnapshot: expect.objectContaining({
         configSource: "env",
+        compiledPromptVersion: "global_intent_constraints_v1",
+        globalHardConstraints: expect.arrayContaining([
+          expect.stringContaining("Do not invent garment details"),
+        ]),
+        globalUserIntent: {},
+        segmentInstruction: "Slow front push-in.",
+        compiledPromptSections: [
+          "GLOBAL HARD CONSTRAINTS",
+          "GLOBAL USER INTENT",
+          "SEGMENT INSTRUCTION",
+        ],
       }),
     });
   });
@@ -470,10 +486,10 @@ describe("video segment services", () => {
         "https://signed.example/users/user-1/assets/asset-front/original.jpg",
         "https://signed.example/users/user-1/assets/asset-scene/original.jpg",
       ],
-      prompt: expect.stringContaining("Image 1 is the garment reference"),
+      prompt: expect.stringContaining("Image 1 is a front garment reference"),
     });
     expect((seenInputs[0] as { prompt: string }).prompt).toContain(
-      "Image 2 is the scene/background reference",
+      "Image 2 is a scene/background reference",
     );
     expect((seenInputs[0] as { prompt: string }).prompt).toContain(
       "Use scene/background reference only for environment, lighting, and mood",
@@ -529,14 +545,19 @@ describe("video segment services", () => {
         return {
         provider: "apimart",
         model: "pixverse-v6",
-        providerTaskId: `task-${input.prompt}`,
+        providerTaskId: "task-env-only",
         raw: { ok: true },
         };
       },
     });
 
-    expect(result.providerTaskId).toBe("task-Slow front push-in.");
-    expect(seenInputs[0]).toMatchObject({ prompt: "Slow front push-in." });
+    expect(result.providerTaskId).toBe("task-env-only");
+    expect((seenInputs[0] as { prompt: string }).prompt).toContain(
+      "SEGMENT INSTRUCTION:\nSlow front push-in.",
+    );
+    expect((seenInputs[0] as { prompt: string }).prompt).toContain(
+      "GLOBAL HARD CONSTRAINTS:",
+    );
     expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
       provider: "apimart",
       model: "pixverse-v6",
@@ -616,6 +637,10 @@ describe("video segment services", () => {
       expect.objectContaining({
         status: "succeeded",
         providerTaskId: "task-retry-success",
+        requestSnapshot: expect.objectContaining({
+          attempt: 2,
+          maxAttempts: 3,
+        }),
       }),
     ]);
   });

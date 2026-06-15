@@ -24,6 +24,11 @@ import {
   type ModerationResultStore,
 } from "@/server/moderation/results";
 
+import {
+  assetFactsSnapshotFromAssets,
+  buildGlobalHardConstraints,
+} from "./global-constraints";
+import { buildGlobalUserIntent } from "./global-intent";
 import { parseStoryboardJson, type ParsedStoryboard } from "./schema";
 
 export interface StoryboardRecord {
@@ -144,6 +149,8 @@ function userPromptForStoryboard({
   availableTemplateIds,
   userPrompt,
   assetCompleteness,
+  globalHardConstraints,
+  globalUserIntent,
   templates,
 }: {
   durationSeconds: number;
@@ -160,6 +167,8 @@ function userPromptForStoryboard({
     hasFlatLayOrWhiteBackground: boolean;
     detailTypes: string[];
   };
+  globalHardConstraints: string[];
+  globalUserIntent: ReturnType<typeof buildGlobalUserIntent>;
   templates: ShotTemplateDefinition[];
 }) {
   const templatesById = new Map(
@@ -199,6 +208,14 @@ function userPromptForStoryboard({
         },
       ];
     }),
+    global_hard_constraints: globalHardConstraints,
+    global_user_intent: globalUserIntent,
+    instructions: [
+      "Return only segment prompts.",
+      "Do not create, output, or rewrite global constraints.",
+      "Every segment prompt must obey global_hard_constraints.",
+      "Use only selected_template_ids as segment template_id values.",
+    ],
     user_prompt: userPrompt,
     output_schema: {
       duration_seconds: "number",
@@ -212,6 +229,50 @@ function userPromptForStoryboard({
       ],
     },
   });
+}
+
+function asJsonRecord(value: JsonValue): Record<string, JsonValue> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, JsonValue>;
+}
+
+function assertStoryboardPromptPolicy({
+  parsed,
+  hasBackAsset,
+  hasDetailAsset,
+  hasSceneAsset,
+}: {
+  parsed: ParsedStoryboard;
+  hasBackAsset: boolean;
+  hasDetailAsset: boolean;
+  hasSceneAsset: boolean;
+}) {
+  const backViolation = /背面|后背|转身|360度|\b(back|rear)\s+(view|side|shot|display)|\bback\s+side\b|\bback\s+of\s+the\s+garment\b|\bfrom\s+behind\b|\brear(?:\s|-)?facing\b|\bturn(?:\s|-)?around\b|\b360\b|\bfront(?:\s|-)?to(?:\s|-)?back\b/i;
+  const detailViolation = /细节特写|微距|面料特写|\bmacro\b|\bcloseup\b|\bdetail\s+close(?:\s|-)?up\b|\bclose(?:\s|-)?up\s+(?:detail|fabric|neckline|cuff|print)\b|\bzoom\s+in\s+on\s+fabric\b|\bfabric\s+macro\b|\bneckline\s+close(?:\s|-)?up\b|\bcuff\s+close(?:\s|-)?up\b|\bprint\s+close(?:\s|-)?up\b/i;
+  const sceneViolation = /上传.*(场景|背景)|(场景|背景).*(参考|图片|素材)|\b(uploaded|provided)\s+(scene|background)\s+(reference|image|asset)\b|\bscene\/background\s+reference\b/i;
+
+  const violatesPolicy = parsed.segments.some((segment) => {
+    if (!hasBackAsset && backViolation.test(segment.prompt)) {
+      return true;
+    }
+
+    if (!hasDetailAsset && detailViolation.test(segment.prompt)) {
+      return true;
+    }
+
+    if (!hasSceneAsset && sceneViolation.test(segment.prompt)) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (violatesPolicy) {
+    throw new Error("Storyboard prompt violates global hard constraints.");
+  }
 }
 
 export async function generateStoryboardDraft({
@@ -286,12 +347,26 @@ export async function generateStoryboardDraft({
 
   const startedAt = Date.now();
   const systemPrompt = systemPromptForStoryboard();
+  const assetFactsSnapshot = assetFactsSnapshotFromAssets(
+    detail.assets.map((asset) => ({ role: asset.role })),
+  );
+  const globalHardConstraints = buildGlobalHardConstraints({
+    hasBackAsset: detail.assetCompleteness.hasBack,
+    hasDetailAsset: detail.assetCompleteness.hasDetail,
+    hasSceneAsset: detail.assetCompleteness.hasScene,
+  });
+  const globalUserIntent = buildGlobalUserIntent({
+    userPrompt,
+    hasDetailAsset: detail.assetCompleteness.hasDetail,
+  });
   const deepSeekUserPrompt = userPromptForStoryboard({
     durationSeconds: detail.job.durationSeconds,
     selectedTemplateIds,
     availableTemplateIds: detail.recommendations.availableTemplateIds,
     userPrompt,
     assetCompleteness: detail.assetCompleteness,
+    globalHardConstraints,
+    globalUserIntent,
     templates,
   });
 
@@ -326,7 +401,13 @@ export async function generateStoryboardDraft({
   try {
     parsed = parseStoryboardJson(providerResult.storyboardJson, {
       durationSeconds: detail.job.durationSeconds,
-      allowedTemplateIds: detail.recommendations.availableTemplateIds,
+      allowedTemplateIds: selectedTemplateIds,
+    });
+    assertStoryboardPromptPolicy({
+      parsed,
+      hasBackAsset: detail.assetCompleteness.hasBack,
+      hasDetailAsset: detail.assetCompleteness.hasDetail,
+      hasSceneAsset: detail.assetCompleteness.hasScene,
     });
   } catch (error) {
     await providerCallLogStore.createCallLog({
@@ -342,11 +423,25 @@ export async function generateStoryboardDraft({
       responseSummary: providerResult.storyboardJson,
       durationMs: Date.now() - startedAt,
       status: "failed",
-      errorCode: "storyboard_schema_error",
+      errorCode:
+        error instanceof Error &&
+        error.message === "Storyboard prompt violates global hard constraints."
+          ? "storyboard_policy_error"
+          : "storyboard_schema_error",
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
     throw error;
   }
+
+  parsed = {
+    ...parsed,
+    raw: {
+      ...asJsonRecord(parsed.raw),
+      globalHardConstraints,
+      globalUserIntent: globalUserIntent as unknown as JsonValue,
+      assetFactsSnapshot,
+    },
+  };
 
   const callLog = await providerCallLogStore.createCallLog({
     provider: providerResult.provider,
