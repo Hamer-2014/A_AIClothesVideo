@@ -124,6 +124,35 @@ describe("create video job", () => {
     expect(store.listTrialUsages()).toHaveLength(1);
   });
 
+  it("stores preset id and snapshot when creating a job", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-1",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-1"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      presetId: "marketplace_clean",
+    });
+
+    expect(result.job).toMatchObject({
+      presetId: "marketplace_clean",
+      presetSnapshot: expect.objectContaining({
+        id: "marketplace_clean",
+        label: "电商主图动效",
+      }),
+    });
+  });
+
   it("defaults 8 second jobs to paid unless free trial is explicitly requested", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

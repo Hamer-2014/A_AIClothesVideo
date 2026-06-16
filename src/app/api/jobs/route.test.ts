@@ -55,6 +55,8 @@ describe("POST /api/jobs", () => {
             generationProfile: "trial_540p_watermarked",
             watermarkEnabled: true,
             trialEligibilitySnapshot: null,
+            presetId: "minimal_studio",
+            presetSnapshot: null,
             isTest: false,
           },
           jobAssets: [
@@ -112,6 +114,8 @@ describe("POST /api/jobs", () => {
               generationProfile: "paid_720p_audio",
               watermarkEnabled: false,
               trialEligibilitySnapshot: null,
+              presetId: "minimal_studio",
+              presetSnapshot: null,
               isTest: false,
             },
             jobAssets: [
@@ -134,6 +138,61 @@ describe("POST /api/jobs", () => {
       useFreeTrialIfAvailable: false,
     });
     expect(seenInputs[0]).not.toHaveProperty("isTrial");
+  });
+
+  it("forwards preset id to job creation", async () => {
+    const seenInputs: unknown[] = [];
+    const response = await handleCreateJobRequest(
+      new Request("http://localhost/api/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-1"],
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          presetId: "marketplace_clean",
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createJob: async (input) => {
+          seenInputs.push(input);
+          return {
+            job: {
+              id: "job-1",
+              userId: input.userId,
+              status: "asset_analysis_queued",
+              userVisibleStatus: "analyzing_assets",
+              durationSeconds: input.durationSeconds,
+              aspectRatio: "9:16",
+              postQaMode: "standard",
+              postQaRequired: "true",
+              creditCost: 70,
+              billingMode: "paid",
+              generationProfile: "paid_720p_audio",
+              watermarkEnabled: false,
+              trialEligibilitySnapshot: null,
+              presetId: "marketplace_clean",
+              presetSnapshot: null,
+              isTest: false,
+            },
+            jobAssets: [
+              {
+                id: "job-asset-1",
+                videoJobId: "job-1",
+                assetId: "asset-1",
+                role: "front",
+                sortOrder: 0,
+              },
+            ],
+          };
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    expect(seenInputs[0]).toMatchObject({
+      presetId: "marketplace_clean",
+    });
   });
 
   it("maps unavailable explicit free trial requests to a clear conflict response", async () => {
@@ -244,6 +303,8 @@ describe("POST /api/jobs", () => {
               generationProfile: "trial_540p_watermarked",
               watermarkEnabled: true,
               trialEligibilitySnapshot: null,
+              presetId: "minimal_studio",
+              presetSnapshot: null,
               isTest: false,
             },
             jobAssets: [

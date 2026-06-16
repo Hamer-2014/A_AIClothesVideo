@@ -13,6 +13,7 @@ import {
   trialAbuseSignals,
 } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
+import { createPresetSnapshot, getStylePreset } from "@/lib/presets";
 import type { assetRoleValues, assetStatusValues } from "@/lib/db/schema/assets";
 import type {
   videoAspectRatioValues,
@@ -50,6 +51,8 @@ export interface CreatedVideoJob {
   userVisibleStatus: string;
   durationSeconds: number;
   aspectRatio: VideoAspectRatio;
+  presetId: string | null;
+  presetSnapshot: JsonValue | null;
   postQaMode: "lite" | "standard" | "strict" | "off";
   postQaRequired: string;
   creditCost: number;
@@ -430,6 +433,8 @@ export function createDrizzleVideoJobCreationStore(
           userVisibleStatus: videoJobs.userVisibleStatus,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
+          presetId: videoJobs.presetId,
+          presetSnapshot: videoJobs.presetSnapshot,
           postQaMode: videoJobs.postQaMode,
           postQaRequired: videoJobs.postQaRequired,
           creditCost: videoJobs.creditCost,
@@ -651,6 +656,7 @@ export async function createVideoJobWithAssets({
   isTrial: _clientIsTrial,
   useFreeTrialIfAvailable,
   isTest = false,
+  presetId,
   now = new Date(),
   requestContext,
   email,
@@ -668,6 +674,7 @@ export async function createVideoJobWithAssets({
   isTrial?: boolean;
   useFreeTrialIfAvailable?: boolean;
   isTest?: boolean;
+  presetId?: string | null;
   now?: Date;
   requestContext?: RequestContext;
   email?: string | null;
@@ -758,6 +765,8 @@ export async function createVideoJobWithAssets({
   const billingMode: BillingMode =
     shouldAttemptFreeTrial && recentTrialCount === 0 ? "free_trial" : "paid";
   const profile = profileForBillingMode(billingMode);
+  const preset = getStylePreset(presetId);
+  const presetSnapshot = createPresetSnapshot(preset) as unknown as JsonValue;
   const trialEligibilitySnapshot =
     shouldAttemptFreeTrial
       ? ({
@@ -791,6 +800,8 @@ export async function createVideoJobWithAssets({
     userVisibleStatus: "analyzing_assets",
     durationSeconds,
     aspectRatio: aspectRatio as VideoAspectRatio,
+    presetId: preset.id,
+    presetSnapshot,
     postQaMode: profile.postQaMode,
     postQaRequired: "true",
     creditCost: creditCostForDuration(durationSeconds, billingMode),

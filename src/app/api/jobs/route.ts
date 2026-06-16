@@ -25,6 +25,7 @@ interface CreateJobRouteDeps {
     aspectRatio: string;
     useFreeTrialIfAvailable?: boolean;
     isTest?: boolean;
+    presetId?: string | null;
     requestContext?: {
       ipAddress: string | null;
       userAgent: string | null;
@@ -79,6 +80,8 @@ export async function handleCreateJobRequest(
       ? input.useFreeTrialIfAvailable
       : undefined;
   const isTest = input.isTest === true;
+  const presetId =
+    typeof input.presetId === "string" ? input.presetId : null;
   const deviceFingerprint =
     typeof input.deviceFingerprint === "string" ? input.deviceFingerprint : null;
   const createJob =
@@ -97,6 +100,7 @@ export async function handleCreateJobRequest(
       aspectRatio,
       useFreeTrialIfAvailable,
       isTest,
+      presetId,
       email: session?.user?.email ?? null,
       emailVerified: session?.user?.emailVerified ?? null,
       deviceFingerprint,
