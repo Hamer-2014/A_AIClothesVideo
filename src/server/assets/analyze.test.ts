@@ -117,6 +117,36 @@ describe("asset analysis workflow service", () => {
     expect(result.recommendations.availableTemplateIds).toContain("print_closeup");
   });
 
+  it("ranks recommendations by preset without enabling unavailable templates", () => {
+    const result = buildRecommendationsFromAnalyses({
+      analyses: [
+        parseAssetAnalysisJson({
+          asset_role: "front",
+          garment_category: "dress",
+          view_angle: "front",
+          human_present: "no",
+          visible_details: ["front_shape"],
+          not_visible_details: [],
+          quality: {
+            is_garment: true,
+            is_clear: true,
+            is_safe: true,
+            has_flat_lay_or_white_background: true,
+          },
+          confidence: "high",
+          risk_flags: [],
+        }),
+      ],
+      templates: mvpShotTemplates,
+      isTrial: false,
+      declaredRoles: ["front"],
+      presetId: "marketplace_clean",
+    });
+
+    expect(result.recommendations.availableTemplateIds[0]).toBe("product_float");
+    expect(result.recommendations.availableTemplateIds).not.toContain("back_display");
+  });
+
   it("stores rejected analyses but does not recommend generation templates", async () => {
     const store = createInMemoryAssetAnalysisStore();
 

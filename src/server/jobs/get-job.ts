@@ -22,6 +22,8 @@ export interface VideoJobSummary {
   failureReason: string | null;
   durationSeconds: number;
   aspectRatio: string;
+  presetId: string | null;
+  presetSnapshot: JsonValue | null;
   creditCost: number;
   billingMode: BillingMode;
   generationProfile: GenerationProfile;
@@ -118,6 +120,8 @@ export function createDrizzleVideoJobReadStore(
           failureReason: videoJobs.failureReason,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
+          presetId: videoJobs.presetId,
+          presetSnapshot: videoJobs.presetSnapshot,
           creditCost: videoJobs.creditCost,
           billingMode: videoJobs.billingMode,
           generationProfile: videoJobs.generationProfile,
@@ -211,6 +215,7 @@ export async function getVideoJobDetail({
     declaredRoles: assets
       .map((asset) => declaredRoleFromJobAsset(asset.role))
       .filter((role): role is AssetRole => Boolean(role) && role !== "unknown"),
+    presetId: job.presetId,
   });
 
   const declaredRoleByAssetId = new Map(

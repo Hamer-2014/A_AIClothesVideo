@@ -23,6 +23,8 @@ describe("get video job detail", () => {
           failureReason: null,
           durationSeconds: 8,
           aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
           creditCost: 0,
           billingMode: "paid",
           generationProfile: "paid_720p_audio",
@@ -145,6 +147,8 @@ describe("get video job detail", () => {
           failureReason: null,
           durationSeconds: 8,
           aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
           creditCost: 0,
           billingMode: "free_trial",
           generationProfile: "trial_540p_watermarked",
@@ -178,6 +182,8 @@ describe("get video job detail", () => {
           failureReason: null,
           durationSeconds: 8,
           aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
           creditCost: 70,
           billingMode: "paid",
           generationProfile: "paid_720p_audio",
@@ -252,6 +258,68 @@ describe("get video job detail", () => {
     expect(detail?.recommendations.availableTemplateIds).toContain("fabric_macro");
   });
 
+  it("ranks recommendations using the persisted job preset", async () => {
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+          presetId: "marketplace_clean",
+          presetSnapshot: null,
+        },
+      ],
+      assets: [
+        {
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      analyses: [
+        {
+          assetId: "asset-front",
+          analysisJson: {
+            asset_role: "front",
+            garment_category: "dress",
+            view_angle: "front",
+            human_present: "no",
+            visible_details: ["front_shape"],
+            not_visible_details: [],
+            quality: {
+              is_garment: true,
+              is_clear: true,
+              is_safe: true,
+              has_flat_lay_or_white_background: true,
+            },
+            confidence: "high",
+            risk_flags: [],
+          },
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.recommendations.availableTemplateIds[0]).toBe("product_float");
+    expect(detail?.recommendations.availableTemplateIds).not.toContain("back_display");
+  });
+
   it("preserves declared fixed-slot roles when building job detail recommendations", async () => {
     const store = createInMemoryVideoJobReadStore({
       jobs: [
@@ -264,6 +332,8 @@ describe("get video job detail", () => {
           failureReason: null,
           durationSeconds: 8,
           aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
           creditCost: 70,
           billingMode: "paid",
           generationProfile: "paid_720p_audio",
@@ -360,6 +430,8 @@ describe("get video job detail", () => {
           failureReason: null,
           durationSeconds: 8,
           aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
           creditCost: 70,
           billingMode: "paid",
           generationProfile: "paid_720p_audio",

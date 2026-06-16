@@ -31,6 +31,8 @@ describe("GET /api/jobs/[id]", () => {
             failureReason: null,
             durationSeconds: 8,
             aspectRatio: "9:16",
+            presetId: null,
+            presetSnapshot: null,
             creditCost: 0,
             billingMode: "free_trial",
             generationProfile: "trial_540p_watermarked",

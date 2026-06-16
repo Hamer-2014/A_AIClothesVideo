@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db/client";
 import { assetAnalyses } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
+import { getStylePreset, rankTemplatesForPreset } from "@/lib/presets";
 import {
   createDrizzleProviderCallLogStore,
   type ProviderCallLogStore,
@@ -181,21 +182,27 @@ export function buildRecommendationsFromAnalyses({
   templates,
   isTrial,
   declaredRoles = [],
+  presetId,
 }: {
   analyses: ParsedAssetAnalysis[];
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
   declaredRoles?: AssetRole[];
+  presetId?: string | null;
 }) {
   const acceptableAnalyses = analyses.filter(isAssetAnalysisAcceptable);
   const acceptable = acceptableAnalyses.length > 0;
   const assetCompleteness = acceptable
     ? buildAssetCompletenessFromAnalyses(acceptableAnalyses, declaredRoles)
     : emptyAssetCompleteness();
-  const recommendations = recommendShotTemplates({
+  const baseRecommendations = recommendShotTemplates({
     templates,
     assetCompleteness,
     isTrial,
+  });
+  const recommendations = rankTemplatesForPreset({
+    recommendations: baseRecommendations,
+    preset: getStylePreset(presetId),
   });
 
   return {
