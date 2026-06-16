@@ -174,6 +174,24 @@ describe("WorkspaceApp", () => {
     vi.restoreAllMocks();
   });
 
+  it("uses query preset defaults for trial workspace entry", () => {
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="marketplace_clean"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(screen.getByText("电商主图动效")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /电商主图动效/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByDisplayValue(/商品主图可售卖感/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "免费试用" })).toBeInTheDocument();
+  });
+
   it("creates a job and automatically analyzes assets", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -501,6 +519,7 @@ describe("WorkspaceApp", () => {
             assetIds: ["asset-1"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            presetId: "minimal_studio",
             useFreeTrialIfAvailable: false,
             deviceFingerprint: "device-existing",
           }),
@@ -532,6 +551,7 @@ describe("WorkspaceApp", () => {
             assetIds: ["asset-1"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            presetId: "minimal_studio",
             useFreeTrialIfAvailable: true,
             deviceFingerprint: "device-existing",
           }),
@@ -869,7 +889,8 @@ describe("WorkspaceApp", () => {
           method: "POST",
           body: JSON.stringify({
             selectedTemplateIds: ["front_push_in"],
-            userPrompt: "保持服装版型稳定，适合商品页宣传。",
+            presetId: "minimal_studio",
+            userPrompt: "突出服装版型和整体轮廓，使用干净背景和稳定镜头，避免夸张动作。",
           }),
         }),
       );
@@ -1044,7 +1065,7 @@ describe("WorkspaceApp", () => {
     });
   });
 
-  it("prefers the scene template for one-click generation when a scene asset is available", async () => {
+  it("uses backend preset-ranked template order for one-click generation", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -1196,8 +1217,9 @@ describe("WorkspaceApp", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({
-            selectedTemplateIds: ["scene_lifestyle_showcase"],
-            userPrompt: "保持服装版型稳定，适合商品页宣传。",
+            selectedTemplateIds: ["front_push_in"],
+            presetId: "minimal_studio",
+            userPrompt: "突出服装版型和整体轮廓，使用干净背景和稳定镜头，避免夸张动作。",
           }),
         }),
       );

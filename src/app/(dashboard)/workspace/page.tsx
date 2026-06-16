@@ -12,11 +12,20 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkspacePage() {
+export default async function WorkspacePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    mode?: string;
+    preset?: string;
+  }>;
+}) {
   const session = await getServerSession();
   if (!session?.user?.id) {
     redirect("/login");
   }
+  const resolvedSearchParams = await searchParams;
+  const initialMode = resolvedSearchParams?.mode === "trial" ? "trial" : "paid";
   const overview = await getUserBillingOverview({
     store: createDrizzleUserBillingStore(),
     userId: session.user.id,
@@ -30,7 +39,11 @@ export default async function WorkspacePage() {
       user={session.user}
       billing={overview.wallet}
     >
-      <WorkspaceApp templateCatalog={mvpShotTemplates} />
+      <WorkspaceApp
+        initialMode={initialMode}
+        initialPresetId={resolvedSearchParams?.preset ?? null}
+        templateCatalog={mvpShotTemplates}
+      />
     </DashboardShell>
   );
 }

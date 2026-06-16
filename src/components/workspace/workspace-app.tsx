@@ -12,6 +12,14 @@ import {
 } from "./storyboard-confirmation";
 import { UploadPanel, type UploadedAssetItem } from "./upload-panel";
 import { getOrCreateDeviceFingerprint } from "@/lib/abuse/device-fingerprint";
+import {
+  getStylePreset,
+  selectTemplateIdsForPreset,
+  type StylePresetId,
+  type WorkspaceEntryMode,
+} from "@/lib/presets";
+
+import { StylePresetSelector } from "./style-preset-selector";
 
 interface TemplateCatalogItem {
   templateId: string;
@@ -24,6 +32,8 @@ interface TemplateCatalogItem {
 
 interface WorkspaceAppProps {
   templateCatalog: TemplateCatalogItem[];
+  initialMode?: WorkspaceEntryMode;
+  initialPresetId?: string | null;
 }
 
 interface JobDetailResponse {
@@ -35,6 +45,8 @@ interface JobDetailResponse {
     failureReason?: string | null;
     durationSeconds: number;
     aspectRatio: string;
+    presetId?: string | null;
+    presetSnapshot?: unknown;
     creditCost: number;
     billingMode: "free_trial" | "paid";
     generationProfile: string;
@@ -184,14 +196,26 @@ function missingIntentReason(requiredAsset: string) {
   }
 }
 
-export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
+export function WorkspaceApp({
+  templateCatalog,
+  initialMode = "paid",
+  initialPresetId,
+}: WorkspaceAppProps) {
+  const initialPreset = getStylePreset(initialPresetId);
   const [assets, setAssets] = useState<UploadedAssetItem[]>([]);
-  const [durationSeconds, setDurationSeconds] = useState<8 | 16 | 24>(8);
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "1:1" | "16:9">("9:16");
+  const [selectedPresetId, setSelectedPresetId] = useState<StylePresetId>(
+    initialPreset.id,
+  );
+  const [durationSeconds, setDurationSeconds] = useState<8 | 16 | 24>(
+    initialMode === "trial" ? 8 : initialPreset.defaultDurationSeconds,
+  );
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "1:1" | "16:9">(
+    initialPreset.defaultAspectRatio,
+  );
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobDetail, setJobDetail] = useState<JobDetailResponse | null>(null);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
-  const [userPrompt, setUserPrompt] = useState("保持服装版型稳定，适合商品页宣传。");
+  const [userPrompt, setUserPrompt] = useState(initialPreset.defaultIntent);
   const [storyboardId, setStoryboardId] = useState<string | null>(null);
   const [segments, setSegments] = useState<
     Array<{ index: number; durationSeconds: number; templateId: string; prompt: string }>
@@ -244,24 +268,25 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     return value === 8 ? 1 : value === 16 ? 2 : 3;
   }
 
-  function defaultTemplateSelection(detailBody: JobDetailResponse, count: number) {
-    const availableTemplateIds = new Set(detailBody.recommendations.availableTemplateIds);
-    const sceneTemplateIds = detailBody.assetCompleteness.hasScene
-      ? templateCatalog
-          .filter(
-            (template) =>
-              template.requiredAssets?.includes("scene") &&
-              availableTemplateIds.has(template.templateId),
-          )
-          .map((template) => template.templateId)
-      : [];
-    const ordered = [
-      ...sceneTemplateIds,
-      ...detailBody.recommendations.recommended.map((item) => item.templateId),
-      ...detailBody.recommendations.optional.map((item) => item.templateId),
-      ...detailBody.recommendations.availableTemplateIds,
-    ];
-    return Array.from(new Set(ordered)).slice(0, count);
+  function defaultTemplateSelection(
+    detailBody: JobDetailResponse,
+    nextDurationSeconds: 8 | 16 | 24,
+  ) {
+    return selectTemplateIdsForPreset({
+      recommendations: detailBody.recommendations,
+      preset: getStylePreset(selectedPresetId),
+      durationSeconds: nextDurationSeconds,
+    });
+  }
+
+  function changePreset(presetId: StylePresetId) {
+    const nextPreset = getStylePreset(presetId);
+    setSelectedPresetId(nextPreset.id);
+    setUserPrompt(nextPreset.defaultIntent);
+    setAspectRatio(nextPreset.defaultAspectRatio);
+    if (!nextPreset.allowedDurationSeconds.includes(durationSeconds)) {
+      setDurationSeconds(nextPreset.defaultDurationSeconds);
+    }
   }
 
   async function loadJobDetail(nextJobId: string, nextDurationSeconds: 8 | 16 | 24) {
@@ -278,7 +303,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
     setJobDetail(typedDetailBody);
     setSelectedTemplateIds(defaultTemplateSelection(
       typedDetailBody,
-      requiredTemplateCountForDuration(nextDurationSeconds),
+      nextDurationSeconds,
     ));
     if (typedDetailBody.latestStoryboard?.status === "draft") {
       setStoryboardId(typedDetailBody.latestStoryboard.id);
@@ -429,6 +454,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
         assetIds: uploadedAssetIds,
         durationSeconds,
         aspectRatio,
+        presetId: selectedPresetId,
         useFreeTrialIfAvailable,
         deviceFingerprint: getOrCreateDeviceFingerprint(),
       }),
@@ -495,6 +521,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         selectedTemplateIds: templateIds,
+        presetId: selectedPresetId,
         userPrompt,
       }),
     });
@@ -608,7 +635,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
 
     const templateIds = defaultTemplateSelection(
       created.detail,
-      requiredTemplateCountForDuration(durationSeconds),
+      durationSeconds,
     );
     if (templateIds.length !== requiredTemplateCount) {
       setMessage(`素材不足，无法自动选择 ${requiredTemplateCount} 个可用模板。`);
@@ -685,6 +712,10 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
               durationSeconds={durationSeconds}
               onAspectRatioChange={setAspectRatio}
               onDurationChange={setDurationSeconds}
+            />
+            <StylePresetSelector
+              onChange={changePreset}
+              selectedPresetId={selectedPresetId}
             />
             <div>
               <label
