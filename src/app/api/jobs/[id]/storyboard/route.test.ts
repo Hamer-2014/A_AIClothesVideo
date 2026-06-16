@@ -42,6 +42,8 @@ describe("POST /api/jobs/[id]/storyboard", () => {
             version: 1,
             status: "draft",
             selectedTemplateIds: input.selectedTemplateIds,
+            presetId: null,
+            presetSnapshot: null,
             storyboardJson: {
               duration_seconds: 8,
               segments: [],

@@ -397,6 +397,117 @@ describe("generate storyboard draft", () => {
     ]);
   });
 
+  it("includes persisted style preset in DeepSeek prompt and storyboard record", async () => {
+    const capturedPrompts: string[] = [];
+    const storyboardStore = createInMemoryStoryboardStore();
+
+    await generateStoryboardDraft({
+      jobReadStore: createInMemoryVideoJobReadStore({
+        jobs: [
+          {
+            id: jobId,
+            userId,
+            status: "asset_analysis_passed",
+            userVisibleStatus: "assets_ready",
+            lastError: null,
+            failureReason: null,
+            durationSeconds: 8,
+            aspectRatio: "9:16",
+            presetId: "marketplace_clean",
+            presetSnapshot: {
+              id: "marketplace_clean",
+              label: "电商主图动效",
+              preferredTemplateIds: [
+                "product_float",
+                "front_pan",
+                "front_crop_detail",
+                "front_push_in",
+              ],
+              promptStyleHint:
+                "clean ecommerce product motion, marketplace-ready, stable garment shape, no invented details",
+            },
+            creditCost: 70,
+            billingMode: "paid",
+            generationProfile: "paid_720p_audio",
+            watermarkEnabled: false,
+          },
+        ],
+        assets: [{ assetId: "asset-front", role: "front", sortOrder: 0 }],
+        analyses: [
+          {
+            assetId: "asset-front",
+            analysisJson: {
+              asset_role: "front",
+              garment_category: "dress",
+              view_angle: "front",
+              human_present: "no",
+              visible_details: ["front_shape"],
+              not_visible_details: [],
+              quality: {
+                is_garment: true,
+                is_clear: true,
+                is_safe: true,
+                has_flat_lay_or_white_background: true,
+              },
+              confidence: "high",
+              risk_flags: [],
+            },
+          },
+        ],
+      }),
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      storyboardStore,
+      providerCallLogStore: createInMemoryProviderCallLogStore(),
+      moderationResultStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      selectedTemplateIds: ["product_float"],
+      userPrompt: "Make it marketplace-ready.",
+      templates: mvpShotTemplates,
+      moderatePrompt: async () => ({ id: "mod-preset", decision: "allow", raw: {} }),
+      createStoryboard: async (input) => {
+        capturedPrompts.push(input.userPrompt);
+        return {
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "product_float",
+                prompt: "Clean product float.",
+              },
+            ],
+          },
+          raw: {},
+        };
+      },
+    });
+
+    const prompt = JSON.parse(capturedPrompts[0] ?? "{}");
+    expect(prompt.style_preset).toMatchObject({
+      id: "marketplace_clean",
+      label: "电商主图动效",
+      prompt_style_hint: expect.stringContaining("clean ecommerce product motion"),
+    });
+    expect(storyboardStore.listStoryboards()[0]).toMatchObject({
+      presetId: "marketplace_clean",
+      presetSnapshot: expect.objectContaining({ id: "marketplace_clean" }),
+    });
+  });
+
   it("sends system-owned global constraints and user intent to DeepSeek", async () => {
     const capturedPrompts: string[] = [];
 

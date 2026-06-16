@@ -59,6 +59,8 @@ function createStores() {
         version: 1,
         status: "draft",
         selectedTemplateIds: ["front_push_in", "front_pan"],
+        presetId: null,
+        presetSnapshot: null,
         storyboardJson: {
           duration_seconds: 16,
           segments: [
@@ -376,6 +378,8 @@ describe("confirmStoryboard", () => {
           version: 1,
           status: "draft",
           selectedTemplateIds: ["front_push_in", "back_display"],
+          presetId: null,
+          presetSnapshot: null,
           storyboardJson: {
             duration_seconds: 16,
             segments: [
@@ -504,6 +508,8 @@ describe("confirmStoryboard", () => {
           version: 1,
           status: "draft",
           selectedTemplateIds: ["scene_lifestyle_showcase"],
+          presetId: null,
+          presetSnapshot: null,
           storyboardJson: {
             duration_seconds: 8,
             segments: [
@@ -950,6 +956,8 @@ describe("confirmStoryboard", () => {
           version: 1,
           status: "draft",
           selectedTemplateIds: ["front_push_in"],
+          presetId: null,
+          presetSnapshot: null,
           storyboardJson: {
             duration_seconds: 8,
             segments: [
@@ -1040,6 +1048,8 @@ describe("confirmStoryboard", () => {
           version: 1,
           status: "draft",
           selectedTemplateIds: ["fabric_macro"],
+          presetId: null,
+          presetSnapshot: null,
           storyboardJson: {
             duration_seconds: 8,
             segments: [
@@ -1079,3 +1089,4 @@ describe("confirmStoryboard", () => {
     expect(trialStoryboardStore.listStoryboards()[0]?.status).toBe("draft");
   });
 });
+

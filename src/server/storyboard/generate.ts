@@ -37,6 +37,8 @@ export interface StoryboardRecord {
   version: number;
   status: string;
   selectedTemplateIds: JsonValue;
+  presetId: string | null;
+  presetSnapshot: JsonValue | null;
   storyboardJson: JsonValue;
   finalPromptSnapshot: JsonValue | null;
   providerCallLogId: string | null;
@@ -48,6 +50,8 @@ export interface StoryboardRecord {
 export interface NewStoryboardRecord {
   videoJobId: string;
   selectedTemplateIds: string[];
+  presetId?: string | null;
+  presetSnapshot?: JsonValue | null;
   storyboardJson: ParsedStoryboard;
   providerCallLogId?: string | null;
 }
@@ -62,6 +66,8 @@ function toRecordInput(input: NewStoryboardRecord) {
     version: 1,
     status: "draft",
     selectedTemplateIds: input.selectedTemplateIds,
+    presetId: input.presetId ?? null,
+    presetSnapshot: input.presetSnapshot ?? null,
     storyboardJson: input.storyboardJson.raw,
     finalPromptSnapshot: null,
     providerCallLogId: input.providerCallLogId ?? null,
@@ -151,6 +157,7 @@ function userPromptForStoryboard({
   assetCompleteness,
   globalHardConstraints,
   globalUserIntent,
+  presetSnapshot,
   templates,
 }: {
   durationSeconds: number;
@@ -169,6 +176,7 @@ function userPromptForStoryboard({
   };
   globalHardConstraints: string[];
   globalUserIntent: ReturnType<typeof buildGlobalUserIntent>;
+  presetSnapshot?: JsonValue | null;
   templates: ShotTemplateDefinition[];
 }) {
   const templatesById = new Map(
@@ -208,6 +216,14 @@ function userPromptForStoryboard({
         },
       ];
     }),
+    style_preset: presetSnapshot
+      ? {
+          id: asJsonRecord(presetSnapshot).id ?? null,
+          label: asJsonRecord(presetSnapshot).label ?? null,
+          prompt_style_hint:
+            asJsonRecord(presetSnapshot).promptStyleHint ?? null,
+        }
+      : null,
     global_hard_constraints: globalHardConstraints,
     global_user_intent: globalUserIntent,
     instructions: [
@@ -367,6 +383,7 @@ export async function generateStoryboardDraft({
     assetCompleteness: detail.assetCompleteness,
     globalHardConstraints,
     globalUserIntent,
+    presetSnapshot: detail.job.presetSnapshot,
     templates,
   });
 
@@ -463,6 +480,8 @@ export async function generateStoryboardDraft({
   const storyboard = await storyboardStore.createStoryboard({
     videoJobId: jobId,
     selectedTemplateIds,
+    presetId: detail.job.presetId,
+    presetSnapshot: detail.job.presetSnapshot,
     storyboardJson: parsed,
     providerCallLogId: callLog.id,
   });
