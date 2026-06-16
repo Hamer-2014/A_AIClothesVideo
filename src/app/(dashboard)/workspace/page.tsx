@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { WorkspaceApp } from "@/components/workspace/workspace-app";
+import {
+  buildLoginHrefForRedirect,
+  buildRelativePathWithQuery,
+} from "@/lib/auth/redirects";
 import { getServerSession } from "@/lib/auth/server";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
 import { buildDashboardNav } from "@/app/app-shell";
@@ -21,10 +25,14 @@ export default async function WorkspacePage({
   }>;
 }) {
   const session = await getServerSession();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
   const resolvedSearchParams = await searchParams;
+  if (!session?.user?.id) {
+    redirect(
+      buildLoginHrefForRedirect(
+        buildRelativePathWithQuery("/workspace", resolvedSearchParams),
+      ),
+    );
+  }
   const initialMode = resolvedSearchParams?.mode === "trial" ? "trial" : "paid";
   const overview = await getUserBillingOverview({
     store: createDrizzleUserBillingStore(),
