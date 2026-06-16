@@ -22,6 +22,11 @@ describe("JobDetailPanel", () => {
             durationSeconds: 16,
             aspectRatio: "9:16",
             creditCost: 130,
+            presetId: "minimal_studio",
+            presetSnapshot: {
+              id: "minimal_studio",
+              label: "极简棚拍",
+            },
             trialEligibilitySnapshot: {
               decision: "deny",
               reasonCodes: ["email_trial_used"],
@@ -45,7 +50,25 @@ describe("JobDetailPanel", () => {
           },
           assets: [],
           analyses: [],
-          latestStoryboard: null,
+          latestStoryboard: {
+            id: "storyboard-1",
+            videoJobId: "job-1",
+            status: "draft",
+            presetId: "minimal_studio",
+            presetSnapshot: {
+              id: "minimal_studio",
+              label: "极简棚拍",
+            },
+            selectedTemplateIds: ["front_push_in"],
+            storyboardJson: {
+              duration_seconds: 16,
+              segments: [{ index: 0, template_id: "front_push_in" }],
+            },
+            finalPromptSnapshot: {
+              prompt: "keep front view",
+            },
+            createdAt: new Date("2026-06-11T00:01:00.000Z"),
+          },
           segments: [
             {
               id: "segment-1",
@@ -113,6 +136,8 @@ describe("JobDetailPanel", () => {
     expect(screen.getByText("Segment 表")).toBeInTheDocument();
     expect(screen.getByText("Provider Logs 表")).toBeInTheDocument();
     expect(screen.getByText("Trial Eligibility")).toBeInTheDocument();
+    expect(screen.getByText("Style Preset Snapshot")).toBeInTheDocument();
+    expect(screen.getAllByText("minimal_studio").length).toBeGreaterThan(0);
     expect(screen.getByText(/email_trial_used/)).toBeInTheDocument();
     expect(screen.getByText("State Events Timeline")).toBeInTheDocument();
     expect(screen.getByText("原始辅助数据")).toBeInTheDocument();

@@ -35,6 +35,8 @@ export interface AdminJobRecord {
   durationSeconds: number;
   aspectRatio: string;
   creditCost: number;
+  presetId: string | null;
+  presetSnapshot: unknown;
   trialEligibilitySnapshot: unknown;
   reservedLedgerId: string | null;
   finalVideoKey: string | null;
@@ -82,6 +84,8 @@ export interface AdminStoryboardRecord {
   id: string;
   videoJobId: string;
   status: string;
+  presetId: string | null;
+  presetSnapshot: unknown;
   selectedTemplateIds: unknown;
   storyboardJson: unknown;
   finalPromptSnapshot?: unknown;
@@ -482,6 +486,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
           creditCost: videoJobs.creditCost,
+          presetId: videoJobs.presetId,
+          presetSnapshot: videoJobs.presetSnapshot,
           trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
           reservedLedgerId: videoJobs.reservedLedgerId,
           finalVideoKey: videoJobs.finalVideoKey,
@@ -533,6 +539,8 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           id: storyboards.id,
           videoJobId: storyboards.videoJobId,
           status: storyboards.status,
+          presetId: storyboards.presetId,
+          presetSnapshot: storyboards.presetSnapshot,
           selectedTemplateIds: storyboards.selectedTemplateIds,
           storyboardJson: storyboards.storyboardJson,
           finalPromptSnapshot: storyboards.finalPromptSnapshot,

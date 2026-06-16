@@ -114,6 +114,7 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
         <SummaryItem label="失败原因" value={detail.job.failureReason ?? "-"} />
         <SummaryItem label="最后错误" value={detail.job.lastError ?? "-"} />
         <SummaryItem label="任务类型" value={detail.job.isTest ? "测试任务" : "正式任务"} />
+        <SummaryItem label="Preset" value={detail.job.presetId ?? "-"} />
         <SummaryItem
           label="规格"
           value={`${detail.job.durationSeconds} 秒 / ${detail.job.aspectRatio}`}
@@ -144,6 +145,11 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
         data={detail.job.trialEligibilitySnapshot ?? null}
       />
 
+      <JsonBlock
+        title="Style Preset Snapshot"
+        data={detail.job.presetSnapshot ?? detail.latestStoryboard?.presetSnapshot ?? null}
+      />
+
       <SectionTable
         title="素材分析"
         columns={["Asset", "Mode", "结果摘要"]}
@@ -161,6 +167,10 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
           <div className="mt-4 space-y-4 text-sm">
             <div className="grid gap-3 lg:grid-cols-3">
               <SummaryItem label="分镜状态" value={detail.latestStoryboard.status} />
+              <SummaryItem
+                label="Preset"
+                value={detail.latestStoryboard.presetId ?? detail.job.presetId ?? "-"}
+              />
               <SummaryItem
                 label="模板 ID"
                 value={stringifyJson(detail.latestStoryboard.selectedTemplateIds)}
