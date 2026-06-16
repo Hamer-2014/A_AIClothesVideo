@@ -83,7 +83,7 @@ describe("JobLivePanels", () => {
     );
   });
 
-  it("uses the generated cover URL when progress includes a cover key", () => {
+  it("uses the generated cover URL as the video poster when progress includes a cover key", () => {
     render(
       <JobLivePanels
         defaultFilename="runwaytools-job-1.mp4"
@@ -112,9 +112,77 @@ describe("JobLivePanels", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "视频封面" })).toHaveAttribute(
-      "src",
+    const video = screen.getByText("当前浏览器不支持视频预览。").closest("video");
+    expect(video).toHaveAttribute(
+      "poster",
       "/api/jobs/job-1/cover",
     );
+    expect(video).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/jobs/job-1/stitched/final.mp4",
+    );
+  });
+
+  it("shows a large status preview while the download is not ready", () => {
+    render(
+      <JobLivePanels
+        defaultFilename="runwaytools-job-1.mp4"
+        initialPreviewUrl={null}
+        initialProgress={{
+          jobId: "job-1",
+          status: "post_qa_running",
+          userVisibleStatus: "checking",
+          message: null,
+          phase: "post_qa",
+          segmentProgress: {
+            total: 1,
+            queued: 0,
+            generating: 0,
+            succeeded: 1,
+            failed: 0,
+          },
+          stitching: { status: "succeeded" },
+          postQa: { status: "running" },
+          downloadReady: false,
+          finalVideoKey: null,
+          coverKey: null,
+        }}
+        jobId="job-1"
+      />,
+    );
+
+    expect(screen.getByText("质检中")).toBeInTheDocument();
+    expect(screen.getByLabelText("视频默认预览：质检中")).toBeInTheDocument();
+  });
+
+  it("labels the waiting preview before generation starts", () => {
+    render(
+      <JobLivePanels
+        defaultFilename="runwaytools-job-1.mp4"
+        initialPreviewUrl={null}
+        initialProgress={{
+          jobId: "job-1",
+          status: "segments_queued",
+          userVisibleStatus: "queued",
+          message: null,
+          phase: "pre_generation",
+          segmentProgress: {
+            total: 1,
+            queued: 1,
+            generating: 0,
+            succeeded: 0,
+            failed: 0,
+          },
+          stitching: { status: "not_started" },
+          postQa: { status: "not_started" },
+          downloadReady: false,
+          finalVideoKey: null,
+          coverKey: null,
+        }}
+        jobId="job-1"
+      />,
+    );
+
+    expect(screen.getByText("等待生成")).toBeInTheDocument();
   });
 });

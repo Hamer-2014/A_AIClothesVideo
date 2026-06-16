@@ -97,6 +97,35 @@ describe("UploadPanel", () => {
     });
   });
 
+  it("uses a vertical canvas with the front slot above the supporting images", () => {
+    render(
+      <UploadPanel
+        assets={[]}
+        onUploaded={vi.fn()}
+        onUploadingChange={vi.fn()}
+        onRemoveUploaded={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("upload-panel-canvas")).toBeInTheDocument();
+    const primaryRow = screen.getByTestId("upload-primary-row");
+    const secondaryGrid = screen.getByTestId("upload-secondary-grid");
+    expect(primaryRow).toBeInTheDocument();
+    expect(secondaryGrid).toBeInTheDocument();
+    expect(primaryRow.compareDocumentPosition(secondaryGrid)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(screen.getByTestId("upload-panel-canvas").className).toContain("space-y-4");
+    expect(screen.getByTestId("upload-panel-canvas").className).not.toContain("lg:grid-cols");
+    expect(screen.getByTestId("upload-slot-front")).toHaveAttribute(
+      "data-primary-slot",
+      "true",
+    );
+    expect(screen.getAllByTestId("upload-secondary-slot")).toHaveLength(4);
+    expect(screen.getByLabelText("选择正面图")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择场景图")).toBeInTheDocument();
+  });
+
   it("clears a selected uploaded slot when the user removes it", () => {
     const onRemoveUploaded = vi.fn();
     const asset: UploadedAssetItem = {

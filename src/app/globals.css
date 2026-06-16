@@ -2,11 +2,14 @@
 
 :root {
   --font-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
-  --surface: #f7f5f1;
-  --ink: #171715;
-  --muted: #676a63;
-  --line: #ddd8cd;
-  --accent: #b85c38;
+  --surface: #f7fbfc;
+  --ink: #102027;
+  --muted: #64737a;
+  --line: #dde7e9;
+  --accent: #0891b2;
+  --accent-strong: #0e7490;
+  --success: #22c55e;
+  --brand-gradient: linear-gradient(135deg, #06b6d4 0%, #14b8a6 52%, #22c55e 100%);
 }
 
 * {

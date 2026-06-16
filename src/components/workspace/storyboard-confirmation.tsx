@@ -31,7 +31,10 @@ export function StoryboardConfirmation({
   const hasDraft = segments.length > 0;
 
   return (
-    <section className="space-y-5 rounded-lg border border-[var(--line)] bg-white p-5">
+    <section
+      aria-label="分镜确认"
+      className="space-y-4 rounded-lg border border-[var(--line)] bg-white p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-medium">分镜确认</h3>
@@ -73,7 +76,7 @@ export function StoryboardConfirmation({
         <p className="text-sm text-[var(--accent)]">{moderationPendingMessage}</p>
       ) : null}
       <button
-        className="inline-flex h-11 items-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-11 items-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         onClick={onConfirm}
         type="button"

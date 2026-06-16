@@ -1,0 +1,26 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">RunwayTools default video preview</title>
+  <desc id="desc">A clean placeholder image for fashion product videos that are not generated yet.</desc>
+  <rect width="1280" height="720" fill="#F7FBFC"/>
+  <rect x="96" y="72" width="1088" height="576" rx="48" fill="url(#panel)" stroke="#DDE7E9"/>
+  <path d="M254 528C335 434 388 344 408 168C414 119 475 102 508 138L748 398C782 435 759 496 710 503C535 527 425 548 293 596C253 611 225 561 254 528Z" fill="url(#ribbon)" fill-opacity="0.9"/>
+  <path d="M372 496C445 433 489 343 502 237L655 403C544 421 457 451 372 496Z" fill="#F8FEFF" fill-opacity="0.94"/>
+  <path d="M268 528C352 431 391 341 408 168" stroke="white" stroke-opacity="0.48" stroke-width="32" stroke-linecap="round"/>
+  <path d="M777 218H1014" stroke="#C8DADF" stroke-width="18" stroke-linecap="round"/>
+  <path d="M777 288H1084" stroke="#DDE7E9" stroke-width="16" stroke-linecap="round"/>
+  <path d="M777 354H1028" stroke="#DDE7E9" stroke-width="16" stroke-linecap="round"/>
+  <rect x="777" y="442" width="184" height="46" rx="23" fill="#102027"/>
+  <rect x="983" y="442" width="116" height="46" rx="23" fill="white" stroke="#DDE7E9"/>
+  <circle cx="1060" cy="176" r="18" fill="#22C55E" fill-opacity="0.9"/>
+  <defs>
+    <linearGradient id="panel" x1="120" y1="86" x2="1132" y2="641" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECFEFF"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="281" y1="117" x2="730" y2="564" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#06B6D4"/>
+      <stop offset="0.52" stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+</svg>

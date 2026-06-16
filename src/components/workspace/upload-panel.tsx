@@ -268,87 +268,180 @@ export function UploadPanel({
 
   return (
     <section>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {uploadSlots.map((slot) => {
-          const uploaded = uploadedByRole.get(slot.role);
-          const failed = failedByRole.get(slot.role);
-          const selected = slotFiles[slot.role];
-          const uploading = uploadingRoles.has(slot.role);
-          const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl;
-          const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName;
-          const hasImage = Boolean(previewUrl);
+      <div
+        className="space-y-4"
+        data-testid="upload-panel-canvas"
+      >
+        <div data-testid="upload-primary-row">
+          {uploadSlots.slice(0, 1).map((slot) => {
+            const uploaded = uploadedByRole.get(slot.role);
+            const failed = failedByRole.get(slot.role);
+            const selected = slotFiles[slot.role];
+            const uploading = uploadingRoles.has(slot.role);
+            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl;
+            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName;
+            const hasImage = Boolean(previewUrl);
 
-          return (
-            <div
-              className="relative flex min-h-40 min-w-0 flex-col rounded-lg border border-dashed border-[var(--line)] bg-white p-4 transition hover:border-[var(--accent)]"
-              key={slot.role}
-            >
-              <div className="flex min-w-0 items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {slot.label}
-                    {slot.required ? " *" : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">{slot.hint}</p>
-                </div>
-                {fileName ? (
-                  <button
-                    aria-label={`删除${slot.label}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--muted)] transition hover:border-red-200 hover:text-red-600"
-                    onClick={() => removeSlot(slot.role)}
-                    type="button"
-                  >
-                    <X size={16} />
-                  </button>
-                ) : (
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface)] text-[var(--accent)]">
-                    {failed ? <RotateCcw size={16} /> : <ImagePlus size={16} />}
-                  </div>
-                )}
-              </div>
-              <label
-                className="mt-3 flex min-h-24 cursor-pointer flex-col justify-center rounded-md bg-[var(--surface)] text-xs text-[var(--muted)]"
-                htmlFor={`upload-slot-${slot.role}`}
+            return (
+              <div
+                className="relative flex min-h-[20rem] min-w-0 flex-col rounded-lg border border-dashed border-[var(--accent)] bg-white p-4 transition hover:border-[var(--accent-strong)]"
+                data-primary-slot="true"
+                data-testid="upload-slot-front"
+                key={slot.role}
               >
-                {hasImage && previewUrl ? (
-                  <Image
-                    alt={`${slot.label}预览`}
-                    className="aspect-[4/3] w-full rounded-md object-cover"
-                    height={180}
-                    src={previewUrl}
-                    unoptimized
-                    width={240}
-                  />
-                ) : (
-                  <span className="px-3">选择图片</span>
-                )}
-              </label>
-              <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-xs">
-                <p
-                  className="min-w-0 flex-1 truncate text-[var(--muted)]"
-                  title={fileName ?? undefined}
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {slot.label}
+                      {slot.required ? " *" : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{slot.hint}</p>
+                  </div>
+                  {fileName ? (
+                    <button
+                      aria-label={`删除${slot.label}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--muted)] transition hover:border-red-200 hover:text-red-600"
+                      onClick={() => removeSlot(slot.role)}
+                      type="button"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface)] text-[var(--accent)]">
+                      {failed ? <RotateCcw size={16} /> : <ImagePlus size={16} />}
+                    </div>
+                  )}
+                </div>
+                <label
+                  className="mt-3 flex min-h-56 flex-1 cursor-pointer flex-col justify-center rounded-md bg-[var(--surface)] text-xs text-[var(--muted)]"
+                  htmlFor={`upload-slot-${slot.role}`}
                 >
-                  {fileName ?? failed?.error ?? "未选择文件"}
-                </p>
-                <span className="shrink-0 text-[var(--muted)]">
-                  {uploading ? "上传中" : uploaded ? "已上传" : failed ? "失败" : ""}
-                </span>
+                  {hasImage && previewUrl ? (
+                    <Image
+                      alt={`${slot.label}预览`}
+                      className="h-full min-h-56 w-full rounded-md object-cover"
+                      height={360}
+                      src={previewUrl}
+                      unoptimized
+                      width={720}
+                    />
+                  ) : (
+                    <span className="px-3 text-center">选择正面主图</span>
+                  )}
+                </label>
+                <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-xs">
+                  <p
+                    className="min-w-0 flex-1 truncate text-[var(--muted)]"
+                    title={fileName ?? undefined}
+                  >
+                    {fileName ?? failed?.error ?? "未选择文件"}
+                  </p>
+                  <span className="shrink-0 text-[var(--muted)]">
+                    {uploading ? "上传中" : uploaded ? "已上传" : failed ? "失败" : ""}
+                  </span>
+                </div>
+                {failed?.error ? (
+                  <p className="mt-1 text-xs text-red-600">{failed.error}</p>
+                ) : null}
+                <input
+                  accept={accept}
+                  aria-label={`选择${slot.label}`}
+                  className="sr-only"
+                  disabled={uploading}
+                  id={`upload-slot-${slot.role}`}
+                  onChange={(event) => handleSlotFileChange(slot.role, event)}
+                  type="file"
+                />
               </div>
-              {failed?.error ? (
-                <p className="mt-1 text-xs text-red-600">{failed.error}</p>
-              ) : null}
-              <input
-                accept={accept}
-                aria-label={`选择${slot.label}`}
-                className="sr-only"
-                disabled={uploading}
-                id={`upload-slot-${slot.role}`}
-                onChange={(event) => handleSlotFileChange(slot.role, event)}
-                type="file"
-              />
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          data-testid="upload-secondary-grid"
+        >
+          {uploadSlots.slice(1).map((slot) => {
+            const uploaded = uploadedByRole.get(slot.role);
+            const failed = failedByRole.get(slot.role);
+            const selected = slotFiles[slot.role];
+            const uploading = uploadingRoles.has(slot.role);
+            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl;
+            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName;
+            const hasImage = Boolean(previewUrl);
+
+            return (
+              <div
+                className="relative flex min-h-44 min-w-0 flex-col rounded-lg border border-dashed border-[var(--line)] bg-white p-4 transition hover:border-[var(--accent)]"
+                data-testid="upload-secondary-slot"
+                key={slot.role}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {slot.label}
+                      {slot.required ? " *" : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{slot.hint}</p>
+                  </div>
+                  {fileName ? (
+                    <button
+                      aria-label={`删除${slot.label}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--muted)] transition hover:border-red-200 hover:text-red-600"
+                      onClick={() => removeSlot(slot.role)}
+                      type="button"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface)] text-[var(--accent)]">
+                      {failed ? <RotateCcw size={16} /> : <ImagePlus size={16} />}
+                    </div>
+                  )}
+                </div>
+                <label
+                  className="mt-3 flex min-h-24 cursor-pointer flex-col justify-center rounded-md bg-[var(--surface)] text-xs text-[var(--muted)]"
+                  htmlFor={`upload-slot-${slot.role}`}
+                >
+                  {hasImage && previewUrl ? (
+                    <Image
+                      alt={`${slot.label}预览`}
+                      className="aspect-[4/3] w-full rounded-md object-cover"
+                      height={180}
+                      src={previewUrl}
+                      unoptimized
+                      width={240}
+                    />
+                  ) : (
+                    <span className="px-3">选择图片</span>
+                  )}
+                </label>
+                <div className="mt-2 flex min-w-0 items-center justify-between gap-2 text-xs">
+                  <p
+                    className="min-w-0 flex-1 truncate text-[var(--muted)]"
+                    title={fileName ?? undefined}
+                  >
+                    {fileName ?? failed?.error ?? "未选择文件"}
+                  </p>
+                  <span className="shrink-0 text-[var(--muted)]">
+                    {uploading ? "上传中" : uploaded ? "已上传" : failed ? "失败" : ""}
+                  </span>
+                </div>
+                {failed?.error ? (
+                  <p className="mt-1 text-xs text-red-600">{failed.error}</p>
+                ) : null}
+                <input
+                  accept={accept}
+                  aria-label={`选择${slot.label}`}
+                  className="sr-only"
+                  disabled={uploading}
+                  id={`upload-slot-${slot.role}`}
+                  onChange={(event) => handleSlotFileChange(slot.role, event)}
+                  type="file"
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

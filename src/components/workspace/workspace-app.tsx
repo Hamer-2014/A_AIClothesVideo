@@ -640,62 +640,130 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-      <section className="space-y-6">
-        <div className="rounded-lg border border-[var(--line)] bg-white p-5">
-          <h2 className="text-base font-medium">生成设置与素材</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            先选规格和目标素材位。点击生成后会自动分析、推荐模板、生成分镜并提交任务。
-          </p>
-          <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="space-y-6">
+      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
+          <div>
+            <h2 className="text-base font-medium">创建商品短视频</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+              先上传正面主图，再补背面、细节、侧面或场景素材。系统会自动分析素材、选择安全模板并提交生成。
+            </p>
+          </div>
+          <div className="space-y-2 text-right">
+            <div className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-medium text-[var(--accent)]">
+              {durationSeconds} 秒 · {aspectRatio} · {paidCost} 点
+            </div>
+            {message ? (
+              <p className="max-w-sm rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-left text-xs leading-5 text-[var(--muted)]">
+                {message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          className="mt-5 grid gap-6 xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)] xl:items-start"
+          data-testid="workspace-main-stage"
+        >
+          <aside
+            className="space-y-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:self-start"
+            data-testid="workspace-control-rail"
+          >
+            <div
+              className="flex min-h-16 items-start"
+              data-testid="workspace-panel-header"
+            >
+              <div>
+                <h3 className="text-sm font-medium">生成控制</h3>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  主按钮会按推荐模板自动完成分析、分镜和提交。
+                </p>
+              </div>
+            </div>
+            <SpecSelector
+              aspectRatio={aspectRatio}
+              durationSeconds={durationSeconds}
+              onAspectRatioChange={setAspectRatio}
+              onDurationChange={setDurationSeconds}
+            />
+            <div>
+              <label
+                className="text-xs font-medium text-[var(--muted)]"
+                htmlFor="workspace-user-prompt"
+              >
+                生成意图
+              </label>
+              <textarea
+                className="mt-2 min-h-32 w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                id="workspace-user-prompt"
+                onChange={(event) => setUserPrompt(event.target.value)}
+                value={userPrompt}
+              />
+              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。
+              </p>
+            </div>
+            <div className="rounded-md border border-[var(--line)] bg-white p-3 text-xs leading-5 text-[var(--muted)]">
+              将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
+            </div>
+            <button
+              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busyAction !== null || imagesUploading}
+              onClick={() => oneClickGenerate(false)}
+              type="button"
+            >
+              {imagesUploading
+                ? "图片上传中..."
+                : busyAction === "one-click" || busyAction === "create-job" || busyAction === "analyze"
+                  ? "正在生成..."
+                  : `生成视频 · 将冻结 ${paidCost} 点`}
+            </button>
+            {durationSeconds === 8 ? (
+              <div className="space-y-2 rounded-md border border-[var(--line)] bg-white p-3">
+                <button
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={busyAction !== null || imagesUploading}
+                  onClick={() => oneClickGenerate(true)}
+                  type="button"
+                >
+                  免费试用
+                </button>
+                <p className="text-xs leading-5 text-[var(--muted)]">
+                  免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板
+                </p>
+              </div>
+            ) : null}
+          </aside>
+
+          <section
+            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+            data-testid="workspace-material-panel"
+          >
+            <div
+              className="mb-4 flex min-h-16 items-start justify-between gap-3"
+              data-testid="workspace-panel-header"
+            >
+              <div>
+                <h3 className="text-sm font-medium">素材画布</h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  正面图是主素材；其他素材用于开放背面、细节和场景模板。
+                </p>
+              </div>
+            </div>
             <UploadPanel
               assets={assets}
               onRemoveUploaded={removeUploadedAsset}
               onUploaded={addUploadedAsset}
               onUploadingChange={setImagesUploading}
             />
-            <div className="space-y-5">
-              <SpecSelector
-                aspectRatio={aspectRatio}
-                durationSeconds={durationSeconds}
-                onAspectRatioChange={setAspectRatio}
-                onDurationChange={setDurationSeconds}
-              />
-              <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-3 text-xs leading-5 text-[var(--muted)]">
-                将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
-              </div>
-              <button
-                className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={busyAction !== null || imagesUploading}
-                onClick={() => oneClickGenerate(false)}
-                type="button"
-              >
-                {imagesUploading
-                  ? "图片上传中..."
-                  : busyAction === "one-click" || busyAction === "create-job" || busyAction === "analyze"
-                  ? "正在生成..."
-                  : `生成视频 · 将冻结 ${paidCost} 点`}
-              </button>
-              {durationSeconds === 8 ? (
-                <div className="space-y-2 rounded-md border border-[var(--line)] bg-[var(--surface)] p-3">
-                  <button
-                    className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={busyAction !== null || imagesUploading}
-                    onClick={() => oneClickGenerate(true)}
-                    type="button"
-                  >
-                    免费试用
-                  </button>
-                  <p className="text-xs leading-5 text-[var(--muted)]">
-                    免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          </section>
         </div>
+      </section>
 
-        <div className="rounded-lg border border-[var(--line)] bg-white p-5">
+      <section
+        className="rounded-lg border border-[var(--line)] bg-white p-5"
+        data-testid="workspace-deferred-analysis"
+      >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-medium">素材分析与模板选择</h2>
@@ -801,23 +869,9 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
               />
             </div>
           )}
-        </div>
       </section>
 
-      <aside className="space-y-6">
-        <div className="rounded-lg border border-[var(--line)] bg-white p-5">
-          <h2 className="text-base font-medium">生成意图</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            可选填写卖点、场景或风格偏好。所有文本都会先经过 Creem Moderation。
-          </p>
-          <textarea
-            className="mt-4 min-h-40 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
-            onChange={(event) => setUserPrompt(event.target.value)}
-            value={userPrompt}
-          />
-        </div>
-
-        <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
           <button
             className="text-left text-base font-medium"
             onClick={() => setAdvancedOpen((current) => !current)}
@@ -859,14 +913,7 @@ export function WorkspaceApp({ templateCatalog }: WorkspaceAppProps) {
               ) : null}
             </div>
           ) : null}
-        </section>
-
-        {message ? (
-          <div className="rounded-lg border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
-            {message}
-          </div>
-        ) : null}
-      </aside>
+      </section>
     </div>
   );
 }

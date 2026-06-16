@@ -18,7 +18,7 @@ vi.mock("./upload-panel", () => ({
     }) => void;
     onUploadingChange: (uploading: boolean) => void;
   }) => (
-    <div>
+    <div data-testid="mock-upload-panel">
       <button
         onClick={() =>
           onUploaded({
@@ -96,7 +96,7 @@ vi.mock("./template-picker", () => ({
     optional: Array<{ displayName: string; selectable: boolean }>;
     unavailable: Array<{ displayName: string; selectable: boolean }>;
   }) => (
-    <div>
+    <div data-testid="mock-template-picker">
       {[...recommended, ...optional, ...unavailable].map((template) => (
         <div
           data-selectable={template.selectable ? "true" : "false"}
@@ -580,6 +580,38 @@ describe("WorkspaceApp", () => {
     expect(
       screen.queryByRole("button", { name: "确认分镜并生成" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("puts the material canvas and generation controls into a task-first workspace layout", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    const mainStage = screen.getByTestId("workspace-main-stage");
+    const materialPanel = screen.getByTestId("workspace-material-panel");
+    const controlRail = screen.getByTestId("workspace-control-rail");
+    const panelHeaders = screen.getAllByTestId("workspace-panel-header");
+    const generateButton = screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" });
+
+    expect(mainStage).toBeInTheDocument();
+    expect(mainStage.className).toContain("xl:items-start");
+    expect(mainStage.className).toContain("xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)]");
+    expect(mainStage.firstElementChild).toBe(controlRail);
+    expect(mainStage.lastElementChild).toBe(materialPanel);
+    expect(panelHeaders).toHaveLength(2);
+    panelHeaders.forEach((header) => {
+      expect(header.className).toContain("min-h-16");
+    });
+    expect(materialPanel).toBeInTheDocument();
+    expect(materialPanel.className).toContain("rounded-lg");
+    expect(materialPanel.className).toContain("bg-[var(--surface)]");
+    expect(controlRail).toBeInTheDocument();
+    expect(controlRail.className).toContain("bg-[var(--surface)]");
+    expect(controlRail.className).toContain("xl:self-start");
+    expect(screen.getByTestId("workspace-deferred-analysis")).toBeInTheDocument();
+    expect(screen.getByTestId("mock-upload-panel")).toBeInTheDocument();
+    expect(screen.getByText("生成意图")).toBeInTheDocument();
+    expect(generateButton).toBeInTheDocument();
+    expect(generateButton.className).toContain("bg-[var(--accent)]");
+    expect(generateButton.className).not.toContain("bg-[var(--ink)]");
   });
 
   it("does not show non-garment warnings for scene assets", async () => {

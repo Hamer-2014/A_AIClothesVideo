@@ -1,0 +1,26 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">RunwayTools logo</title>
+  <desc id="desc">A clean gradient runway ribbon forming a play symbol for fashion video generation.</desc>
+  <rect width="512" height="512" rx="116" fill="#F7FBFC"/>
+  <rect x="32" y="32" width="448" height="448" rx="92" fill="url(#bg)" fill-opacity="0.16"/>
+  <path d="M136 346C178 298 204 256 214 168C217 143 248 134 265 153L378 280C395 299 384 330 359 334C272 347 218 356 152 379C131 386 121 363 136 346Z" fill="url(#ribbon)"/>
+  <path d="M190 333C229 302 251 255 258 199L334 285C275 294 231 309 190 333Z" fill="#F8FEFF" fill-opacity="0.92"/>
+  <path d="M138 346C181 298 205 253 214 168" stroke="url(#shine)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M152 379C218 356 272 347 359 334" stroke="#0E7490" stroke-opacity="0.22" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="366" cy="154" r="20" fill="#22C55E" fill-opacity="0.9"/>
+  <defs>
+    <linearGradient id="bg" x1="78" y1="70" x2="444" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#06B6D4"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="146" y1="141" x2="369" y2="361" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#06B6D4"/>
+      <stop offset="0.52" stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="167" y1="151" x2="213" y2="334" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>

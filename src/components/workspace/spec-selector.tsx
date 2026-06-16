@@ -32,7 +32,7 @@ function SegmentedButton<T extends string | number>({
     <button
       className={`h-10 rounded-md border px-3 text-sm font-medium transition ${
         active
-          ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+          ? "border-[var(--accent-strong)] bg-[var(--accent)] text-white shadow-sm"
           : "border-[var(--line)] bg-white text-[var(--ink)]"
       }`}
       onClick={onClick}

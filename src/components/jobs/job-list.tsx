@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+
+import { VideoPlaceholder } from "./video-placeholder";
 
 interface JobListItem {
   id: string;
@@ -31,6 +37,32 @@ function formatStatus(job: JobListItem) {
   return job.userVisibleStatus;
 }
 
+function JobCoverThumbnail({
+  coverUrl,
+  label,
+}: {
+  coverUrl: string | null;
+  label: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!coverUrl || failed) {
+    return <VideoPlaceholder label={label} variant="thumbnail" />;
+  }
+
+  return (
+    <Image
+      alt="任务封面"
+      className="h-20 w-14 flex-none rounded-md bg-black object-cover"
+      height={80}
+      onError={() => setFailed(true)}
+      src={coverUrl}
+      unoptimized
+      width={56}
+    />
+  );
+}
+
 export function JobList({
   jobs,
 }: {
@@ -39,7 +71,16 @@ export function JobList({
   if (jobs.length === 0) {
     return (
       <div className="rounded-lg border border-[var(--line)] bg-white px-5 py-6">
-        <p className="text-sm text-[var(--muted)]">还没有视频任务。</p>
+        <p className="text-sm font-medium">还没有视频任务</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          从工作台上传服装素材，生成第一条商品短视频。
+        </p>
+        <Link
+          className="mt-4 inline-flex h-10 items-center rounded-md bg-[var(--ink)] px-4 text-sm font-medium text-white"
+          href="/workspace"
+        >
+          去工作台创建第一个视频
+        </Link>
       </div>
     );
   }
@@ -48,6 +89,7 @@ export function JobList({
     <div className="space-y-3">
       {jobs.map((job) => {
         const coverUrl = job.coverUrl ?? null;
+        const statusLabel = formatStatus(job);
 
         return (
           <Link
@@ -57,13 +99,7 @@ export function JobList({
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 flex-1 gap-4">
-                {coverUrl ? (
-                  <img
-                    alt="任务封面"
-                    className="h-20 w-14 flex-none rounded-md bg-black object-cover"
-                    src={coverUrl}
-                  />
-                ) : null}
+                <JobCoverThumbnail coverUrl={coverUrl} label={statusLabel} />
                 <div className="min-w-0 space-y-2">
                   <p className="text-sm font-medium">任务 {job.id.slice(0, 8)}</p>
                   <p className="text-sm text-[var(--muted)]">
@@ -77,7 +113,7 @@ export function JobList({
                 </div>
               </div>
               <div className="text-right text-sm">
-                <p>{formatStatus(job)}</p>
+                <p>{statusLabel}</p>
                 <p className="mt-1 text-[var(--muted)]">
                   {new Date(job.createdAt).toLocaleString("zh-CN")}
                 </p>

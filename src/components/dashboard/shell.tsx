@@ -2,6 +2,9 @@ import Link from "next/link";
 import { type ReactNode } from "react";
 import { Wallet } from "lucide-react";
 
+import { LogoLockup } from "@/components/brand/logo";
+import { AppFooter } from "@/components/layout/app-footer";
+
 import { SignOutButton } from "./sign-out-button";
 
 interface DashboardShellProps {
@@ -41,9 +44,7 @@ export function DashboardShell({
         <header className="border-b border-[var(--line)] pb-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-                RunwayTools
-              </p>
+              <LogoLockup />
               <div>
                 <h1 className="text-2xl font-semibold tracking-normal">{title}</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
@@ -86,8 +87,8 @@ export function DashboardShell({
               <Link
                 className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
                   item.active
-                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                    : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)]"
+                    ? "border-[var(--accent)] bg-cyan-50 text-[var(--accent-strong)] shadow-[inset_0_0_0_1px_rgba(8,145,178,0.08)]"
+                    : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)] hover:bg-cyan-50/60 hover:text-[var(--accent-strong)]"
                 }`}
                 href={item.href}
                 key={item.href}
@@ -98,6 +99,7 @@ export function DashboardShell({
           </nav>
         </header>
         <div className="flex-1 py-6">{children}</div>
+        <AppFooter />
       </div>
     </main>
   );

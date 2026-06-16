@@ -36,7 +36,7 @@ describe("JobDeliverablePanel", () => {
     );
   });
 
-  it("shows the generated cover image before falling back to the video preview", () => {
+  it("plays the video when both a cover and public preview URL are available", () => {
     render(
       <JobDeliverablePanel
         coverUrl="https://cdn.example.com/jobs/job-1/covers/cover.webp"
@@ -46,17 +46,35 @@ describe("JobDeliverablePanel", () => {
       />,
     );
 
-    expect(screen.getByRole("img", { name: "视频封面" })).toHaveAttribute(
+    const video = screen.getByText("当前浏览器不支持视频预览。").closest("video");
+    expect(video).toHaveAttribute(
       "src",
+      "https://cdn.example.com/jobs/job-1/stitched/final.mp4",
+    );
+    expect(video).toHaveAttribute(
+      "poster",
       "https://cdn.example.com/jobs/job-1/covers/cover.webp",
     );
-    expect(
-      screen.queryByText("当前浏览器不支持视频预览。"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "视频封面" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载成片" })).toHaveAttribute(
       "href",
       "/api/jobs/job-1/download?filename=runwaytools-job-1.mp4",
     );
+  });
+
+  it("falls back to the default preview when a cover-only image fails to load", () => {
+    render(
+      <JobDeliverablePanel
+        coverUrl="https://cdn.example.com/jobs/job-1/covers/cover.webp"
+        defaultFilename="runwaytools-job-1.mp4"
+        jobId="job-1"
+        previewUrl={null}
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "视频封面" }));
+
+    expect(screen.getByLabelText("视频默认预览：成片已生成")).toBeInTheDocument();
   });
 
   it("keeps download available when the public preview URL is not configured", () => {
@@ -69,8 +87,9 @@ describe("JobDeliverablePanel", () => {
     );
 
     expect(
-      screen.getByText("视频预览需要先配置公开 R2 访问域名。"),
+      screen.getByText("成片已生成"),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("视频默认预览：成片已生成")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载成片" })).toHaveAttribute(
       "href",
       "/api/jobs/job-1/download?filename=runwaytools-job-1.mp4",

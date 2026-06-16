@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
+
+import { VideoPlaceholder } from "./video-placeholder";
 
 interface JobDeliverablePanelProps {
   coverUrl?: string | null;
@@ -25,6 +28,7 @@ export function JobDeliverablePanel({
   defaultFilename,
 }: JobDeliverablePanelProps) {
   const [filename, setFilename] = useState(defaultFilename);
+  const [coverFailed, setCoverFailed] = useState(false);
   const downloadHref = useMemo(
     () =>
       `/api/jobs/${jobId}/download?filename=${encodeURIComponent(
@@ -65,26 +69,32 @@ export function JobDeliverablePanel({
           </div>
         </div>
       </div>
-      {coverUrl ? (
-        <img
-          alt="视频封面"
-          className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
-          src={coverUrl}
-        />
-      ) : previewUrl ? (
+      {previewUrl ? (
         <video
           className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
           controls
           playsInline
+          poster={coverUrl && !coverFailed ? coverUrl : undefined}
           preload="metadata"
           src={previewUrl}
         >
           当前浏览器不支持视频预览。
         </video>
+      ) : coverUrl && !coverFailed ? (
+        <Image
+          alt="视频封面"
+          className="mx-auto mt-5 max-h-[420px] w-full max-w-3xl rounded-lg bg-black object-contain"
+          height={420}
+          onError={() => setCoverFailed(true)}
+          src={coverUrl}
+          unoptimized
+          width={746}
+        />
       ) : (
-        <div className="mt-5 rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)]">
-          视频预览需要先配置公开 R2 访问域名。
-        </div>
+        <VideoPlaceholder
+          description="当前没有可在线播放的预览地址，但下载文件已经保留在上方。"
+          label="成片已生成"
+        />
       )}
     </section>
   );
