@@ -29,5 +29,6 @@ describe("admin access helpers", () => {
     );
     expect(canRolePerformAdminAction("operator", "job:retry_segment")).toBe(true);
     expect(canRolePerformAdminAction("operator", "job:reopen_post_qa")).toBe(true);
+    expect(canRolePerformAdminAction("operator", "job:release_credits")).toBe(true);
   });
 });

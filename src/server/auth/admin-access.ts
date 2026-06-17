@@ -4,6 +4,7 @@ export type AdminAction =
   | "job:retry_segment"
   | "job:reopen_post_qa"
   | "job:mark_undeliverable"
+  | "job:release_credits"
   | "job:refund"
   | "template:update_status"
   | "provider_key:update"
@@ -17,6 +18,7 @@ const operatorAllowedActions = new Set<AdminAction>([
   "job:retry_segment",
   "job:reopen_post_qa",
   "job:mark_undeliverable",
+  "job:release_credits",
   "job:refund",
   "template:update_status",
   "credits:admin_adjust",

@@ -47,6 +47,12 @@ export default async function AdminJobDetailPage({
             title="重试质检"
           />
           <AdminActionForm
+            description="仅释放已失败且仍有 reserved ledger 的冻结点数。已交付、已 capture、已 release/refund 或无冻结流水的任务会被拒绝。"
+            endpoint={`/api/admin/jobs/${detail.job.id}/release-credits`}
+            submitLabel="释放冻结点数"
+            title="释放冻结点数"
+          />
+          <AdminActionForm
             description="当任务无法恢复时，填写原因并释放冻结点数。"
             endpoint={`/api/admin/jobs/${detail.job.id}/undeliverable`}
             submitLabel="标记不可交付"
