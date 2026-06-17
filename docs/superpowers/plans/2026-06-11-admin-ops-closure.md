@@ -311,7 +311,7 @@ Cover at least:
 
 - retry segment
 - reopen Post-QA
-- mark undeliverable
+- release frozen credits
 - admin credit adjustment
 - provider key status update
 - model route update
@@ -489,4 +489,3 @@ Before handing back for验收:
 - [ ] `docs/API_TEST_STATUS.md` is updated.
 
 If any item fails, do not claim completion. Fix it or state it as a known blocker.
-

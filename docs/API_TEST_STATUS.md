@@ -289,7 +289,7 @@ npm run build
 - Post-QA failed 不 capture。
 - Post-QA failed 释放冻结点数。
 - Post-QA resolve replay 不重复 capture。
-- Admin undeliverable 已有 release 和 audit 自动化覆盖。
+- Admin release-credits 已有 release 和 audit 自动化覆盖。
 
 ### Creem 代码审查状态
 
@@ -377,7 +377,7 @@ npm run verify:blockers
 - 以下动作已统一要求 `reason` 至少 `6` 个字符：
   - 重试 segment
   - 重开 Post-QA
-  - 标记不可交付
+  - 释放冻结点数
   - 手动补点
   - 更新模板状态
   - 更新 provider key 状态

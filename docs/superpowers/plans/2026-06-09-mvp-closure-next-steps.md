@@ -453,7 +453,7 @@ npm run build
 接入：
 
 - `POST /api/admin/segments/[id]/retry`
-- `POST /api/admin/jobs/[id]/undeliverable`
+- `POST /api/admin/jobs/[id]/release-credits`
 - `POST /api/admin/credits/adjust`
 - `POST /api/admin/templates/status`
 - `POST /api/admin/provider-keys/[id]/status`

@@ -44,7 +44,7 @@
   - `video_jobs.final_video_key` 不为空
   - `post_qa_results.frame_keys` 至少 1 张
 - 创建第二个非试用付费任务，确保已经产生 `reserve`。
-- 通过真实系统路径触发失败补偿，优先使用 Post-QA failed resolve 或管理员标记不可交付路径。
+- 通过真实系统路径触发失败补偿，优先使用 Post-QA failed resolve 或管理员释放冻结点数路径。
 - 确认失败补偿任务同时具备：
   - `video_jobs.status in ('failed_released', 'failed_refunded')`
   - `credit_ledger.type` 包含 `release` 或 `refund`
@@ -87,7 +87,7 @@
 允许两种方式：
 
 1. Post-QA failed resolve：在任务已 reserve 后，调用 `POST /api/internal/post-qa/resolve`，传入 `status = failed`，由系统服务执行 release 与状态流转。
-2. 管理员标记不可交付：在后台对已 reserve 的付费任务执行“标记不可交付”，由系统服务执行 release 与审计。
+2. 管理员释放冻结点数：在后台对已失败且仍有 reserved ledger 的付费任务执行“释放冻结点数”，由系统服务执行 release 与审计。
 
 两种方式都必须通过应用服务或 API 执行，不能直接 SQL 更新状态或账本。
 
@@ -142,4 +142,3 @@ npm run verify:blockers -- --json
 这里最大的坑是把“脚本能跑”误当“商业闭环可上线”。`verify:blockers` 只证明后台/API 有关键证据，不证明 Creem 真实支付 review、真实用户转化、供应商成本和大规模稳定性已经完成。
 
 另一个坑是为了尽快绿灯而制造假证据。别干这种蠢事。你要的是能上线收钱的系统，不是能糊弄自己的报告。任何直接改库伪造状态的行为都必须视为验收失败。
-

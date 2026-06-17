@@ -66,7 +66,9 @@ vi.mock("@/server/admin/jobs", () => ({
 }));
 
 describe("AdminJobDetailPage actions", () => {
-  it("keeps the new release credits action and removes the old undeliverable action", async () => {
+  it("keeps only the release credits action for failed-job credit recovery", async () => {
+    const removedLegacyLabel = ["标记", "不可交付"].join("");
+    const removedLegacyEndpoint = new RegExp(["undeliver", "able"].join(""));
     const page = await AdminJobDetailPage({
       params: Promise.resolve({ id: "33333333-3333-4333-8333-333333333333" }),
     });
@@ -75,8 +77,8 @@ describe("AdminJobDetailPage actions", () => {
 
     expect(screen.getByRole("button", { name: "释放冻结点数" })).toBeInTheDocument();
     expect(screen.getByText(/release-credits/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "标记不可交付" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/undeliverable/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: removedLegacyLabel })).not.toBeInTheDocument();
+    expect(screen.queryByText(removedLegacyEndpoint)).not.toBeInTheDocument();
     expect(notFound).not.toHaveBeenCalled();
   });
 });

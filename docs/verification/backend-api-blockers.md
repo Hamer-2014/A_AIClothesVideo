@@ -85,7 +85,7 @@ npm run verify:blockers
 
 1. 准备一个 `credit_cost > 0` 且已经 reserve 的测试任务。
 2. 让 provider、stitch 或 Post-QA 进入失败路径。
-3. 使用系统自动 resolve 或后台标记不可交付释放点数。
+3. 使用系统自动 resolve 或后台“释放冻结点数”操作释放点数。
 4. 运行：
 
 ```bash
@@ -100,7 +100,7 @@ npm run verify:blockers
 - `provider_key:create`
 - `provider_key:rotate`
 - `credits:admin_adjust`
-- `job:mark_undeliverable`
+- `job:release_credits`
 - `job:retry_segment`
 - `job:reopen_post_qa`
 

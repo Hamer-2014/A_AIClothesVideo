@@ -14,7 +14,7 @@
 
 - 任务卡住时，管理员能判断卡在哪个阶段。
 - 任务失败时，管理员能看到 provider、segment、stitch、Post-QA、账本、状态事件。
-- 管理员执行重试、重开 Post-QA、标记不可交付、补点、暂停模板或 provider key 时，必须填写原因并写审计。
+- 管理员执行重试、重开 Post-QA、释放冻结点数、补点、暂停模板或 provider key 时，必须填写原因并写审计。
 - 后台只展示排障必需信息，不做花哨 Dashboard。
 
 不要做：
@@ -47,7 +47,7 @@
 - `src/server/admin/audit.ts`
 - `src/app/api/admin/jobs/[id]/route.ts`
 - `src/app/api/admin/jobs/[id]/reopen-post-qa/route.ts`
-- `src/app/api/admin/jobs/[id]/undeliverable/route.ts`
+- `src/app/api/admin/jobs/[id]/release-credits/route.ts`
 - `src/app/api/admin/segments/[id]/retry/route.ts`
 - `src/app/api/admin/credits/adjust/route.ts`
 - `src/app/api/admin/templates/status/route.ts`
@@ -142,7 +142,7 @@
 
 - `POST /api/admin/segments/[id]/retry`
 - `POST /api/admin/jobs/[id]/reopen-post-qa`
-- `POST /api/admin/jobs/[id]/undeliverable`
+- `POST /api/admin/jobs/[id]/release-credits`
 - `POST /api/admin/credits/adjust`
 - `POST /api/admin/templates/status`
 - `POST /api/admin/provider-keys/[id]/status`
@@ -315,7 +315,7 @@ Billing 页面必须展示：
 - 任务详情里能看到 segment、provider task id、stitch job、Post-QA、credit ledger、state events。
 - 重开 Post-QA 需要 reason。
 - 重试 segment 需要 reason。
-- 标记不可交付需要 reason。
+- 释放冻结点数需要 reason。
 - 手动补点需要 reason。
 - 操作后能查到 `admin_audit_logs`。
 - operator 不能改 provider key 和 model route。
@@ -376,4 +376,3 @@ npm run smoke:backend
 如果做到一半发现真实状态机字段不足，先补服务层字段，不要在 UI 里硬猜。
 
 如果做到一半想做漂亮 Dashboard，停。那是后续任务，现在不是。
-

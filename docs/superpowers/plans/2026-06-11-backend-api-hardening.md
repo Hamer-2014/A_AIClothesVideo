@@ -266,7 +266,7 @@ Get-Content -Raw src\server\admin\job-actions.test.ts
 Expected:
 
 - 找到 Post-QA failed 到 release/refund 的实现。
-- 找到 admin undeliverable 的 release 实现。
+- 找到 admin release-credits 的 release 实现。
 
 - [ ] **Step 2: 增加 Post-QA 失败不 capture 测试**
 
@@ -306,7 +306,7 @@ it("releases reserved credits instead of capturing when post-qa fails", async ()
 在 `src/server/admin/job-actions.test.ts` 增加测试：
 
 ```ts
-it("marks a reserved failed job undeliverable and writes release plus audit", async () => {
+it("releases credits for a reserved failed job and writes release plus audit", async () => {
   const auditStore = createInMemoryAdminAuditStore();
   const store = createInMemoryAdminJobActionStore({
     jobs: [
@@ -321,7 +321,7 @@ it("marks a reserved failed job undeliverable and writes release plus audit", as
     ledger: [{ type: "reserve", amount: 70, relatedJobId: "job-paid" }],
   });
 
-  await markJobUndeliverable({
+  await releaseJobCreditsByAdmin({
     store,
     auditStore,
     actor: { userId: "admin-1", email: "admin@example.com", role: "admin" },
@@ -367,7 +367,7 @@ Expected:
 
 - Post-QA failed 不 capture
 - Post-QA failed 释放冻结点数
-- Admin undeliverable 写 release 和 audit
+- Admin release-credits 写 release 和 audit
 - 重复 resolve 不重复释放
 ```
 
@@ -1464,4 +1464,3 @@ git commit -m "docs: record backend api hardening verification"
 - [ ] `docs/API_TEST_STATUS.md` 有真实验收记录。
 
 如果任何一项失败，不要说“基本完成”。要么修复，要么把阻塞原因写进 `docs/API_TEST_STATUS.md`。
-

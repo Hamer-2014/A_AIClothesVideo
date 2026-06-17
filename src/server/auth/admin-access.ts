@@ -3,7 +3,6 @@ export type AdminRole = "admin" | "operator";
 export type AdminAction =
   | "job:retry_segment"
   | "job:reopen_post_qa"
-  | "job:mark_undeliverable"
   | "job:release_credits"
   | "job:refund"
   | "template:update_status"
@@ -17,7 +16,6 @@ export type AdminAction =
 const operatorAllowedActions = new Set<AdminAction>([
   "job:retry_segment",
   "job:reopen_post_qa",
-  "job:mark_undeliverable",
   "job:release_credits",
   "job:refund",
   "template:update_status",

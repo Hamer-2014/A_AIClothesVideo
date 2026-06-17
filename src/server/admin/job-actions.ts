@@ -152,47 +152,6 @@ export async function retryVideoSegmentByAdmin({
   };
 }
 
-export async function markJobUndeliverable({
-  jobStore = createDrizzleJobStore(),
-  actionStore,
-  creditStore = createDrizzleCreditLedgerStore(),
-  auditStore,
-  actor,
-  jobId,
-  reason,
-  requestMeta,
-}: {
-  jobStore?: JobStore;
-  actionStore: AdminJobActionStore;
-  creditStore?: CreditLedgerStore;
-  auditStore: AdminAuditStore;
-  actor: AdminJobActionActor;
-  jobId: string;
-  reason: string;
-  requestMeta?: AdminAuditRequestMeta;
-}) {
-  if (!canRolePerformAdminAction(actor.role, "job:mark_undeliverable")) {
-    throw new Error("Actor cannot mark jobs undeliverable.");
-  }
-
-  const result = await releaseJobCreditsByAdmin({
-    jobStore,
-    actionStore,
-    creditStore,
-    auditStore,
-    actor,
-    jobId,
-    reason,
-    requestMeta,
-  });
-
-  if (result.idempotent) {
-    throw new Error("Video job reserved credits are already resolved.");
-  }
-
-  return result;
-}
-
 const adminReleaseableStatuses = new Set([
   "asset_analysis_failed",
   "prompt_moderation_blocked",

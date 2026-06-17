@@ -9,7 +9,7 @@
 - Cloud Run `stitch-worker` 已实现并完成真实 smoke 验证。
 - `POST /api/internal/worker/tick` 已经组合了素材分析、片段生成推进、stitch 创建、Post-QA 推进。
 - Post-QA 不是空壳，已经具备真实状态流转、provider call log 写入、capture/release 结算。
-- 后台运维 API 和页面已具备最小闭环：任务查看、审计查询、模板状态、provider key 新增/轮换/状态、model route、点数包可见化、补点、片段重试、不可交付释放。
+- 后台运维 API 和页面已具备最小闭环：任务查看、审计查询、模板状态、provider key 新增/轮换/状态、model route、点数包可见化、补点、片段重试、释放冻结点数。
 - Creem 真实支付账号验收仍是 `pending Creem approval`；代码路径已要求签名、幂等和不得伪造 checkout URL。
 - 付费 `credit_cost > 0` full smoke 仍必须单独执行，不能用 0 成本试用任务替代。
 
@@ -55,7 +55,7 @@
 | `GET /api/admin/audit-logs` | 查询后台审计日志 | 已实现 | admin only，snapshot 做 key/prompt 脱敏 |
 | `POST /api/admin/credits/adjust` | 管理员补点 | 已实现 | 只支持正向补点，写账本与审计 |
 | `POST /api/admin/segments/[id]/retry` | 重试失败片段 | 已实现 | operator/admin 可用 |
-| `POST /api/admin/jobs/[id]/undeliverable` | 标记任务不可交付并释放冻结点数 | 已实现 | operator/admin 可用，当前不走 Creem 原路退款 |
+| `POST /api/admin/jobs/[id]/release-credits` | 释放已失败任务的冻结点数 | 已实现 | operator/admin 可用；仅允许已失败、仍有 reserved ledger、未 capture/refund/release 且 credit_cost > 0 的任务 |
 
 ## 运维边界
 
