@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
 import {
-  createDrizzleFunnelEventStore,
+  createRuntimeFunnelEventStore,
   recordFunnelEventSafely,
   type FunnelEventStore,
 } from "@/server/analytics/funnel-events";
@@ -62,7 +62,7 @@ export async function handleJobDownloadRequest(
       filename: filenameFrom(request),
     });
     await recordFunnelEventSafely({
-      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
       eventName: "video_downloaded",
       source: "server",
       userId,

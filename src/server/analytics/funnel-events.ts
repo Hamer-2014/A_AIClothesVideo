@@ -134,6 +134,18 @@ export function createInMemoryFunnelEventStore(): FunnelEventStore & {
   };
 }
 
+export function createNoopFunnelEventStore(): FunnelEventStore {
+  return {
+    async createEvent(input) {
+      return {
+        id: randomUUID(),
+        createdAt: new Date(),
+        ...input,
+      };
+    },
+  };
+}
+
 export function createDrizzleFunnelEventStore(): FunnelEventStore {
   const db = getDb();
 
@@ -171,8 +183,16 @@ export function createDrizzleFunnelEventStore(): FunnelEventStore {
   };
 }
 
+export function createRuntimeFunnelEventStore(): FunnelEventStore {
+  if (process.env.NODE_ENV === "test") {
+    return createNoopFunnelEventStore();
+  }
+
+  return createDrizzleFunnelEventStore();
+}
+
 export async function recordFunnelEvent({
-  store = createDrizzleFunnelEventStore(),
+  store = createRuntimeFunnelEventStore(),
   eventName,
   source,
   userId = null,

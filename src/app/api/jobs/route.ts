@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
-import { createDrizzleFunnelEventStore } from "@/server/analytics/funnel-events";
+import { createRuntimeFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
   createDrizzleVideoJobCreationStore,
   createVideoJobWithAssets,
@@ -90,7 +90,7 @@ export async function handleCreateJobRequest(
     ((jobInput) =>
       createVideoJobWithAssets({
         store: createDrizzleVideoJobCreationStore(),
-        funnelEventStore: createDrizzleFunnelEventStore(),
+        funnelEventStore: createRuntimeFunnelEventStore(),
         ...jobInput,
       }));
 

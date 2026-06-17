@@ -8,7 +8,7 @@ import {
   WebhookSignatureError,
 } from "@/lib/providers/creem/webhook";
 import {
-  createDrizzleFunnelEventStore,
+  createRuntimeFunnelEventStore,
   recordFunnelEventSafely,
   type FunnelEventStore,
 } from "@/server/analytics/funnel-events";
@@ -54,7 +54,7 @@ export async function handleCreemWebhookRequest(
       event,
     });
     await recordFunnelEventSafely({
-      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
       eventName: "payment_succeeded",
       source: "server",
       userId: result.order.userId,

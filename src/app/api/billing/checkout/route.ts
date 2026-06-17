@@ -8,7 +8,7 @@ import {
   CreemUnavailableError,
 } from "@/lib/providers/creem/client";
 import {
-  createDrizzleFunnelEventStore,
+  createRuntimeFunnelEventStore,
   recordFunnelEventSafely,
   type FunnelEventStore,
 } from "@/server/analytics/funnel-events";
@@ -112,7 +112,7 @@ export async function handleBillingCheckoutRequest(
       checkoutSnapshot: checkout.raw as never,
     });
     await recordFunnelEventSafely({
-      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
       eventName: "checkout_started",
       source: "server",
       userId,
