@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
+import { createDrizzleFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
   confirmStoryboard,
   createDrizzleStoryboardConfirmationStore,
@@ -59,6 +60,7 @@ function defaultConfirmStoryboard(input: {
 }) {
   return confirmStoryboard({
     storyboardStore: createDrizzleStoryboardConfirmationStore(),
+    funnelEventStore: createDrizzleFunnelEventStore(),
     ...input,
   });
 }

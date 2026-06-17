@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/server";
 import type { VisionAnalysisMode } from "@/lib/providers/vision/client";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
+import { createDrizzleFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
   analyzeVideoJobAssets,
   createDrizzleVideoJobAssetStore,
@@ -56,6 +57,7 @@ async function analyzeJobWithDrizzle(input: {
     mode: input.mode ?? (isTrial ? "lite" : "standard"),
     templates: mvpShotTemplates,
     isTrial,
+    funnelEventStore: createDrizzleFunnelEventStore(),
   });
 
   return {

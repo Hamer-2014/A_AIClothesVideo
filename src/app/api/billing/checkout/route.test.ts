@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CreemUnavailableError } from "@/lib/providers/creem/client";
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryOrderStore } from "@/server/billing/orders";
 
 import { handleBillingCheckoutRequest } from "./route";
@@ -57,6 +58,7 @@ describe("POST /api/billing/checkout", () => {
 
   it("creates a Creem checkout and records a local order", async () => {
     const orderStore = createInMemoryOrderStore();
+    const funnelStore = createInMemoryFunnelEventStore();
     const response = await handleBillingCheckoutRequest(
       new Request("http://localhost/api/billing/checkout", {
         method: "POST",
@@ -73,6 +75,7 @@ describe("POST /api/billing/checkout", () => {
           checkoutUrl: "https://checkout.creem.io/checkout_1",
           raw: { id: "checkout_1" },
         }),
+        funnelEventStore: funnelStore,
       },
     );
     const body = await response.json();
@@ -86,6 +89,20 @@ describe("POST /api/billing/checkout", () => {
       externalOrderId: expect.any(String),
       status: "created",
     });
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "checkout_started",
+        source: "server",
+        userId: "11111111-1111-4111-8111-111111111111",
+        metadata: expect.objectContaining({
+          sourcePage: "billing",
+          status: "created",
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(funnelStore.listEvents())).not.toContain(
+      "https://checkout.creem.io",
+    );
   });
 
   it("fails closed when the Creem checkout provider is unavailable", async () => {

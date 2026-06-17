@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
+
 import { handleJobDownloadRequest } from "./route";
 
 describe("GET /api/jobs/[id]/download", () => {
@@ -16,6 +18,7 @@ describe("GET /api/jobs/[id]/download", () => {
   });
 
   it("redirects to a signed attachment URL for the owner of a deliverable job", async () => {
+    const funnelStore = createInMemoryFunnelEventStore();
     const response = await handleJobDownloadRequest(
       new Request(
         "http://localhost/api/jobs/job-1/download?filename=spring-dress.mp4",
@@ -30,12 +33,26 @@ describe("GET /api/jobs/[id]/download", () => {
             expiresIn: 900,
           };
         },
+        funnelEventStore: funnelStore,
       },
     );
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
       "https://download.example/final.mp4",
+    );
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "video_downloaded",
+        source: "server",
+        userId: "user-1",
+        metadata: {
+          jobId: "job-1",
+        },
+      }),
+    ]);
+    expect(JSON.stringify(funnelStore.listEvents())).not.toContain(
+      "https://download.example",
     );
   });
 

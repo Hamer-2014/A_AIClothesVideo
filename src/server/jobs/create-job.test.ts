@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createInMemoryFunnelEventStore,
+} from "@/server/analytics/funnel-events";
+
+import {
   createInMemoryVideoJobCreationStore,
   createVideoJobWithAssets,
 } from "./create-job";
@@ -9,6 +13,7 @@ const userId = "22222222-2222-4222-8222-222222222222";
 
 describe("create video job", () => {
   it("creates an asset-analysis queued job and binds owned assets", async () => {
+    const funnelStore = createInMemoryFunnelEventStore();
     const store = createInMemoryVideoJobCreationStore([
       {
         id: "asset-front",
@@ -32,6 +37,7 @@ describe("create video job", () => {
       aspectRatio: "9:16",
       useFreeTrialIfAvailable: true,
       now: new Date("2026-06-12T08:00:00.000Z"),
+      funnelEventStore: funnelStore,
     });
 
     expect(result.job).toMatchObject({
@@ -81,6 +87,60 @@ describe("create video job", () => {
         model: "pixverse-v6",
       }),
     ]);
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "job_created",
+        source: "server",
+        userId,
+        path: null,
+        metadata: expect.objectContaining({
+          jobId: result.job.id,
+          billingMode: "free_trial",
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          presetId: "minimal_studio",
+          status: "asset_analysis_queued",
+        }),
+      }),
+      expect.objectContaining({
+        eventName: "trial_generation_started",
+        metadata: expect.objectContaining({
+          jobId: result.job.id,
+          billingMode: "free_trial",
+        }),
+      }),
+    ]);
+  });
+
+  it("records paid generation funnel event and does not block job creation when analytics fails", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 16,
+      aspectRatio: "1:1",
+      useFreeTrialIfAvailable: false,
+      funnelEventStore: {
+        async createEvent() {
+          throw new Error("analytics down");
+        },
+      },
+    });
+
+    expect(result.job).toMatchObject({
+      billingMode: "paid",
+      status: "asset_analysis_queued",
+    });
+    expect(store.listJobs()).toHaveLength(1);
   });
 
   it("creates a paid 8 second job when paid generation is selected after trial was already used", async () => {

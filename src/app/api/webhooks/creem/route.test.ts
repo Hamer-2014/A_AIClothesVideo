@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
 import { signCreemWebhookPayloadForTest } from "@/lib/providers/creem/webhook";
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
   createCheckoutOrder,
   createInMemoryOrderStore,
@@ -67,6 +68,7 @@ describe("POST /api/webhooks/creem", () => {
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
+    const funnelStore = createInMemoryFunnelEventStore();
     await createCheckoutOrder({
       store: orderStore,
       userId,
@@ -102,6 +104,7 @@ describe("POST /api/webhooks/creem", () => {
       {
         orderStore,
         ledgerStore,
+        funnelEventStore: funnelStore,
       },
     );
     const body = await response.json();
@@ -110,6 +113,19 @@ describe("POST /api/webhooks/creem", () => {
     expect(body).toEqual({ received: true });
     expect(ledgerStore.listLedger()).toHaveLength(1);
     expect(ledgerStore.listLedger()[0]?.amount).toBe(360);
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "payment_succeeded",
+        source: "server",
+        userId,
+        metadata: {
+          status: "paid",
+        },
+      }),
+    ]);
+    expect(JSON.stringify(funnelStore.listEvents())).not.toContain(
+      "buyer@example.com",
+    );
   });
 
   it("does not grant credits twice for replayed paid webhook events", async () => {

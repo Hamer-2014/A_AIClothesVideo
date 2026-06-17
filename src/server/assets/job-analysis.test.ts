@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 
 import {
@@ -42,6 +43,7 @@ describe("video job asset analysis", () => {
     ]);
     const analysisStore = createInMemoryAssetAnalysisStore();
     const providerCallLogStore = createInMemoryProviderCallLogStore();
+    const funnelStore = createInMemoryFunnelEventStore();
 
     const result = await analyzeVideoJobAssets({
       jobStore,
@@ -53,6 +55,7 @@ describe("video job asset analysis", () => {
       mode: "standard",
       templates: mvpShotTemplates,
       isTrial: false,
+      funnelEventStore: funnelStore,
       createDownloadSignedUrl: async ({ key }) => `https://signed.example/${key}`,
       visionProvider: async ({ imageUrls }) => {
         const isBack = imageUrls[0]?.includes("asset-back");
@@ -93,6 +96,17 @@ describe("video job asset analysis", () => {
       lockedBy: null,
       lockedUntil: null,
     });
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "asset_analysis_passed",
+        source: "server",
+        userId,
+        metadata: expect.objectContaining({
+          jobId,
+          status: "asset_analysis_passed",
+        }),
+      }),
+    ]);
   });
 
   it("preserves user fixed-slot roles when vision role detection is lower confidence", async () => {
@@ -202,6 +216,7 @@ describe("video job asset analysis", () => {
   });
 
   it("fails closed when a job has no attached assets", async () => {
+    const funnelStore = createInMemoryFunnelEventStore();
     const jobStore = createInMemoryJobStore([
       {
         id: jobId,
@@ -225,6 +240,7 @@ describe("video job asset analysis", () => {
         mode: "standard",
         templates: mvpShotTemplates,
         isTrial: false,
+        funnelEventStore: funnelStore,
         createDownloadSignedUrl: async () => "https://signed.example/asset.jpg",
         visionProvider: async () => {
           throw new Error("must not call provider");
@@ -238,6 +254,18 @@ describe("video job asset analysis", () => {
       failureReason: "Video job has no attached assets.",
       lastError: "Video job has no attached assets.",
     });
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "asset_analysis_failed",
+        source: "server",
+        userId,
+        metadata: expect.objectContaining({
+          jobId,
+          status: "asset_analysis_failed",
+          reasonCategory: "asset_analysis",
+        }),
+      }),
+    ]);
   });
 
   it("stores a readable retry message when the vision provider network fetch fails", async () => {

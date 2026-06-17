@@ -7,6 +7,11 @@ import {
   verifyCreemWebhookSignature,
   WebhookSignatureError,
 } from "@/lib/providers/creem/webhook";
+import {
+  createDrizzleFunnelEventStore,
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 import {
   handleCreemCheckoutCompleted,
@@ -16,6 +21,7 @@ import {
 interface CreemWebhookDeps {
   orderStore?: OrderStore;
   ledgerStore?: CreditLedgerStore;
+  funnelEventStore?: FunnelEventStore;
 }
 
 export async function handleCreemWebhookRequest(
@@ -42,10 +48,20 @@ export async function handleCreemWebhookRequest(
   }
 
   try {
-    await handleCreemCheckoutCompleted({
+    const result = await handleCreemCheckoutCompleted({
       orderStore: deps.orderStore ?? createDrizzleOrderStore(),
       ledgerStore: deps.ledgerStore ?? createDrizzleCreditLedgerStore(),
       event,
+    });
+    await recordFunnelEventSafely({
+      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      eventName: "payment_succeeded",
+      source: "server",
+      userId: result.order.userId,
+      path: new URL(request.url).pathname,
+      metadata: {
+        status: "paid",
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "webhook_failed";

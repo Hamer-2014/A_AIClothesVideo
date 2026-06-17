@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
 import {
+  createDrizzleFunnelEventStore,
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
+import {
   createDrizzleJobDownloadStore,
   createJobDownloadUrl,
 } from "@/server/files/job-download";
@@ -19,6 +24,7 @@ interface DownloadJobDeps {
     userId: string;
     filename?: string;
   }) => Promise<{ url: string; expiresIn: number }>;
+  funnelEventStore?: FunnelEventStore;
 }
 
 function defaultCreateDownload(input: {
@@ -54,6 +60,16 @@ export async function handleJobDownloadRequest(
       jobId: context.params.id,
       userId,
       filename: filenameFrom(request),
+    });
+    await recordFunnelEventSafely({
+      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      eventName: "video_downloaded",
+      source: "server",
+      userId,
+      path: new URL(request.url).pathname,
+      metadata: {
+        jobId: context.params.id,
+      },
     });
     return NextResponse.redirect(download.url);
   } catch (error) {

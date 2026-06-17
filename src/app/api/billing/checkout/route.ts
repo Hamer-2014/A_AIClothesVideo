@@ -7,6 +7,11 @@ import {
   createCreemCheckout,
   CreemUnavailableError,
 } from "@/lib/providers/creem/client";
+import {
+  createDrizzleFunnelEventStore,
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
 import { createCheckoutOrder, type OrderStore } from "@/server/billing/orders";
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 
@@ -32,6 +37,7 @@ interface BillingCheckoutDeps {
     successUrl: string;
     metadata: Record<string, string>;
   }) => Promise<CheckoutResult>;
+  funnelEventStore?: FunnelEventStore;
 }
 
 function getAppUrl() {
@@ -104,6 +110,17 @@ export async function handleBillingCheckoutRequest(
       packageCode: selectedPackage.code,
       externalOrderId: checkout.externalOrderId ?? requestId,
       checkoutSnapshot: checkout.raw as never,
+    });
+    await recordFunnelEventSafely({
+      store: deps.funnelEventStore ?? createDrizzleFunnelEventStore(),
+      eventName: "checkout_started",
+      source: "server",
+      userId,
+      path: new URL(request.url).pathname,
+      metadata: {
+        sourcePage: "billing",
+        status: "created",
+      },
     });
 
     return NextResponse.json({

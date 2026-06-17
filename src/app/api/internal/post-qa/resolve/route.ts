@@ -4,6 +4,7 @@ import {
   getInternalWorkerSecret,
   isInternalWorkerAuthorized,
 } from "@/server/internal/auth";
+import { createDrizzleFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
   createDrizzlePostQaStore,
   resolvePostQaResult,
@@ -77,6 +78,7 @@ function parseBody(body: unknown): {
 function defaultResolvePostQa(input: ReturnType<typeof parseBody>) {
   return resolvePostQaResult({
     postQaStore: createDrizzlePostQaStore(),
+    funnelEventStore: createDrizzleFunnelEventStore(),
     ...input,
   });
 }

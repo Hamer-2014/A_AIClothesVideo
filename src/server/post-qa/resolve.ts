@@ -13,6 +13,10 @@ import { postQaResults, videoJobs } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import type { postQaModeValues, postQaStatusValues } from "@/lib/db/schema/jobs";
 import {
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
+import {
   createDrizzleJobStore,
   type JobStore,
   transitionJobStatus,
@@ -72,6 +76,7 @@ export async function resolvePostQaResult({
   frameKeys,
   resultJson,
   failureCategory,
+  funnelEventStore,
 }: {
   jobStore?: JobStore;
   postQaStore: PostQaStore;
@@ -82,6 +87,7 @@ export async function resolvePostQaResult({
   frameKeys: string[];
   resultJson?: JsonValue | null;
   failureCategory?: string | null;
+  funnelEventStore?: FunnelEventStore;
 }) {
   const job = await postQaStore.findJob(jobId);
   if (!job) {
@@ -158,6 +164,18 @@ export async function resolvePostQaResult({
       reason: "video_deliverable",
       userVisibleStatus: "downloadable",
     });
+    if (funnelEventStore) {
+      await recordFunnelEventSafely({
+        store: funnelEventStore,
+        eventName: "generation_deliverable",
+        source: "server",
+        userId: job.userId,
+        metadata: {
+          jobId,
+          status: "deliverable",
+        },
+      });
+    }
   } else {
     if (job.creditCost > 0) {
       await releaseReservedCredits({
@@ -184,6 +202,19 @@ export async function resolvePostQaResult({
       userVisibleStatus: "failed",
       eventSnapshot: { failureCategory: failureCategory ?? null },
     });
+    if (funnelEventStore) {
+      await recordFunnelEventSafely({
+        store: funnelEventStore,
+        eventName: "generation_failed",
+        source: "server",
+        userId: job.userId,
+        metadata: {
+          jobId,
+          status: "failed_released",
+          reasonCategory: failureCategory ?? "post_qa_failed",
+        },
+      });
+    }
   }
 
   return {

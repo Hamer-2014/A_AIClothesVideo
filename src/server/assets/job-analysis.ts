@@ -14,6 +14,10 @@ import type { ProviderCallLogStore } from "@/lib/providers/log-call";
 import { createDrizzleProviderCallLogStore } from "@/lib/providers/log-call";
 import type { VisionAnalysisMode } from "@/lib/providers/vision/client";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
+import {
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
 import type { AssetRole } from "@/server/assets/analysis-schema";
 import type { JobStore } from "@/server/jobs/state-machine";
 import { transitionJobStatus } from "@/server/jobs/state-machine";
@@ -152,6 +156,7 @@ export async function analyzeVideoJobAssets({
     createR2DownloadSignedUrl({ key, expiresIn: 900 }),
   visionProvider,
   manageJobStatus = true,
+  funnelEventStore,
 }: {
   jobStore: JobStore;
   jobAssetStore: VideoJobAssetStore;
@@ -165,6 +170,7 @@ export async function analyzeVideoJobAssets({
   createDownloadSignedUrl?: (input: { key: string }) => Promise<string>;
   visionProvider?: VisionAssetAnalysisProvider;
   manageJobStatus?: boolean;
+  funnelEventStore?: FunnelEventStore;
 }) {
   const job = await jobStore.findJob(jobId);
   if (!job || job.userId !== userId) {
@@ -229,6 +235,18 @@ export async function analyzeVideoJobAssets({
         clearLock: true,
       });
     }
+    if (funnelEventStore) {
+      await recordFunnelEventSafely({
+        store: funnelEventStore,
+        eventName: "asset_analysis_passed",
+        source: "server",
+        userId,
+        metadata: {
+          jobId,
+          status: "asset_analysis_passed",
+        },
+      });
+    }
 
     return {
       analyses,
@@ -247,6 +265,19 @@ export async function analyzeVideoJobAssets({
         jobId,
         message: errorMessage(error),
       });
+      if (funnelEventStore) {
+        await recordFunnelEventSafely({
+          store: funnelEventStore,
+          eventName: "asset_analysis_failed",
+          source: "server",
+          userId,
+          metadata: {
+            jobId,
+            status: "asset_analysis_failed",
+            reasonCategory: "asset_analysis",
+          },
+        });
+      }
     }
     throw error;
   }

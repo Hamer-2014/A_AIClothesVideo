@@ -22,6 +22,10 @@ import type {
   generationProfileValues,
 } from "@/lib/db/schema/jobs";
 import {
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
+import {
   evaluateTrialEligibility,
   resolveAbuseHashSecret,
   type TrialAbuseSignalInput,
@@ -665,6 +669,7 @@ export async function createVideoJobWithAssets({
   deviceFingerprint,
   abuseHashSecret = process.env.ABUSE_HASH_SECRET,
   appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
+  funnelEventStore,
 }: {
   store: VideoJobCreationStore;
   userId: string;
@@ -683,6 +688,7 @@ export async function createVideoJobWithAssets({
   deviceFingerprint?: string | null;
   abuseHashSecret?: string | null;
   appEnvironment?: string;
+  funnelEventStore?: FunnelEventStore;
 }) {
   const uniqueAssetIds = Array.from(new Set(assetIds));
   assertValidInput({ assetIds: uniqueAssetIds, durationSeconds, aspectRatio });
@@ -939,6 +945,36 @@ export async function createVideoJobWithAssets({
     reason: "job_created",
     actorType: "user",
   });
+
+  if (funnelEventStore) {
+    const commonMetadata = {
+      jobId: job.id,
+      billingMode,
+      durationSeconds,
+      aspectRatio,
+      presetId: preset.id,
+      status: job.status,
+    };
+    await recordFunnelEventSafely({
+      store: funnelEventStore,
+      eventName: "job_created",
+      source: "server",
+      userId,
+      path: requestContext?.path ?? null,
+      metadata: commonMetadata,
+    });
+    await recordFunnelEventSafely({
+      store: funnelEventStore,
+      eventName:
+        billingMode === "free_trial"
+          ? "trial_generation_started"
+          : "paid_generation_started",
+      source: "server",
+      userId,
+      path: requestContext?.path ?? null,
+      metadata: commonMetadata,
+    });
+  }
 
   return {
     job,

@@ -11,6 +11,10 @@ import type { JsonValue } from "@/lib/db/schema/common";
 import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { CreemPromptModerationResult } from "@/lib/providers/creem/moderation";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
+import {
+  recordFunnelEventSafely,
+  type FunnelEventStore,
+} from "@/server/analytics/funnel-events";
 import { createDrizzleJobStore, type JobStore } from "@/server/jobs/state-machine";
 import { transitionJobStatus } from "@/server/jobs/state-machine";
 import { checkPrompt } from "@/server/moderation/check-prompt";
@@ -613,6 +617,7 @@ export async function confirmStoryboard({
   userId,
   storyboardId,
   moderatePrompt,
+  funnelEventStore,
 }: {
   jobStore?: JobStore;
   storyboardStore: StoryboardConfirmationStore;
@@ -625,6 +630,7 @@ export async function confirmStoryboard({
     prompt: string;
     externalId?: string;
   }) => Promise<CreemPromptModerationResult>;
+  funnelEventStore?: FunnelEventStore;
 }) {
   const job = await storyboardStore.findJob({ jobId, userId });
   if (!job) {
@@ -785,6 +791,32 @@ export async function confirmStoryboard({
         storyboardId,
         segmentIds: segments.map((segment) => segment.id),
       },
+    });
+  }
+
+  if (funnelEventStore) {
+    const metadata = {
+      jobId,
+      billingMode: job.billingMode,
+      durationSeconds: job.durationSeconds,
+      status: "segments_queued",
+    };
+    await recordFunnelEventSafely({
+      store: funnelEventStore,
+      eventName: "storyboard_confirmed",
+      source: "server",
+      userId,
+      metadata,
+    });
+    await recordFunnelEventSafely({
+      store: funnelEventStore,
+      eventName:
+        job.billingMode === "free_trial"
+          ? "trial_generation_started"
+          : "paid_generation_started",
+      source: "server",
+      userId,
+      metadata,
     });
   }
 

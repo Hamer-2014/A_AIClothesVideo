@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { grantTrialCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryModerationResultStore } from "@/server/moderation/results";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 
@@ -186,6 +187,7 @@ describe("confirmStoryboard", () => {
 
   it("moderates the final prompt, reserves credits, confirms storyboard, and creates video segments", async () => {
     const stores = createStores();
+    const funnelStore = createInMemoryFunnelEventStore();
     const moderatedPrompts: string[] = [];
     await grantTrialCredits({
       store: stores.creditStore,
@@ -200,6 +202,7 @@ describe("confirmStoryboard", () => {
       jobId,
       userId,
       storyboardId,
+      funnelEventStore: funnelStore,
       moderatePrompt: async (input) => {
         moderatedPrompts.push(input.prompt);
         return {
@@ -302,6 +305,30 @@ describe("confirmStoryboard", () => {
       }),
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "storyboard_confirmed",
+        source: "server",
+        userId,
+        metadata: expect.objectContaining({
+          jobId,
+          billingMode: "paid",
+          durationSeconds: 16,
+          status: "segments_queued",
+        }),
+      }),
+      expect.objectContaining({
+        eventName: "paid_generation_started",
+        metadata: expect.objectContaining({
+          jobId,
+          billingMode: "paid",
+          durationSeconds: 16,
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(funnelStore.listEvents())).not.toContain(
+      "Slow push-in on the front garment.",
+    );
   });
 
   it("uses an explicit debug resolution override when creating video segments", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { grantTrialCredits, reserveCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
+import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 
 import { createInMemoryPostQaStore, resolvePostQaResult } from "./resolve";
@@ -58,6 +59,7 @@ async function createStores() {
 describe("resolvePostQaResult", () => {
   it("captures reserved credits and marks a job deliverable when QA passes", async () => {
     const stores = await createStores();
+    const funnelStore = createInMemoryFunnelEventStore();
 
     const result = await resolvePostQaResult({
       ...stores,
@@ -66,6 +68,7 @@ describe("resolvePostQaResult", () => {
       mode: "standard",
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
       resultJson: { passed: true },
+      funnelEventStore: funnelStore,
     });
 
     expect(result).toEqual({
@@ -84,6 +87,20 @@ describe("resolvePostQaResult", () => {
       status: "passed",
       mode: "standard",
     });
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "generation_deliverable",
+        source: "server",
+        userId,
+        metadata: expect.objectContaining({
+          jobId,
+          status: "deliverable",
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(funnelStore.listEvents())).not.toContain(
+      "jobs/job-1/qa/frames/0.jpg",
+    );
   });
 
   it("does not capture credits twice when a passed QA resolve is replayed", async () => {
@@ -115,6 +132,7 @@ describe("resolvePostQaResult", () => {
 
   it("releases reserved credits when QA fails", async () => {
     const stores = await createStores();
+    const funnelStore = createInMemoryFunnelEventStore();
 
     const result = await resolvePostQaResult({
       ...stores,
@@ -124,6 +142,7 @@ describe("resolvePostQaResult", () => {
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
       resultJson: { passed: false },
       failureCategory: "garment_mismatch",
+      funnelEventStore: funnelStore,
     });
 
     expect(result).toEqual({
@@ -137,6 +156,16 @@ describe("resolvePostQaResult", () => {
       "release",
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("failed_released");
+    expect(funnelStore.listEvents()).toEqual([
+      expect.objectContaining({
+        eventName: "generation_failed",
+        metadata: expect.objectContaining({
+          jobId,
+          status: "failed_released",
+          reasonCategory: "garment_mismatch",
+        }),
+      }),
+    ]);
   });
 
   it("does not capture or release credits for zero-cost jobs", async () => {
