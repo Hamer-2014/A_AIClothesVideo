@@ -113,7 +113,7 @@ export function JobFailureSummary({
         <SummaryRow label="User Visible Status" value={job.userVisibleStatus} />
         <SummaryRow label="Failure Reason" value={job.failureReason ?? "-"} />
         <SummaryRow label="Last Error" value={job.lastError ?? "-"} />
-        <SummaryRow label="Billing Mode" value={job.billingMode} />
+        <SummaryRow label="Billing Mode" value={job.billingMode ?? "-"} />
         <SummaryRow label="Credit Cost" value={`${job.creditCost} 点`} />
         <SummaryRow label="Reserved Ledger ID" value={job.reservedLedgerId ?? "-"} />
         <SummaryRow label="Segment Latest" value={latestSegmentSummary(segments)} />
