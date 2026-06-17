@@ -81,9 +81,21 @@ vi.mock("./upload-panel", () => ({
 vi.mock("./spec-selector", () => ({
   SpecSelector: ({
     durationSeconds,
+    onDurationChange,
   }: {
     durationSeconds: 8 | 16 | 24;
-  }) => <div>spec-selector {durationSeconds}</div>,
+    onDurationChange: (duration: 8 | 16 | 24) => void;
+  }) => (
+    <div>
+      spec-selector {durationSeconds}
+      <button onClick={() => onDurationChange(16)} type="button">
+        mock-duration-16
+      </button>
+      <button onClick={() => onDurationChange(24)} type="button">
+        mock-duration-24
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("./template-picker", () => ({
@@ -133,6 +145,18 @@ vi.mock("./storyboard-confirmation", () => ({
       <button disabled={disabled} onClick={onConfirm} type="button">
         确认分镜并生成
       </button>
+    </div>
+  ),
+}));
+
+vi.mock("./trial-status-panel", () => ({
+  TrialStatusPanel: ({
+    status,
+  }: {
+    status: { state: string; message: string };
+  }) => (
+    <div data-testid="mock-trial-status-panel">
+      {status.state}:{status.message}
     </div>
   ),
 }));
@@ -211,6 +235,132 @@ describe("WorkspaceApp", () => {
     });
   });
 
+  it("shows available trial status and keeps paid generation as a separate CTA", async () => {
+    window.localStorage.setItem("runwaytools_device_id", "device-existing");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          state: "available",
+          message: "你有 1 次免费试用，可生成 8 秒带水印视频。",
+          limits: {
+            durationSeconds: 8,
+            qualityLabel: "低分辨率",
+            audioLabel: "无音频",
+            watermarkEnabled: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="minimal_studio"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(
+      await screen.findByTestId("mock-trial-status-panel"),
+    ).toHaveTextContent("available:你有 1 次免费试用，可生成 8 秒带水印视频。");
+    expect(
+      screen.getByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps paid generation available when trial status is unavailable", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          state: "unavailable",
+          message: "当前账号暂时无法使用免费试用，可以购买点数继续生成。",
+          limits: null,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="minimal_studio"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(
+      await screen.findByTestId("mock-trial-status-panel"),
+    ).toHaveTextContent(
+      "unavailable:当前账号暂时无法使用免费试用，可以购买点数继续生成。",
+    );
+    expect(
+      screen.queryByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the free trial CTA for 16 or 24 second specs", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          state: "available",
+          message: "你有 1 次免费试用，可生成 8 秒带水印视频。",
+          limits: {
+            durationSeconds: 8,
+            qualityLabel: "低分辨率",
+            audioLabel: "无音频",
+            watermarkEnabled: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="minimal_studio"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    await screen.findByTestId("mock-trial-status-panel");
+    fireEvent.click(screen.getByRole("button", { name: "mock-duration-16" }));
+
+    expect(
+      screen.queryByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("免费试用仅支持 8 秒。16/24 秒请使用付费生成。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 130 点" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-duration-24" }));
+    expect(
+      screen.queryByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 190 点" }),
+    ).toBeInTheDocument();
+  });
+
   it("uses query preset defaults for trial workspace entry", () => {
     render(
       <WorkspaceApp
@@ -226,7 +376,7 @@ describe("WorkspaceApp", () => {
       "true",
     );
     expect(screen.getByDisplayValue(/商品主图可售卖感/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "免费试用" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "免费试用生成 · 8 秒带水印" })).toBeInTheDocument();
   });
 
   it("creates a job and automatically analyzes assets", async () => {
@@ -342,7 +492,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
@@ -392,7 +542,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     expect(
       await screen.findByText('relation "free_trial_usages" does not exist'),
@@ -509,7 +659,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(window.location.href).toBe("/jobs/job-1");
@@ -546,7 +696,7 @@ describe("WorkspaceApp", () => {
       screen.getByText("免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/540p|720p|1080p/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -578,7 +728,7 @@ describe("WorkspaceApp", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "免费试用" }));
+    fireEvent.click(screen.getByRole("button", { name: "免费试用生成 · 8 秒带水印" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -646,7 +796,7 @@ describe("WorkspaceApp", () => {
     const materialPanel = screen.getByTestId("workspace-material-panel");
     const controlRail = screen.getByTestId("workspace-control-rail");
     const panelHeaders = screen.getAllByTestId("workspace-panel-header");
-    const generateButton = screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" });
+    const generateButton = screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" });
 
     expect(mainStage).toBeInTheDocument();
     expect(mainStage.className).toContain("xl:items-start");
@@ -798,7 +948,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(screen.getByText("正面慢推近")).toBeInTheDocument();
@@ -916,7 +1066,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
@@ -1069,7 +1219,7 @@ describe("WorkspaceApp", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await screen.findByText("审核服务暂时不可用，请稍后再试。");
     expect(
@@ -1245,7 +1395,7 @@ describe("WorkspaceApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
     fireEvent.click(screen.getByRole("button", { name: "mock-upload-scene" }));
-    fireEvent.click(screen.getByRole("button", { name: "生成视频 · 将冻结 70 点" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { SpecSelector } from "./spec-selector";
+import { TrialStatusPanel } from "./trial-status-panel";
 import {
   TemplatePicker,
   type TemplateAvailabilityCard,
@@ -18,6 +19,7 @@ import {
   type StylePresetId,
   type WorkspaceEntryMode,
 } from "@/lib/presets";
+import type { TrialStatus } from "@/server/trial/status";
 
 import { StylePresetSelector } from "./style-preset-selector";
 
@@ -224,6 +226,7 @@ export function WorkspaceApp({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [imagesUploading, setImagesUploading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
 
   useEffect(() => {
     if (initialMode !== "trial") {
@@ -235,12 +238,23 @@ export function WorkspaceApp({
       `/api/trial/status?deviceFingerprint=${encodeURIComponent(
         deviceFingerprint,
       )}`,
-    ).catch(() => undefined);
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          return;
+        }
+
+        setTrialStatus((await response.json()) as TrialStatus);
+      })
+      .catch(() => undefined);
   }, [initialMode]);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
   const paidCost = paidCreditCost(durationSeconds);
   const hasUploadedAssets = assets.some((asset) => asset.status === "uploaded");
+  const canUseFreeTrial =
+    durationSeconds === 8 &&
+    (!trialStatus || trialStatus.state === "available");
   const showAdvancedManualControls =
     advancedOpen || Boolean(storyboardId) || segments.length > 0;
   const uploadedRoles = useMemo(
@@ -747,8 +761,11 @@ export function WorkspaceApp({
                 可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。
               </p>
             </div>
+            {initialMode === "trial" && trialStatus ? (
+              <TrialStatusPanel status={trialStatus} />
+            ) : null}
             <div className="rounded-md border border-[var(--line)] bg-white p-3 text-xs leading-5 text-[var(--muted)]">
-              将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
+              付费生成：高清无水印，{durationSeconds} 秒将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
             </div>
             <button
               className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -760,9 +777,9 @@ export function WorkspaceApp({
                 ? "图片上传中..."
                 : busyAction === "one-click" || busyAction === "create-job" || busyAction === "analyze"
                   ? "正在生成..."
-                  : `生成视频 · 将冻结 ${paidCost} 点`}
+                  : `付费生成高清无水印 · ${paidCost} 点`}
             </button>
-            {durationSeconds === 8 ? (
+            {canUseFreeTrial ? (
               <div className="space-y-2 rounded-md border border-[var(--line)] bg-white p-3">
                 <button
                   className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
@@ -770,12 +787,16 @@ export function WorkspaceApp({
                   onClick={() => oneClickGenerate(true)}
                   type="button"
                 >
-                  免费试用
+                  免费试用生成 · 8 秒带水印
                 </button>
                 <p className="text-xs leading-5 text-[var(--muted)]">
                   免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板
                 </p>
               </div>
+            ) : durationSeconds !== 8 && initialMode === "trial" ? (
+              <p className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+                免费试用仅支持 8 秒。16/24 秒请使用付费生成。
+              </p>
             ) : null}
           </aside>
 
