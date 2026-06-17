@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { SpecSelector } from "./spec-selector";
 import {
@@ -224,6 +224,19 @@ export function WorkspaceApp({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [imagesUploading, setImagesUploading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialMode !== "trial") {
+      return;
+    }
+
+    const deviceFingerprint = getOrCreateDeviceFingerprint();
+    void fetch(
+      `/api/trial/status?deviceFingerprint=${encodeURIComponent(
+        deviceFingerprint,
+      )}`,
+    ).catch(() => undefined);
+  }, [initialMode]);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
   const paidCost = paidCreditCost(durationSeconds);

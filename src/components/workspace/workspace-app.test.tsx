@@ -172,6 +172,43 @@ describe("WorkspaceApp", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("requests trial status with the existing device fingerprint on trial entry", async () => {
+    window.localStorage.setItem("runwaytools_device_id", "device-existing");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          state: "available",
+          message: "你有 1 次免费试用，可生成 8 秒带水印视频。",
+          limits: {
+            durationSeconds: 8,
+            qualityLabel: "低分辨率",
+            audioLabel: "无音频",
+            watermarkEnabled: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="minimal_studio"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/trial/status?deviceFingerprint=device-existing",
+      );
+    });
   });
 
   it("uses query preset defaults for trial workspace entry", () => {

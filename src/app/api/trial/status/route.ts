@@ -24,6 +24,7 @@ interface TrialStatusRouteDeps {
     requestContext: {
       ipAddress: string | null;
       userAgent: string | null;
+      deviceFingerprint: string | null;
       path: string | null;
     };
   }) => Promise<TrialStatus>;
@@ -36,6 +37,16 @@ function requestIp(request: Request) {
   }
 
   return request.headers.get("x-real-ip")?.trim() || null;
+}
+
+function requestDeviceFingerprint(request: Request) {
+  const url = new URL(request.url);
+  const queryFingerprint = url.searchParams.get("deviceFingerprint")?.trim();
+  if (queryFingerprint) {
+    return queryFingerprint;
+  }
+
+  return request.headers.get("x-device-fingerprint")?.trim() || null;
 }
 
 export async function handleGetTrialStatusRequest(
@@ -52,6 +63,7 @@ export async function handleGetTrialStatusRequest(
   const requestContext = {
     ipAddress: requestIp(request),
     userAgent: request.headers.get("user-agent"),
+    deviceFingerprint: requestDeviceFingerprint(request),
     path: new URL(request.url).pathname,
   };
   const getTrialStatus =
@@ -65,6 +77,7 @@ export async function handleGetTrialStatusRequest(
           emailVerified: input.emailVerified,
           ipAddress: input.requestContext.ipAddress,
           userAgent: input.requestContext.userAgent,
+          deviceFingerprint: input.requestContext.deviceFingerprint,
         },
       }));
 
