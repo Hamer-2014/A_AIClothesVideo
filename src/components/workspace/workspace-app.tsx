@@ -718,11 +718,11 @@ export function WorkspaceApp({
         </div>
 
         <div
-          className="mt-5 grid gap-6 xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)] xl:items-start"
+          className="mt-5 grid gap-6 xl:min-h-[calc(100svh-13rem)] xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)] xl:items-stretch"
           data-testid="workspace-main-stage"
         >
           <aside
-            className="space-y-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:self-start"
+            className="space-y-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:min-h-full"
             data-testid="workspace-control-rail"
           >
             <div
@@ -803,7 +803,7 @@ export function WorkspaceApp({
           </aside>
 
           <section
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:min-h-full"
             data-testid="workspace-material-panel"
           >
             <div

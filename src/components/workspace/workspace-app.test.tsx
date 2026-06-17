@@ -799,7 +799,8 @@ describe("WorkspaceApp", () => {
     const generateButton = screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" });
 
     expect(mainStage).toBeInTheDocument();
-    expect(mainStage.className).toContain("xl:items-start");
+    expect(mainStage.className).toContain("xl:min-h-[calc(100svh-13rem)]");
+    expect(mainStage.className).toContain("xl:items-stretch");
     expect(mainStage.className).toContain("xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)]");
     expect(mainStage.firstElementChild).toBe(controlRail);
     expect(mainStage.lastElementChild).toBe(materialPanel);
@@ -810,9 +811,12 @@ describe("WorkspaceApp", () => {
     expect(materialPanel).toBeInTheDocument();
     expect(materialPanel.className).toContain("rounded-lg");
     expect(materialPanel.className).toContain("bg-[var(--surface)]");
+    expect(materialPanel.className).toContain("xl:min-h-full");
     expect(controlRail).toBeInTheDocument();
     expect(controlRail.className).toContain("bg-[var(--surface)]");
-    expect(controlRail.className).toContain("xl:self-start");
+    expect(controlRail.className).toContain("xl:min-h-full");
+    expect(controlRail.className).not.toContain("sticky");
+    expect(materialPanel.className).not.toContain("sticky");
     expect(screen.getByTestId("workspace-deferred-analysis")).toBeInTheDocument();
     expect(screen.getByTestId("mock-upload-panel")).toBeInTheDocument();
     expect(screen.getByText("生成意图")).toBeInTheDocument();
