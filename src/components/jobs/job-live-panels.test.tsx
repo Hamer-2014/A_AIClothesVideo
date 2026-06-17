@@ -5,6 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobLivePanels } from "./job-live-panels";
 
+vi.mock("./job-upgrade-panel", () => ({
+  JobUpgradePanel: ({
+    billingMode,
+    downloadReady,
+    phase,
+  }: {
+    billingMode?: string;
+    downloadReady: boolean;
+    phase: string;
+  }) => (
+    <div data-testid="mock-job-upgrade-panel">
+      {billingMode}:{phase}:{downloadReady ? "ready" : "not-ready"}
+    </div>
+  ),
+}));
+
 describe("JobLivePanels", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -120,6 +136,42 @@ describe("JobLivePanels", () => {
     expect(video).toHaveAttribute(
       "src",
       "https://cdn.example.com/jobs/job-1/stitched/final.mp4",
+    );
+  });
+
+  it("passes trial progress into the upgrade panel", () => {
+    render(
+      <JobLivePanels
+        defaultFilename="runwaytools-job-1.mp4"
+        initialPreviewUrl={null}
+        initialProgress={{
+          jobId: "job-1",
+          status: "deliverable",
+          userVisibleStatus: "ready",
+          message: null,
+          phase: "deliverable",
+          segmentProgress: {
+            total: 1,
+            queued: 0,
+            generating: 0,
+            succeeded: 1,
+            failed: 0,
+          },
+          stitching: { status: "succeeded" },
+          postQa: { status: "passed" },
+          billingMode: "free_trial",
+          creditStatus: "trial",
+          downloadReady: true,
+          finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          coverKey: null,
+        }}
+        jobId="job-1"
+        publicVideoBaseUrl="https://cdn.example.com"
+      />,
+    );
+
+    expect(screen.getByTestId("mock-job-upgrade-panel")).toHaveTextContent(
+      "free_trial:deliverable:ready",
     );
   });
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { JobDeliverablePanel } from "./job-deliverable-panel";
 import { JobProgress, type JobProgressData } from "./job-progress";
+import { JobUpgradePanel } from "./job-upgrade-panel";
 import { VideoPlaceholder } from "./video-placeholder";
 
 interface JobLivePanelsProps {
@@ -102,6 +103,12 @@ export function JobLivePanels({
           label={pendingPreview.label}
         />
       )}
+
+      <JobUpgradePanel
+        billingMode={progress.billingMode}
+        downloadReady={progress.downloadReady}
+        phase={progress.phase}
+      />
     </>
   );
 }
