@@ -8,6 +8,7 @@ export function PublicFooter() {
         <div className="flex gap-4">
           <Link href="/privacy">隐私</Link>
           <Link href="/terms">条款</Link>
+          <Link href="/faq">FAQ</Link>
           <Link href="/pricing">价格</Link>
         </div>
       </div>

@@ -15,6 +15,9 @@ export function PublicHeader() {
           <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/pricing">
             价格
           </Link>
+          <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/faq">
+            FAQ
+          </Link>
           <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/login">
             登录
           </Link>
