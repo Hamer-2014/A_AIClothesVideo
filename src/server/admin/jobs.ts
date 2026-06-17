@@ -34,6 +34,7 @@ export interface AdminJobRecord {
   userVisibleStatus: string;
   durationSeconds: number;
   aspectRatio: string;
+  billingMode?: string;
   creditCost: number;
   presetId: string | null;
   presetSnapshot: unknown;
@@ -485,6 +486,7 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           userVisibleStatus: videoJobs.userVisibleStatus,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
+          billingMode: videoJobs.billingMode,
           creditCost: videoJobs.creditCost,
           presetId: videoJobs.presetId,
           presetSnapshot: videoJobs.presetSnapshot,

@@ -1,6 +1,7 @@
 import type { getAdminJobDetail } from "@/server/admin/jobs";
 
 import { JobDiagnosisPanel } from "./job-diagnosis-panel";
+import { JobFailureSummary } from "./job-failure-summary";
 
 interface AdminJobDetailPanelProps {
   detail: NonNullable<Awaited<ReturnType<typeof getAdminJobDetail>>>;
@@ -107,6 +108,21 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
   return (
     <div className="space-y-6">
       <JobDiagnosisPanel diagnosis={detail.diagnosis} />
+
+      <JobFailureSummary
+        job={{
+          status: detail.job.status,
+          userVisibleStatus: detail.job.userVisibleStatus,
+          failureReason: detail.job.failureReason,
+          lastError: detail.job.lastError,
+          billingMode: detail.job.billingMode,
+          creditCost: detail.job.creditCost,
+          reservedLedgerId: detail.job.reservedLedgerId,
+        }}
+        segments={detail.segments}
+        stitchJobs={detail.stitchJobs}
+        postQaResults={detail.postQaResults}
+      />
 
       <section className="grid gap-3 lg:grid-cols-3 xl:grid-cols-4">
         <SummaryItem label="任务状态" value={detail.job.status} />

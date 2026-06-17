@@ -19,6 +19,7 @@ describe("JobDetailPanel", () => {
             userId: "user-1",
             status: "segment_failed",
             userVisibleStatus: "failed",
+            billingMode: "paid",
             durationSeconds: 16,
             aspectRatio: "9:16",
             creditCost: 130,
@@ -133,6 +134,9 @@ describe("JobDetailPanel", () => {
 
     expect(screen.getByText("诊断摘要")).toBeInTheDocument();
     expect(screen.getByText("存在失败片段")).toBeInTheDocument();
+    expect(screen.getByText("失败摘要")).toBeInTheDocument();
+    expect(screen.getByText("segment #0: failed")).toBeInTheDocument();
+    expect(screen.getAllByText("ledger-1").length).toBeGreaterThan(0);
     expect(screen.getByText("Segment 表")).toBeInTheDocument();
     expect(screen.getByText("Provider Logs 表")).toBeInTheDocument();
     expect(screen.getByText("Trial Eligibility")).toBeInTheDocument();
