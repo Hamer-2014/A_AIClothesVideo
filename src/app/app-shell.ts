@@ -66,6 +66,11 @@ export function buildAdminNav(pathname: string): NavItem[] {
       active: pathname.startsWith("/admin/billing"),
     },
     {
+      href: "/admin/funnel",
+      label: "漏斗",
+      active: pathname.startsWith("/admin/funnel"),
+    },
+    {
       href: "/admin/templates",
       label: "模板",
       active: pathname.startsWith("/admin/templates"),
