@@ -92,6 +92,13 @@
       "when": 1781697600000,
       "tag": "0012_funnel_events",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781712000000,
+      "tag": "0013_admin_job_notes",
+      "breakpoints": true
     }
   ]
 }

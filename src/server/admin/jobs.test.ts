@@ -237,6 +237,7 @@ describe("admin job detail", () => {
       ],
       moderationResults: [expect.objectContaining({ id: "mod-1" })],
       ledger: [expect.objectContaining({ id: "ledger-reserve" })],
+      notes: [],
       stitchJobs: [expect.objectContaining({ id: "stitch-1" })],
       postQaResults: [expect.objectContaining({ id: "qa-1" })],
       stateEvents: [expect.objectContaining({ id: "evt-1" })],

@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
+  adminJobNotes,
   assets,
   assetAnalyses,
   creditLedger,
@@ -174,6 +175,14 @@ export interface AdminStateEventRecord {
   createdAt: Date;
 }
 
+export interface AdminJobNoteRecord {
+  id: string;
+  jobId: string;
+  adminUserId: string;
+  note: string;
+  createdAt: Date;
+}
+
 export interface AdminJobDiagnosis {
   kind:
     | "deliverable"
@@ -201,6 +210,7 @@ export interface AdminJobStore {
   listStitchJobs(jobId: string): Promise<AdminStitchJobRecord[]>;
   listPostQaResults(jobId: string): Promise<AdminPostQaRecord[]>;
   listStateEvents(jobId: string): Promise<AdminStateEventRecord[]>;
+  listNotes(jobId: string): Promise<AdminJobNoteRecord[]>;
 }
 
 function isStale(updatedAt: Date, now: Date) {
@@ -363,6 +373,7 @@ export async function getAdminJobDetail({
     stitchJobRecords,
     postQaResultRecords,
     stateEventRecords,
+    noteRecords,
   ] = await Promise.all([
     store.listAssets(jobId),
     store.listAnalyses(jobId),
@@ -374,6 +385,7 @@ export async function getAdminJobDetail({
     store.listStitchJobs(jobId),
     store.listPostQaResults(jobId),
     store.listStateEvents(jobId),
+    store.listNotes(jobId),
   ]);
 
   const diagnosis = diagnoseAdminJob({
@@ -416,6 +428,9 @@ export async function getAdminJobDetail({
     stateEvents: [...stateEventRecords].sort(
       (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
     ),
+    notes: [...noteRecords].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    ),
   };
 }
 
@@ -431,6 +446,7 @@ export function createInMemoryAdminJobStore(input: {
   stitchJobs: AdminStitchJobRecord[];
   postQaResults: AdminPostQaRecord[];
   stateEvents?: AdminStateEventRecord[];
+  notes?: AdminJobNoteRecord[];
 }): AdminJobStore {
   return {
     async findJob(jobId) {
@@ -469,6 +485,9 @@ export function createInMemoryAdminJobStore(input: {
     },
     async listStateEvents(jobId) {
       return (input.stateEvents ?? []).filter((event) => event.videoJobId === jobId);
+    },
+    async listNotes(jobId) {
+      return (input.notes ?? []).filter((note) => note.jobId === jobId);
     },
   };
 }
@@ -685,6 +704,19 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
         .from(jobStateEvents)
         .where(eq(jobStateEvents.videoJobId, jobId))
         .orderBy(desc(jobStateEvents.createdAt));
+    },
+    async listNotes(jobId) {
+      return db
+        .select({
+          id: adminJobNotes.id,
+          jobId: adminJobNotes.jobId,
+          adminUserId: adminJobNotes.adminUserId,
+          note: adminJobNotes.note,
+          createdAt: adminJobNotes.createdAt,
+        })
+        .from(adminJobNotes)
+        .where(eq(adminJobNotes.jobId, jobId))
+        .orderBy(desc(adminJobNotes.createdAt));
     },
   };
 }

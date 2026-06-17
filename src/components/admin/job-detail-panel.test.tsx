@@ -112,6 +112,15 @@ describe("JobDetailPanel", () => {
           ],
           moderationResults: [],
           ledger: [],
+          notes: [
+            {
+              id: "note-1",
+              jobId: "job-1",
+              adminUserId: "operator-1",
+              note: "checked provider logs before retry",
+              createdAt: new Date("2026-06-11T00:05:00.000Z"),
+            },
+          ],
           stitchJobs: [],
           postQaResults: [],
           stateEvents: [
@@ -144,6 +153,8 @@ describe("JobDetailPanel", () => {
     expect(screen.getAllByText("minimal_studio").length).toBeGreaterThan(0);
     expect(screen.getByText(/email_trial_used/)).toBeInTheDocument();
     expect(screen.getByText("State Events Timeline")).toBeInTheDocument();
+    expect(screen.getByText("管理员备注")).toBeInTheDocument();
+    expect(screen.getByText("checked provider logs before retry")).toBeInTheDocument();
     expect(screen.getByText("原始辅助数据")).toBeInTheDocument();
   });
 });

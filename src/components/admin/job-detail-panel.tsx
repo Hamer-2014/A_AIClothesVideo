@@ -2,6 +2,7 @@ import type { getAdminJobDetail } from "@/server/admin/jobs";
 
 import { JobDiagnosisPanel } from "./job-diagnosis-panel";
 import { JobFailureSummary } from "./job-failure-summary";
+import { JobNoteForm } from "./job-note-form";
 
 interface AdminJobDetailPanelProps {
   detail: NonNullable<Awaited<ReturnType<typeof getAdminJobDetail>>>;
@@ -332,6 +333,36 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
           formatDateTime(entry.createdAt),
         ])}
       />
+
+      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-medium">管理员备注</h3>
+          <p className="text-xs text-[var(--muted)]">仅后台可见，写入 admin audit log。</p>
+        </div>
+        <JobNoteForm endpoint={`/api/admin/jobs/${detail.job.id}/notes`} />
+        <div className="mt-4 space-y-3">
+          {detail.notes.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">当前没有管理员备注。</p>
+          ) : (
+            detail.notes.map((note) => (
+              <div
+                className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+                key={note.id}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-medium">{note.adminUserId}</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {formatDateTime(note.createdAt)}
+                  </p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                  {note.note}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="rounded-lg border border-[var(--line)] bg-white p-5">
         <h3 className="text-base font-medium">State Events Timeline</h3>

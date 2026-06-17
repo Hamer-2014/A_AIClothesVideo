@@ -39,6 +39,14 @@ export const userAccessEvents = pgTable("user_access_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const adminJobNotes = pgTable("admin_job_notes", {
+  ...id,
+  jobId: uuid("job_id").notNull(),
+  adminUserId: text("admin_user_id").notNull(),
+  note: text("note").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const trialAbuseSignals = pgTable("trial_abuse_signals", {
   ...id,
   userId: text("user_id").notNull(),

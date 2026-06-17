@@ -38,4 +38,25 @@ describe("drizzle migrations", () => {
     expect(migrationSql).toContain('"metadata"');
     expect(migrationSql).toContain('"created_at"');
   });
+
+  it("includes the admin job notes migration with required fields", () => {
+    const drizzleDir = path.resolve(process.cwd(), "drizzle");
+    const journalPath = path.join(drizzleDir, "meta", "_journal.json");
+    const journal = JSON.parse(readFileSync(journalPath, "utf8")) as MigrationJournal;
+
+    expect(journal.entries.some((entry) => entry.tag === "0013_admin_job_notes")).toBe(
+      true,
+    );
+
+    const migrationSql = readFileSync(
+      path.join(drizzleDir, "0013_admin_job_notes.sql"),
+      "utf8",
+    );
+
+    expect(migrationSql).toContain('"admin_job_notes"');
+    expect(migrationSql).toContain('"job_id"');
+    expect(migrationSql).toContain('"admin_user_id"');
+    expect(migrationSql).toContain('"note"');
+    expect(migrationSql).toContain('"created_at"');
+  });
 });
