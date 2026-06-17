@@ -36,6 +36,7 @@ export default async function AdminJobsPage({
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const attention = resolvedSearchParams?.attention === "1";
+  const failureQueue = resolvedSearchParams?.failureQueue === "1";
   const isTest = toBooleanFilter(
     typeof resolvedSearchParams?.isTest === "string"
       ? resolvedSearchParams.isTest
@@ -45,6 +46,14 @@ export default async function AdminJobsPage({
     typeof resolvedSearchParams?.status === "string"
       ? resolvedSearchParams.status
       : undefined;
+  const billingMode =
+    typeof resolvedSearchParams?.billingMode === "string"
+      ? resolvedSearchParams.billingMode
+      : undefined;
+  const presetId =
+    typeof resolvedSearchParams?.presetId === "string"
+      ? resolvedSearchParams.presetId
+      : undefined;
   const query =
     typeof resolvedSearchParams?.q === "string" ? resolvedSearchParams.q : undefined;
 
@@ -53,8 +62,11 @@ export default async function AdminJobsPage({
     ledgerSummaryStore: createDrizzleAdminJobLedgerSummaryStore(),
     filters: {
       attention,
+      failureQueue,
       isTest,
       status,
+      billingMode,
+      presetId,
       query,
     },
   });
@@ -66,7 +78,7 @@ export default async function AdminJobsPage({
       nav={buildAdminNav("/admin/jobs")}
     >
       <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-        <form className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))_auto]">
+        <form className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(6,minmax(0,0.7fr))_auto]">
           <input
             className="h-10 rounded-md border border-[var(--line)] px-3 text-sm outline-none ring-0 transition focus:border-[var(--accent)]"
             defaultValue={query ?? ""}
@@ -84,6 +96,14 @@ export default async function AdminJobsPage({
           </select>
           <select
             className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
+            defaultValue={failureQueue ? "1" : "0"}
+            name="failureQueue"
+          >
+            <option value="0">全部队列</option>
+            <option value="1">失败队列</option>
+          </select>
+          <select
+            className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
             defaultValue={typeof isTest === "boolean" ? String(isTest) : ""}
             name="isTest"
           >
@@ -91,6 +111,22 @@ export default async function AdminJobsPage({
             <option value="true">仅测试</option>
             <option value="false">仅正式</option>
           </select>
+          <select
+            className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
+            defaultValue={billingMode ?? ""}
+            name="billingMode"
+          >
+            <option value="">计费全部</option>
+            <option value="free_trial">免费试用</option>
+            <option value="paid">付费</option>
+          </select>
+          <input
+            className="h-10 rounded-md border border-[var(--line)] px-3 text-sm outline-none ring-0 transition focus:border-[var(--accent)]"
+            defaultValue={presetId ?? ""}
+            name="presetId"
+            placeholder="presetId"
+            type="text"
+          />
           <input
             className="h-10 rounded-md border border-[var(--line)] px-3 text-sm outline-none ring-0 transition focus:border-[var(--accent)]"
             defaultValue={status ?? ""}
@@ -114,9 +150,15 @@ export default async function AdminJobsPage({
           </Link>
           <Link
             className="inline-flex h-8 items-center rounded-md border border-[var(--line)] px-3 text-[var(--muted)]"
+            href="/admin/jobs?failureQueue=1"
+          >
+            失败队列
+          </Link>
+          <Link
+            className="inline-flex h-8 items-center rounded-md border border-[var(--line)] px-3 text-[var(--muted)]"
             href="/admin/jobs?attention=1"
           >
-            异常队列
+            异常/卡住
           </Link>
           <Link
             className="inline-flex h-8 items-center rounded-md border border-[var(--line)] px-3 text-[var(--muted)]"
@@ -142,6 +184,8 @@ export default async function AdminJobsPage({
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">状态</th>
                 <th className="px-4 py-3 font-medium">用户态</th>
+                <th className="px-4 py-3 font-medium">计费</th>
+                <th className="px-4 py-3 font-medium">Preset</th>
                 <th className="px-4 py-3 font-medium">时长 / 比例</th>
                 <th className="px-4 py-3 font-medium">点数</th>
                 <th className="px-4 py-3 font-medium">账务</th>
@@ -154,7 +198,7 @@ export default async function AdminJobsPage({
             <tbody className="divide-y divide-[var(--line)]">
               {jobs.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-[var(--muted)]" colSpan={11}>
+                  <td className="px-4 py-6 text-sm text-[var(--muted)]" colSpan={13}>
                     当前筛选条件下没有任务。
                   </td>
                 </tr>
@@ -165,6 +209,8 @@ export default async function AdminJobsPage({
                     <td className="px-4 py-4 text-[var(--muted)]">{job.userId}</td>
                     <td className="px-4 py-4">{job.status}</td>
                     <td className="px-4 py-4">{job.userVisibleStatus}</td>
+                    <td className="px-4 py-4">{job.billingMode}</td>
+                    <td className="px-4 py-4">{job.presetId ?? "-"}</td>
                     <td className="px-4 py-4">
                       {job.durationSeconds} 秒 / {job.aspectRatio}
                     </td>

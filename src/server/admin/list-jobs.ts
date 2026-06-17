@@ -13,6 +13,15 @@ const ATTENTION_FAILURE_STATUSES = new Set([
   "asset_analysis_failed",
 ]);
 
+const FAILURE_QUEUE_STATUSES = new Set([
+  "failed_released",
+  "failed_refunded",
+  "post_qa_failed",
+  "prompt_moderation_blocked",
+  "segment_failed",
+  "asset_analysis_failed",
+]);
+
 const ATTENTION_STALE_STATUSES = new Set([
   "post_qa_queued",
   "post_qa_running",
@@ -30,6 +39,8 @@ export interface AdminJobListItem {
   userVisibleStatus: string;
   durationSeconds: number;
   aspectRatio: string;
+  billingMode: string;
+  presetId: string | null;
   creditCost: number;
   failureReason: string | null;
   isTest: boolean;
@@ -40,8 +51,11 @@ export interface AdminJobListItem {
 
 export interface AdminJobListFilters {
   attention?: boolean;
+  failureQueue?: boolean;
   isTest?: boolean;
   status?: string;
+  billingMode?: string;
+  presetId?: string;
   query?: string;
 }
 
@@ -90,6 +104,8 @@ export function createDrizzleAdminJobListStore(
           userVisibleStatus: videoJobs.userVisibleStatus,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
+          billingMode: videoJobs.billingMode,
+          presetId: videoJobs.presetId,
           creditCost: videoJobs.creditCost,
           failureReason: videoJobs.failureReason,
           isTest: videoJobs.isTest,
@@ -175,11 +191,23 @@ export async function listAdminJobs({
       return false;
     }
 
+    if (filters?.failureQueue && !FAILURE_QUEUE_STATUSES.has(job.status)) {
+      return false;
+    }
+
     if (typeof filters?.isTest === "boolean" && job.isTest !== filters.isTest) {
       return false;
     }
 
     if (filters?.status && job.status !== filters.status) {
+      return false;
+    }
+
+    if (filters?.billingMode && job.billingMode !== filters.billingMode) {
+      return false;
+    }
+
+    if (filters?.presetId && job.presetId !== filters.presetId) {
       return false;
     }
 
