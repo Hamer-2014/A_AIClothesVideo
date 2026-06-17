@@ -225,6 +225,7 @@ describe("admin job actions", () => {
       jobId,
       status: "failed_released",
       ledgerType: "release",
+      idempotent: false,
     });
     expect(creditStore.listLedger().map((entry) => entry.type)).toEqual([
       "trial_grant",
@@ -233,10 +234,165 @@ describe("admin job actions", () => {
     ]);
     expect(jobStore.listJobs()[0]?.status).toBe("failed_released");
     expect(auditStore.listAuditLogs()[0]).toMatchObject({
-      action: "job:mark_undeliverable",
+      action: "job:release_credits",
       targetType: "video_job",
       targetId: jobId,
     });
+  });
+
+  it("uses release credit guardrails when marking jobs undeliverable", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    const auditStore = createInMemoryAdminAuditStore();
+
+    await expect(
+      markJobUndeliverable({
+        jobStore: createInMemoryJobStore([
+          {
+            id: jobId,
+            userId,
+            status: "deliverable",
+            lockedBy: null,
+            lockedUntil: null,
+            attemptCount: 1,
+            lastError: null,
+          },
+        ]),
+        actionStore: createInMemoryAdminJobActionStore([
+          {
+            id: jobId,
+            userId,
+            status: "deliverable",
+            creditCost: 70,
+            reservedLedgerId: "ledger-reserve",
+            failureReason: null,
+          },
+        ]),
+        creditStore,
+        auditStore,
+        actor,
+        jobId,
+        reason: "cannot recover generation",
+      }),
+    ).rejects.toThrow("Video job credits cannot be released in this state.");
+
+    await expect(
+      markJobUndeliverable({
+        jobStore: createInMemoryJobStore([
+          {
+            id: jobId,
+            userId,
+            status: "segment_failed",
+            lockedBy: null,
+            lockedUntil: null,
+            attemptCount: 1,
+            lastError: "provider failed",
+          },
+        ]),
+        actionStore: createInMemoryAdminJobActionStore([
+          {
+            id: jobId,
+            userId,
+            status: "segment_failed",
+            creditCost: 70,
+            reservedLedgerId: null,
+            failureReason: "provider failed",
+          },
+        ]),
+        creditStore,
+        auditStore,
+        actor,
+        jobId,
+        reason: "cannot recover generation",
+      }),
+    ).rejects.toThrow("Video job has no reserved ledger to release.");
+  });
+
+  it("rejects marking an already released job undeliverable without repeating release", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 100,
+      reason: "setup",
+      idempotencyKey: "grant:undeliverable-idempotent",
+    });
+    const reserve = await reserveCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "reserve",
+      idempotencyKey: `reserve:job:${jobId}:undeliverable-idempotent`,
+      relatedJobId: jobId,
+    });
+    await markJobUndeliverable({
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "segment_failed",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 1,
+          lastError: "provider failed",
+        },
+      ]),
+      actionStore: createInMemoryAdminJobActionStore([
+        {
+          id: jobId,
+          userId,
+          status: "segment_failed",
+          creditCost: 70,
+          reservedLedgerId: reserve.ledger.id,
+          failureReason: "provider failed",
+        },
+      ], [
+        { id: reserve.ledger.id, type: "reserve", relatedJobId: jobId },
+      ]),
+      creditStore,
+      auditStore: createInMemoryAdminAuditStore(),
+      actor,
+      jobId,
+      reason: "cannot recover generation",
+    });
+
+    const secondAuditStore = createInMemoryAdminAuditStore();
+    await expect(markJobUndeliverable({
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "failed_released",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 1,
+          lastError: "provider failed",
+        },
+      ]),
+      actionStore: createInMemoryAdminJobActionStore([
+        {
+          id: jobId,
+          userId,
+          status: "failed_released",
+          creditCost: 70,
+          reservedLedgerId: reserve.ledger.id,
+          failureReason: "provider failed",
+        },
+      ], [
+        { id: reserve.ledger.id, type: "reserve", relatedJobId: jobId },
+        { id: "ledger-release", type: "release", relatedJobId: jobId },
+      ]),
+      creditStore,
+      auditStore: secondAuditStore,
+      actor,
+      jobId,
+      reason: "cannot recover generation",
+    })).rejects.toThrow("Video job reserved credits are already resolved.");
+    expect(creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+      "release",
+    ]);
+    expect(secondAuditStore.listAuditLogs()).toEqual([]);
   });
 
   it("releases reserved credits for a failed job idempotently and writes audit once", async () => {

@@ -15,7 +15,7 @@ import {
 
 interface MarkUndeliverableDeps {
   getAdminSession?: () => Promise<AdminSession | null>;
-  markUndeliverable?: (input: {
+  releaseCredits?: (input: {
     jobId: string;
     reason: string;
   }) => Promise<unknown>;
@@ -77,7 +77,7 @@ export async function handleMarkUndeliverableRequest(
   }
 
   try {
-    const result = await (deps.markUndeliverable ??
+    const result = await (deps.releaseCredits ??
       ((args) => defaultMarkUndeliverable({ admin, request, ...args })))({
       jobId: context.params.id,
       reason: input.reason,
@@ -86,7 +86,10 @@ export async function handleMarkUndeliverableRequest(
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === "Actor cannot mark jobs undeliverable."
+      [
+        "Actor cannot mark jobs undeliverable.",
+        "Actor cannot release job credits.",
+      ].includes(error.message)
     ) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
@@ -101,6 +104,20 @@ export async function handleMarkUndeliverableRequest(
     }
     if (error instanceof Error && error.message === "Video job not found.") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    if (
+      error instanceof Error &&
+      [
+        "Video job reserved credits are already resolved.",
+        "Video job has no reserved ledger to release.",
+        "Video job has no paid credits to release.",
+        "Video job credits cannot be released in this state.",
+      ].includes(error.message)
+    ) {
+      return NextResponse.json(
+        { error: "release_credits_not_allowed", message: error.message },
+        { status: 409 },
+      );
     }
 
     return NextResponse.json(

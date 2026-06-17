@@ -175,56 +175,22 @@ export async function markJobUndeliverable({
     throw new Error("Actor cannot mark jobs undeliverable.");
   }
 
-  const normalizedReason = normalizeAdminReason(reason);
-
-  const before = await actionStore.findJob(jobId);
-  if (!before) {
-    throw new Error("Video job not found.");
-  }
-
-  await releaseReservedCredits({
-    store: creditStore,
-    userId: before.userId,
-    amount: before.creditCost,
-    reason: normalizedReason,
-    idempotencyKey: `admin_release:job:${jobId}`,
-    relatedJobId: jobId,
-    metadata: {
-      actorUserId: actor.userId,
-      actorEmail: actor.email,
-      reservedLedgerId: before.reservedLedgerId,
-    },
-  });
-  const after = await actionStore.updateFailureReason({
-    jobId,
-    failureReason: normalizedReason,
-  });
-  await transitionJobStatus({
-    store: jobStore,
-    jobId,
-    toStatus: "failed_released",
-    reason: "admin_mark_undeliverable",
-    actorType: "admin",
-    actorId: actor.userId,
-    eventSnapshot: { reason: normalizedReason },
-  });
-  await writeAdminAuditLog({
-    store: auditStore,
+  const result = await releaseJobCreditsByAdmin({
+    jobStore,
+    actionStore,
+    creditStore,
+    auditStore,
     actor,
-    action: "job:mark_undeliverable",
-    targetType: "video_job",
-    targetId: jobId,
-    reason: normalizedReason,
-    beforeSnapshot: toAuditSnapshot(before),
-    afterSnapshot: toAuditSnapshot(after),
+    jobId,
+    reason,
     requestMeta,
   });
 
-  return {
-    jobId,
-    status: "failed_released" as const,
-    ledgerType: "release" as CreditLedgerType,
-  };
+  if (result.idempotent) {
+    throw new Error("Video job reserved credits are already resolved.");
+  }
+
+  return result;
 }
 
 const adminReleaseableStatuses = new Set([
