@@ -85,6 +85,13 @@
       "when": 1781620800000,
       "tag": "0011_style_preset_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781697600000,
+      "tag": "0012_funnel_events",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 export * from "./assets";
 export * from "./audit";
 export * from "./auth";
+export * from "./analytics";
 export * from "./credits";
 export * from "./jobs";
 export * from "./providers";

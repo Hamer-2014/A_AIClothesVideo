@@ -20,4 +20,22 @@ describe("drizzle migrations", () => {
 
     expect(journalTags).toEqual(migrationFiles);
   });
+
+  it("includes the funnel events migration with required fields", () => {
+    const drizzleDir = path.resolve(process.cwd(), "drizzle");
+    const journalPath = path.join(drizzleDir, "meta", "_journal.json");
+    const journal = JSON.parse(readFileSync(journalPath, "utf8")) as MigrationJournal;
+
+    expect(journal.entries.some((entry) => entry.tag === "0012_funnel_events")).toBe(true);
+
+    const migrationSql = readFileSync(
+      path.join(drizzleDir, "0012_funnel_events.sql"),
+      "utf8",
+    );
+
+    expect(migrationSql).toContain('"funnel_events"');
+    expect(migrationSql).toContain('"event_name"');
+    expect(migrationSql).toContain('"metadata"');
+    expect(migrationSql).toContain('"created_at"');
+  });
 });
