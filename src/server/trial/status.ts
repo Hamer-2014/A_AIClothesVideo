@@ -41,7 +41,7 @@ export interface TrialStatusInput {
   now?: Date;
 }
 
-type TrialStatusStore = Pick<TrialEligibilityStore, "countTrialUsagesByUserId">;
+type TrialStatusStore = TrialEligibilityStore;
 
 interface TrialStatusDeps {
   store: TrialStatusStore;
@@ -55,12 +55,14 @@ interface TrialStatusDeps {
 function createReadOnlyEligibilityStore(
   store: TrialStatusStore,
 ): TrialEligibilityStore {
-  return {
+  const readOnlyStore: TrialEligibilityStore = {
     ...store,
     async createTrialAbuseSignal() {
       // Status reads must not create trial check/grant/deny signals.
     },
-  } as TrialEligibilityStore;
+  };
+
+  return readOnlyStore;
 }
 
 const availableStatus: TrialStatus = {

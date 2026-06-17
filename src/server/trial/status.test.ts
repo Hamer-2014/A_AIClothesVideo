@@ -1,13 +1,33 @@
 import { describe, expect, it } from "vitest";
 
+import type { TrialEligibilityStore } from "@/server/abuse/trial-eligibility";
+
 import { getUserVisibleTrialStatus } from "./status";
+
+function trialStatusStore({
+  userTrialCount = 0,
+  signals = [],
+}: {
+  userTrialCount?: number;
+  signals?: unknown[];
+} = {}): TrialEligibilityStore {
+  return {
+    countTrialUsagesByUserId: async () => userTrialCount,
+    countTrialUsagesByEmailHash: async () => 0,
+    countTrialUsagesByOauthAccount: async () => 0,
+    countRecentTrialSignalsByDevice: async () => 0,
+    countRecentTrialSignalsByIp: async () => 0,
+    countRecentTrialSignalsByIpAndUserAgent: async () => 0,
+    createTrialAbuseSignal: async (input) => {
+      signals.push(input);
+    },
+  };
+}
 
 describe("getUserVisibleTrialStatus", () => {
   it("returns available when the user has no previous trial and eligibility allows", async () => {
     const status = await getUserVisibleTrialStatus({
-      store: {
-        countTrialUsagesByUserId: async () => 0,
-      },
+      store: trialStatusStore(),
       evaluateEligibility: async () => ({
         decision: "allow",
         riskScore: 0,
@@ -31,9 +51,7 @@ describe("getUserVisibleTrialStatus", () => {
 
   it("returns used when the user already has a historical trial", async () => {
     const status = await getUserVisibleTrialStatus({
-      store: {
-        countTrialUsagesByUserId: async () => 1,
-      },
+      store: trialStatusStore({ userTrialCount: 1 }),
       evaluateEligibility: async () => {
         throw new Error("eligibility should not run after historical usage");
       },
@@ -49,9 +67,7 @@ describe("getUserVisibleTrialStatus", () => {
 
   it("returns unavailable when risk or eligibility denies trial access", async () => {
     const status = await getUserVisibleTrialStatus({
-      store: {
-        countTrialUsagesByUserId: async () => 0,
-      },
+      store: trialStatusStore(),
       evaluateEligibility: async () => ({
         decision: "deny",
         riskScore: 100,
@@ -73,9 +89,7 @@ describe("getUserVisibleTrialStatus", () => {
 
   it("does not expose risk scores, hashes, or internal reason codes", async () => {
     const status = await getUserVisibleTrialStatus({
-      store: {
-        countTrialUsagesByUserId: async () => 0,
-      },
+      store: trialStatusStore(),
       evaluateEligibility: async () => ({
         decision: "review",
         riskScore: 45,
@@ -100,17 +114,7 @@ describe("getUserVisibleTrialStatus", () => {
     const signals: unknown[] = [];
 
     await getUserVisibleTrialStatus({
-      store: {
-        countTrialUsagesByUserId: async () => 0,
-        countTrialUsagesByEmailHash: async () => 0,
-        countTrialUsagesByOauthAccount: async () => 0,
-        countRecentTrialSignalsByDevice: async () => 0,
-        countRecentTrialSignalsByIp: async () => 0,
-        countRecentTrialSignalsByIpAndUserAgent: async () => 0,
-        createTrialAbuseSignal: async (input) => {
-          signals.push(input);
-        },
-      },
+      store: trialStatusStore({ signals }),
       input: {
         userId: "user-1",
         email: "seller@example.com",

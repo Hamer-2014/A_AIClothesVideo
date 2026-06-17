@@ -234,11 +234,13 @@ export function WorkspaceApp({
     }
 
     const deviceFingerprint = getOrCreateDeviceFingerprint();
-    void fetch(
-      `/api/trial/status?deviceFingerprint=${encodeURIComponent(
-        deviceFingerprint,
-      )}`,
-    )
+    const trialStatusUrl = deviceFingerprint
+      ? `/api/trial/status?deviceFingerprint=${encodeURIComponent(
+          deviceFingerprint,
+        )}`
+      : "/api/trial/status";
+
+    void fetch(trialStatusUrl)
       .then(async (response) => {
         if (!response.ok) {
           return;
