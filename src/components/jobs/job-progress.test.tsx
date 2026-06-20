@@ -21,8 +21,9 @@ describe("JobProgress", () => {
       <JobProgress
         key="queued"
         progress={{
+          jobId: "job-1",
           status: "segment_failed",
-          phase: "generation",
+          phase: "failed",
           message:
             "EvoLink failed: Service busy. Allocating resources, please retry later.",
           segmentProgress: {
@@ -39,9 +40,17 @@ describe("JobProgress", () => {
       />,
     );
 
-    expect(screen.getByText("生成失败原因")).toBeInTheDocument();
+    expect(screen.getByText("处理建议")).toBeInTheDocument();
     expect(screen.queryByText(/EvoLink/i)).not.toBeInTheDocument();
-    expect(screen.getByText("生成服务暂时不可用，请稍后重试。")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "生成服务暂时繁忙，本次没有交付成片。冻结点数会自动退回，你可以稍后重试。",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "返回工作台重新创建" })).toHaveAttribute(
+      "href",
+      "/workspace?sourceJobId=job-1",
+    );
   });
 
   it("does not expose provider names in user-facing failure copy", () => {
@@ -66,7 +75,11 @@ describe("JobProgress", () => {
     );
 
     expect(screen.queryByText(/EvoLink/i)).not.toBeInTheDocument();
-    expect(screen.getByText("生成服务暂时不可用，请稍后重试。")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "生成服务暂时繁忙，本次没有交付成片。冻结点数会自动退回，你可以稍后重试。",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("does not show a failure card while provider generation is still active", () => {
@@ -90,9 +103,14 @@ describe("JobProgress", () => {
       />,
     );
 
-    expect(screen.getByText(/片段生成中 · 片段 0\/1/)).toBeInTheDocument();
-    expect(screen.queryByText("生成失败原因")).not.toBeInTheDocument();
-    expect(screen.queryByText("生成服务暂时不可用，请稍后重试。")).not.toBeInTheDocument();
+    expect(screen.getByText("正在生成视频镜头")).toBeInTheDocument();
+    expect(screen.getByText(/正在生成第 1 个镜头，共 1 个/)).toBeInTheDocument();
+    expect(screen.queryByText("处理建议")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "生成服务暂时繁忙，本次没有交付成片。冻结点数会自动退回，你可以稍后重试。",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("labels queued and failed generation states clearly", () => {
@@ -117,7 +135,11 @@ describe("JobProgress", () => {
       />,
     );
 
-    expect(screen.getByText(/等待提交生成/)).toBeInTheDocument();
+    expect(screen.getByText("正在生成视频镜头")).toBeInTheDocument();
+    expect(screen.getByText(/正在生成第 1 个镜头，共 1 个/)).toBeInTheDocument();
+    expect(screen.queryByText("Segment")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stitch")).not.toBeInTheDocument();
+    expect(screen.queryByText("Post-QA")).not.toBeInTheDocument();
 
     cleanup();
     render(
@@ -140,7 +162,7 @@ describe("JobProgress", () => {
       />,
     );
 
-    expect(screen.getByText(/生成失败 · 片段 0\/1/)).toBeInTheDocument();
+    expect(screen.getByText("本次任务未交付成片")).toBeInTheDocument();
   });
 
   it("polls job progress while generation is active", async () => {
@@ -191,7 +213,7 @@ describe("JobProgress", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/progress", {
       cache: "no-store",
     });
-    expect(screen.getByText(/片段 1\/1/)).toBeInTheDocument();
+    expect(screen.getByText(/正在生成第 1 个镜头，共 1 个/)).toBeInTheDocument();
   });
 
   it("shows credit lifecycle copy for paid reserved and captured jobs", () => {
@@ -219,7 +241,9 @@ describe("JobProgress", () => {
     );
 
     expect(screen.getByText("已冻结 70 点")).toBeInTheDocument();
-    expect(screen.getByText("质检通过后正式扣除。")).toBeInTheDocument();
+    expect(
+      screen.getByText("视频通过质量检查后才会正式扣除。生成失败会自动退回。"),
+    ).toBeInTheDocument();
 
     cleanup();
     render(
@@ -272,6 +296,7 @@ describe("JobProgress", () => {
       />,
     );
 
-    expect(screen.getByText("免费试用 · 不扣点数")).toBeInTheDocument();
+    expect(screen.getByText("免费试用任务")).toBeInTheDocument();
+    expect(screen.getByText("不扣点数。输出为低分辨率并带水印。")).toBeInTheDocument();
   });
 });

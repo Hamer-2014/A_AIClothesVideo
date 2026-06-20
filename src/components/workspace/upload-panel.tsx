@@ -10,13 +10,14 @@ export interface UploadedAssetItem {
   assetId: string;
   fileName: string;
   intendedRole: UploadSlotRole;
-  status: "idle" | "uploading" | "uploaded" | "failed";
+  status: "idle" | "local" | "uploading" | "uploaded" | "failed";
   error?: string | null;
   previewUrl?: string | null;
 }
 
 interface UploadPanelProps {
   assets: UploadedAssetItem[];
+  isAuthenticated?: boolean;
   onUploaded: (asset: UploadedAssetItem) => void;
   onRemoveUploaded: (assetId: string) => void;
   onUploadingChange: (uploading: boolean) => void;
@@ -78,10 +79,12 @@ function humanReadableUploadError(error: string) {
 interface SelectedSlotFile {
   fileName: string;
   previewUrl: string;
+  status: "local" | "uploading";
 }
 
 export function UploadPanel({
   assets,
+  isAuthenticated = true,
   onRemoveUploaded,
   onUploaded,
   onUploadingChange,
@@ -108,6 +111,15 @@ export function UploadPanel({
       new Map(
         assets
           .filter((asset) => asset.status === "failed")
+          .map((asset) => [asset.intendedRole, asset]),
+      ),
+    [assets],
+  );
+  const localByRole = useMemo(
+    () =>
+      new Map(
+        assets
+          .filter((asset) => asset.status === "local")
           .map((asset) => [asset.intendedRole, asset]),
       ),
     [assets],
@@ -156,9 +168,20 @@ export function UploadPanel({
         [role]: {
           fileName: file.name,
           previewUrl,
+          status: isAuthenticated ? "uploading" : "local",
         },
       };
     });
+    if (!isAuthenticated) {
+      onUploaded({
+        assetId: `local-${role}`,
+        fileName: file.name,
+        intendedRole: role,
+        status: "local",
+        previewUrl,
+      });
+      return;
+    }
     void uploadRole(role, file, previewUrl, currentToken);
   }
 
@@ -257,7 +280,8 @@ export function UploadPanel({
       return next;
     });
 
-    const existingAsset = uploadedByRole.get(role) ?? failedByRole.get(role);
+    const existingAsset =
+      uploadedByRole.get(role) ?? failedByRole.get(role) ?? localByRole.get(role);
     if (existingAsset) {
       if (existingAsset.previewUrl) {
         URL.revokeObjectURL(existingAsset.previewUrl);
@@ -276,10 +300,12 @@ export function UploadPanel({
           {uploadSlots.slice(0, 1).map((slot) => {
             const uploaded = uploadedByRole.get(slot.role);
             const failed = failedByRole.get(slot.role);
+            const local = localByRole.get(slot.role);
             const selected = slotFiles[slot.role];
             const uploading = uploadingRoles.has(slot.role);
-            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl;
-            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName;
+            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl ?? local?.previewUrl;
+            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName ?? local?.fileName;
+            const localPreview = selected?.status === "local" || Boolean(local);
             const hasImage = Boolean(previewUrl);
 
             return (
@@ -337,7 +363,15 @@ export function UploadPanel({
                     {fileName ?? failed?.error ?? "未选择文件"}
                   </p>
                   <span className="shrink-0 text-[var(--muted)]">
-                    {uploading ? "上传中" : uploaded ? "已上传" : failed ? "失败" : ""}
+                    {uploading
+                      ? "上传中"
+                      : uploaded
+                        ? "已上传"
+                        : localPreview
+                          ? "本地预览"
+                          : failed
+                            ? "失败"
+                            : ""}
                   </span>
                 </div>
                 {failed?.error ? (
@@ -363,10 +397,12 @@ export function UploadPanel({
           {uploadSlots.slice(1).map((slot) => {
             const uploaded = uploadedByRole.get(slot.role);
             const failed = failedByRole.get(slot.role);
+            const local = localByRole.get(slot.role);
             const selected = slotFiles[slot.role];
             const uploading = uploadingRoles.has(slot.role);
-            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl;
-            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName;
+            const previewUrl = selected?.previewUrl ?? uploaded?.previewUrl ?? failed?.previewUrl ?? local?.previewUrl;
+            const fileName = selected?.fileName ?? uploaded?.fileName ?? failed?.fileName ?? local?.fileName;
+            const localPreview = selected?.status === "local" || Boolean(local);
             const hasImage = Boolean(previewUrl);
 
             return (
@@ -423,7 +459,15 @@ export function UploadPanel({
                     {fileName ?? failed?.error ?? "未选择文件"}
                   </p>
                   <span className="shrink-0 text-[var(--muted)]">
-                    {uploading ? "上传中" : uploaded ? "已上传" : failed ? "失败" : ""}
+                    {uploading
+                      ? "上传中"
+                      : uploaded
+                        ? "已上传"
+                        : localPreview
+                          ? "本地预览"
+                          : failed
+                            ? "失败"
+                            : ""}
                   </span>
                 </div>
                 {failed?.error ? (

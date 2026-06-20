@@ -24,6 +24,25 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function storyboardSegments(storyboardJson: unknown) {
+  if (
+    !storyboardJson ||
+    typeof storyboardJson !== "object" ||
+    !("segments" in storyboardJson) ||
+    !Array.isArray((storyboardJson as { segments?: unknown }).segments)
+  ) {
+    return [];
+  }
+
+  return (storyboardJson as {
+    segments: Array<{
+      index?: number;
+      duration_seconds?: number;
+      template_id?: string;
+    }>;
+  }).segments;
+}
+
 export default async function JobDetailPage({
   params,
 }: {
@@ -159,11 +178,34 @@ export default async function JobDetailPage({
         </section>
 
         <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-          <h2 className="text-base font-medium">最新分镜</h2>
+          <h2 className="text-base font-medium">分镜摘要</h2>
           {detail.latestStoryboard ? (
-            <pre className="mt-4 overflow-x-auto rounded-md bg-[var(--surface)] p-4 text-xs leading-6 text-[var(--muted)]">
-              {JSON.stringify(detail.latestStoryboard.storyboardJson, null, 2)}
-            </pre>
+            <div className="mt-4 space-y-3">
+              {storyboardSegments(detail.latestStoryboard.storyboardJson).map(
+                (segment, index) => (
+                  <div
+                    className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3"
+                    key={`${segment.template_id ?? "segment"}-${index}`}
+                  >
+                    <p className="text-sm font-medium">
+                      镜头 {segment.index ?? index + 1}
+                      {segment.duration_seconds
+                        ? ` · ${segment.duration_seconds} 秒`
+                        : ""}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      模板：{segment.template_id ?? "系统推荐模板"}
+                    </p>
+                  </div>
+                ),
+              )}
+              {storyboardSegments(detail.latestStoryboard.storyboardJson).length ===
+              0 ? (
+                <p className="text-sm text-[var(--muted)]">
+                  分镜已生成，暂无可展示摘要。
+                </p>
+              ) : null}
+            </div>
           ) : (
             <p className="mt-4 text-sm text-[var(--muted)]">尚未生成分镜。</p>
           )}

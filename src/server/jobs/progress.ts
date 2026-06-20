@@ -15,6 +15,7 @@ export interface JobProgressRecord {
   creditCost: number;
   billingMode: string;
   reservedLedgerId: string | null;
+  updatedAt: Date;
 }
 
 export interface SegmentProgressRecord {
@@ -145,6 +146,7 @@ export async function getVideoJobProgress({
     downloadReady: job.status === "deliverable" && Boolean(job.finalVideoKey),
     finalVideoKey: job.finalVideoKey,
     coverKey: job.coverKey,
+    updatedAt: job.updatedAt,
   };
 }
 
@@ -200,6 +202,7 @@ export function createDrizzleJobProgressStore(
           creditCost: videoJobs.creditCost,
           billingMode: videoJobs.billingMode,
           reservedLedgerId: videoJobs.reservedLedgerId,
+          updatedAt: videoJobs.updatedAt,
         })
         .from(videoJobs)
         .where(

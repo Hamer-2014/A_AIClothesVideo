@@ -97,6 +97,42 @@ describe("UploadPanel", () => {
     });
   });
 
+  it("keeps guest selections local-only without requesting upload presign", async () => {
+    const onUploaded = vi.fn();
+    const onUploadingChange = vi.fn();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    render(
+      <UploadPanel
+        assets={[]}
+        isAuthenticated={false}
+        onUploaded={onUploaded}
+        onUploadingChange={onUploadingChange}
+        onRemoveUploaded={vi.fn()}
+      />,
+    );
+
+    const file = new File(["front"], "guest-front.jpg", {
+      type: "image/jpeg",
+    });
+    fireEvent.change(screen.getByLabelText("选择正面图"), {
+      target: { files: [file] },
+    });
+
+    expect(screen.getByAltText("正面图预览")).toHaveAttribute("src", "blob:front-preview");
+    expect(screen.getByText("guest-front.jpg")).toBeInTheDocument();
+    expect(screen.getByText("本地预览")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onUploaded).toHaveBeenCalledWith({
+      assetId: "local-front",
+      fileName: "guest-front.jpg",
+      intendedRole: "front",
+      status: "local",
+      previewUrl: "blob:front-preview",
+    });
+    expect(onUploadingChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("uses a vertical canvas with the front slot above the supporting images", () => {
     render(
       <UploadPanel

@@ -15,6 +15,7 @@ function jobFixture(overrides: Partial<Parameters<typeof createInMemoryJobProgre
     creditCost: 70,
     billingMode: "paid",
     reservedLedgerId: null,
+    updatedAt: new Date("2026-06-19T08:00:00.000Z"),
     ...overrides,
   };
 }
@@ -57,6 +58,7 @@ describe("video job progress", () => {
       downloadReady: false,
       finalVideoKey: null,
       coverKey: null,
+      updatedAt: new Date("2026-06-19T08:00:00.000Z"),
     });
   });
 
@@ -120,6 +122,7 @@ describe("video job progress", () => {
       downloadReady: false,
       finalVideoKey: null,
       coverKey: null,
+      updatedAt: new Date("2026-06-19T08:00:00.000Z"),
     });
   });
 

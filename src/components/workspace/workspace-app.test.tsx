@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { WorkspaceApp } from "./workspace-app";
+import { WORKSPACE_GUEST_DRAFT_KEY } from "@/lib/workspace/guest-draft";
 
 vi.mock("./upload-panel", () => ({
   UploadPanel: ({
@@ -14,7 +15,7 @@ vi.mock("./upload-panel", () => ({
       assetId: string;
       fileName: string;
       intendedRole: "front" | "back" | "detail" | "scene";
-      status: "uploaded";
+      status: "local" | "uploaded";
     }) => void;
     onUploadingChange: (uploading: boolean) => void;
   }) => (
@@ -71,6 +72,19 @@ vi.mock("./upload-panel", () => ({
       >
         mock-upload-scene
       </button>
+      <button
+        onClick={() =>
+          onUploaded({
+            assetId: "local-front",
+            fileName: "guest-front.jpg",
+            intendedRole: "front",
+            status: "local",
+          })
+        }
+        type="button"
+      >
+        mock-local-front
+      </button>
       <button onClick={() => onUploadingChange(true)} type="button">
         mock-uploading
       </button>
@@ -80,19 +94,26 @@ vi.mock("./upload-panel", () => ({
 
 vi.mock("./spec-selector", () => ({
   SpecSelector: ({
+    aspectRatio,
     durationSeconds,
+    onAspectRatioChange,
     onDurationChange,
   }: {
+    aspectRatio: "9:16" | "1:1" | "16:9";
     durationSeconds: 8 | 16 | 24;
+    onAspectRatioChange: (aspectRatio: "9:16" | "1:1" | "16:9") => void;
     onDurationChange: (duration: 8 | 16 | 24) => void;
   }) => (
     <div>
-      spec-selector {durationSeconds}
+      spec-selector {durationSeconds} {aspectRatio}
       <button onClick={() => onDurationChange(16)} type="button">
         mock-duration-16
       </button>
       <button onClick={() => onDurationChange(24)} type="button">
         mock-duration-24
+      </button>
+      <button onClick={() => onAspectRatioChange("1:1")} type="button">
+        mock-aspect-1-1
       </button>
     </div>
   ),
@@ -197,6 +218,134 @@ describe("WorkspaceApp", () => {
     cleanup();
     vi.restoreAllMocks();
     window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it("saves a guest draft and redirects to login without creating a job", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const location = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "" },
+    });
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="marketplace_clean"
+        isAuthenticated={false}
+        loginHref="/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dmarketplace_clean%26resumeDraft%3D1"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-duration-16" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-aspect-1-1" }));
+    fireEvent.change(screen.getByLabelText("生成意图"), {
+      target: { value: "突出连衣裙垂坠感" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 130 点" }));
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/jobs",
+      expect.anything(),
+    );
+    expect(JSON.parse(window.sessionStorage.getItem(WORKSPACE_GUEST_DRAFT_KEY) ?? "{}")).toEqual({
+      mode: "paid",
+      presetId: "marketplace_clean",
+      durationSeconds: 16,
+      aspectRatio: "1:1",
+      userPrompt: "突出连衣裙垂坠感",
+      intendedAssetRoles: [],
+      fileNames: [],
+    });
+    expect(window.location.href).toBe(
+      "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dmarketplace_clean%26resumeDraft%3D1",
+    );
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: location,
+    });
+  });
+
+  it("restores a saved guest draft for authenticated users and asks them to reselect images", async () => {
+    window.sessionStorage.setItem(
+      WORKSPACE_GUEST_DRAFT_KEY,
+      JSON.stringify({
+        mode: "paid",
+        presetId: "social_lifestyle",
+        durationSeconds: 24,
+        aspectRatio: "1:1",
+        userPrompt: "恢复后的卖点文案",
+        intendedAssetRoles: ["front"],
+        fileNames: ["front.jpg"],
+      }),
+    );
+
+    render(
+      <WorkspaceApp
+        initialMode="paid"
+        initialPresetId="minimal_studio"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /社媒氛围短片/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("spec-selector 24 1:1")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("恢复后的卖点文案")).toBeInTheDocument();
+    expect(
+      screen.getByText("已恢复刚才的配置，请重新选择图片后生成。"),
+    ).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(WORKSPACE_GUEST_DRAFT_KEY)).toBeNull();
+  });
+
+  it("does not request trial status in guest mode", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="minimal_studio"
+        isAuthenticated={false}
+        loginHref="/login?next=%2Fworkspace%3Fmode%3Dtrial%26resumeDraft%3D1"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses guest local selections for template preview without calling them uploaded", () => {
+    render(
+      <WorkspaceApp
+        initialMode="paid"
+        isAuthenticated={false}
+        loginHref="/login?next=%2Fworkspace%3FresumeDraft%3D1"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-local-front" }));
+
+    expect(screen.getByText("正面慢推近")).toHaveAttribute(
+      "data-selectable",
+      "true",
+    );
+    expect(screen.getByText("Front").nextElementSibling).toHaveTextContent(
+      "已选择",
+    );
+    expect(
+      screen.getByText(
+        "基于已选择素材位预估模板，登录后需要重新选择图片并正式上传。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("基于已上传素材位预估模板，生成前会再次分析校验。"),
+    ).not.toBeInTheDocument();
   });
 
   it("requests trial status with the existing device fingerprint on trial entry", async () => {

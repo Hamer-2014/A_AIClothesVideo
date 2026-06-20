@@ -203,8 +203,13 @@ describe("JobLivePanels", () => {
       />,
     );
 
-    expect(screen.getByText("质检中")).toBeInTheDocument();
-    expect(screen.getByLabelText("视频默认预览：质检中")).toBeInTheDocument();
+    expect(screen.getByText("成片预览将在这里显示")).toBeInTheDocument();
+    expect(
+      screen.getByText(/正在进行质量检查。任务会继续处理，你可以稍后回来查看。/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("视频默认预览：成片预览将在这里显示"),
+    ).toBeInTheDocument();
   });
 
   it("labels the waiting preview before generation starts", () => {
@@ -235,6 +240,9 @@ describe("JobLivePanels", () => {
       />,
     );
 
-    expect(screen.getByText("等待生成")).toBeInTheDocument();
+    expect(screen.getByText("成片预览将在这里显示")).toBeInTheDocument();
+    expect(
+      screen.getByText(/正在进行生成前检查。任务会继续处理，你可以稍后回来查看。/),
+    ).toBeInTheDocument();
   });
 });

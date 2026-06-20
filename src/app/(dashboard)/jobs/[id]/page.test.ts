@@ -16,4 +16,17 @@ describe("job detail page server imports", () => {
       'import { userFacingJobMessage } from "@/lib/jobs/user-facing-message"',
     );
   });
+
+  it("presents storyboard as a readable summary instead of raw JSON", () => {
+    const source = readFileSync(
+      "src/app/(dashboard)/jobs/[id]/page.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("分镜摘要");
+    expect(source).toContain("storyboardSegments");
+    expect(source).not.toContain(
+      "JSON.stringify(detail.latestStoryboard.storyboardJson, null, 2)",
+    );
+  });
 });

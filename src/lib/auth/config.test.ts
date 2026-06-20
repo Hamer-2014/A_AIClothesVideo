@@ -1,9 +1,52 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { users } from "@/lib/db/schema";
 
+const mocks = vi.hoisted(() => ({
+  betterAuth: vi.fn(() => ({ auth: true })),
+  drizzleAdapter: vi.fn(() => ({ adapter: true })),
+  emailOTP: vi.fn((options) => ({ id: "email-otp", options })),
+  magicLink: vi.fn((options) => ({ id: "magic-link", options })),
+  getDb: vi.fn(() => ({ db: true })),
+  buildMagicLinkEmail: vi.fn(() => ({
+    subject: "magic",
+    html: "<p>magic</p>",
+    text: "magic",
+  })),
+  buildOtpEmail: vi.fn(() => ({
+    subject: "otp",
+    html: "<p>otp</p>",
+    text: "otp",
+  })),
+  sendAuthEmail: vi.fn(),
+}));
+
+vi.mock("better-auth", () => ({
+  betterAuth: mocks.betterAuth,
+}));
+
+vi.mock("@better-auth/drizzle-adapter", () => ({
+  drizzleAdapter: mocks.drizzleAdapter,
+}));
+
+vi.mock("better-auth/plugins", () => ({
+  emailOTP: mocks.emailOTP,
+  magicLink: mocks.magicLink,
+}));
+
+vi.mock("@/lib/db/client", () => ({
+  getDb: mocks.getDb,
+}));
+
+vi.mock("./email", () => ({
+  buildMagicLinkEmail: mocks.buildMagicLinkEmail,
+  buildOtpEmail: mocks.buildOtpEmail,
+  sendAuthEmail: mocks.sendAuthEmail,
+}));
+
 describe("auth config", () => {
   afterEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     vi.unstubAllEnvs();
   });
 

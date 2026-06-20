@@ -19,6 +19,11 @@ import {
   type StylePresetId,
   type WorkspaceEntryMode,
 } from "@/lib/presets";
+import {
+  WORKSPACE_GUEST_DRAFT_KEY,
+  parseWorkspaceGuestDraft,
+  serializeWorkspaceGuestDraft,
+} from "@/lib/workspace/guest-draft";
 import type { TrialStatus } from "@/server/trial/status";
 
 import { StylePresetSelector } from "./style-preset-selector";
@@ -36,6 +41,8 @@ interface WorkspaceAppProps {
   templateCatalog: TemplateCatalogItem[];
   initialMode?: WorkspaceEntryMode;
   initialPresetId?: string | null;
+  isAuthenticated?: boolean;
+  loginHref?: string;
 }
 
 interface JobDetailResponse {
@@ -202,6 +209,8 @@ export function WorkspaceApp({
   templateCatalog,
   initialMode = "paid",
   initialPresetId,
+  isAuthenticated = true,
+  loginHref = "/login?next=%2Fworkspace%3FresumeDraft%3D1",
 }: WorkspaceAppProps) {
   const initialPreset = getStylePreset(initialPresetId);
   const [assets, setAssets] = useState<UploadedAssetItem[]>([]);
@@ -229,7 +238,7 @@ export function WorkspaceApp({
   const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
 
   useEffect(() => {
-    if (initialMode !== "trial") {
+    if (!isAuthenticated || initialMode !== "trial") {
       return;
     }
 
@@ -249,11 +258,53 @@ export function WorkspaceApp({
         setTrialStatus((await response.json()) as TrialStatus);
       })
       .catch(() => undefined);
-  }, [initialMode]);
+  }, [initialMode, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const draft = parseWorkspaceGuestDraft(
+      window.sessionStorage.getItem(WORKSPACE_GUEST_DRAFT_KEY),
+    );
+    if (!draft) {
+      return;
+    }
+
+    let cancelled = false;
+    const restoreDraft = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setSelectedPresetId(draft.presetId);
+      setDurationSeconds(draft.durationSeconds);
+      setAspectRatio(draft.aspectRatio);
+      setUserPrompt(draft.userPrompt);
+      setMessage("已恢复刚才的配置，请重新选择图片后生成。");
+      window.sessionStorage.removeItem(WORKSPACE_GUEST_DRAFT_KEY);
+    };
+
+    window.queueMicrotask(restoreDraft);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const requiredTemplateCount = durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
   const paidCost = paidCreditCost(durationSeconds);
-  const hasUploadedAssets = assets.some((asset) => asset.status === "uploaded");
+  const previewableAssetStatuses = useMemo(
+    () =>
+      isAuthenticated
+        ? new Set<UploadedAssetItem["status"]>(["uploaded"])
+        : new Set<UploadedAssetItem["status"]>(["uploaded", "local"]),
+    [isAuthenticated],
+  );
+  const hasPreviewableAssets = assets.some((asset) =>
+    previewableAssetStatuses.has(asset.status),
+  );
   const canUseFreeTrial =
     durationSeconds === 8 &&
     (!trialStatus || trialStatus.state === "available");
@@ -263,10 +314,10 @@ export function WorkspaceApp({
     () =>
       new Set(
         assets
-          .filter((asset) => asset.status === "uploaded")
+          .filter((asset) => previewableAssetStatuses.has(asset.status))
           .map((asset) => asset.intendedRole),
       ),
-    [assets],
+    [assets, previewableAssetStatuses],
   );
   const materialWarnings = useMemo(() => {
     if (!jobDetail) {
@@ -455,6 +506,23 @@ export function WorkspaceApp({
   }
 
   async function createAndAnalyzeJob(useFreeTrialIfAvailable: boolean) {
+    if (!isAuthenticated) {
+      window.sessionStorage.setItem(
+        WORKSPACE_GUEST_DRAFT_KEY,
+        serializeWorkspaceGuestDraft({
+          mode: useFreeTrialIfAvailable ? "trial" : "paid",
+          presetId: selectedPresetId,
+          durationSeconds,
+          aspectRatio,
+          userPrompt,
+          intendedAssetRoles: assets.map((asset) => asset.intendedRole),
+          fileNames: assets.map((asset) => asset.fileName),
+        }),
+      );
+      window.location.href = loginHref;
+      return;
+    }
+
     if (imagesUploading) {
       setMessage("图片上传中，请稍候。");
       return;
@@ -819,6 +887,7 @@ export function WorkspaceApp({
             </div>
             <UploadPanel
               assets={assets}
+              isAuthenticated={isAuthenticated}
               onRemoveUploaded={removeUploadedAsset}
               onUploaded={addUploadedAsset}
               onUploadingChange={setImagesUploading}
@@ -891,14 +960,18 @@ export function WorkspaceApp({
             </div>
           ) : (
             <div className="mt-5 space-y-5">
-              {hasUploadedAssets ? (
+              {hasPreviewableAssets ? (
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
                       Front
                     </p>
                     <p className="mt-2 text-sm">
-                      {uploadedRoles.has("front") ? "已上传" : "未上传"}
+                      {uploadedRoles.has("front")
+                        ? isAuthenticated
+                          ? "已上传"
+                          : "已选择"
+                        : "未上传"}
                     </p>
                   </div>
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
@@ -906,7 +979,11 @@ export function WorkspaceApp({
                       Back
                     </p>
                     <p className="mt-2 text-sm">
-                      {uploadedRoles.has("back") ? "已上传" : "未上传"}
+                      {uploadedRoles.has("back")
+                        ? isAuthenticated
+                          ? "已上传"
+                          : "已选择"
+                        : "未上传"}
                     </p>
                   </div>
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
@@ -914,7 +991,11 @@ export function WorkspaceApp({
                       Detail
                     </p>
                     <p className="mt-2 text-sm">
-                      {uploadedRoles.has("detail") ? "已上传" : "未上传"}
+                      {uploadedRoles.has("detail")
+                        ? isAuthenticated
+                          ? "已上传"
+                          : "已选择"
+                        : "未上传"}
                     </p>
                   </div>
                 </div>
@@ -923,9 +1004,11 @@ export function WorkspaceApp({
                   创建任务后会自动分析素材，失败时可在这里重试。
                 </p>
               )}
-              {hasUploadedAssets ? (
+              {hasPreviewableAssets ? (
                 <p className="text-sm text-[var(--muted)]">
-                  基于已上传素材位预估模板，生成前会再次分析校验。
+                  {isAuthenticated
+                    ? "基于已上传素材位预估模板，生成前会再次分析校验。"
+                    : "基于已选择素材位预估模板，登录后需要重新选择图片并正式上传。"}
                 </p>
               ) : null}
               <TemplatePicker

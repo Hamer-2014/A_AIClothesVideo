@@ -23,6 +23,7 @@ const progressFixture = {
   downloadReady: false,
   finalVideoKey: null,
   coverKey: null,
+  updatedAt: new Date("2026-06-19T08:00:00.000Z"),
 };
 
 describe("GET /api/jobs/[id]/progress", () => {
