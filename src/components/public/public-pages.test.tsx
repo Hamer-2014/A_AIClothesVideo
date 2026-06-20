@@ -54,9 +54,27 @@ describe("public trust pages", () => {
 
     rerender(<PublicFooter />);
 
+    expect(
+      screen.getByText("2026 RunwayTools. All rights reserved."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("服装商品图生成宣传短视频工具"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "隐私" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+    expect(screen.getByRole("link", { name: "条款" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute(
       "href",
       "/faq",
+    );
+    expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
+      "href",
+      "/pricing",
     );
   });
 });
