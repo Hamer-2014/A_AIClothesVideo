@@ -1,10 +1,20 @@
 import Link from "next/link";
 
 import { LogoLockup } from "@/components/brand/logo";
+import { SignOutButton } from "@/components/dashboard/sign-out-button";
 
 import { TrialCtaLink } from "./cta-link";
 
-export function PublicHeader() {
+interface PublicHeaderProps {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+  } | null;
+}
+
+export function PublicHeader({ user }: PublicHeaderProps) {
+  const displayName = user?.name || user?.email || "当前用户";
+
   return (
     <header className="border-b border-[var(--line)] bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
@@ -18,10 +28,30 @@ export function PublicHeader() {
           <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/faq">
             FAQ
           </Link>
-          <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/login">
-            登录
-          </Link>
-          <TrialCtaLink>免费试用</TrialCtaLink>
+          {user ? (
+            <>
+              <Link
+                className="text-[var(--muted)] hover:text-[var(--ink)]"
+                href="/workspace"
+              >
+                工作台
+              </Link>
+              <span className="max-w-40 truncate text-[var(--muted)]">
+                {displayName}
+              </span>
+              <SignOutButton />
+            </>
+          ) : (
+            <>
+              <Link
+                className="text-[var(--muted)] hover:text-[var(--ink)]"
+                href="/login"
+              >
+                登录
+              </Link>
+              <TrialCtaLink>免费试用</TrialCtaLink>
+            </>
+          )}
         </nav>
       </div>
     </header>

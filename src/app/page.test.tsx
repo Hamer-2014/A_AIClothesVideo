@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import PricingPage from "./page";
+import Home from "./page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
@@ -17,39 +17,40 @@ vi.mock("@/components/dashboard/sign-out-button", () => ({
   SignOutButton: () => <button type="button">退出</button>,
 }));
 
-describe("PricingPage", () => {
+describe("Home", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  it("explains public trial, packages, duration credit costs, and failed generation credit handling", async () => {
+  it("shows anonymous trial actions to visitors", async () => {
     mocks.getServerSession.mockResolvedValue(null);
-    render(await PricingPage());
 
-    expect(screen.getByText("Starter")).toBeInTheDocument();
-    expect(screen.getByText("Creator")).toBeInTheDocument();
-    expect(screen.getByText("Studio")).toBeInTheDocument();
-    expect(screen.getAllByText(/8 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/16 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/24 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/免费试用/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/失败会释放或退回点数/)).toBeInTheDocument();
+    render(await Home());
+
+    expect(screen.getByRole("link", { name: "登录" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(screen.getByRole("link", { name: "免费试用" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
+    ).toBeInTheDocument();
   });
 
-  it("shows a signed-in workspace CTA instead of anonymous header actions", async () => {
+  it("shows signed-in workspace actions instead of anonymous trial actions", async () => {
     mocks.getServerSession.mockResolvedValue({
       user: { email: "merchant@example.com" },
     });
 
-    render(await PricingPage());
+    render(await Home());
 
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "进入工作台" })[0]).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "工作台" })).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("link", { name: "工作台" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "进入工作台" })).toHaveAttribute(
       "href",
       "/workspace",
     );

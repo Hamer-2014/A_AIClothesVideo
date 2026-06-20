@@ -1,5 +1,6 @@
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
+import { getServerSession } from "@/lib/auth/server";
 
 const faqs = [
   {
@@ -24,10 +25,12 @@ const faqs = [
   },
 ];
 
-export default function FaqPage() {
+export default async function FaqPage() {
+  const session = await getServerSession();
+
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
-      <PublicHeader />
+      <PublicHeader user={session?.user ?? null} />
       <article className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-normal">FAQ</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">

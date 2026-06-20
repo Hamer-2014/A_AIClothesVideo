@@ -37,7 +37,7 @@ export default async function WorkspacePage({
 
     return (
       <div className="min-h-svh bg-[var(--surface)] text-[var(--ink)]">
-        <PublicHeader />
+        <PublicHeader user={session?.user ?? null} />
         <main>
           <section className="border-b border-[var(--line)] bg-white">
             <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-5 px-4 py-6 sm:px-6 lg:px-8">

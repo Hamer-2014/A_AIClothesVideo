@@ -2,11 +2,15 @@ import { TrialCtaLink } from "@/components/public/cta-link";
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { SampleGallery } from "@/components/public/sample-gallery";
+import { getServerSession } from "@/lib/auth/server";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getServerSession();
+  const user = session?.user ?? null;
+
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
-      <PublicHeader />
+      <PublicHeader user={user} />
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1fr_400px] lg:items-center">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.14em] text-[var(--accent)]">
@@ -20,7 +24,16 @@ export default function Home() {
             生成 8/16/24 秒商品短视频。新用户可以免费试用 1 条。
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <TrialCtaLink />
+            {user ? (
+              <a
+                className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)]"
+                href="/workspace"
+              >
+                进入工作台
+              </a>
+            ) : (
+              <TrialCtaLink />
+            )}
             <a
               className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium"
               href="/pricing"

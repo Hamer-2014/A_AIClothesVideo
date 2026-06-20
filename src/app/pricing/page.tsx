@@ -1,12 +1,16 @@
 import { TrialCtaLink } from "@/components/public/cta-link";
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
+import { getServerSession } from "@/lib/auth/server";
 import { creditPackages } from "@/lib/credits/packages";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const session = await getServerSession();
+  const user = session?.user ?? null;
+
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
-      <PublicHeader />
+      <PublicHeader user={user} />
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
@@ -21,7 +25,16 @@ export default function PricingPage() {
               点数在确认生成后冻结，质检通过并交付后才正式扣除。
             </p>
           </div>
-          <TrialCtaLink />
+          {user ? (
+            <a
+              className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)]"
+              href="/workspace"
+            >
+              进入工作台
+            </a>
+          ) : (
+            <TrialCtaLink />
+          )}
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
