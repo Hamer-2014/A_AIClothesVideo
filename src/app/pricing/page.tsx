@@ -3,10 +3,18 @@ import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { getServerSession } from "@/lib/auth/server";
 import { creditPackages } from "@/lib/credits/packages";
+import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
 export default async function PricingPage() {
   const session = await getServerSession();
   const user = session?.user ?? null;
+  await recordFunnelEventSafely({
+    eventName: "pricing_viewed",
+    source: "server",
+    userId: user?.id ?? null,
+    path: "/pricing",
+    metadata: { sourcePage: "pricing" },
+  });
 
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
@@ -33,7 +41,7 @@ export default async function PricingPage() {
               进入工作台
             </a>
           ) : (
-            <TrialCtaLink />
+            <TrialCtaLink sourcePage="pricing" />
           )}
         </div>
 

@@ -12,6 +12,7 @@ import {
   StoryboardConfirmation,
 } from "./storyboard-confirmation";
 import { UploadPanel, type UploadedAssetItem } from "./upload-panel";
+import { trackFunnelEvent } from "@/lib/analytics/client-funnel";
 import { getOrCreateDeviceFingerprint } from "@/lib/abuse/device-fingerprint";
 import {
   getStylePreset,
@@ -238,6 +239,18 @@ export function WorkspaceApp({
   const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
 
   useEffect(() => {
+    void trackFunnelEvent("workspace_entered", {
+      presetId: selectedPresetId,
+      durationSeconds,
+      aspectRatio,
+      mode: initialMode,
+      sourcePage: "workspace",
+    });
+    // Track the initial entry once; config changes are tracked by explicit handlers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || initialMode !== "trial") {
       return;
     }
@@ -283,6 +296,14 @@ export function WorkspaceApp({
       setAspectRatio(draft.aspectRatio);
       setUserPrompt(draft.userPrompt);
       setMessage("已恢复刚才的配置，请重新选择图片后生成。");
+      void trackFunnelEvent("guest_draft_restored", {
+        presetId: draft.presetId,
+        durationSeconds: draft.durationSeconds,
+        aspectRatio: draft.aspectRatio,
+        mode: draft.mode,
+        draftRestored: true,
+        sourcePage: "workspace",
+      });
       window.sessionStorage.removeItem(WORKSPACE_GUEST_DRAFT_KEY);
     };
 
@@ -366,6 +387,43 @@ export function WorkspaceApp({
     setAspectRatio(nextPreset.defaultAspectRatio);
     if (!nextPreset.allowedDurationSeconds.includes(durationSeconds)) {
       setDurationSeconds(nextPreset.defaultDurationSeconds);
+    }
+    if (!isAuthenticated) {
+      void trackFunnelEvent("guest_config_changed", {
+        presetId: nextPreset.id,
+        durationSeconds: nextPreset.allowedDurationSeconds.includes(durationSeconds)
+          ? durationSeconds
+          : nextPreset.defaultDurationSeconds,
+        aspectRatio: nextPreset.defaultAspectRatio,
+        mode: initialMode,
+        sourcePage: "workspace",
+      });
+    }
+  }
+
+  function changeDurationSeconds(value: 8 | 16 | 24) {
+    setDurationSeconds(value);
+    if (!isAuthenticated) {
+      void trackFunnelEvent("guest_config_changed", {
+        presetId: selectedPresetId,
+        durationSeconds: value,
+        aspectRatio,
+        mode: initialMode,
+        sourcePage: "workspace",
+      });
+    }
+  }
+
+  function changeAspectRatio(value: "9:16" | "1:1" | "16:9") {
+    setAspectRatio(value);
+    if (!isAuthenticated) {
+      void trackFunnelEvent("guest_config_changed", {
+        presetId: selectedPresetId,
+        durationSeconds,
+        aspectRatio: value,
+        mode: initialMode,
+        sourcePage: "workspace",
+      });
     }
   }
 
@@ -499,6 +557,21 @@ export function WorkspaceApp({
       ...current.filter((item) => item.intendedRole !== asset.intendedRole),
       asset,
     ]);
+    void trackFunnelEvent(
+      asset.status === "local"
+        ? "guest_asset_selected"
+        : isAuthenticated
+          ? "authenticated_asset_reselected"
+          : "guest_asset_selected",
+      {
+        presetId: selectedPresetId,
+        durationSeconds,
+        aspectRatio,
+        mode: initialMode,
+        assetRole: asset.intendedRole,
+        sourcePage: "workspace",
+      },
+    );
   }
 
   function removeUploadedAsset(assetId: string) {
@@ -507,6 +580,13 @@ export function WorkspaceApp({
 
   async function createAndAnalyzeJob(useFreeTrialIfAvailable: boolean) {
     if (!isAuthenticated) {
+      void trackFunnelEvent("guest_generate_clicked", {
+        presetId: selectedPresetId,
+        durationSeconds,
+        aspectRatio,
+        mode: useFreeTrialIfAvailable ? "trial" : "paid",
+        sourcePage: "workspace",
+      });
       window.sessionStorage.setItem(
         WORKSPACE_GUEST_DRAFT_KEY,
         serializeWorkspaceGuestDraft({
@@ -807,8 +887,8 @@ export function WorkspaceApp({
             <SpecSelector
               aspectRatio={aspectRatio}
               durationSeconds={durationSeconds}
-              onAspectRatioChange={setAspectRatio}
-              onDurationChange={setDurationSeconds}
+              onAspectRatioChange={changeAspectRatio}
+              onDurationChange={changeDurationSeconds}
             />
             <StylePresetSelector
               onChange={changePreset}

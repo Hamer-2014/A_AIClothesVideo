@@ -3,10 +3,18 @@ import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { SampleGallery } from "@/components/public/sample-gallery";
 import { getServerSession } from "@/lib/auth/server";
+import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
 export default async function Home() {
   const session = await getServerSession();
   const user = session?.user ?? null;
+  await recordFunnelEventSafely({
+    eventName: "landing_viewed",
+    source: "server",
+    userId: user?.id ?? null,
+    path: "/",
+    metadata: { sourcePage: "landing" },
+  });
 
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
@@ -32,7 +40,7 @@ export default async function Home() {
                 进入工作台
               </a>
             ) : (
-              <TrialCtaLink />
+              <TrialCtaLink sourcePage="landing" />
             )}
             <a
               className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium"

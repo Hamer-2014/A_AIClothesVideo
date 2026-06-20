@@ -10,6 +10,17 @@ describe("admin funnel summary", () => {
     const store = createInMemoryAdminFunnelStore([
       { eventName: "workspace_entered", metadata: {}, createdAt: new Date("2026-06-17T00:00:00Z") },
       { eventName: "workspace_entered", metadata: {}, createdAt: new Date("2026-06-17T00:01:00Z") },
+      { eventName: "landing_viewed", metadata: { sourcePage: "landing" }, createdAt: new Date("2026-06-17T00:01:10Z") },
+      { eventName: "landing_viewed", metadata: { sourcePage: "landing" }, createdAt: new Date("2026-06-17T00:01:20Z") },
+      { eventName: "trial_cta_clicked", metadata: { sourcePage: "landing" }, createdAt: new Date("2026-06-17T00:01:30Z") },
+      { eventName: "guest_asset_selected", metadata: { assetRole: "front" }, createdAt: new Date("2026-06-17T00:01:40Z") },
+      { eventName: "guest_asset_selected", metadata: { assetRole: "front" }, createdAt: new Date("2026-06-17T00:01:45Z") },
+      { eventName: "guest_generate_clicked", metadata: { mode: "trial" }, createdAt: new Date("2026-06-17T00:01:50Z") },
+      { eventName: "guest_generate_clicked", metadata: { mode: "trial" }, createdAt: new Date("2026-06-17T00:01:52Z") },
+      { eventName: "guest_draft_restored", metadata: { draftRestored: true }, createdAt: new Date("2026-06-17T00:01:55Z") },
+      { eventName: "guest_draft_restored", metadata: { draftRestored: true }, createdAt: new Date("2026-06-17T00:01:56Z") },
+      { eventName: "authenticated_asset_reselected", metadata: { assetRole: "front" }, createdAt: new Date("2026-06-17T00:01:58Z") },
+      { eventName: "authenticated_asset_reselected", metadata: { assetRole: "front" }, createdAt: new Date("2026-06-17T00:01:59Z") },
       { eventName: "asset_uploaded", metadata: {}, createdAt: new Date("2026-06-17T00:02:00Z") },
       {
         eventName: "job_created",
@@ -77,6 +88,9 @@ describe("admin funnel summary", () => {
     expect(summary.eventCounts).toEqual(
       expect.arrayContaining([
         { eventName: "workspace_entered", count: 2 },
+        { eventName: "landing_viewed", count: 2 },
+        { eventName: "trial_cta_clicked", count: 1 },
+        { eventName: "guest_generate_clicked", count: 2 },
         { eventName: "asset_uploaded", count: 1 },
         { eventName: "job_created", count: 2 },
         { eventName: "generation_deliverable", count: 1 },
@@ -84,6 +98,48 @@ describe("admin funnel summary", () => {
     );
     expect(summary.conversions).toEqual(
       expect.arrayContaining([
+        {
+          key: "landing_to_trial_cta",
+          label: "Landing -> Trial CTA",
+          numerator: 1,
+          denominator: 2,
+          rate: 0.5,
+        },
+        {
+          key: "guest_workspace_to_asset",
+          label: "Guest Workspace -> Guest Asset",
+          numerator: 2,
+          denominator: 2,
+          rate: 1,
+        },
+        {
+          key: "guest_asset_to_generate",
+          label: "Guest Asset -> Guest Generate",
+          numerator: 2,
+          denominator: 2,
+          rate: 1,
+        },
+        {
+          key: "guest_generate_to_draft_restored",
+          label: "Guest Generate -> Draft Restored",
+          numerator: 2,
+          denominator: 2,
+          rate: 1,
+        },
+        {
+          key: "draft_restored_to_auth_asset",
+          label: "Draft Restored -> Auth Asset Reselected",
+          numerator: 2,
+          denominator: 2,
+          rate: 1,
+        },
+        {
+          key: "auth_asset_to_job",
+          label: "Auth Asset Reselected -> Job Created",
+          numerator: 2,
+          denominator: 2,
+          rate: 1,
+        },
         {
           key: "workspace_to_upload",
           label: "Workspace -> Upload",

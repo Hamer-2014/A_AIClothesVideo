@@ -6,6 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceApp } from "./workspace-app";
 import { WORKSPACE_GUEST_DRAFT_KEY } from "@/lib/workspace/guest-draft";
 
+const analyticsMocks = vi.hoisted(() => ({
+  trackFunnelEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics/client-funnel", () => ({
+  trackFunnelEvent: analyticsMocks.trackFunnelEvent,
+}));
+
 vi.mock("./upload-panel", () => ({
   UploadPanel: ({
     onUploaded,
@@ -217,6 +225,7 @@ describe("WorkspaceApp", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    analyticsMocks.trackFunnelEvent.mockClear();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -262,6 +271,34 @@ describe("WorkspaceApp", () => {
     expect(window.location.href).toBe(
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dmarketplace_clean%26resumeDraft%3D1",
     );
+    expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "guest_config_changed",
+      expect.objectContaining({
+        presetId: "marketplace_clean",
+        durationSeconds: 16,
+        aspectRatio: "9:16",
+        mode: "trial",
+      }),
+    );
+    expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "guest_config_changed",
+      expect.objectContaining({
+        presetId: "marketplace_clean",
+        durationSeconds: 16,
+        aspectRatio: "1:1",
+        mode: "trial",
+      }),
+    );
+    expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "guest_generate_clicked",
+      expect.objectContaining({
+        presetId: "marketplace_clean",
+        durationSeconds: 16,
+        aspectRatio: "1:1",
+        mode: "paid",
+        sourcePage: "workspace",
+      }),
+    );
 
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -301,6 +338,16 @@ describe("WorkspaceApp", () => {
       screen.getByText("已恢复刚才的配置，请重新选择图片后生成。"),
     ).toBeInTheDocument();
     expect(window.sessionStorage.getItem(WORKSPACE_GUEST_DRAFT_KEY)).toBeNull();
+    expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "guest_draft_restored",
+      expect.objectContaining({
+        presetId: "social_lifestyle",
+        durationSeconds: 24,
+        aspectRatio: "1:1",
+        mode: "paid",
+        draftRestored: true,
+      }),
+    );
   });
 
   it("does not request trial status in guest mode", () => {
@@ -331,6 +378,14 @@ describe("WorkspaceApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "mock-local-front" }));
 
+    expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "guest_asset_selected",
+      expect.objectContaining({
+        presetId: "minimal_studio",
+        assetRole: "front",
+        sourcePage: "workspace",
+      }),
+    );
     expect(screen.getByText("正面慢推近")).toHaveAttribute(
       "data-selectable",
       "true",

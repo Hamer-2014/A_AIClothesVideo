@@ -27,6 +27,13 @@ describe("FunnelDashboard", () => {
               denominator: 10,
               rate: 0.6,
             },
+            {
+              key: "guest_generate_to_draft_restored",
+              label: "Guest Generate -> Draft Restored",
+              numerator: 5,
+              denominator: 8,
+              rate: 0.625,
+            },
           ],
           presetSummary: [
             {
@@ -46,6 +53,8 @@ describe("FunnelDashboard", () => {
     expect(screen.getByText("workspace_entered")).toBeInTheDocument();
     expect(screen.getByText("Workspace -> Upload")).toBeInTheDocument();
     expect(screen.getByText("60.0%")).toBeInTheDocument();
+    expect(screen.getByText("Guest Generate -> Draft Restored")).toBeInTheDocument();
+    expect(screen.getByText("62.5%")).toBeInTheDocument();
     expect(screen.getByText("Preset Summary")).toBeInTheDocument();
     expect(screen.getByText("minimal_studio")).toBeInTheDocument();
   });

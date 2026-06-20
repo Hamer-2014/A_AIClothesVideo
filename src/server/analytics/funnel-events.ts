@@ -11,6 +11,11 @@ export const funnelEventNames = [
   "login_viewed",
   "login_completed",
   "workspace_entered",
+  "guest_asset_selected",
+  "guest_config_changed",
+  "guest_generate_clicked",
+  "guest_draft_restored",
+  "authenticated_asset_reselected",
   "trial_status_viewed",
   "asset_uploaded",
   "job_created",
@@ -39,6 +44,9 @@ export const allowedFunnelMetadataKeys = [
   "sourcePage",
   "status",
   "reasonCategory",
+  "mode",
+  "assetRole",
+  "draftRestored",
 ] as const;
 
 export type FunnelMetadata = Partial<

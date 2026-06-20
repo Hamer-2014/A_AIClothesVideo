@@ -7,10 +7,15 @@ import Home from "./page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  recordFunnelEventSafely: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
   getServerSession: mocks.getServerSession,
+}));
+
+vi.mock("@/server/analytics/funnel-events", () => ({
+  recordFunnelEventSafely: mocks.recordFunnelEventSafely,
 }));
 
 vi.mock("@/components/dashboard/sign-out-button", () => ({
@@ -36,11 +41,20 @@ describe("Home", () => {
     expect(
       screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
     ).toBeInTheDocument();
+    expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "landing_viewed",
+        source: "server",
+        userId: null,
+        path: "/",
+        metadata: { sourcePage: "landing" },
+      }),
+    );
   });
 
   it("shows signed-in workspace actions instead of anonymous trial actions", async () => {
     mocks.getServerSession.mockResolvedValue({
-      user: { email: "merchant@example.com" },
+      user: { id: "user-1", email: "merchant@example.com" },
     });
 
     render(await Home());
@@ -58,5 +72,14 @@ describe("Home", () => {
     expect(
       screen.queryByRole("link", { name: "免费试用" }),
     ).not.toBeInTheDocument();
+    expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "landing_viewed",
+        source: "server",
+        userId: "user-1",
+        path: "/",
+        metadata: { sourcePage: "landing" },
+      }),
+    );
   });
 });

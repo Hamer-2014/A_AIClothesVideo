@@ -175,6 +175,42 @@ export async function getAdminFunnelSummary({
     eventCounts,
     conversions: [
       conversion({
+        key: "landing_to_trial_cta",
+        label: "Landing -> Trial CTA",
+        numerator: eventCount(eventCounts, "trial_cta_clicked"),
+        denominator: eventCount(eventCounts, "landing_viewed"),
+      }),
+      conversion({
+        key: "guest_workspace_to_asset",
+        label: "Guest Workspace -> Guest Asset",
+        numerator: eventCount(eventCounts, "guest_asset_selected"),
+        denominator: eventCount(eventCounts, "workspace_entered"),
+      }),
+      conversion({
+        key: "guest_asset_to_generate",
+        label: "Guest Asset -> Guest Generate",
+        numerator: eventCount(eventCounts, "guest_generate_clicked"),
+        denominator: eventCount(eventCounts, "guest_asset_selected"),
+      }),
+      conversion({
+        key: "guest_generate_to_draft_restored",
+        label: "Guest Generate -> Draft Restored",
+        numerator: eventCount(eventCounts, "guest_draft_restored"),
+        denominator: eventCount(eventCounts, "guest_generate_clicked"),
+      }),
+      conversion({
+        key: "draft_restored_to_auth_asset",
+        label: "Draft Restored -> Auth Asset Reselected",
+        numerator: eventCount(eventCounts, "authenticated_asset_reselected"),
+        denominator: eventCount(eventCounts, "guest_draft_restored"),
+      }),
+      conversion({
+        key: "auth_asset_to_job",
+        label: "Auth Asset Reselected -> Job Created",
+        numerator: eventCount(eventCounts, "job_created"),
+        denominator: eventCount(eventCounts, "authenticated_asset_reselected"),
+      }),
+      conversion({
         key: "workspace_to_upload",
         label: "Workspace -> Upload",
         numerator: eventCount(eventCounts, "asset_uploaded"),

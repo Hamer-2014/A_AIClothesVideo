@@ -53,7 +53,7 @@ describe("funnel events", () => {
 
     await recordFunnelEvent({
       store,
-      eventName: "job_created",
+      eventName: "guest_generate_clicked",
       source: "server",
       metadata: {
         presetId: "minimal_studio",
@@ -64,7 +64,11 @@ describe("funnel events", () => {
         sourcePage: "workspace",
         status: "asset_analysis_queued",
         reasonCategory: "provider",
+        mode: "trial",
+        assetRole: "front",
+        draftRestored: true,
         prompt: "full prompt must not be stored",
+        fileName: "dress.jpg",
         signedUrl: "https://r2.example.com/signed",
         apiKey: "sk-secret",
         providerResponse: { raw: true },
@@ -83,8 +87,12 @@ describe("funnel events", () => {
       sourcePage: "workspace",
       status: "asset_analysis_queued",
       reasonCategory: "provider",
+      mode: "trial",
+      assetRole: "front",
+      draftRestored: true,
     });
     expect(JSON.stringify(store.listEvents())).not.toContain("full prompt");
+    expect(JSON.stringify(store.listEvents())).not.toContain("dress.jpg");
     expect(JSON.stringify(store.listEvents())).not.toContain("signed");
     expect(JSON.stringify(store.listEvents())).not.toContain("sk-secret");
     expect(JSON.stringify(store.listEvents())).not.toContain("riskScore");

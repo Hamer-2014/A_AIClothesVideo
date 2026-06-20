@@ -7,10 +7,15 @@ import PricingPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  recordFunnelEventSafely: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
   getServerSession: mocks.getServerSession,
+}));
+
+vi.mock("@/server/analytics/funnel-events", () => ({
+  recordFunnelEventSafely: mocks.recordFunnelEventSafely,
 }));
 
 vi.mock("@/components/dashboard/sign-out-button", () => ({
@@ -35,11 +40,20 @@ describe("PricingPage", () => {
     expect(screen.getAllByText(/24 秒/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/免费试用/).length).toBeGreaterThan(0);
     expect(screen.getByText(/失败会释放或退回点数/)).toBeInTheDocument();
+    expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "pricing_viewed",
+        source: "server",
+        userId: null,
+        path: "/pricing",
+        metadata: { sourcePage: "pricing" },
+      }),
+    );
   });
 
   it("shows a signed-in workspace CTA instead of anonymous header actions", async () => {
     mocks.getServerSession.mockResolvedValue({
-      user: { email: "merchant@example.com" },
+      user: { id: "user-1", email: "merchant@example.com" },
     });
 
     render(await PricingPage());
@@ -57,5 +71,14 @@ describe("PricingPage", () => {
     expect(
       screen.queryByRole("link", { name: "免费试用" }),
     ).not.toBeInTheDocument();
+    expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "pricing_viewed",
+        source: "server",
+        userId: "user-1",
+        path: "/pricing",
+        metadata: { sourcePage: "pricing" },
+      }),
+    );
   });
 });
