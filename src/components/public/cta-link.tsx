@@ -22,7 +22,7 @@ export function TrialCtaLink({
   return (
     <Link
       className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)]"
-      href={loginTrialHref()}
+      href={trialWorkspaceHref()}
       onClick={() => {
         void trackFunnelEvent("trial_cta_clicked", {
           sourcePage,

@@ -39,6 +39,9 @@ describe("PricingPage", () => {
     expect(screen.getAllByText(/16 秒/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/24 秒/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/免费试用/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
+    ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
     expect(screen.getByText(/失败会释放或退回点数/)).toBeInTheDocument();
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({

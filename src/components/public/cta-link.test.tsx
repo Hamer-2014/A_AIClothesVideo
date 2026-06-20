@@ -22,7 +22,7 @@ describe("TrialCtaLink", () => {
 
     expect(link).toHaveAttribute(
       "href",
-      "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dminimal_studio",
+      "/workspace?mode=trial&preset=minimal_studio",
     );
     expect(analyticsMocks.trackFunnelEvent).toHaveBeenCalledWith(
       "trial_cta_clicked",

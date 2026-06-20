@@ -11,7 +11,7 @@ export default async function TermsPage() {
       <article className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-normal">服务条款</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          这是公开 MVP 试用阶段的基础服务条款说明，不是最终法律意见。正式商用前应由法律顾问复核。
+          使用 RunwayTools 前，请确认你拥有上传素材的使用权，并理解生成视频可能受素材质量、内容审核和模型服务影响。
         </p>
         <div className="mt-8 space-y-8 text-sm leading-7 text-[var(--muted)]">
           <section>

@@ -40,7 +40,7 @@ describe("Home", () => {
     expect(screen.getByRole("link", { name: "免费试用" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "landing_viewed",

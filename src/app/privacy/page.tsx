@@ -11,7 +11,7 @@ export default async function PrivacyPage() {
       <article className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-normal">隐私政策</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          这是公开 MVP 试用阶段的基础隐私说明，不是最终法律意见。正式商用前应由法律顾问复核。
+          这是 RunwayTools 的基础隐私说明，用于解释我们如何处理你上传的素材、生成结果和账号数据。
         </p>
         <div className="mt-8 space-y-8 text-sm leading-7 text-[var(--muted)]">
           <section>
@@ -38,7 +38,7 @@ export default async function PrivacyPage() {
           <section>
             <h2 className="text-base font-medium text-[var(--ink)]">保存周期</h2>
             <p className="mt-2">
-              MVP 默认保存周期：上传原图和最终视频约 180 天，片段视频和普通质检抽帧约 30 天，异常或申诉相关文件可保留更久用于排障。
+              默认保存周期：上传原图和最终视频约 180 天，片段视频和普通质检抽帧约 30 天，异常或申诉相关文件可保留更久用于排障。
               账务、订单和必要审计记录会按合规与对账需要保留。
             </p>
           </section>
