@@ -279,13 +279,13 @@ LEGAL_CONTACT_EMAIL=
 
 ```text
 RESEND_API_KEY
-RESEND_FROM_EMAIL
+EMAIL_FROM
 ABUSE_HASH_SECRET
 ```
 
 `/api/health` 新增 `legalCompliance` 检查：
 
-- 生产和 staging 必须有 `LEGAL_CONTACT_EMAIL`、`RESEND_API_KEY`、`RESEND_FROM_EMAIL` 和 `ABUSE_HASH_SECRET`。
+- 生产和 staging 必须有 `LEGAL_CONTACT_EMAIL`、`RESEND_API_KEY`、`EMAIL_FROM` 和 `ABUSE_HASH_SECRET`。
 - 本地开发允许邮件未配置，但公开表单仍应通过内存/测试依赖验证，不能返回假发送成功。
 
 ## 7. 法律页面与用户文案
