@@ -18,7 +18,7 @@ describe("public CTA links", () => {
     const html = renderToStaticMarkup(createElement(TrialCtaLink));
 
     expect(html).toContain(
-      'href="/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dminimal_studio"',
+      'href="/workspace?mode=trial&amp;preset=minimal_studio"',
     );
     expect(html).toContain("免费生成 1 条试用视频");
   });
