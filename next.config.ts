@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
-import path from "node:path";
+
+import { resolveTurbopackRoot } from "./src/lib/workspace/turbopack-root";
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: path.resolve(__dirname, "..", ".."),
+    root: resolveTurbopackRoot(__dirname),
   },
 };
 
