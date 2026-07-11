@@ -17,6 +17,7 @@ describe("GET /api/health", () => {
     vi.stubEnv("CLOUDFLARE_R2_BUCKET", "bucket");
     vi.stubEnv("INTERNAL_WORKER_SECRET", "internal-secret");
     vi.stubEnv("CRON_JOB_SECRET", "cron-secret");
+    vi.stubEnv("ABUSE_HASH_SECRET", "abuse-hash-secret");
     vi.stubEnv(
       "CLOUD_RUN_STITCH_URL",
       "https://stitch-worker-hebafdmksq-uc.a.run.app",

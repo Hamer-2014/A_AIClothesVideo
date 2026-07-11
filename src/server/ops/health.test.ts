@@ -71,6 +71,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "creem-api-key",
@@ -136,6 +137,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -198,6 +200,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -231,6 +234,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -265,6 +269,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -296,6 +301,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_BUCKET: "bucket",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
+      ABUSE_HASH_SECRET: "abuse-hash-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -313,6 +319,26 @@ describe("getRuntimeHealth", () => {
 
     expect(result.ready).toBe(true);
     expect(result.checks.aiProviders.missing).toEqual([]);
+  });
+
+  it("uses APP_ENV as the business environment", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "staging",
+      NODE_ENV: "production",
+    });
+
+    expect(report.environment).toBe("staging");
+  });
+
+  it("reports a missing abuse hash secret in internal security readiness", () => {
+    const report = getRuntimeHealth({
+      INTERNAL_WORKER_SECRET: "worker-secret",
+      CRON_JOB_SECRET: "cron-secret",
+    });
+
+    expect(report.checks.internalSecurity.missing).toContain(
+      "ABUSE_HASH_SECRET",
+    );
   });
 });
 

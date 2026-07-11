@@ -95,6 +95,7 @@ export function getRuntimeHealth(
     internalSecurity: buildCheck(env, [
       "INTERNAL_WORKER_SECRET",
       "CRON_JOB_SECRET",
+      "ABUSE_HASH_SECRET",
     ]),
     stitchWorker: buildCheck(env, [
       "CLOUD_RUN_STITCH_URL",
@@ -116,7 +117,8 @@ export function getRuntimeHealth(
   return {
     ok: true,
     service: "a-runwaytools",
-    environment: trimEnv(env, "NODE_ENV") || "development",
+    environment:
+      trimEnv(env, "APP_ENV") || trimEnv(env, "NODE_ENV") || "development",
     ready: missing.length === 0,
     checks,
     summary: {
