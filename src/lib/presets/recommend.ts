@@ -2,11 +2,13 @@ import type {
   AvailableTemplateRecommendation,
   ShotTemplateRecommendationResult,
 } from "@/lib/templates/recommend";
+import { getVideoSpec, type VideoDuration } from "@/lib/video/specs";
 
 type PresetRankableTemplate = {
   templateId: string;
   riskLevel: string;
   trialAllowed?: boolean;
+  autoSelectAllowed?: boolean;
 };
 
 type PresetRankableRecommendationResult = {
@@ -102,8 +104,8 @@ export function rankTemplatesForPreset({
   };
 }
 
-export function requiredTemplateCount(durationSeconds: 8 | 16 | 24) {
-  return durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
+export function requiredTemplateCount(durationSeconds: VideoDuration) {
+  return getVideoSpec(durationSeconds).segmentCount;
 }
 
 export function rankTemplateIdsForPreset({
@@ -113,13 +115,19 @@ export function rankTemplateIdsForPreset({
   recommendations: PresetRankableRecommendationResult;
   preset: StylePreset;
 }) {
+  const recommendationObjects = [
+    ...recommendations.recommended,
+    ...recommendations.optional,
+  ];
   const availableTemplates = sortRankableTemplates(
-    [...recommendations.recommended, ...recommendations.optional],
+    recommendationObjects,
     preset,
-  );
+  ).filter((template) => template.autoSelectAllowed !== false);
   const rankedIds = availableTemplates.map((template) => template.templateId);
 
-  return rankedIds.length > 0 ? rankedIds : recommendations.availableTemplateIds;
+  return recommendationObjects.length > 0
+    ? rankedIds
+    : recommendations.availableTemplateIds;
 }
 
 export function selectTemplateIdsForPreset({
@@ -129,11 +137,30 @@ export function selectTemplateIdsForPreset({
 }: {
   recommendations: PresetRankableRecommendationResult;
   preset: StylePreset;
-  durationSeconds: 8 | 16 | 24;
+  durationSeconds: VideoDuration;
 }) {
-  const availableTemplateIds = rankTemplateIdsForPreset({
+  const rankedIds = rankTemplateIdsForPreset({
     recommendations,
     preset,
   });
-  return availableTemplateIds.slice(0, requiredTemplateCount(durationSeconds));
+  const target = requiredTemplateCount(durationSeconds);
+
+  if (durationSeconds !== 40) {
+    return rankedIds.slice(0, target);
+  }
+  if (new Set(rankedIds).size < 3) {
+    return rankedIds;
+  }
+
+  const selected: string[] = [];
+  for (let pass = 0; selected.length < target && pass < 2; pass += 1) {
+    for (const templateId of rankedIds) {
+      if (selected.length >= target) break;
+      if (selected.at(-1) === templateId) continue;
+      if (selected.filter((id) => id === templateId).length >= 2) continue;
+      selected.push(templateId);
+    }
+  }
+
+  return selected;
 }

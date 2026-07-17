@@ -7,6 +7,14 @@ import {
 } from "./guest-draft";
 
 describe("workspace guest draft", () => {
+  it("preserves a 40-second paid Beta draft", () => {
+    expect(
+      parseWorkspaceGuestDraft(
+        JSON.stringify({ mode: "paid", durationSeconds: 40 }),
+      ),
+    ).toMatchObject({ durationSeconds: 40, mode: "paid" });
+  });
+
   it("serializes only safe workspace configuration without file blobs", () => {
     const serialized = serializeWorkspaceGuestDraft({
       mode: "trial",

@@ -1,6 +1,7 @@
 import { TrialCtaLink } from "@/components/public/cta-link";
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
+import { isVideoDurationEnabled } from "@/lib/video/specs";
 import { SampleGallery } from "@/components/public/sample-gallery";
 import { getServerSession } from "@/lib/auth/server";
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
@@ -8,6 +9,7 @@ import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 export default async function Home() {
   const session = await getServerSession();
   const user = session?.user ?? null;
+  const duration40Enabled = isVideoDurationEnabled(40, process.env);
   await recordFunnelEventSafely({
     eventName: "landing_viewed",
     source: "server",
@@ -29,7 +31,8 @@ export default async function Home() {
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--muted)]">
             上传服装商品图，选择极简棚拍等 Style Preset，系统按素材完整度推荐安全镜头，
-            生成 8/16/24 秒商品短视频。新用户可以免费试用 1 条。
+            生成 {duration40Enabled ? "8/16/24/40 秒" : "8/16/24 秒"}商品短视频。
+            {duration40Enabled ? "40 秒为付费 Beta。" : ""}新用户可以免费试用 1 条。
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             {user ? (

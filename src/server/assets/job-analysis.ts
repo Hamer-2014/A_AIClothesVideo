@@ -21,6 +21,12 @@ import {
 import type { AssetRole } from "@/server/assets/analysis-schema";
 import type { JobStore } from "@/server/jobs/state-machine";
 import { transitionJobStatus } from "@/server/jobs/state-machine";
+import {
+  createDrizzleAssetConsistencyStore,
+  runAssetConsistencyAnalysis,
+  type AssetConsistencyStore,
+  type VisionConsistencyProvider,
+} from "./consistency";
 
 export interface VideoJobAssetRecord {
   assetId: string;
@@ -146,6 +152,7 @@ export async function analyzeVideoJobAssets({
   jobStore,
   jobAssetStore,
   analysisStore = createDrizzleAssetAnalysisStore(),
+  assetConsistencyStore = createDrizzleAssetConsistencyStore(),
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   jobId,
   userId,
@@ -155,12 +162,14 @@ export async function analyzeVideoJobAssets({
   createDownloadSignedUrl = ({ key }) =>
     createR2DownloadSignedUrl({ key, expiresIn: 900 }),
   visionProvider,
+  consistencyProvider,
   manageJobStatus = true,
   funnelEventStore,
 }: {
   jobStore: JobStore;
   jobAssetStore: VideoJobAssetStore;
   analysisStore?: AssetAnalysisStore;
+  assetConsistencyStore?: AssetConsistencyStore;
   providerCallLogStore?: ProviderCallLogStore;
   jobId: string;
   userId: string;
@@ -169,6 +178,7 @@ export async function analyzeVideoJobAssets({
   isTrial: boolean;
   createDownloadSignedUrl?: (input: { key: string }) => Promise<string>;
   visionProvider?: VisionAssetAnalysisProvider;
+  consistencyProvider?: VisionConsistencyProvider;
   manageJobStatus?: boolean;
   funnelEventStore?: FunnelEventStore;
 }) {
@@ -188,6 +198,12 @@ export async function analyzeVideoJobAssets({
 
     const analyses = [];
     const records = [];
+    const consistencyCandidates: Array<{
+      assetId: string;
+      role: AssetRole;
+      subjectKind: "product" | "human_model" | "unknown";
+      imageUrl: string;
+    }> = [];
     const declaredRoles = jobAssets
       .map((asset) => declaredRoleFromJobAsset(asset.role))
       .filter((role): role is AssetRole => Boolean(role) && role !== "unknown");
@@ -205,17 +221,79 @@ export async function analyzeVideoJobAssets({
         templates,
         isTrial,
         visionProvider,
+        declaredRole: declaredRoleFromJobAsset(asset.role),
       });
 
       analyses.push(result.analysis);
       records.push(result.record);
+      consistencyCandidates.push({
+        assetId: asset.assetId,
+        role: result.analysis.assetRole,
+        subjectKind: result.analysis.subjectKind,
+        imageUrl: signedUrl,
+      });
     }
+
+    const productViewRoles = new Set<AssetRole>(["front", "side", "back"]);
+    const roleOrder = new Map<AssetRole, number>([
+      ["front", 0],
+      ["side", 1],
+      ["back", 2],
+    ]);
+    const orderedProductViews = consistencyCandidates
+      .filter(
+        (candidate) =>
+          candidate.subjectKind === "product" &&
+          productViewRoles.has(candidate.role),
+      )
+      .sort(
+        (left, right) =>
+          (roleOrder.get(left.role) ?? 99) -
+          (roleOrder.get(right.role) ?? 99),
+      );
+    const orderedModelViews = consistencyCandidates
+      .filter(
+        (candidate) =>
+          candidate.subjectKind === "human_model" &&
+          productViewRoles.has(candidate.role),
+      )
+      .sort(
+        (left, right) =>
+          (roleOrder.get(left.role) ?? 99) -
+          (roleOrder.get(right.role) ?? 99),
+      );
+    const productConsistency =
+      orderedProductViews.length >= 2
+        ? await runAssetConsistencyAnalysis({
+            store: assetConsistencyStore,
+            providerCallLogStore,
+            videoJobId: jobId,
+            analysisKind: "product_views",
+            expectedSubjectKind: "product",
+            assets: orderedProductViews,
+            analyzeConsistency: consistencyProvider,
+          })
+        : null;
+    const modelConsistency =
+      orderedModelViews.length >= 2
+        ? await runAssetConsistencyAnalysis({
+            store: assetConsistencyStore,
+            providerCallLogStore,
+            videoJobId: jobId,
+            analysisKind: "model_views",
+            expectedSubjectKind: "human_model",
+            assets: orderedModelViews,
+            analyzeConsistency: consistencyProvider,
+          })
+        : null;
 
     const recommendationResult = buildRecommendationsFromAnalyses({
       analyses,
       templates,
       isTrial,
       declaredRoles,
+      consistency: productConsistency,
+      modelConsistency,
     });
 
     if (manageJobStatus) {
@@ -251,6 +329,9 @@ export async function analyzeVideoJobAssets({
     return {
       analyses,
       records,
+      consistency: productConsistency,
+      productConsistency,
+      modelConsistency,
       ...recommendationResult,
     };
   } catch (error) {

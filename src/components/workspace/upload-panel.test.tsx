@@ -1,9 +1,29 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UploadPanel, type UploadedAssetItem } from "./upload-panel";
+
+function UploadPanelHarness({ isAuthenticated }: { isAuthenticated: boolean }) {
+  const [rightsAccepted, setRightsAccepted] = useState(false);
+  return (
+    <UploadPanel
+      assets={[]}
+      isAuthenticated={isAuthenticated}
+      onRemoveUploaded={() => {}}
+      onUploaded={() => {}}
+      onUploadingChange={() => {}}
+      rightsAccepted={rightsAccepted}
+      onRightsAcceptedChange={setRightsAccepted}
+    />
+  );
+}
+
+function renderUploadPanel({ isAuthenticated }: { isAuthenticated: boolean }) {
+  return render(<UploadPanelHarness isAuthenticated={isAuthenticated} />);
+}
 
 describe("UploadPanel", () => {
   beforeEach(() => {
@@ -18,6 +38,32 @@ describe("UploadPanel", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("requires an explicit rights statement for authenticated uploads", () => {
+    renderUploadPanel({ isAuthenticated: true });
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: /我确认拥有或已获得/,
+    });
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByLabelText("选择正面图")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "服务条款" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    expect(screen.getByRole("link", { name: "隐私政策" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+  });
+
+  it("keeps guest image selection local without treating it as consent", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    renderUploadPanel({ isAuthenticated: false });
+
+    expect(screen.getByLabelText("选择正面图")).toBeEnabled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uploads a selected slot image immediately and shows the selected preview", async () => {
@@ -53,6 +99,8 @@ describe("UploadPanel", () => {
         onUploaded={onUploaded}
         onUploadingChange={onUploadingChange}
         onRemoveUploaded={vi.fn()}
+        rightsAccepted
+        onRightsAcceptedChange={vi.fn()}
       />,
     );
 
@@ -73,6 +121,10 @@ describe("UploadPanel", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({
+            rightsAttestation: {
+              accepted: true,
+              version: "image_rights_v1",
+            },
             files: [
               {
                 fileName: file.name,
@@ -109,6 +161,8 @@ describe("UploadPanel", () => {
         onUploaded={onUploaded}
         onUploadingChange={onUploadingChange}
         onRemoveUploaded={vi.fn()}
+        rightsAccepted={false}
+        onRightsAcceptedChange={vi.fn()}
       />,
     );
 
@@ -140,6 +194,8 @@ describe("UploadPanel", () => {
         onUploaded={vi.fn()}
         onUploadingChange={vi.fn()}
         onRemoveUploaded={vi.fn()}
+        rightsAccepted
+        onRightsAcceptedChange={vi.fn()}
       />,
     );
 
@@ -178,6 +234,8 @@ describe("UploadPanel", () => {
         onUploaded={vi.fn()}
         onUploadingChange={vi.fn()}
         onRemoveUploaded={onRemoveUploaded}
+        rightsAccepted
+        onRightsAcceptedChange={vi.fn()}
       />,
     );
 

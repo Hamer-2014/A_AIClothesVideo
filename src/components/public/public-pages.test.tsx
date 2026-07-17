@@ -37,6 +37,8 @@ describe("public trust pages", () => {
     expect(screen.getByRole("heading", { name: "Cloudflare R2" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "保存周期" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "删除" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "声明与投诉数据" })).toBeInTheDocument();
+    expect(container).toHaveTextContent(/三年/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
@@ -49,6 +51,10 @@ describe("public trust pages", () => {
     expect(screen.getByRole("heading", { name: "生成失败" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "退款" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "用户上传素材" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "肖像与未成年人授权" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "权利通知" })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
@@ -60,6 +66,8 @@ describe("public trust pages", () => {
     expect(screen.getByText(/为什么不能生成背面/)).toBeInTheDocument();
     expect(screen.getByText(/多久生成/)).toBeInTheDocument();
     expect(screen.getByText(/试用和付费有什么区别/)).toBeInTheDocument();
+    expect(screen.getByText(/真人或儿童模特需要什么授权/)).toBeInTheDocument();
+    expect(screen.getByText(/如何提交侵权删除请求/)).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 

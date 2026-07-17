@@ -18,6 +18,7 @@ export interface RuntimeHealthReport {
     stitchWorker: RuntimeHealthCheck;
     billing: RuntimeHealthCheck;
     moderation: RuntimeHealthCheck;
+    legalCompliance: RuntimeHealthCheck;
     creemPayment: RuntimeHealthCheck;
     aiProviders: RuntimeHealthCheck;
   };
@@ -48,6 +49,26 @@ function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
     configured: missing.length === 0,
     missing,
     status: missing.length === 0 ? "ready" : "pending",
+  };
+}
+
+function buildLegalComplianceCheck(
+  env: EnvSource,
+  environment: string,
+): RuntimeHealthCheck {
+  const required = [
+    "LEGAL_CONTACT_EMAIL",
+    "RESEND_API_KEY",
+    "EMAIL_FROM",
+    "ABUSE_HASH_SECRET",
+  ];
+  const check = buildCheck(env, required);
+  if (environment === "production" || environment === "staging") {
+    return check;
+  }
+  return {
+    ...check,
+    status: check.configured ? "ready" : "pending",
   };
 }
 
@@ -83,6 +104,8 @@ function buildAiProvidersCheck(env: EnvSource): RuntimeHealthCheck {
 export function getRuntimeHealth(
   env: EnvSource = process.env,
 ): Omit<RuntimeHealthReport, "timestamp"> {
+  const environment =
+    trimEnv(env, "APP_ENV") || trimEnv(env, "NODE_ENV") || "development";
   const checks = {
     database: buildCheck(env, ["DATABASE_URL"]),
     auth: buildCheck(env, ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]),
@@ -103,12 +126,13 @@ export function getRuntimeHealth(
     ]),
     billing: buildCheck(env, []),
     moderation: buildCheck(env, ["CREEM_MODERATION_API_KEY"]),
+    legalCompliance: buildLegalComplianceCheck(env, environment),
     creemPayment: buildOptionalPaymentCheck(env),
     aiProviders: buildAiProvidersCheck(env),
   };
 
   const readinessChecks = Object.entries(checks).filter(
-    ([name]) => name !== "creemPayment",
+    ([, check]) => check.status !== "pending",
   );
   const missing = Array.from(
     new Set(readinessChecks.flatMap(([, check]) => check.missing)),
@@ -117,8 +141,7 @@ export function getRuntimeHealth(
   return {
     ok: true,
     service: "a-runwaytools",
-    environment:
-      trimEnv(env, "APP_ENV") || trimEnv(env, "NODE_ENV") || "development",
+    environment,
     ready: missing.length === 0,
     checks,
     summary: {

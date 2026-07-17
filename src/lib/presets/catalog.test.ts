@@ -28,4 +28,10 @@ describe("style preset catalog", () => {
       defaultAspectRatio: "9:16",
     });
   });
+
+  it("allows paid 40-second use for every preset", () => {
+    for (const preset of stylePresets) {
+      expect(preset.allowedDurationSeconds).toContain(40);
+    }
+  });
 });

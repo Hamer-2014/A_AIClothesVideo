@@ -72,6 +72,9 @@ describe("getRuntimeHealth", () => {
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "creem-api-key",
@@ -138,6 +141,9 @@ describe("getRuntimeHealth", () => {
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -201,6 +207,9 @@ describe("getRuntimeHealth", () => {
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -235,6 +244,9 @@ describe("getRuntimeHealth", () => {
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -302,6 +314,9 @@ describe("getRuntimeHealth", () => {
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
       CREEM_API_KEY: "",
@@ -339,6 +354,23 @@ describe("getRuntimeHealth", () => {
     expect(report.checks.internalSecurity.missing).toContain(
       "ABUSE_HASH_SECRET",
     );
+  });
+
+  it("reports production legal compliance configuration", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      LEGAL_CONTACT_EMAIL: "",
+      RESEND_API_KEY: "",
+      EMAIL_FROM: "",
+      ABUSE_HASH_SECRET: "",
+    });
+
+    expect(report.checks.legalCompliance.missing).toEqual([
+      "LEGAL_CONTACT_EMAIL",
+      "RESEND_API_KEY",
+      "EMAIL_FROM",
+      "ABUSE_HASH_SECRET",
+    ]);
   });
 });
 

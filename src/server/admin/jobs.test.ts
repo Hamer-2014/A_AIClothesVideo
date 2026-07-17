@@ -58,6 +58,21 @@ describe("admin job detail", () => {
           mode: "standard",
         },
       ],
+      consistencyAnalyses: [
+        {
+          videoJobId: "job-1",
+          analysisKind: "product_views",
+          status: "failed",
+          garmentMatch: "fail",
+          modelMatch: "not_applicable",
+          colorMatch: false,
+          patternMatch: true,
+          viewCoverage: ["front", "side"],
+          confidence: "0.61",
+          riskFlags: ["pattern_mismatch"],
+          resultJson: { garment_match: "fail" },
+        },
+      ],
       storyboards: [
         {
           id: "storyboard-1",
@@ -212,6 +227,13 @@ describe("admin job detail", () => {
       }),
       assets: [expect.objectContaining({ assetId: "asset-1" })],
       analyses: [expect.objectContaining({ assetId: "asset-1", mode: "standard" })],
+      consistencyAnalyses: [
+        expect.objectContaining({
+          analysisKind: "product_views",
+          garmentMatch: "fail",
+          confidence: "0.61",
+        }),
+      ],
       latestStoryboard: expect.objectContaining({
         id: "storyboard-1",
         presetId: "minimal_studio",

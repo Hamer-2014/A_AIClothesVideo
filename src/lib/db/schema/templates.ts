@@ -26,7 +26,12 @@ export const shotTemplates = pgTable("shot_templates", {
   riskLevel: templateRiskEnum("risk_level").notNull(),
   displayName: text("display_name").notNull(),
   description: text("description"),
+  subjectKind: text("subject_kind").notNull().default("any"),
   requiredAssets: jsonSnapshot("required_assets").notNull().default([]),
+  consistencyRequirements: jsonSnapshot("consistency_requirements")
+    .notNull()
+    .default([]),
+  autoSelectAllowed: boolean("auto_select_allowed").notNull().default(true),
   blockedConditions: jsonSnapshot("blocked_conditions").notNull().default([]),
   allowedMotion: jsonSnapshot("allowed_motion").notNull().default([]),
   basePromptIntent: text("base_prompt_intent").notNull(),

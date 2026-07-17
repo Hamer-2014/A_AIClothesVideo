@@ -3,6 +3,7 @@ export * from "./audit";
 export * from "./auth";
 export * from "./analytics";
 export * from "./credits";
+export * from "./compliance";
 export * from "./jobs";
 export * from "./providers";
 export * from "./templates";

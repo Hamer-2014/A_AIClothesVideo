@@ -80,6 +80,11 @@ export function buildAdminNav(pathname: string): NavItem[] {
       label: "审计",
       active: pathname.startsWith("/admin/audit-logs"),
     },
+    {
+      href: "/admin/rights-removal",
+      label: "侵权处理",
+      active: pathname.startsWith("/admin/rights-removal"),
+    },
   ];
 }
 

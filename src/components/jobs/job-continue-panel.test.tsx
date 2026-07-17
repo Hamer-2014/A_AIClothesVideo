@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JobContinuePanel } from "./job-continue-panel";
+import { continueReasonLabel, JobContinuePanel } from "./job-continue-panel";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -43,6 +43,21 @@ const templateCatalog = [
 describe("JobContinuePanel", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("keeps human-model turn blockers readable after resuming a job", () => {
+    expect(continueReasonLabel("model_side_asset_required")).toBe(
+      "缺少模特侧面图",
+    );
+    expect(continueReasonLabel("model_back_asset_required")).toBe(
+      "缺少模特背面图",
+    );
+    expect(continueReasonLabel("model_view_consistency_failed")).toBe(
+      "多角度图片中的模特不一致",
+    );
+    expect(continueReasonLabel("model_garment_consistency_failed")).toBe(
+      "模特视角中的服装不一致",
+    );
   });
 
   it("uses user-facing quality tiers instead of exact resolution values", () => {
@@ -127,5 +142,47 @@ describe("JobContinuePanel", () => {
       screen.getByText("这个任务还停在生成前，你可以补充生成意图后继续。"),
     ).toBeInTheDocument();
     expect(screen.getByText("template-picker")).toBeInTheDocument();
+  });
+
+  it("shows five ordered template slots for a 40-second job", () => {
+    render(
+      <JobContinuePanel
+        job={{
+          id: "job-40",
+          status: "asset_analysis_passed",
+          durationSeconds: 40,
+          aspectRatio: "9:16",
+          creditCost: 310,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        }}
+        latestStoryboard={null}
+        recommendations={{
+          recommended: [],
+          optional: [],
+          unavailable: [],
+          availableTemplateIds: ["front_push_in", "front_pan", "minimal_studio"],
+        }}
+        templateCatalog={[
+          ...templateCatalog,
+          {
+            templateId: "front_pan",
+            displayName: "正面平移",
+            description: "横向展示",
+            riskLevel: "low",
+          },
+          {
+            templateId: "minimal_studio",
+            displayName: "极简棚拍",
+            description: "稳定展示",
+            riskLevel: "low",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByRole("combobox", { name: /镜头 [1-5]/ })).toHaveLength(5);
+    expect(screen.queryByText("template-picker")).not.toBeInTheDocument();
   });
 });

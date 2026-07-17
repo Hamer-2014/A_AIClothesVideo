@@ -31,5 +31,9 @@ describe("SiteFooterContent", () => {
       "href",
       "/pricing",
     );
+    expect(screen.getByRole("link", { name: "侵权删除" })).toHaveAttribute(
+      "href",
+      "/takedown",
+    );
   });
 });

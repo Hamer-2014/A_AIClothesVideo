@@ -11,7 +11,9 @@ export type AdminAction =
   | "provider_key:rotate"
   | "model_route:update"
   | "pricing:update"
-  | "credits:admin_adjust";
+  | "credits:admin_adjust"
+  | "rights_removal:triage"
+  | "rights_removal:resolve";
 
 const operatorAllowedActions = new Set<AdminAction>([
   "job:retry_segment",
@@ -20,6 +22,7 @@ const operatorAllowedActions = new Set<AdminAction>([
   "job:refund",
   "template:update_status",
   "credits:admin_adjust",
+  "rights_removal:triage",
 ]);
 
 export function normalizeEmail(email: string) {

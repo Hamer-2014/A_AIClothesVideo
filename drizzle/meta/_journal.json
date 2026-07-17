@@ -99,6 +99,27 @@
       "when": 1781712000000,
       "tag": "0013_admin_job_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781971200000,
+      "tag": "0014_admin_audit_target_id_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1783733006176,
+      "tag": "0015_rights_compliance",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1783739047871,
+      "tag": "0016_product_rotation_consistency",
+      "breakpoints": true
     }
   ]
 }

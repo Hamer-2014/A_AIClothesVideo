@@ -22,6 +22,7 @@ describe("auth schema compatibility", () => {
     expect(assets.userId.columnType).toBe("PgText");
     expect(abuseEvents.userId.columnType).toBe("PgText");
     expect(adminAuditLogs.adminUserId.columnType).toBe("PgText");
+    expect(adminAuditLogs.targetId.columnType).toBe("PgText");
     expect(creditWallets.userId.columnType).toBe("PgText");
     expect(creditLedger.userId.columnType).toBe("PgText");
     expect(orders.userId.columnType).toBe("PgText");
@@ -77,6 +78,16 @@ describe("auth schema compatibility", () => {
     expect(userIdSql).toContain('ALTER TABLE "video_jobs"');
     expect(userIdSql).toContain('ALTER TABLE "user_profiles"');
     expect(userIdSql).toContain('ALTER COLUMN "user_id" TYPE text USING "user_id"::text');
+
+    const auditTargetMigrationPath = path.resolve(
+      process.cwd(),
+      "drizzle",
+      "0014_admin_audit_target_id_text.sql",
+    );
+    const auditTargetSql = readFileSync(auditTargetMigrationPath, "utf8");
+
+    expect(auditTargetSql).toContain('ALTER TABLE "admin_audit_logs"');
+    expect(auditTargetSql).toContain('ALTER COLUMN "target_id" TYPE text');
   });
 
   it("historical init migration shows why a follow-up fix is required", () => {

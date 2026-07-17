@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
-import { stitchJobs, videoJobs } from "@/lib/db/schema";
+import { stitchJobs, videoJobs, videoSegments } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import type { postQaModeValues } from "@/lib/db/schema/jobs";
 
@@ -12,6 +12,7 @@ export interface PostQaJobInput {
   userId: string;
   mode: PostQaMode;
   frameKeys: string[];
+  selectedTemplateIds: string[];
 }
 
 export interface PostQaJobRecord {
@@ -33,6 +34,7 @@ export interface PostQaJobInputStore {
   findLatestSucceededStitchJob(
     jobId: string,
   ): Promise<PostQaStitchJobRecord | null>;
+  listTemplateIds(jobId: string): Promise<string[]>;
 }
 
 function asFrameKeys(value: JsonValue) {
@@ -61,21 +63,25 @@ export async function getPostQaJobInput({
   if (!stitchJob) {
     throw new Error("Succeeded stitch job not found.");
   }
+  const selectedTemplateIds = await store.listTemplateIds(jobId);
 
   return {
     jobId,
     userId: job.userId,
     mode: asMode(job.postQaMode),
     frameKeys: asFrameKeys(stitchJob.frameKeys),
+    selectedTemplateIds,
   };
 }
 
 export function createInMemoryPostQaJobStore({
   jobs,
   stitchJobs,
+  templateIdsByJob = {},
 }: {
   jobs: PostQaJobRecord[];
   stitchJobs: PostQaStitchJobRecord[];
+  templateIdsByJob?: Record<string, string[]>;
 }): PostQaJobInputStore {
   return {
     async findJob(jobId) {
@@ -88,6 +94,9 @@ export function createInMemoryPostQaJobStore({
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 
       return stitchJob ? { ...stitchJob } : null;
+    },
+    async listTemplateIds(jobId) {
+      return [...(templateIdsByJob[jobId] ?? [])];
     },
   };
 }
@@ -135,6 +144,14 @@ export function createDrizzlePostQaJobStore(
       }
 
       return stitchJob as PostQaStitchJobRecord;
+    },
+    async listTemplateIds(jobId) {
+      const rows = await db
+        .select({ templateId: videoSegments.templateId })
+        .from(videoSegments)
+        .where(eq(videoSegments.videoJobId, jobId));
+
+      return [...new Set(rows.map((row) => row.templateId))];
     },
   };
 }

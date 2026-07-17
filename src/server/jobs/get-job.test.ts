@@ -11,6 +11,89 @@ const jobId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 
 describe("get video job detail", () => {
+  it("preserves product rotation eligibility after reloading job detail", async () => {
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          presetId: null,
+          presetSnapshot: null,
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets: [
+        { assetId: "asset-front", role: "front", sortOrder: 0 },
+        { assetId: "asset-side", role: "side", sortOrder: 1 },
+        { assetId: "asset-back", role: "back", sortOrder: 2 },
+      ],
+      analyses: ["front", "side", "back"].map((role) => ({
+        assetId: `asset-${role}`,
+        analysisJson: {
+          asset_role: role,
+          garment_category: "dress",
+          view_angle: role,
+          human_present: "no",
+          subject_kind: "product",
+          visible_details: [`${role}_shape`],
+          not_visible_details: [],
+          quality: {
+            is_garment: true,
+            is_clear: true,
+            is_safe: true,
+            has_flat_lay_or_white_background: role === "front",
+          },
+          confidence: "high",
+          risk_flags: [],
+        },
+      })),
+      consistencyAnalyses: [
+        {
+          videoJobId: jobId,
+          analysisKind: "product_views",
+          status: "passed",
+          garmentMatch: "pass",
+          modelMatch: "not_applicable",
+          colorMatch: true,
+          patternMatch: true,
+          viewCoverage: ["front", "side", "back"],
+          confidence: "0.96",
+          riskFlags: [],
+          resultJson: { garment_match: "pass" },
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.assetCompleteness.garmentConsistency).toBe("pass");
+    expect(detail?.recommendations.availableTemplateIds).toContain(
+      "product_half_rotation",
+    );
+    expect(detail?.consistencyAnalyses).toEqual([
+      expect.objectContaining({
+        analysisKind: "product_views",
+        status: "passed",
+        confidence: "0.96",
+      }),
+    ]);
+  });
+
   it("returns job status, assets, and aggregated recommendations", async () => {
     const store = createInMemoryVideoJobReadStore({
       jobs: [

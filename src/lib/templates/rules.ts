@@ -11,7 +11,15 @@ export interface AssetCompleteness {
   hasDetail: boolean;
   hasScene: boolean;
   hasModelFront: boolean;
+  hasModelSide: boolean;
+  hasModelBack: boolean;
   hasFlatLayOrWhiteBackground: boolean;
+  hasProductFront: boolean;
+  hasProductSide: boolean;
+  hasProductBack: boolean;
+  garmentConsistency: "pass" | "fail" | "unknown";
+  modelGarmentConsistency: "pass" | "fail" | "unknown";
+  modelConsistency: "pass" | "fail" | "unknown";
   detailTypes: DetailType[];
 }
 
@@ -24,7 +32,19 @@ export type TemplateUnavailableReason =
   | "detail_asset_required"
   | "scene_asset_required"
   | "model_front_asset_required"
+  | "model_side_asset_required"
+  | "model_back_asset_required"
   | "flat_lay_or_white_background_required"
+  | "product_front_asset_required"
+  | "product_side_asset_required"
+  | "product_back_asset_required"
+  | "matching_product_views_required"
+  | "product_view_consistency_failed"
+  | "product_only_template"
+  | "matching_model_garment_views_required"
+  | "model_garment_consistency_failed"
+  | "matching_model_views_required"
+  | "model_view_consistency_failed"
   | "fabric_detail_required"
   | "neckline_detail_required"
   | "cuff_detail_required"
@@ -39,6 +59,11 @@ const requiredAssetReason: Record<RequiredAssetKind, TemplateUnavailableReason> 
   scene: "scene_asset_required",
   model_front: "model_front_asset_required",
   flat_lay_or_white_background: "flat_lay_or_white_background_required",
+  product_front: "product_front_asset_required",
+  product_side: "product_side_asset_required",
+  product_back: "product_back_asset_required",
+  model_side: "model_side_asset_required",
+  model_back: "model_back_asset_required",
 };
 
 function hasRequiredAsset(kind: RequiredAssetKind, assets: AssetCompleteness) {
@@ -57,6 +82,16 @@ function hasRequiredAsset(kind: RequiredAssetKind, assets: AssetCompleteness) {
       return assets.hasModelFront;
     case "flat_lay_or_white_background":
       return assets.hasFlatLayOrWhiteBackground;
+    case "product_front":
+      return assets.hasProductFront;
+    case "product_side":
+      return assets.hasProductSide;
+    case "product_back":
+      return assets.hasProductBack;
+    case "model_side":
+      return assets.hasModelSide;
+    case "model_back":
+      return assets.hasModelBack;
   }
 }
 
@@ -100,6 +135,47 @@ export function getTemplateUnavailableReasons({
   for (const detailType of template.detailTypes ?? []) {
     if (!assetCompleteness.detailTypes.includes(detailType)) {
       reasons.push(detailReason(detailType));
+    }
+  }
+
+  if (
+    template.subjectKind === "product" &&
+    !assetCompleteness.hasProductFront &&
+    !assetCompleteness.hasProductSide &&
+    !assetCompleteness.hasProductBack
+  ) {
+    reasons.push("product_only_template");
+  }
+
+  if (template.consistencyRequirements.includes("same_garment")) {
+    const garmentConsistency =
+      template.subjectKind === "human_model"
+        ? assetCompleteness.modelGarmentConsistency
+        : assetCompleteness.garmentConsistency;
+
+    if (garmentConsistency !== "pass") {
+      reasons.push(
+        template.subjectKind === "human_model"
+          ? "matching_model_garment_views_required"
+          : "matching_product_views_required",
+      );
+      if (garmentConsistency === "fail") {
+        reasons.push(
+          template.subjectKind === "human_model"
+            ? "model_garment_consistency_failed"
+            : "product_view_consistency_failed",
+        );
+      }
+    }
+  }
+
+  if (
+    template.consistencyRequirements.includes("same_model") &&
+    assetCompleteness.modelConsistency !== "pass"
+  ) {
+    reasons.push("matching_model_views_required");
+    if (assetCompleteness.modelConsistency === "fail") {
+      reasons.push("model_view_consistency_failed");
     }
   }
 

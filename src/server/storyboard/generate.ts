@@ -14,6 +14,8 @@ import {
 } from "@/lib/providers/log-call";
 import type { CreemPromptModerationResult } from "@/lib/providers/creem/moderation";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
+import { isVideoDuration, type VideoDuration } from "@/lib/video/specs";
+import { validateTemplateSlots } from "@/lib/video/template-slots";
 import type { VideoJobReadStore } from "@/server/jobs/get-job";
 import { getVideoJobDetail } from "@/server/jobs/get-job";
 import type { JobStore } from "@/server/jobs/state-machine";
@@ -186,6 +188,10 @@ function userPromptForStoryboard({
   return JSON.stringify({
     duration_seconds: durationSeconds,
     selected_template_ids: selectedTemplateIds,
+    template_slots: selectedTemplateIds.map((templateId, index) => ({
+      index,
+      template_id: templateId,
+    })),
     available_template_ids: availableTemplateIds,
     asset_summary: {
       has_front: assetCompleteness.hasFront,
@@ -231,6 +237,7 @@ function userPromptForStoryboard({
       "Do not create, output, or rewrite global constraints.",
       "Every segment prompt must obey global_hard_constraints.",
       "Use only selected_template_ids as segment template_id values.",
+      "Use template_slots in order; each segment template_id must match its slot.",
     ],
     user_prompt: userPrompt,
     output_schema: {
@@ -339,6 +346,25 @@ export async function generateStoryboardDraft({
     availableTemplateIds: detail.recommendations.availableTemplateIds,
   });
 
+  if (!isVideoDuration(detail.job.durationSeconds)) {
+    throw new Error("Unsupported video duration.");
+  }
+  const highRiskTemplateIds = templates
+    .filter(
+      (template) =>
+        template.riskLevel === "medium_high" ||
+        template.riskLevel === "high",
+    )
+    .map((template) => template.templateId);
+  const slotReasons = validateTemplateSlots({
+    durationSeconds: detail.job.durationSeconds as VideoDuration,
+    templateIds: selectedTemplateIds,
+    highRiskTemplateIds,
+  });
+  if (slotReasons.length > 0) {
+    throw new Error(`Invalid template slots: ${slotReasons.join(",")}.`);
+  }
+
   const moderation = await checkPrompt(
     {
       userId,
@@ -371,6 +397,7 @@ export async function generateStoryboardDraft({
     hasDetailAsset: detail.assetCompleteness.hasDetail,
     hasSceneAsset: detail.assetCompleteness.hasScene,
   });
+
   const globalUserIntent = buildGlobalUserIntent({
     userPrompt,
     hasDetailAsset: detail.assetCompleteness.hasDetail,
@@ -419,6 +446,7 @@ export async function generateStoryboardDraft({
     parsed = parseStoryboardJson(providerResult.storyboardJson, {
       durationSeconds: detail.job.durationSeconds,
       allowedTemplateIds: selectedTemplateIds,
+      selectedTemplateIds,
     });
     assertStoryboardPromptPolicy({
       parsed,

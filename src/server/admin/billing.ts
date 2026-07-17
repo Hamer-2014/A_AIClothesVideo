@@ -90,6 +90,8 @@ export async function adjustUserCreditsByAdmin({
   targetUserId,
   amount,
   reason,
+  idempotencyKey,
+  relatedJobId,
   requestMeta,
 }: {
   ledgerStore?: CreditLedgerStore;
@@ -98,6 +100,8 @@ export async function adjustUserCreditsByAdmin({
   targetUserId: string;
   amount: number;
   reason: string;
+  idempotencyKey?: string;
+  relatedJobId?: string;
   requestMeta?: AdminAuditRequestMeta;
 }) {
   if (!canRolePerformAdminAction(actor.role, "credits:admin_adjust")) {
@@ -111,24 +115,29 @@ export async function adjustUserCreditsByAdmin({
     userId: targetUserId,
     amount,
     reason: normalizedReason,
-    idempotencyKey: `admin_adjust:${targetUserId}:${actor.userId}:${Date.now()}`,
+    idempotencyKey:
+      idempotencyKey ?? `admin_adjust:${targetUserId}:${actor.userId}:${Date.now()}`,
+    relatedJobId: relatedJobId ?? null,
     metadata: {
       actorUserId: actor.userId,
       actorEmail: actor.email,
+      relatedJobId: relatedJobId ?? null,
     },
   });
 
-  await writeAdminAuditLog({
-    store: auditStore,
-    actor,
-    action: "credits:admin_adjust",
-    targetType: "user",
-    targetId: targetUserId,
-    reason: normalizedReason,
-    beforeSnapshot: null,
-    afterSnapshot: toAuditSnapshot(result.ledger),
-    requestMeta,
-  });
+  if (!result.idempotent) {
+    await writeAdminAuditLog({
+      store: auditStore,
+      actor,
+      action: "credits:admin_adjust",
+      targetType: relatedJobId ? "video_job" : "user",
+      targetId: relatedJobId ?? targetUserId,
+      reason: normalizedReason,
+      beforeSnapshot: null,
+      afterSnapshot: toAuditSnapshot(result.ledger),
+      requestMeta,
+    });
+  }
 
   return result;
 }

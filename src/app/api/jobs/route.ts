@@ -159,6 +159,16 @@ export async function handleCreateJobRequest(
       );
     }
 
+    if (
+      error instanceof Error &&
+      error.message === "Rights attestation is required for all assets."
+    ) {
+      return NextResponse.json(
+        { error: "rights_attestation_required" },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: "job_creation_failed",

@@ -1,17 +1,14 @@
 "use client";
 
+import { videoDurations, type VideoDuration } from "@/lib/video/specs";
+
 interface SpecSelectorProps {
-  durationSeconds: 8 | 16 | 24;
+  durationSeconds: VideoDuration;
   aspectRatio: "9:16" | "1:1" | "16:9";
-  onDurationChange: (value: 8 | 16 | 24) => void;
+  duration40Enabled?: boolean;
+  onDurationChange: (value: VideoDuration) => void;
   onAspectRatioChange: (value: "9:16" | "1:1" | "16:9") => void;
 }
-
-const durationOptions = [
-  { value: 8, label: "8 秒" },
-  { value: 16, label: "16 秒" },
-  { value: 24, label: "24 秒" },
-] as const;
 
 const aspectRatioOptions = [
   { value: "9:16", label: "9:16" },
@@ -45,10 +42,18 @@ function SegmentedButton<T extends string | number>({
 
 export function SpecSelector({
   durationSeconds,
+  duration40Enabled = false,
   aspectRatio,
   onDurationChange,
   onAspectRatioChange,
 }: SpecSelectorProps) {
+  const durationOptions = videoDurations
+    .filter((duration) => duration !== 40 || duration40Enabled)
+    .map((duration) => ({
+      value: duration,
+      label: duration === 40 ? "40 秒 Beta" : `${duration} 秒`,
+    }));
+
   return (
     <section className="space-y-5">
       <div>

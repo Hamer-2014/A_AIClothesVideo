@@ -185,6 +185,258 @@ describe("confirmStoryboard", () => {
     vi.unstubAllEnvs();
   });
 
+  it("orders verified product references and forces strict QA for half rotation", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "storyboard_draft_ready",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const storyboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+          postQaMode: "standard",
+          postQaReason: null,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "back-product",
+          role: "back",
+          subjectKind: "product",
+          sortOrder: 0,
+        },
+        {
+          videoJobId: jobId,
+          assetId: "front-product",
+          role: "front",
+          subjectKind: "product",
+          sortOrder: 1,
+        },
+        {
+          videoJobId: jobId,
+          assetId: "side-product",
+          role: "side",
+          subjectKind: "product",
+          sortOrder: 2,
+        },
+      ],
+      consistencyAnalyses: [
+        {
+          videoJobId: jobId,
+          analysisKind: "product_views",
+          status: "passed",
+          garmentMatch: "pass",
+          modelMatch: "not_applicable",
+          confidence: "0.97",
+          riskFlags: [],
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["product_half_rotation"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "product_half_rotation",
+                prompt: "Rotate the product from front through side to back.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-07-11T00:00:00.000Z"),
+          updatedAt: new Date("2026-07-11T00:00:00.000Z"),
+        },
+      ],
+    });
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 100,
+      reason: "test setup",
+      idempotencyKey: "grant:product-half",
+    });
+
+    await confirmStoryboard({
+      jobStore,
+      storyboardStore,
+      creditStore,
+      moderationStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: allowModeration,
+    });
+
+    expect(storyboardStore.listSegments()[0]?.inputAssetSnapshot).toMatchObject({
+      assets: [
+        { assetId: "front-product", role: "front", subjectKind: "product" },
+        { assetId: "side-product", role: "side", subjectKind: "product" },
+        { assetId: "back-product", role: "back", subjectKind: "product" },
+      ],
+      consistency: {
+        analysisKind: "product_views",
+        status: "passed",
+        garmentMatch: "pass",
+      },
+    });
+    expect(storyboardStore.listJobs()[0]).toMatchObject({
+      postQaMode: "strict",
+      postQaReason: "template_requires_strict_review",
+    });
+  });
+
+  it("selects only verified human-model references for a half turn", async () => {
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "storyboard_draft_ready",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 0,
+        lastError: null,
+      },
+    ]);
+    const storyboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 70,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+          postQaMode: "standard",
+          postQaReason: null,
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "flat-lay-front",
+          role: "front",
+          subjectKind: "product",
+          sortOrder: 0,
+        },
+        ...["back", "front", "side"].map((role, index) => ({
+          videoJobId: jobId,
+          assetId: `model-${role}`,
+          role,
+          subjectKind: "human_model" as const,
+          sortOrder: index + 1,
+        })),
+      ],
+      consistencyAnalyses: [
+        {
+          videoJobId: jobId,
+          analysisKind: "model_views",
+          status: "passed",
+          garmentMatch: "pass",
+          modelMatch: "pass",
+          confidence: "0.97",
+          riskFlags: [],
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["model_half_turn"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "model_half_turn",
+                prompt: "Turn the same visible model from front to back.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-07-11T00:00:00.000Z"),
+          updatedAt: new Date("2026-07-11T00:00:00.000Z"),
+        },
+      ],
+    });
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 100,
+      reason: "test setup",
+      idempotencyKey: "grant:model-half",
+    });
+
+    await confirmStoryboard({
+      jobStore,
+      storyboardStore,
+      creditStore,
+      moderationStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: allowModeration,
+    });
+
+    const snapshot = storyboardStore.listSegments()[0]?.inputAssetSnapshot;
+    expect(snapshot).toMatchObject({
+      assets: [
+        { assetId: "model-front", role: "front", subjectKind: "human_model" },
+        { assetId: "model-side", role: "side", subjectKind: "human_model" },
+        { assetId: "model-back", role: "back", subjectKind: "human_model" },
+      ],
+      consistency: {
+        analysisKind: "model_views",
+        status: "passed",
+        garmentMatch: "pass",
+        modelMatch: "pass",
+      },
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("flat-lay-front");
+    expect(storyboardStore.listJobs()[0]).toMatchObject({
+      postQaMode: "strict",
+      postQaReason: "template_requires_strict_review",
+    });
+  });
+
   it("moderates the final prompt, reserves credits, confirms storyboard, and creates video segments", async () => {
     const stores = createStores();
     const funnelStore = createInMemoryFunnelEventStore();
@@ -466,6 +718,7 @@ describe("confirmStoryboard", () => {
             {
               assetId: "asset-front",
               role: "front",
+              subjectKind: "unknown",
               sortOrder: 0,
             },
           ],
@@ -486,6 +739,7 @@ describe("confirmStoryboard", () => {
             {
               assetId: "asset-back",
               role: "back",
+              subjectKind: "unknown",
               sortOrder: 1,
             },
           ],
@@ -965,6 +1219,20 @@ describe("confirmStoryboard", () => {
           billingMode: "free_trial",
           generationProfile: "trial_540p_watermarked",
           watermarkEnabled: true,
+          trialEligibilitySnapshot: {
+            decision: "allow",
+            riskScore: 0,
+            reasonCodes: [],
+            signals: {
+              emailHash: "email-hash-1",
+              oauthAccounts: [
+                { provider: "google", accountHash: "oauth-hash-1" },
+              ],
+              ipHash: "ip-hash-1",
+              deviceFingerprintHash: "device-hash-1",
+              userAgentHash: "ua-hash-1",
+            },
+          },
           isTest: false,
         },
       ],
@@ -1026,6 +1294,45 @@ describe("confirmStoryboard", () => {
       segmentCount: 1,
     });
     expect(stores.creditStore.listLedger()).toHaveLength(0);
+    expect(trialStoryboardStore.listTrialUsages()).toEqual([
+      expect.objectContaining({
+        userId,
+        videoJobId: jobId,
+        durationSeconds: 8,
+        generationProfile: "trial_540p_watermarked",
+        resolution: "540p",
+        watermarkEnabled: true,
+        provider: "apimart",
+        model: "pixverse-v6",
+      }),
+    ]);
+    expect(trialStoryboardStore.listTrialAbuseSignals()).toEqual([
+      expect.objectContaining({
+        userId,
+        videoJobId: jobId,
+        eventType: "trial_granted",
+        decision: "allow",
+        riskScore: 0,
+        reasonCodes: [],
+        emailHash: "email-hash-1",
+        oauthProvider: "google",
+        oauthAccountIdHash: "oauth-hash-1",
+        ipHash: "ip-hash-1",
+        deviceFingerprintHash: "device-hash-1",
+        userAgentHash: "ua-hash-1",
+      }),
+    ]);
+    expect(trialStoryboardStore.listAccessEvents()).toEqual([
+      expect.objectContaining({
+        userId,
+        eventType: "trial_granted",
+        metadata: expect.objectContaining({
+          videoJobId: jobId,
+          durationSeconds: 8,
+          generationProfile: "trial_540p_watermarked",
+        }),
+      }),
+    ]);
     expect(trialStoryboardStore.listStoryboards()[0]).toMatchObject({
       status: "confirmed",
     });
@@ -1042,6 +1349,341 @@ describe("confirmStoryboard", () => {
       }),
     ]);
     expect(stores.jobStore.listJobs()[0]?.status).toBe("segments_queued");
+  });
+
+  it("does not duplicate trial usage when a trial confirmation is retried after segments queued", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
+          trialEligibilitySnapshot: {
+            decision: "allow",
+            riskScore: 5,
+            reasonCodes: ["missing_device_fingerprint"],
+            signals: {},
+          },
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+
+    await confirmStoryboard({
+      ...stores,
+      storyboardStore: trialStoryboardStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: allowModeration,
+    });
+
+    await confirmStoryboard({
+      ...stores,
+      storyboardStore: trialStoryboardStore,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: allowModeration,
+    });
+
+    expect(trialStoryboardStore.listTrialUsages()).toHaveLength(1);
+    expect(trialStoryboardStore.listTrialAbuseSignals()).toHaveLength(1);
+    expect(trialStoryboardStore.listAccessEvents()).toHaveLength(1);
+  });
+
+  it("marks a second trial job failed when the user already has trial usage", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
+          trialEligibilitySnapshot: {
+            decision: "allow",
+            riskScore: 0,
+            reasonCodes: [],
+            signals: {},
+          },
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+      trialUsages: [
+        {
+          userId,
+          videoJobId: "55555555-5555-4555-8555-555555555555",
+          usedAt: new Date("2026-06-06T00:00:00.000Z"),
+        },
+      ],
+    });
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        storyboardStore: trialStoryboardStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow("Free trial is not available.");
+
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("segment_failed");
+    expect(trialStoryboardStore.listTrialUsages()).toHaveLength(1);
+    expect(trialStoryboardStore.listTrialUsages()[0]).toMatchObject({
+      videoJobId: "55555555-5555-4555-8555-555555555555",
+    });
+    expect(trialStoryboardStore.listTrialAbuseSignals()).toHaveLength(0);
+    expect(trialStoryboardStore.listAccessEvents()).toHaveLength(0);
+  });
+
+  it("does not consume trial usage when trial segment queue transition fails", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
+          trialEligibilitySnapshot: {
+            decision: "allow",
+            riskScore: 0,
+            reasonCodes: [],
+            signals: {},
+          },
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+    const failingJobStore = {
+      ...stores.jobStore,
+      async createStateEvent(
+        input: Parameters<typeof stores.jobStore.createStateEvent>[0],
+      ) {
+        if (input.toStatus === "segments_queued") {
+          throw new Error("segments queued event failed");
+        }
+
+        return stores.jobStore.createStateEvent(input);
+      },
+    };
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        jobStore: failingJobStore,
+        storyboardStore: trialStoryboardStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow("segments queued event failed");
+
+    expect(trialStoryboardStore.listTrialUsages()).toHaveLength(0);
+    expect(trialStoryboardStore.listTrialAbuseSignals()).toHaveLength(0);
+    expect(trialStoryboardStore.listAccessEvents()).toHaveLength(0);
+  });
+
+  it("marks a trial job failed when final trial usage audit write fails", async () => {
+    const stores = createStores();
+    const trialStoryboardStore = createInMemoryStoryboardConfirmationStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "storyboard_draft_ready",
+          durationSeconds: 8,
+          creditCost: 0,
+          billingMode: "free_trial",
+          generationProfile: "trial_540p_watermarked",
+          watermarkEnabled: true,
+          trialEligibilitySnapshot: {
+            decision: "allow",
+            riskScore: 0,
+            reasonCodes: [],
+            signals: {},
+          },
+          isTest: false,
+        },
+      ],
+      jobAssets: [
+        {
+          videoJobId: jobId,
+          assetId: "asset-front",
+          role: "front",
+          sortOrder: 0,
+        },
+      ],
+      storyboards: [
+        {
+          id: storyboardId,
+          videoJobId: jobId,
+          version: 1,
+          status: "draft",
+          selectedTemplateIds: ["front_push_in"],
+          presetId: null,
+          presetSnapshot: null,
+          storyboardJson: {
+            duration_seconds: 8,
+            segments: [
+              {
+                index: 0,
+                duration_seconds: 8,
+                template_id: "front_push_in",
+                prompt: "Slow push-in on the front garment.",
+              },
+            ],
+          },
+          finalPromptSnapshot: null,
+          providerCallLogId: null,
+          confirmedAt: null,
+          createdAt: new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        },
+      ],
+    });
+    const failingTrialGrantStore = {
+      ...trialStoryboardStore,
+      async grantFreeTrialUsageIfNeeded() {
+        throw new Error("trial audit unavailable");
+      },
+    };
+
+    await expect(
+      confirmStoryboard({
+        ...stores,
+        storyboardStore: failingTrialGrantStore,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: allowModeration,
+      }),
+    ).rejects.toThrow("trial audit unavailable");
+
+    expect(stores.jobStore.listJobs()[0]?.status).toBe("segment_failed");
   });
 
   it("rejects non trial-allowed templates when confirming a free trial storyboard", async () => {

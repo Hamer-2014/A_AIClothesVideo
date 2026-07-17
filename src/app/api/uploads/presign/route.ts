@@ -2,12 +2,16 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
-import { getDb } from "@/lib/db/client";
-import { assets } from "@/lib/db/schema";
 import { buildAssetOriginalKey } from "@/lib/storage/keys";
 import { createUploadSignedUrl as createR2UploadSignedUrl } from "@/lib/storage/presign";
 import { validateUploadFile } from "@/lib/storage/validation";
 import type { AssetRole } from "@/server/assets/analysis-schema";
+import {
+  createAttestationWithAssets as createRightsAttestationWithAssets,
+  parseRightsAttestation,
+  type CreateAttestationWithAssetsInput,
+  type CreateAttestationWithAssetsResult,
+} from "@/server/compliance/rights-attestation";
 
 type UploadSession = {
   user?: {
@@ -17,20 +21,13 @@ type UploadSession = {
 
 interface UploadPresignDeps {
   getSession?: () => Promise<UploadSession>;
-  createAsset?: (asset: {
-    id: string;
-    userId: string;
-    key: string;
-    fileName: string;
-    mimeType: string;
-    fileSize: number;
-    detectedRole: AssetRole;
-    status: "pending_upload" | "uploaded";
-  }) => Promise<{ id: string; key: string }>;
   createUploadSignedUrl?: (input: {
     key: string;
     contentType: string;
   }) => Promise<{ url: string; headers: Record<string, string> }>;
+  createAttestationWithAssets?: (
+    input: CreateAttestationWithAssetsInput,
+  ) => Promise<CreateAttestationWithAssetsResult>;
 }
 
 const uploadSlotRoles: AssetRole[] = [
@@ -89,35 +86,17 @@ function parseUploadFiles(body: Record<string, unknown>): {
   };
 }
 
-async function createAssetRecord(asset: {
-  id: string;
-  userId: string;
-  key: string;
-  fileName: string;
-  mimeType: string;
-  fileSize: number;
-  detectedRole: AssetRole;
-  status: "pending_upload" | "uploaded";
-}) {
-  await getDb().insert(assets).values({
-    id: asset.id,
-    userId: asset.userId,
-    status: asset.status,
-    originalKey: asset.key,
-    fileName: asset.fileName,
-    mimeType: asset.mimeType,
-    fileSize: asset.fileSize,
-    detectedRole: asset.detectedRole,
-    metadata: {
-      intendedRole: asset.detectedRole,
-      uploadState: asset.status,
-    },
-  });
+function getRequestIpAddress(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || null;
+  }
+  return request.headers.get("x-real-ip")?.trim() || null;
+}
 
-  return {
-    id: asset.id,
-    key: asset.key,
-  };
+function getRequestLocale(request: Request) {
+  const acceptLanguage = request.headers.get("accept-language");
+  return acceptLanguage?.split(",")[0]?.split(";")[0]?.trim() || "zh-CN";
 }
 
 export async function handleUploadPresignRequest(
@@ -132,13 +111,27 @@ export async function handleUploadPresignRequest(
   }
 
   const body = (await request.json()) as Record<string, unknown>;
+  let attestation;
+  try {
+    attestation = parseRightsAttestation(body.rightsAttestation);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "rights_attestation_required") {
+      return NextResponse.json({ error: code }, { status: 400 });
+    }
+    if (code === "rights_attestation_version_mismatch") {
+      return NextResponse.json({ error: code }, { status: 409 });
+    }
+    throw error;
+  }
   const { files, batch } = parseUploadFiles(body);
 
   if (files.length === 0 || files.length > 8) {
     return NextResponse.json({ error: "invalid_upload_batch" }, { status: 400 });
   }
 
-  const createAsset = deps.createAsset ?? createAssetRecord;
+  const createAttestationWithAssets =
+    deps.createAttestationWithAssets ?? createRightsAttestationWithAssets;
   const createUploadSignedUrl =
     deps.createUploadSignedUrl ??
     ((input) =>
@@ -146,7 +139,7 @@ export async function handleUploadPresignRequest(
         key: input.key,
         contentType: input.contentType,
       }));
-  const signedFiles = [];
+  const validatedFiles: CreateAttestationWithAssetsInput["files"] = [];
 
   for (const file of files) {
     const validation = validateUploadFile({
@@ -164,29 +157,60 @@ export async function handleUploadPresignRequest(
 
     const assetId = randomUUID();
     const key = buildAssetOriginalKey(userId, assetId, validation.mimeType);
-    const asset = await createAsset({
+    validatedFiles.push({
       id: assetId,
-      userId,
       key,
       fileName: file.fileName,
       mimeType: validation.mimeType,
       fileSize: file.fileSize,
       detectedRole: file.intendedRole,
-      status: batch ? "pending_upload" : "uploaded",
-    });
-    const signed = await createUploadSignedUrl({
-      key: asset.key,
-      contentType: validation.mimeType,
-    });
-
-    signedFiles.push({
-      assetId: asset.id,
-      fileName: file.fileName,
-      intendedRole: file.intendedRole,
-      uploadUrl: signed.url,
-      headers: signed.headers,
+      status: "pending_upload",
     });
   }
+
+  let createdAssets: CreateAttestationWithAssetsResult;
+  try {
+    createdAssets = await createAttestationWithAssets({
+      userId,
+      attestation,
+      scope: "upload",
+      locale: getRequestLocale(request),
+      ipAddress: getRequestIpAddress(request),
+      userAgent: request.headers.get("user-agent"),
+      files: validatedFiles,
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "compliance_hash_secret_required") {
+      return NextResponse.json({ error: code }, { status: 503 });
+    }
+    if (code === "invalid_upload_batch") {
+      return NextResponse.json({ error: code }, { status: 400 });
+    }
+    throw error;
+  }
+
+  const filesById = new Map(validatedFiles.map((file) => [file.id, file]));
+  const signedFiles = await Promise.all(
+    createdAssets.assets.map(async (asset) => {
+      const file = filesById.get(asset.id);
+      if (!file) {
+        throw new Error("rights_attestation_asset_mismatch");
+      }
+      const signed = await createUploadSignedUrl({
+        key: asset.key,
+        contentType: file.mimeType,
+      });
+
+      return {
+        assetId: asset.id,
+        fileName: file.fileName,
+        intendedRole: file.detectedRole,
+        uploadUrl: signed.url,
+        headers: signed.headers,
+      };
+    }),
+  );
 
   if (batch) {
     return NextResponse.json({ files: signedFiles });

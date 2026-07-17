@@ -24,6 +24,13 @@ export interface VisionAssetAnalysisInput {
 export interface VisionPostQaInput {
   mode: VisionAnalysisMode;
   frameUrls: string[];
+  qaRequirements?: string[];
+}
+
+export interface VisionConsistencyInput {
+  imageUrls: string[];
+  declaredRoles: string[];
+  expectedSubjectKind: "product" | "human_model";
 }
 
 export interface VisionAssetAnalysisResult {
@@ -40,15 +47,28 @@ export interface VisionPostQaResult {
   raw: JsonValue;
 }
 
+export interface VisionConsistencyResult {
+  provider: string;
+  model: string;
+  consistencyJson: JsonValue;
+  raw: JsonValue;
+}
+
 interface VisionClientDeps {
   fetch?: typeof fetch;
 }
 
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
-  "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.";
+  "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, subject_kind, visible_details, not_visible_details, quality, confidence, risk_flags. Set subject_kind to human_model only when the visible person is wearing the target garment; a person merely present in the scene is not enough. Use product for a garment shown without a real person wearing it, otherwise use unknown.";
 const postQaSystemInstruction =
   "Review stitched clothing product video frames for delivery quality and safety. Return only JSON with passed, failure_category, checks, risk_flags, summary. Fail only for blocking delivery problems: garment mismatch or invented details, product cannot be recognized, severe blur/distortion/artifacts, black/bad frames, unsafe content, sexualized child imagery, exploitation, privacy-sensitive content, or adultized child presentation. Do not fail for subjective brand preference or broad ad-policy uncertainty. For childrenswear/kids apparel, ordinary child models, child context, lifestyle scenes, outdoor/street scenes, and minor_present/child_model risk flags are not a failure reason by itself when the presentation is safe and the garment remains recognizable. Slight motion blur is acceptable when the garment can still be assessed. If only soft suitability concerns exist, set passed true and include them as risk_flags/summary warnings instead of failure_category.";
+
+function postQaInstruction(requirements: string[] = []) {
+  return requirements.length === 0
+    ? postQaSystemInstruction
+    : `${postQaSystemInstruction} Additional required checks: ${requirements.join("; ")}.`;
+}
 const assetAnalysisJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -57,6 +77,7 @@ const assetAnalysisJsonSchema = {
     "garment_category",
     "view_angle",
     "human_present",
+    "subject_kind",
     "visible_details",
     "not_visible_details",
     "quality",
@@ -68,6 +89,7 @@ const assetAnalysisJsonSchema = {
     garment_category: { type: "string" },
     view_angle: { type: "string" },
     human_present: { type: "string" },
+    subject_kind: { enum: ["product", "human_model", "unknown"] },
     visible_details: {
       type: "array",
       items: { type: "string" },
@@ -135,6 +157,30 @@ const postQaJsonSchema = {
       items: { type: "string" },
     },
     summary: { type: "string" },
+  },
+} as const;
+const consistencyJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "garment_match",
+    "model_match",
+    "color_match",
+    "pattern_match",
+    "view_coverage",
+    "confidence",
+    "risk_flags",
+  ],
+  properties: {
+    garment_match: { enum: ["pass", "fail", "unknown"] },
+    model_match: {
+      enum: ["pass", "fail", "unknown", "not_applicable"],
+    },
+    color_match: { type: "boolean" },
+    pattern_match: { type: "boolean" },
+    view_coverage: { type: "array", items: { type: "string" } },
+    confidence: { type: "string" },
+    risk_flags: { type: "array", items: { type: "string" } },
   },
 } as const;
 
@@ -306,6 +352,70 @@ export async function createVisionAssetAnalysis(
   };
 }
 
+export async function createVisionConsistencyAnalysis(
+  input: VisionConsistencyInput,
+  deps: VisionClientDeps = {},
+): Promise<VisionConsistencyResult> {
+  const config = getVisionConfig("strict");
+  const fetchImpl = deps.fetch ?? fetch;
+  const responsesApi = isResponsesApi(config.baseUrl);
+  const url = responsesApi
+    ? config.baseUrl
+    : `${config.baseUrl}/chat/completions`;
+  const instruction =
+    `Perform a task-local consistency analysis of the ordered clothing images. ` +
+    `Expected subject kind: ${input.expectedSubjectKind}. ` +
+    `Declared role order: ${input.declaredRoles.join(", ")}. ` +
+    "Compare only evidence in this request; do not perform identity matching across tasks or build a face database. " +
+    "Return unknown when evidence is insufficient. Return only JSON with garment_match, model_match, color_match, pattern_match, view_coverage, confidence, risk_flags.";
+  const body = responsesApi
+    ? {
+        model: config.model,
+        input: responsesInput(input.imageUrls, instruction),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "asset_consistency",
+            strict: true,
+            schema: consistencyJsonSchema,
+          },
+        },
+      }
+    : {
+        model: config.model,
+        stream: false,
+        response_format: { type: "json_object" },
+        messages: chatMessages(input.imageUrls, instruction),
+      };
+
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const raw = asRecord(await response.json());
+
+  if (!response.ok) {
+    throw new Error(`Vision provider failed with status ${response.status}.`);
+  }
+
+  const consistencyJson = responsesApi
+    ? parseResponsesOutput(raw)
+    : parseJsonContent(
+        asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content,
+      );
+
+  return {
+    provider: config.provider,
+    model: config.model,
+    consistencyJson,
+    raw: raw as JsonValue,
+  };
+}
+
 export async function createVisionPostQaCheck(
   input: VisionPostQaInput,
   deps: VisionClientDeps = {},
@@ -316,10 +426,11 @@ export async function createVisionPostQaCheck(
   const url = responsesApi
     ? config.baseUrl
     : `${config.baseUrl}/chat/completions`;
+  const instruction = postQaInstruction(input.qaRequirements);
   const body = responsesApi
     ? {
         model: config.model,
-        input: responsesInput(input.frameUrls, postQaSystemInstruction),
+        input: responsesInput(input.frameUrls, instruction),
         text: {
           format: {
             type: "json_schema",
@@ -333,7 +444,7 @@ export async function createVisionPostQaCheck(
         model: config.model,
         stream: false,
         response_format: { type: "json_object" },
-        messages: chatMessages(input.frameUrls, postQaSystemInstruction),
+        messages: chatMessages(input.frameUrls, instruction),
       };
 
   const response = await fetchImpl(url, {

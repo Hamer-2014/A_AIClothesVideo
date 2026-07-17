@@ -45,4 +45,34 @@ describe("SpecSelector", () => {
     expect(onDurationChange).toHaveBeenCalledWith(16);
     expect(onAspectRatioChange).toHaveBeenCalledWith("1:1");
   });
+
+  it("shows the gated 40-second Beta option only when enabled", () => {
+    const onDurationChange = vi.fn();
+    const { rerender } = render(
+      <SpecSelector
+        aspectRatio="9:16"
+        duration40Enabled={false}
+        durationSeconds={8}
+        onAspectRatioChange={vi.fn()}
+        onDurationChange={onDurationChange}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "40 秒 Beta" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <SpecSelector
+        aspectRatio="9:16"
+        duration40Enabled
+        durationSeconds={8}
+        onAspectRatioChange={vi.fn()}
+        onDurationChange={onDurationChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "40 秒 Beta" }));
+
+    expect(onDurationChange).toHaveBeenCalledWith(40);
+  });
 });

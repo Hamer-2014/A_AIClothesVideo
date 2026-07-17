@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createVisionAssetAnalysis,
+  createVisionConsistencyAnalysis,
   createVisionPostQaCheck,
   getVisionConfig,
   VisionProviderUnavailableError,
@@ -189,12 +190,15 @@ describe("vision provider client", () => {
       name: "asset_analysis",
       strict: true,
     });
-    expect(body.input[0].role).toBe("system");
-    expect(body.input[0].content[0]).toEqual({
-      type: "input_text",
-      text:
-        "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, visible_details, not_visible_details, quality, confidence, risk_flags.",
+    expect(body.text?.format?.schema?.required).toContain("subject_kind");
+    expect(body.text?.format?.schema?.properties?.subject_kind).toEqual({
+      enum: ["product", "human_model", "unknown"],
     });
+    expect(body.input[0].role).toBe("system");
+    expect(body.input[0].content[0].text).toContain("subject_kind");
+    expect(body.input[0].content[0].text).toContain(
+      "human_model only when the visible person is wearing the target garment",
+    );
     expect(body.input[1].content).toEqual([
       {
         type: "input_image",
@@ -235,6 +239,73 @@ describe("vision provider client", () => {
         { fetch: fetchMock },
       ),
     ).rejects.toThrow("Vision provider failed with status 400.");
+  });
+
+  it("analyzes ordered product views with the strict consistency schema", async () => {
+    vi.stubEnv("VISION_PROVIDER", "openai");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.openai.example/v1");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                garment_match: "pass",
+                model_match: "not_applicable",
+                color_match: true,
+                pattern_match: true,
+                view_coverage: ["front", "side", "back"],
+                confidence: "0.93",
+                risk_flags: [],
+              }),
+            },
+          },
+        ],
+      });
+    };
+
+    const result = await createVisionConsistencyAnalysis(
+      {
+        imageUrls: [
+          "https://signed.example/front.jpg",
+          "https://signed.example/side.jpg",
+          "https://signed.example/back.jpg",
+        ],
+        declaredRoles: ["front", "side", "back"],
+        expectedSubjectKind: "product",
+      },
+      { fetch: fetchMock },
+    );
+    const requestBody = JSON.parse(calls[0]?.[1]?.body as string);
+
+    expect(requestBody.model).toBe("gpt-5.4");
+    expect(requestBody.messages[0].content).toContain(
+      "task-local consistency analysis",
+    );
+    expect(requestBody.messages[0].content.toLowerCase()).toContain(
+      "return unknown when evidence is insufficient",
+    );
+    expect(requestBody.messages[0].content).toContain(
+      "Declared role order: front, side, back",
+    );
+    expect(requestBody.messages[1].content).toHaveLength(3);
+    expect(requestBody.messages[1].content[0]).toEqual({
+      type: "image_url",
+      image_url: { url: "https://signed.example/front.jpg" },
+    });
+    expect(result.consistencyJson).toEqual({
+      garment_match: "pass",
+      model_match: "not_applicable",
+      color_match: true,
+      pattern_match: true,
+      view_coverage: ["front", "side", "back"],
+      confidence: "0.93",
+      risk_flags: [],
+    });
   });
 
   it("uses a dedicated post-QA schema requiring a boolean passed result", async () => {
@@ -349,5 +420,58 @@ describe("vision provider client", () => {
     expect(instruction).toContain("sexualized");
     expect(instruction).toContain("exploitation");
     expect(instruction).toContain("privacy-sensitive");
+  });
+
+  it("adds explicit human-turn continuity checks only when requested", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json({
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  passed: true,
+                  failure_category: null,
+                  checks: [],
+                  risk_flags: [],
+                  summary: "Human turn continuity passed.",
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    };
+
+    await createVisionPostQaCheck(
+      {
+        mode: "strict",
+        frameUrls: ["https://signed.example/frame-0.jpg"],
+        qaRequirements: [
+          "same visible person across relevant frames",
+          "natural head, arm, hand, hip, and leg anatomy",
+          "garment front/side/back consistency",
+          "turn stops at the supported angle and never completes 360 degrees",
+        ],
+      },
+      { fetch: fetchMock },
+    );
+
+    const body = JSON.parse(calls[0]?.[1]?.body as string);
+    const instruction = body.input[0].content[0].text;
+    expect(instruction).toContain("same visible person across relevant frames");
+    expect(instruction).toContain("natural head, arm, hand, hip, and leg anatomy");
+    expect(instruction).toContain("garment front/side/back consistency");
+    expect(instruction).toContain(
+      "turn stops at the supported angle and never completes 360 degrees",
+    );
   });
 });

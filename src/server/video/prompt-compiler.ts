@@ -2,6 +2,7 @@ import {
   assetFactsSnapshotFromAssets,
   buildGlobalHardConstraints,
 } from "@/server/storyboard/global-constraints";
+import { mvpShotTemplates } from "@/lib/templates/catalog";
 
 export const COMPILED_PROMPT_VERSION = "global_intent_constraints_v1" as const;
 
@@ -12,6 +13,8 @@ const SCENE_ENVIRONMENT_CONSTRAINT =
   "Use scene/background reference only for environment, lighting, and mood.";
 const SCENE_COPY_CONSTRAINT =
   "Do not copy people, faces, logos, storefront names, or readable text from the scene/background reference.";
+const PRODUCT_ONLY_CONSTRAINT =
+  "Do not create a person, hand, body, or model.";
 
 export type CompileVideoPromptInput = {
   finalPromptSnapshot?: unknown;
@@ -40,6 +43,7 @@ export type CompiledVideoPrompt = {
 
 type AssetRole = {
   role: string;
+  subjectKind?: string;
   sortOrder?: number;
 };
 
@@ -50,13 +54,20 @@ export function compileVideoPromptForSegment(
   const segmentInstruction = input.segment.prompt.trim();
   const globalUserIntent = readGlobalUserIntent(finalPromptSnapshot);
   const globalUserIntentLines = formatGlobalUserIntent(globalUserIntent);
-  const globalHardConstraints = addAssetRoleConstraints(
-    readHardConstraints(finalPromptSnapshot, [
-      input.inputAssetSnapshot,
-      input.segment.inputAssetSnapshot,
-    ]),
-    [input.inputAssetSnapshot, input.segment.inputAssetSnapshot],
-  );
+  const snapshots = [
+    input.inputAssetSnapshot,
+    input.segment.inputAssetSnapshot,
+  ];
+  const templateConstraints = mvpShotTemplates.find(
+    (template) => template.templateId === input.segment.templateId,
+  )?.systemConstraints ?? [];
+  const globalHardConstraints = uniqueStrings([
+    ...addAssetRoleConstraints(
+      readHardConstraints(finalPromptSnapshot, snapshots),
+      snapshots,
+    ),
+    ...templateConstraints,
+  ]);
 
   return {
     prompt: [
@@ -105,6 +116,8 @@ function readHardConstraints(
       hasBackAsset: facts.hasBack,
       hasDetailAsset: facts.hasDetail,
       hasSceneAsset: facts.hasScene,
+      hasModelFront: facts.hasModelFront,
+      hasModelBack: facts.hasModelBack,
     });
   }
 
@@ -178,14 +191,22 @@ function addAssetRoleConstraints(
   }
 
   const roleConstraints = assetRoles.map((asset, index) =>
-    buildImageRoleConstraint(asset.role, index + 1),
+    buildImageRoleConstraint(asset.role, index + 1, asset.subjectKind),
   );
   const hasSceneRole = assetRoles.some((asset) => isSceneRole(asset.role));
+  const hasProductOnlyRole = assetRoles.some(
+    (asset) => asset.subjectKind === "product",
+  );
   const sceneConstraints = hasSceneRole
     ? [SCENE_ENVIRONMENT_CONSTRAINT, SCENE_COPY_CONSTRAINT]
     : [];
 
-  return uniqueStrings([...constraints, ...roleConstraints, ...sceneConstraints]);
+  return uniqueStrings([
+    ...constraints,
+    ...roleConstraints,
+    ...sceneConstraints,
+    ...(hasProductOnlyRole ? [PRODUCT_ONLY_CONSTRAINT] : []),
+  ]);
 }
 
 function readAssetRoles(snapshot: unknown): AssetRole[] {
@@ -203,18 +224,30 @@ function readAssetRoles(snapshot: unknown): AssetRole[] {
     .filter((asset): asset is Record<string, unknown> => asset !== null)
     .map((asset) => ({
       role: typeof asset.role === "string" ? asset.role.trim().toLowerCase() : "",
+      subjectKind:
+        typeof asset.subjectKind === "string"
+          ? asset.subjectKind.trim().toLowerCase()
+          : undefined,
       sortOrder:
         typeof asset.sortOrder === "number" ? asset.sortOrder : undefined,
     }))
     .filter((asset) => asset.role.length > 0);
 }
 
-function buildImageRoleConstraint(role: string, imageIndex: number): string {
+function buildImageRoleConstraint(
+  role: string,
+  imageIndex: number,
+  subjectKind?: string,
+): string {
   if (isSceneRole(role)) {
     return `Image ${imageIndex} is a scene/background reference.`;
   }
 
-  return `Image ${imageIndex} is a ${role} garment reference.`;
+  return subjectKind === "product"
+    ? `Image ${imageIndex} is a ${role} product-only garment reference.`
+    : subjectKind === "human_model"
+      ? `Image ${imageIndex} is a ${role} human-model garment reference.`
+      : `Image ${imageIndex} is a ${role} garment reference.`;
 }
 
 function isSceneRole(role: string): boolean {

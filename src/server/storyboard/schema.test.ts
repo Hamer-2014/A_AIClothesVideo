@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import { parseStoryboardJson } from "./schema";
 
+function storyboardJson(templateIds: string[]) {
+  return {
+    duration_seconds: 40,
+    segments: templateIds.map((templateId, index) => ({
+      index,
+      duration_seconds: 8,
+      template_id: templateId,
+      prompt: `Segment ${index + 1}`,
+    })),
+  };
+}
+
 describe("storyboard schema", () => {
   it("accepts an 8 second storyboard with one allowed template", () => {
     const result = parseStoryboardJson(
@@ -68,5 +80,51 @@ describe("storyboard schema", () => {
         },
       ),
     ).toThrow("Storyboard segment count does not match duration.");
+  });
+
+  it("parses five ordered 8-second segments for a 40-second storyboard", () => {
+    const selected = [
+      "front_push_in",
+      "front_pan",
+      "front_crop_detail",
+      "front_push_in",
+      "front_pan",
+    ];
+    const result = parseStoryboardJson(storyboardJson(selected), {
+      durationSeconds: 40,
+      allowedTemplateIds: [...new Set(selected)],
+      selectedTemplateIds: selected,
+    });
+
+    expect(result.segments).toHaveLength(5);
+  });
+
+  it("rejects a segment that does not match its selected slot", () => {
+    expect(() =>
+      parseStoryboardJson(
+        storyboardJson([
+          "front_pan",
+          "front_push_in",
+          "front_crop_detail",
+          "front_push_in",
+          "front_pan",
+        ]),
+        {
+          durationSeconds: 40,
+          allowedTemplateIds: [
+            "front_push_in",
+            "front_pan",
+            "front_crop_detail",
+          ],
+          selectedTemplateIds: [
+            "front_push_in",
+            "front_pan",
+            "front_crop_detail",
+            "front_push_in",
+            "front_pan",
+          ],
+        },
+      ),
+    ).toThrow("Storyboard template does not match selected slot.");
   });
 });

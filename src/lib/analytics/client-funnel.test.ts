@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -28,6 +31,15 @@ describe("client funnel analytics", () => {
     expect(window.sessionStorage.getItem(FUNNEL_SESSION_ID_KEY)).toBe(
       first.sessionId,
     );
+  });
+
+  it("does not import server modules into the browser bundle", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/lib/analytics/client-funnel.ts"),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(/from\s+["']@\/server\//);
   });
 
   it("posts safe funnel events with path and identity", async () => {

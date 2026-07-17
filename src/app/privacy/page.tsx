@@ -49,6 +49,13 @@ export default async function PrivacyPage() {
               已产生的订单、点数流水和安全审计记录可能需要保留。
             </p>
           </section>
+          <section>
+            <h2 className="text-base font-medium text-[var(--ink)]">声明与投诉数据</h2>
+            <p className="mt-2">
+              上传授权声明会保存声明版本、文本快照、关联素材和去标识化的请求摘要。侵权通知会保存举报人联系方式、权利类型、去敏后的内容引用、说明、处理状态和审计记录。
+              已结案投诉以及不再关联有效素材的声明，在三年保留期届满后执行去标识化；公开编号、状态和必要审计关系可继续保留。
+            </p>
+          </section>
         </div>
       </article>
       <PublicFooter />

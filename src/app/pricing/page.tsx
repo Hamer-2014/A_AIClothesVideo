@@ -3,11 +3,20 @@ import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { getServerSession } from "@/lib/auth/server";
 import { creditPackages } from "@/lib/credits/packages";
+import {
+  getVideoSpec,
+  isVideoDurationEnabled,
+  videoDurations,
+} from "@/lib/video/specs";
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
 export default async function PricingPage() {
   const session = await getServerSession();
   const user = session?.user ?? null;
+  const duration40Enabled = isVideoDurationEnabled(40, process.env);
+  const availableDurations = videoDurations.filter(
+    (duration) => duration !== 40 || duration40Enabled,
+  );
   await recordFunnelEventSafely({
     eventName: "pricing_viewed",
     source: "server",
@@ -63,26 +72,27 @@ export default async function PricingPage() {
         <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
             <h2 className="text-base font-medium">生成消耗</h2>
-            <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-              <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
-                <p className="font-medium">8 秒</p>
-                <p className="mt-2 text-[var(--muted)]">70 点 · 1 个片段</p>
-              </div>
-              <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
-                <p className="font-medium">16 秒</p>
-                <p className="mt-2 text-[var(--muted)]">130 点 · 2 个片段</p>
-              </div>
-              <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
-                <p className="font-medium">24 秒</p>
-                <p className="mt-2 text-[var(--muted)]">190 点 · 3 个片段</p>
-              </div>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              {availableDurations.map((duration) => {
+                const spec = getVideoSpec(duration);
+                return (
+                  <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4" key={duration}>
+                    <p className="font-medium">
+                      {duration === 40 ? "40 秒 Beta" : `${duration} 秒`}
+                    </p>
+                    <p className="mt-2 text-[var(--muted)]">
+                      {spec.creditCost} 点 · {spec.segmentCount} 个片段
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
             <h2 className="text-base font-medium">免费试用</h2>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
               新用户可免费生成 1 条试用视频：8 秒、低分辨率、无音频、带水印，
-              仅开放低风险镜头。16/24 秒和高清无水印需要使用点数。
+              仅开放低风险镜头。16/24 秒{duration40Enabled ? "、40 秒 Beta" : ""}和高清无水印需要使用点数。
             </p>
           </div>
         </div>

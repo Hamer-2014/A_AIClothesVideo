@@ -3,6 +3,7 @@ import type { assetRoleValues } from "@/lib/db/schema/assets";
 
 export type AssetRole = (typeof assetRoleValues)[number];
 export type HumanPresent = "yes" | "no" | "unknown";
+export type AssetSubjectKind = "product" | "human_model" | "unknown";
 
 export interface AssetAnalysisQuality {
   isGarment: boolean;
@@ -16,12 +17,17 @@ export interface ParsedAssetAnalysis {
   garmentCategory: string;
   viewAngle: string;
   humanPresent: HumanPresent;
+  subjectKind: AssetSubjectKind;
   visibleDetails: string[];
   notVisibleDetails: string[];
   quality: AssetAnalysisQuality;
   confidence: string;
   riskFlags: string[];
   raw: JsonValue;
+}
+
+export interface ParseAssetAnalysisOptions {
+  declaredRole?: AssetRole;
 }
 
 const assetRoles: AssetRole[] = [
@@ -34,6 +40,11 @@ const assetRoles: AssetRole[] = [
   "unknown",
 ];
 const humanPresenceValues: HumanPresent[] = ["yes", "no", "unknown"];
+const assetSubjectKinds: AssetSubjectKind[] = [
+  "product",
+  "human_model",
+  "unknown",
+];
 const assetRoleAliases: Record<string, AssetRole> = {
   garment: "front",
   "garment on mannequin": "front",
@@ -70,12 +81,40 @@ function normalizeHumanPresent(value: string): HumanPresent {
   return "unknown";
 }
 
-function normalizeAssetRole(value: string): AssetRole | string {
+function isSceneLikeNaturalLanguage(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized.includes("not a garment") ||
+    normalized.includes("no garment") ||
+    normalized.includes("non-garment") ||
+    normalized.includes("studio lighting") ||
+    normalized.includes("lighting equipment") ||
+    normalized.includes("studio setup") ||
+    normalized.includes("photography setup") ||
+    normalized.includes("product photography") ||
+    normalized.includes("background") ||
+    normalized.includes("environment") ||
+    normalized.includes("scene")
+  );
+}
+
+function normalizeAssetRole(
+  value: string,
+  options: ParseAssetAnalysisOptions = {},
+): AssetRole | string {
   const normalized = value.trim().toLowerCase();
   const aliased = assetRoleAliases[normalized];
 
   if (aliased) {
     return aliased;
+  }
+
+  if (
+    options.declaredRole === "scene" &&
+    isSceneLikeNaturalLanguage(normalized)
+  ) {
+    return "scene";
   }
 
   if (
@@ -184,9 +223,35 @@ function booleanFromQuality(
   return typeof value === "boolean" ? value : defaultValue;
 }
 
-export function parseAssetAnalysisJson(input: unknown): ParsedAssetAnalysis {
+function subjectKindFromAnalysis({
+  explicitSubjectKind,
+  humanPresent,
+  isGarment,
+}: {
+  explicitSubjectKind: AssetSubjectKind | null;
+  humanPresent: HumanPresent;
+  isGarment: boolean;
+}): AssetSubjectKind {
+  if (explicitSubjectKind) {
+    return explicitSubjectKind;
+  }
+
+  if (humanPresent === "no" && isGarment) {
+    return "product";
+  }
+
+  return "unknown";
+}
+
+export function parseAssetAnalysisJson(
+  input: unknown,
+  options: ParseAssetAnalysisOptions = {},
+): ParsedAssetAnalysis {
   const record = asRecord(input);
-  const assetRole = normalizeAssetRole(requireString(record, "asset_role"));
+  const assetRole = normalizeAssetRole(
+    requireString(record, "asset_role"),
+    options,
+  );
   if (!assetRoles.includes(assetRole as AssetRole)) {
     throw new Error("Asset analysis JSON has invalid asset_role.");
   }
@@ -203,15 +268,34 @@ export function parseAssetAnalysisJson(input: unknown): ParsedAssetAnalysis {
     throw new Error("Asset analysis JSON is missing required field: quality.");
   }
 
+  const isGarment = booleanFromQuality(quality, "is_garment");
+  const subjectKindValue = record.subject_kind;
+  const explicitSubjectKind =
+    typeof subjectKindValue === "string"
+      ? subjectKindValue.trim().toLowerCase()
+      : null;
+
+  if (
+    explicitSubjectKind !== null &&
+    !assetSubjectKinds.includes(explicitSubjectKind as AssetSubjectKind)
+  ) {
+    throw new Error("Asset analysis JSON has invalid subject_kind.");
+  }
+
   return {
     assetRole: assetRole as AssetRole,
     garmentCategory: requireString(record, "garment_category"),
     viewAngle: requireString(record, "view_angle"),
     humanPresent: humanPresent as HumanPresent,
+    subjectKind: subjectKindFromAnalysis({
+      explicitSubjectKind: explicitSubjectKind as AssetSubjectKind | null,
+      humanPresent: humanPresent as HumanPresent,
+      isGarment,
+    }),
     visibleDetails: requireStringArray(record, "visible_details"),
     notVisibleDetails: requireStringArray(record, "not_visible_details"),
     quality: {
-      isGarment: booleanFromQuality(quality, "is_garment"),
+      isGarment,
       isClear: booleanFromQuality(quality, "is_clear"),
       isSafe: booleanFromQuality(quality, "is_safe"),
       hasFlatLayOrWhiteBackground: booleanFromQuality(

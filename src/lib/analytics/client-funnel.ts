@@ -2,7 +2,7 @@ import {
   allowedFunnelMetadataKeys,
   type FunnelEventName,
   type FunnelMetadata,
-} from "@/server/analytics/funnel-events";
+} from "@/lib/analytics/funnel-contract";
 
 export const FUNNEL_ANONYMOUS_ID_KEY = "runwaytools_funnel_anonymous_id";
 export const FUNNEL_SESSION_ID_KEY = "runwaytools_funnel_session_id";

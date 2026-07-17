@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WorkspaceApp } from "./workspace-app";
+import { reasonLabel, WorkspaceApp } from "./workspace-app";
 import { WORKSPACE_GUEST_DRAFT_KEY } from "@/lib/workspace/guest-draft";
 
 const analyticsMocks = vi.hoisted(() => ({
@@ -18,16 +18,29 @@ vi.mock("./upload-panel", () => ({
   UploadPanel: ({
     onUploaded,
     onUploadingChange,
+    rightsAccepted,
+    onRightsAcceptedChange,
   }: {
     onUploaded: (asset: {
       assetId: string;
       fileName: string;
-      intendedRole: "front" | "back" | "detail" | "scene";
+      intendedRole: "front" | "back" | "side" | "detail" | "scene";
       status: "local" | "uploaded";
     }) => void;
     onUploadingChange: (uploading: boolean) => void;
+    rightsAccepted: boolean;
+    onRightsAcceptedChange: (accepted: boolean) => void;
   }) => (
-    <div data-testid="mock-upload-panel">
+    <div
+      data-rights-accepted={String(rightsAccepted)}
+      data-testid="mock-upload-panel"
+    >
+      <button
+        onClick={() => onRightsAcceptedChange(true)}
+        type="button"
+      >
+        mock-accept-rights
+      </button>
       <button
         onClick={() =>
           onUploaded({
@@ -53,6 +66,19 @@ vi.mock("./upload-panel", () => ({
         type="button"
       >
         mock-upload-back
+      </button>
+      <button
+        onClick={() =>
+          onUploaded({
+            assetId: "asset-side",
+            fileName: "side.jpg",
+            intendedRole: "side",
+            status: "uploaded",
+          })
+        }
+        type="button"
+      >
+        mock-upload-side
       </button>
       <button
         onClick={() =>
@@ -103,14 +129,16 @@ vi.mock("./upload-panel", () => ({
 vi.mock("./spec-selector", () => ({
   SpecSelector: ({
     aspectRatio,
+    duration40Enabled,
     durationSeconds,
     onAspectRatioChange,
     onDurationChange,
   }: {
     aspectRatio: "9:16" | "1:1" | "16:9";
-    durationSeconds: 8 | 16 | 24;
+    duration40Enabled?: boolean;
+    durationSeconds: 8 | 16 | 24 | 40;
     onAspectRatioChange: (aspectRatio: "9:16" | "1:1" | "16:9") => void;
-    onDurationChange: (duration: 8 | 16 | 24) => void;
+    onDurationChange: (duration: 8 | 16 | 24 | 40) => void;
   }) => (
     <div>
       spec-selector {durationSeconds} {aspectRatio}
@@ -120,6 +148,11 @@ vi.mock("./spec-selector", () => ({
       <button onClick={() => onDurationChange(24)} type="button">
         mock-duration-24
       </button>
+      {duration40Enabled ? (
+        <button onClick={() => onDurationChange(40)} type="button">
+          mock-duration-40
+        </button>
+      ) : null}
       <button onClick={() => onAspectRatioChange("1:1")} type="button">
         mock-aspect-1-1
       </button>
@@ -133,14 +166,27 @@ vi.mock("./template-picker", () => ({
     optional,
     unavailable,
   }: {
-    recommended: Array<{ displayName: string; selectable: boolean }>;
-    optional: Array<{ displayName: string; selectable: boolean }>;
-    unavailable: Array<{ displayName: string; selectable: boolean }>;
+    recommended: Array<{
+      displayName: string;
+      selectable: boolean;
+      reasons?: string[];
+    }>;
+    optional: Array<{
+      displayName: string;
+      selectable: boolean;
+      reasons?: string[];
+    }>;
+    unavailable: Array<{
+      displayName: string;
+      selectable: boolean;
+      reasons?: string[];
+    }>;
   }) => (
     <div data-testid="mock-template-picker">
       {[...recommended, ...optional, ...unavailable].map((template) => (
         <div
           data-selectable={template.selectable ? "true" : "false"}
+          data-reasons={template.reasons?.join(" / ") ?? ""}
           key={template.displayName}
         >
           {template.displayName}
@@ -221,13 +267,212 @@ const templateCatalog = [
   },
 ];
 
+function preflightPassResponse() {
+  return new Response(
+    JSON.stringify({
+      canCreateJob: true,
+      blockingReasons: [],
+      warnings: [],
+      recommendedTemplateIds: ["front_push_in"],
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
+function preflightRightsBlockedResponse() {
+  return new Response(
+    JSON.stringify({
+      canCreateJob: false,
+      blockingReasons: [
+        {
+          code: "rights_attestation_required",
+          message: "请先确认所选素材的版权、肖像与商业使用授权。",
+        },
+      ],
+      warnings: [],
+      recommendedTemplateIds: [],
+      missingRightsAttestationAssetIds: ["asset-1"],
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
 describe("WorkspaceApp", () => {
+  it("uses actionable product rotation reason labels", () => {
+    expect(reasonLabel("product_side_asset_required")).toBe(
+      "缺少商品侧面图",
+    );
+    expect(reasonLabel("product_back_asset_required")).toBe(
+      "缺少商品背面图",
+    );
+    expect(reasonLabel("product_view_consistency_failed")).toBe(
+      "多角度商品图不是同一件服装",
+    );
+    expect(reasonLabel("matching_product_views_required")).toBe(
+      "多角度商品图尚未通过一致性校验",
+    );
+  });
+
+  it("uses actionable human-model turn reason labels", () => {
+    expect(reasonLabel("model_side_asset_required")).toBe(
+      "缺少模特侧面图",
+    );
+    expect(reasonLabel("model_back_asset_required")).toBe(
+      "缺少模特背面图",
+    );
+    expect(reasonLabel("matching_model_views_required")).toBe(
+      "多角度图片中的模特尚未通过一致性校验",
+    );
+    expect(reasonLabel("model_view_consistency_failed")).toBe(
+      "多角度图片中的模特不一致",
+    );
+    expect(reasonLabel("model_garment_consistency_failed")).toBe(
+      "模特视角中的服装不一致",
+    );
+  });
+
+  it("keeps front-only model motion available without enabling unsupported turns", () => {
+    render(
+      <WorkspaceApp
+        templateCatalog={[
+          {
+            templateId: "model_front_pose",
+            displayName: "模特正面轻微姿态",
+            description: "保持正面自然动作。",
+            riskLevel: "low",
+            requiredAssets: ["model_front"],
+          },
+          {
+            templateId: "model_quarter_turn",
+            displayName: "模特轻侧身 15-45°",
+            description: "需要正面与侧面模特图。",
+            riskLevel: "medium_high",
+            requiredAssets: ["model_front", "model_side"],
+            consistencyRequirements: ["same_garment", "same_model"],
+          },
+          {
+            templateId: "model_half_turn",
+            displayName: "模特连续转身 180°",
+            description: "需要正面、侧面与背面模特图。",
+            riskLevel: "high",
+            requiredAssets: ["model_front", "model_side", "model_back"],
+            consistencyRequirements: ["same_garment", "same_model"],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+
+    expect(screen.getByText("模特正面轻微姿态")).toHaveAttribute(
+      "data-selectable",
+      "true",
+    );
+    expect(screen.getByText("模特轻侧身 15-45°")).toHaveAttribute(
+      "data-reasons",
+      expect.stringContaining("缺少模特侧面图"),
+    );
+    expect(screen.getByText("模特连续转身 180°")).toHaveAttribute(
+      "data-reasons",
+      expect.stringContaining("缺少模特背面图"),
+    );
+  });
+
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
     analyticsMocks.trackFunnelEvent.mockClear();
     window.localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  it("owns an explicit non-persistent rights acceptance state", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-rights-accepted",
+      "false",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "mock-accept-rights" }));
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-rights-accepted",
+      "true",
+    );
+  });
+
+  it("shows 40-second Beta cost and five-segment summary only when enabled", () => {
+    const { rerender } = render(
+      <WorkspaceApp duration40Enabled={false} templateCatalog={templateCatalog} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "mock-duration-40" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <WorkspaceApp duration40Enabled templateCatalog={templateCatalog} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "mock-duration-40" }));
+
+    expect(screen.getByText(/5 个片段/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 310 点" }),
+    ).toBeInTheDocument();
+  });
+
+  it("attests historical assets and retries preflight only once", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightRightsBlockedResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            attestationId: "attestation-1",
+            assetIds: ["asset-1"],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(preflightRightsBlockedResponse());
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-accept-rights" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
+    );
+
+    await screen.findByText(
+      /生成前检查未通过：请先确认所选素材的版权、肖像与商业使用授权。/,
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/assets/attest-rights",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-1"],
+          rightsAttestation: {
+            accepted: true,
+            version: "image_rights_v1",
+          },
+        }),
+      }),
+    );
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url === "/api/jobs/preflight"),
+    ).toHaveLength(2);
+    expect(
+      fetchMock.mock.calls.some(([url]) => url === "/api/jobs"),
+    ).toBe(false);
   });
 
   it("saves a guest draft and redirects to login without creating a job", () => {
@@ -250,6 +495,7 @@ describe("WorkspaceApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "mock-duration-16" }));
     fireEvent.click(screen.getByRole("button", { name: "mock-aspect-1-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-local-front" }));
     fireEvent.change(screen.getByLabelText("生成意图"), {
       target: { value: "突出连衣裙垂坠感" },
     });
@@ -265,8 +511,8 @@ describe("WorkspaceApp", () => {
       durationSeconds: 16,
       aspectRatio: "1:1",
       userPrompt: "突出连衣裙垂坠感",
-      intendedAssetRoles: [],
-      fileNames: [],
+      intendedAssetRoles: ["front"],
+      fileNames: ["guest-front.jpg"],
     });
     expect(window.location.href).toBe(
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dmarketplace_clean%26resumeDraft%3D1",
@@ -550,7 +796,7 @@ describe("WorkspaceApp", () => {
       screen.queryByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("免费试用仅支持 8 秒。16/24 秒请使用付费生成。"),
+      screen.getByText("免费试用仅支持 8 秒。16/24/40 秒请使用付费生成。"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "付费生成高清无水印 · 130 点" }),
@@ -583,9 +829,149 @@ describe("WorkspaceApp", () => {
     expect(screen.getByRole("button", { name: "免费试用生成 · 8 秒带水印" })).toBeInTheDocument();
   });
 
+  it("disables generation without a front asset and does not create a job", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    render(
+      <WorkspaceApp
+        initialMode="trial"
+        initialPresetId="marketplace_clean"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-scene" }));
+
+    expect(
+      screen.getByRole("button", { name: /付费生成高清无水印/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /免费试用生成/ }),
+    ).toBeDisabled();
+    expect(screen.getByText("请先上传正面图。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /付费生成高清无水印/ }));
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/jobs", expect.anything());
+  });
+
+  it("explains scene assets are only auxiliary for marketplace clean preset", () => {
+    render(
+      <WorkspaceApp
+        initialPresetId="marketplace_clean"
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-scene" }));
+
+    expect(
+      screen.getByText("场景图只作为背景和氛围参考，不作为服装细节来源。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/场景图\/细节图可辅助背景、氛围和可见细节判断。/),
+    ).toBeInTheDocument();
+  });
+
+  it("checks preflight before creating a job", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "stop_after_create",
+            message: "stop after create",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        "/api/jobs/preflight",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        "/api/jobs",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+  });
+
+  it("shows preflight blocking reasons and does not create a job", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          canCreateJob: false,
+          blockingReasons: [
+            { code: "front_asset_required", message: "后端提示：缺少正面图" },
+            "Asset analysis JSON has invalid asset_role.",
+          ],
+          warnings: [
+            { code: "strict_review_required", message: "后端提示：需要严格质检" },
+          ],
+          recommendedTemplateIds: [],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
+
+    expect(await screen.findByText(/后端提示：缺少正面图/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/素材角色识别异常，请检查上传图片后重试。/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/front_asset_required/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/后端提示：需要严格质检/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Asset analysis JSON has invalid asset_role./),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/jobs", expect.anything());
+  });
+
+  it("shows a material checking status immediately after generation click", () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>(() => undefined),
+    );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
+
+    expect(screen.getByText("正在检查素材...")).toBeInTheDocument();
+  });
+
   it("creates a job and automatically analyzes assets", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -701,13 +1087,20 @@ describe("WorkspaceApp", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
         1,
-        "/api/jobs",
+        "/api/jobs/preflight",
         expect.objectContaining({
           method: "POST",
         }),
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
+        "/api/jobs",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
         "/api/jobs/job-1/analyze",
         expect.objectContaining({
           method: "POST",
@@ -717,7 +1110,7 @@ describe("WorkspaceApp", () => {
         }),
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
-        3,
+        4,
         "/api/jobs/job-1",
       );
     });
@@ -729,35 +1122,36 @@ describe("WorkspaceApp", () => {
     });
   });
 
-  it("shows backend job creation errors instead of a generic material/spec message", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          error: "job_creation_failed",
-          message: 'relation "free_trial_usages" does not exist',
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
+  it("hides backend job creation internals behind a generic user-facing message", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "job_creation_failed",
+            message: 'relation "free_trial_usages" does not exist',
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
     fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
+    expect(await screen.findByText("服务暂时异常，请稍后重试。")).toBeInTheDocument();
     expect(
-      await screen.findByText('relation "free_trial_usages" does not exist'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("创建任务失败，请检查素材和规格。"),
+      screen.queryByText('relation "free_trial_usages" does not exist'),
     ).not.toBeInTheDocument();
   });
 
   it("does not show free trial copy for paid 8 second jobs", async () => {
     vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -880,18 +1274,21 @@ describe("WorkspaceApp", () => {
 
   it("uses paid generation by default and only requests free trial from the free trial button", async () => {
     window.localStorage.setItem("runwaytools_device_id", "device-existing");
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          error: "job_creation_failed",
-          message: "stop after first request",
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "job_creation_failed",
+            message: "stop after first request",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
@@ -903,6 +1300,19 @@ describe("WorkspaceApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/jobs/preflight",
+        expect.objectContaining({
+          body: JSON.stringify({
+            assetIds: ["asset-1"],
+            durationSeconds: 8,
+            aspectRatio: "9:16",
+            presetId: "minimal_studio",
+            useFreeTrialIfAvailable: false,
+            deviceFingerprint: "device-existing",
+          }),
+        }),
+      );
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/jobs",
         expect.objectContaining({
@@ -919,22 +1329,37 @@ describe("WorkspaceApp", () => {
     });
 
     fetchMock.mockClear();
-    fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          error: "free_trial_unavailable",
-          message: "免费试用暂不可用，请选择付费生成。",
-        }),
-        {
-          status: 409,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
+    fetchMock
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "free_trial_unavailable",
+            message: "免费试用暂不可用，请选择付费生成。",
+          }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
 
     fireEvent.click(screen.getByRole("button", { name: "免费试用生成 · 8 秒带水印" }));
 
     await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/jobs/preflight",
+        expect.objectContaining({
+          body: JSON.stringify({
+            assetIds: ["asset-1"],
+            durationSeconds: 8,
+            aspectRatio: "9:16",
+            presetId: "minimal_studio",
+            useFreeTrialIfAvailable: true,
+            deviceFingerprint: "device-existing",
+          }),
+        }),
+      );
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/jobs",
         expect.objectContaining({
@@ -996,6 +1421,8 @@ describe("WorkspaceApp", () => {
   it("puts the material canvas and generation controls into a task-first workspace layout", () => {
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+
     const mainStage = screen.getByTestId("workspace-main-stage");
     const materialPanel = screen.getByTestId("workspace-material-panel");
     const controlRail = screen.getByTestId("workspace-control-rail");
@@ -1031,6 +1458,7 @@ describe("WorkspaceApp", () => {
 
   it("does not show non-garment warnings for scene assets", async () => {
     vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -1169,6 +1597,7 @@ describe("WorkspaceApp", () => {
   it("runs the default one-click generation chain after upload", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -1278,7 +1707,7 @@ describe("WorkspaceApp", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
-        4,
+        5,
         "/api/jobs/job-1/storyboard",
         expect.objectContaining({
           method: "POST",
@@ -1290,7 +1719,7 @@ describe("WorkspaceApp", () => {
         }),
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
-        5,
+        6,
         "/api/jobs/job-1/confirm",
         expect.objectContaining({
           method: "POST",
@@ -1310,6 +1739,7 @@ describe("WorkspaceApp", () => {
   it("keeps manual storyboard preview available behind advanced settings after analysis", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -1442,7 +1872,7 @@ describe("WorkspaceApp", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
-        6,
+        7,
         "/api/jobs/job-1/confirm",
         expect.objectContaining({
           method: "POST",
@@ -1460,9 +1890,126 @@ describe("WorkspaceApp", () => {
     });
   });
 
+  it("keeps generated draft confirmation hidden until the operator opens advanced settings after auto submit fails", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-1",
+            status: "asset_analysis_queued",
+            userVisibleStatus: "analyzing_assets",
+            assetCount: 1,
+          }),
+          {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobId: "job-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            job: {
+              id: "job-1",
+              status: "asset_analysis_passed",
+              userVisibleStatus: "assets_ready",
+              lastError: null,
+              failureReason: null,
+              durationSeconds: 8,
+              aspectRatio: "9:16",
+              creditCost: 70,
+              billingMode: "paid",
+              generationProfile: "paid_720p_audio",
+              watermarkEnabled: false,
+            },
+            assetCount: 1,
+            acceptable: true,
+            assetCompleteness: {
+              hasFront: true,
+              hasBack: false,
+              hasSide: false,
+              hasDetail: false,
+              hasScene: false,
+              hasModelFront: false,
+              hasFlatLayOrWhiteBackground: true,
+              detailTypes: [],
+            },
+            recommendations: {
+              recommended: [{ templateId: "front_push_in", riskLevel: "low", riskWarnings: [] }],
+              optional: [],
+              unavailable: [],
+              availableTemplateIds: ["front_push_in"],
+            },
+            analyses: [],
+            latestStoryboard: null,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            storyboardId: "storyboard-1",
+            segments: [
+              {
+                index: 0,
+                durationSeconds: 8,
+                templateId: "front_push_in",
+                prompt: "front prompt",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "generation_route_unavailable",
+            message: "视频生成服务未完成模型路由配置，请联系管理员检查 development 环境的 video_generation route。",
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
+
+    await screen.findByText(
+      /视频生成服务未完成模型路由配置，请联系管理员检查 development 环境的 video_generation route。/,
+    );
+    expect(
+      screen.queryByRole("button", { name: "确认分镜并生成" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("高级设置 / 手动预览分镜"));
+    expect(
+      screen.getByRole("button", { name: "确认分镜并生成" }),
+    ).toBeInTheDocument();
+  });
+
   it("uses backend preset-ranked template order for one-click generation", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -1607,7 +2154,7 @@ describe("WorkspaceApp", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
-        4,
+        5,
         "/api/jobs/job-1/storyboard",
         expect.objectContaining({
           method: "POST",

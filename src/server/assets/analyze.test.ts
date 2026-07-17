@@ -46,6 +46,7 @@ describe("asset analysis workflow service", () => {
       assetId,
       mode: "standard",
       assetRole: "front",
+      subjectKind: "product",
       garmentCategory: "dress",
     });
     expect(result.acceptable).toBe(true);
@@ -232,6 +233,7 @@ describe("asset analysis workflow service", () => {
       },
       responseSummary: {
         assetRole: "front",
+        subjectKind: "product",
         confidence: "high",
       },
       status: "succeeded",
@@ -240,9 +242,53 @@ describe("asset analysis workflow service", () => {
     expect(analysisRecord).toMatchObject({
       providerCallLogId: callLog?.id,
       assetRole: "front",
+      subjectKind: "product",
     });
     expect(result.record.providerCallLogId).toBe(callLog?.id);
     expect(result.recommendations.availableTemplateIds).toContain("front_push_in");
+  });
+
+  it("passes declared scene role into parser for non-garment provider descriptions", async () => {
+    const analysisStore = createInMemoryAssetAnalysisStore();
+    const providerCallLogStore = createInMemoryProviderCallLogStore();
+
+    const result = await analyzeAssetWithVisionProvider({
+      analysisStore,
+      providerCallLogStore,
+      assetId,
+      mode: "standard",
+      imageUrls: ["https://signed.example/scene.jpg"],
+      templates: mvpShotTemplates,
+      isTrial: false,
+      declaredRole: "scene",
+      visionProvider: async () => ({
+        provider: "openai",
+        model: "gpt-5.4-mini",
+        analysisJson: {
+          asset_role:
+            "Unclear/not a garment; appears to be studio lighting equipment used for product photography",
+          garment_category: "unknown",
+          view_angle: "studio setup",
+          human_present: "no",
+          visible_details: ["studio lighting equipment"],
+          not_visible_details: ["garment details"],
+          quality: {
+            is_garment: false,
+            is_clear: true,
+            is_safe: true,
+          },
+          confidence: "low",
+          risk_flags: ["not_a_garment"],
+        },
+        raw: { id: "scene" },
+      }),
+    });
+
+    expect(result.analysis.assetRole).toBe("scene");
+    expect(result.analysis.quality.isGarment).toBe(false);
+    expect(analysisStore.listAnalyses()[0]).toMatchObject({
+      assetRole: "scene",
+    });
   });
 
   it("logs provider failures and does not store fabricated analysis", async () => {

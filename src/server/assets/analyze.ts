@@ -18,12 +18,16 @@ import {
 import { recommendShotTemplates } from "@/lib/templates/recommend";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
 
-import { parseAssetAnalysisJson, type ParsedAssetAnalysis } from "./analysis-schema";
-import type { AssetRole } from "./analysis-schema";
+import {
+  parseAssetAnalysisJson,
+  type AssetRole,
+  type ParsedAssetAnalysis,
+} from "./analysis-schema";
 import {
   buildAssetCompletenessFromAnalyses,
   isAssetAnalysisAcceptable,
 } from "./classify-role";
+import type { ParsedConsistency } from "./consistency";
 
 export interface AssetAnalysisRecord {
   id: string;
@@ -34,6 +38,7 @@ export interface AssetAnalysisRecord {
   garmentCategory: string | null;
   viewAngle: string | null;
   humanPresent: string;
+  subjectKind: ParsedAssetAnalysis["subjectKind"];
   visibleDetails: JsonValue;
   notVisibleDetails: JsonValue;
   quality: JsonValue;
@@ -72,6 +77,7 @@ function toRecordInput(input: NewAssetAnalysisRecord) {
     garmentCategory: input.analysis.garmentCategory,
     viewAngle: input.analysis.viewAngle,
     humanPresent: input.analysis.humanPresent,
+    subjectKind: input.analysis.subjectKind,
     visibleDetails: input.analysis.visibleDetails,
     notVisibleDetails: input.analysis.notVisibleDetails,
     quality,
@@ -151,12 +157,17 @@ export function userVisibleAssetAnalysisError(error: unknown) {
     return "素材分析服务网络连接失败，请稍后重试。";
   }
 
+  if (message.startsWith("Asset analysis JSON ")) {
+    return "素材分析结果格式异常，请重新选择图片或稍后重试。";
+  }
+
   return message;
 }
 
 function summarizeAnalysis(analysis: ParsedAssetAnalysis): JsonValue {
   return {
     assetRole: analysis.assetRole,
+    subjectKind: analysis.subjectKind,
     garmentCategory: analysis.garmentCategory,
     viewAngle: analysis.viewAngle,
     confidence: analysis.confidence,
@@ -172,7 +183,15 @@ function emptyAssetCompleteness() {
     hasDetail: false,
     hasScene: false,
     hasModelFront: false,
+    hasModelSide: false,
+    hasModelBack: false,
     hasFlatLayOrWhiteBackground: false,
+    hasProductFront: false,
+    hasProductSide: false,
+    hasProductBack: false,
+    garmentConsistency: "unknown" as const,
+    modelGarmentConsistency: "unknown" as const,
+    modelConsistency: "unknown" as const,
     detailTypes: [],
   };
 }
@@ -183,17 +202,26 @@ export function buildRecommendationsFromAnalyses({
   isTrial,
   declaredRoles = [],
   presetId,
+  consistency,
+  modelConsistency,
 }: {
   analyses: ParsedAssetAnalysis[];
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
   declaredRoles?: AssetRole[];
   presetId?: string | null;
+  consistency?: ParsedConsistency | null;
+  modelConsistency?: ParsedConsistency | null;
 }) {
   const acceptableAnalyses = analyses.filter(isAssetAnalysisAcceptable);
   const acceptable = acceptableAnalyses.length > 0;
   const assetCompleteness = acceptable
-    ? buildAssetCompletenessFromAnalyses(acceptableAnalyses, declaredRoles)
+    ? buildAssetCompletenessFromAnalyses(
+        acceptableAnalyses,
+        declaredRoles,
+        consistency,
+        modelConsistency,
+      )
     : emptyAssetCompleteness();
   const baseRecommendations = recommendShotTemplates({
     templates,
@@ -220,6 +248,7 @@ export async function analyzeAssetFromVisionResult({
   templates,
   isTrial,
   declaredRoles = [],
+  declaredRole,
   visionJson,
 }: {
   store: AssetAnalysisStore;
@@ -229,9 +258,12 @@ export async function analyzeAssetFromVisionResult({
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
   declaredRoles?: AssetRole[];
+  declaredRole?: AssetRole | null;
   visionJson: unknown;
 }) {
-  const analysis = parseAssetAnalysisJson(visionJson);
+  const analysis = parseAssetAnalysisJson(visionJson, {
+    declaredRole: declaredRole ?? undefined,
+  });
   const record = await store.createAnalysis({
     assetId,
     providerCallLogId: providerCallLogId ?? null,
@@ -263,6 +295,7 @@ export async function analyzeAssetWithVisionProvider({
   imageUrls,
   templates,
   isTrial,
+  declaredRole,
 }: {
   analysisStore?: AssetAnalysisStore;
   providerCallLogStore?: ProviderCallLogStore;
@@ -274,6 +307,7 @@ export async function analyzeAssetWithVisionProvider({
   imageUrls: string[];
   templates: ShotTemplateDefinition[];
   isTrial: boolean;
+  declaredRole?: AssetRole | null;
 }) {
   const startedAt = Date.now();
   const requestSnapshot: JsonValue = {
@@ -305,7 +339,9 @@ export async function analyzeAssetWithVisionProvider({
   let analysis: ParsedAssetAnalysis;
 
   try {
-    analysis = parseAssetAnalysisJson(visionResult.analysisJson);
+    analysis = parseAssetAnalysisJson(visionResult.analysisJson, {
+      declaredRole: declaredRole ?? undefined,
+    });
   } catch (error) {
     await providerCallLogStore.createCallLog({
       provider: visionResult.provider,

@@ -24,6 +24,9 @@ describe("post QA job input", () => {
           createdAt: new Date("2026-06-08T00:00:00.000Z"),
         },
       ],
+      templateIdsByJob: {
+        "job-1": ["model_half_turn"],
+      },
     });
 
     await expect(getPostQaJobInput({ store, jobId: "job-1" })).resolves.toEqual({
@@ -31,6 +34,7 @@ describe("post QA job input", () => {
       userId: "user-1",
       mode: "strict",
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      selectedTemplateIds: ["model_half_turn"],
     });
   });
 
@@ -66,6 +70,7 @@ describe("post QA job input", () => {
       userId: "user-1",
       mode: "standard",
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      selectedTemplateIds: [],
     });
   });
 

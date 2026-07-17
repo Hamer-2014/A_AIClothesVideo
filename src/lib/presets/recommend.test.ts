@@ -17,7 +17,15 @@ const frontOnlyCompleteness = {
   hasDetail: false,
   hasScene: false,
   hasModelFront: false,
+  hasModelSide: false,
+  hasModelBack: false,
   hasFlatLayOrWhiteBackground: true,
+  hasProductFront: false,
+  hasProductSide: false,
+  hasProductBack: false,
+  garmentConsistency: "unknown" as const,
+  modelGarmentConsistency: "unknown" as const,
+  modelConsistency: "unknown" as const,
   detailTypes: [],
 };
 
@@ -74,5 +82,83 @@ describe("style preset recommendation helpers", () => {
         durationSeconds: 16,
       }),
     ).toEqual(["product_float", "front_pan"]);
+  });
+
+  it("builds five valid 40-second slots with controlled repeats", () => {
+    const base = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        ...frontOnlyCompleteness,
+        hasDetail: true,
+        detailTypes: ["fabric", "neckline", "cuff", "print"],
+      },
+      isTrial: false,
+    });
+    const slots = selectTemplateIdsForPreset({
+      recommendations: base,
+      preset: getStylePreset("minimal_studio"),
+      durationSeconds: 40,
+    });
+
+    expect(slots).toHaveLength(5);
+    expect(new Set(slots).size).toBeGreaterThanOrEqual(3);
+    expect(
+      slots.some((templateId, index) =>
+        index > 0 && templateId === slots[index - 1]
+      ),
+    ).toBe(false);
+    expect(
+      Math.max(
+        ...[...new Set(slots)].map(
+          (templateId) => slots.filter((id) => id === templateId).length,
+        ),
+      ),
+    ).toBeLessThanOrEqual(2);
+  });
+
+  it("keeps advanced product rotations selectable but out of preset slots", () => {
+    const base = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        ...frontOnlyCompleteness,
+        hasProductFront: true,
+        hasProductSide: true,
+        garmentConsistency: "pass",
+      },
+      isTrial: false,
+    });
+
+    expect(base.availableTemplateIds).toContain("product_quarter_rotation");
+    expect(
+      selectTemplateIdsForPreset({
+        recommendations: base,
+        preset: getStylePreset("marketplace_clean"),
+        durationSeconds: 24,
+      }),
+    ).not.toContain("product_quarter_rotation");
+  });
+
+  it("keeps verified model turns selectable but out of preset slots", () => {
+    const base = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        ...frontOnlyCompleteness,
+        hasSide: true,
+        hasModelFront: true,
+        hasModelSide: true,
+        modelGarmentConsistency: "pass",
+        modelConsistency: "pass",
+      },
+      isTrial: false,
+    });
+
+    expect(base.availableTemplateIds).toContain("model_quarter_turn");
+    expect(
+      selectTemplateIdsForPreset({
+        recommendations: base,
+        preset: getStylePreset("social_lifestyle"),
+        durationSeconds: 24,
+      }),
+    ).not.toContain("model_quarter_turn");
   });
 });

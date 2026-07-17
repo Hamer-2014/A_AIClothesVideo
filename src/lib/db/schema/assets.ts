@@ -1,8 +1,10 @@
 import {
+  boolean,
   integer,
   pgEnum,
   pgTable,
   text,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -28,6 +30,16 @@ export const assetStatusValues = [
   "deleted",
 ] as const;
 export const assetStatusEnum = pgEnum("asset_status", assetStatusValues);
+
+export const assetSubjectKindValues = [
+  "product",
+  "human_model",
+  "unknown",
+] as const;
+export const assetSubjectKindEnum = pgEnum(
+  "asset_subject_kind",
+  assetSubjectKindValues,
+);
 
 export const assets = pgTable("assets", {
   ...id,
@@ -55,6 +67,9 @@ export const assetAnalyses = pgTable("asset_analyses", {
   garmentCategory: text("garment_category"),
   viewAngle: text("view_angle"),
   humanPresent: text("human_present").notNull().default("unknown"),
+  subjectKind: assetSubjectKindEnum("subject_kind")
+    .notNull()
+    .default("unknown"),
   visibleDetails: jsonSnapshot("visible_details").notNull().default([]),
   notVisibleDetails: jsonSnapshot("not_visible_details").notNull().default([]),
   quality: jsonSnapshot("quality").notNull().default({}),
@@ -63,3 +78,29 @@ export const assetAnalyses = pgTable("asset_analyses", {
   analysisJson: jsonSnapshot("analysis_json").notNull(),
   ...timestamps,
 });
+
+export const assetConsistencyAnalyses = pgTable(
+  "asset_consistency_analyses",
+  {
+    ...id,
+    videoJobId: uuid("video_job_id").notNull(),
+    analysisKind: text("analysis_kind").notNull(),
+    status: text("status").notNull(),
+    garmentMatch: text("garment_match").notNull(),
+    modelMatch: text("model_match").notNull(),
+    colorMatch: boolean("color_match").notNull().default(false),
+    patternMatch: boolean("pattern_match").notNull().default(false),
+    viewCoverage: jsonSnapshot("view_coverage").notNull().default([]),
+    confidence: text("confidence"),
+    riskFlags: jsonSnapshot("risk_flags").notNull().default([]),
+    resultJson: jsonSnapshot("result_json").notNull(),
+    providerCallLogId: uuid("provider_call_log_id"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("asset_consistency_job_kind_unique").on(
+      table.videoJobId,
+      table.analysisKind,
+    ),
+  ],
+);

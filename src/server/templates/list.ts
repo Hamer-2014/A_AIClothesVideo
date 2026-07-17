@@ -3,8 +3,10 @@ import { and, asc, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { shotTemplates } from "@/lib/db/schema";
 import type {
+  ConsistencyRequirement,
   RequiredAssetKind,
   ShotTemplateRecord,
+  TemplateSubjectKind,
 } from "@/lib/templates/types";
 
 function toStringArray(value: unknown) {
@@ -21,7 +23,10 @@ type TemplateSourceRecord = {
   riskLevel: ShotTemplateRecord["riskLevel"];
   displayName: string;
   description: string | null;
+  subjectKind: string;
   requiredAssets: unknown;
+  consistencyRequirements: unknown;
+  autoSelectAllowed: boolean;
   blockedConditions: unknown;
   allowedMotion: unknown;
   basePromptIntent: string;
@@ -38,7 +43,11 @@ function normalizeTemplateRecord(
   return {
     ...template,
     description: template.description ?? "",
+    subjectKind: template.subjectKind as TemplateSubjectKind,
     requiredAssets: toStringArray(template.requiredAssets) as RequiredAssetKind[],
+    consistencyRequirements: toStringArray(
+      template.consistencyRequirements,
+    ) as ConsistencyRequirement[],
     blockedConditions: toStringArray(template.blockedConditions),
     allowedMotion: toStringArray(template.allowedMotion),
     systemConstraints: toStringArray(template.systemConstraints),
@@ -76,7 +85,10 @@ export function createDrizzleTemplateListStore(
           riskLevel: shotTemplates.riskLevel,
           displayName: shotTemplates.displayName,
           description: shotTemplates.description,
+          subjectKind: shotTemplates.subjectKind,
           requiredAssets: shotTemplates.requiredAssets,
+          consistencyRequirements: shotTemplates.consistencyRequirements,
+          autoSelectAllowed: shotTemplates.autoSelectAllowed,
           blockedConditions: shotTemplates.blockedConditions,
           allowedMotion: shotTemplates.allowedMotion,
           basePromptIntent: shotTemplates.basePromptIntent,

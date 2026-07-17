@@ -276,24 +276,27 @@ src/
 
 ### 5.2 上传素材
 
-1. 前端请求上传授权。
-2. 服务端生成 R2 上传 URL 或代理上传策略。
-3. 用户上传原图到 R2。
-4. 服务端创建 `assets` 记录。
-5. 生成缩略图任务可异步执行。
-6. 创建或更新 `video_job` 状态为 `draft_uploaded`。
+1. 前端提交上传描述和主动勾选的 `image_rights_v1` 声明。
+2. 服务端校验声明版本，在单个事务中创建 `rights_attestations`、`assets(status=pending_upload)` 和 `asset_rights_attestations`。
+3. 服务端生成 R2 signed upload URL；响应不暴露永久公开 URL 或底层 R2 key。
+4. 用户上传原图到 R2。
+5. `/api/uploads/complete` 校验归属后把资产改为 `uploaded`；这是唯一允许的完成入口。
+6. 历史资产在复用前通过 `/api/assets/attest-rights` 补签；Preflight 与任务创建再次校验并保存任务级声明快照。
+7. 生成缩略图任务可异步执行，创建或更新 `video_job` 状态为 `draft_uploaded`。
 
 ### 5.3 素材分析与模板推荐
 
 1. worker 领取 `draft_uploaded` 或 `lite_check_queued` 任务。
 2. 调用内容安全模型。
 3. 调用 Lite/Standard 视觉模型。
-4. 保存 `asset_analyses`。
-5. 规则引擎根据素材识别结果和模板要求生成：
+4. 每张图保存保守主体分类 `product | human_model | unknown` 到 `asset_analyses.subject_kind`；不能仅凭画面有人推导 `human_model`。
+5. 对至少两张 `product` front/side/back 视角使用 Strict 视觉模型做任务内商品一致性分析，以 `analysis_kind=product_views` 保存 `asset_consistency_analyses`。
+6. 对至少两张 `human_model` front/side/back 视角单独执行同服装和当前任务内可见模特一致性分析，以 `analysis_kind=model_views` 保存；不能用商品素材补齐模特视角，也不能跨任务做人脸或身份识别。provider 失败或证据不足时写 `unknown` 并 fail closed。
+7. 规则引擎根据素材识别结果、任务内一致性和模板要求生成：
    - 推荐模板。
    - 可选模板。
    - 不可用模板及原因。
-6. 用户进入模板选择步骤。
+8. 用户进入模板选择步骤；`auto_select_allowed=false` 的商品旋转和真人模特转身付费 Beta 只出现在高级调整中。
 
 ### 5.4 分镜生成
 
@@ -447,6 +450,9 @@ PRD 已列出核心实体。技术实现时建议按以下边界设计。
 
 - `assets`
 - `asset_analyses`
+- `asset_consistency_analyses`
+
+`asset_consistency_analyses` 按 `video_job_id + analysis_kind` 唯一 upsert。`product_views` 与 `model_views` 必须分开保存，后者只记录当前任务内可见模特与服装的一致性结论、覆盖视角、置信度和风险标记，不保存人脸 embedding、生物识别标识或跨任务身份。签名 URL 只存在于调用内存，不能进入数据库、provider request log 或事件快照。
 
 ### 7.3 模板
 
@@ -792,9 +798,15 @@ video_segments 全部成功 -> Cloud Run 拼接 -> 抽帧 -> 视觉质检 -> cap
 | `off` | 0 | 无 | 仅管理员/内测 |
 | `lite` | 8 秒 2-3 帧 | 低成本视觉模型 | 免费试用、低风险 8 秒 |
 | `standard` | 每 8 秒 4-5 帧 | 默认视觉模型 | 付费默认 |
-| `strict` | 每 8 秒 6-8 帧 + 转场帧 | 强视觉模型 | 真人、背面、正背切换、中高风险模板 |
+| `strict` | 每 8 秒 6-8 帧 + 转场帧 | 强视觉模型 | 真人、背面、正背切换、中高风险模板、商品旋转与模特转身付费 Beta |
 
 普通用户不能关闭 Post-QA。后台可以为管理员内测任务关闭。
+
+`product_quarter_rotation` 与 `product_half_rotation` 在服务端确认分镜时强制升级为 Strict，且绝不降级已有 Strict。确认器只接受已通过一致性校验的 `product` 素材，并按 front -> side -> back 写入 segment 快照；Prompt 必须包含 no-person、角度边界和禁止 360 约束。该链路不做虚拟穿衣。
+
+`model_quarter_turn` 与 `model_half_turn` 同样在确认时强制 Strict，但只接受已通过 `model_views` 同服装、同模特任务内一致性校验的 `human_model` 素材，并按 front -> side -> back 确定性排序。Prompt 必须固定同一可见人物和服装，限制 15-45° 或 180° 终点，禁止换脸、体型/发型漂移、人体异常和继续到 360°。Post-QA 追加同一人物连续性、人体自然度、服装多视角一致性与转身角度检查。
+
+只有商品图时，模板层不得自动造人。未来虚拟穿衣必须作为独立上游模块产出明确的 `human_model` 素材，其输出完成任务内一致性校验后才能进入上述模特模板链路。
 
 ### 13.3 执行
 
@@ -808,6 +820,10 @@ Cloud Run `stitch-worker` 在拼接成功后直接抽帧：
 6. 后续 worker 调用视觉模型分析抽帧图。
 
 这样可以避免最终视频上传 R2 后再下载回来抽帧。
+
+40 秒付费 Beta 使用独立的分段抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
+
+Post-QA 对 40 秒任务分成 5 个片段批次和 1 个转场批次，逐批调用视觉模型后聚合一次结果。若且仅若一个片段批次失败、所有转场通过且失败不是 provider/schema 异常，任务保留冻结点数并只重排该片段一次；其他情况沿用终态失败和点数释放流程。
 
 ### 13.4 成本
 
@@ -865,6 +881,16 @@ Cloud Run `stitch-worker` 在拼接成功后直接抽帧：
 - 高失败率用户。
 - 内容安全拦截。
 
+### 14.5 权利声明与侵权删除
+
+- 所有服务端图片上传强制使用当前 `image_rights_v1`，声明、资产关联和任务快照分别持久化。
+- 真人素材要求上传者拥有肖像及商业宣传授权；儿童真人素材额外要求监护人授权。系统不建立跨任务人脸库，但这不替代授权义务。
+- `POST /api/compliance/rights-removal` 创建结构化案件，URL query/fragment 在保存前去敏，同一 IP 摘要 24 小时最多提交 5 次。
+- `/takedown` 提交不会自动删除内容；`operator` 只做 triage，`admin` 核验并结案，所有状态迁移写 `admin_audit_logs`。
+- 案件入库成功优先于通知邮件；Resend 失败不得丢失案件。
+- `POST /api/internal/compliance/retention` 对三年前的声明和案件个人信息去标识化，使用 `Authorization: Bearer $CRON_JOB_SECRET`，由 cron-job.org 每日触发。
+- staging/production 缺少 `LEGAL_CONTACT_EMAIL`、`RESEND_API_KEY`、`EMAIL_FROM` 或 `ABUSE_HASH_SECRET` 时健康检查 fail closed。
+
 ## 15. 管理后台技术要求
 
 后台不是装饰性 dashboard，必须能排查问题。
@@ -884,6 +910,7 @@ MVP 后台应支持：
 - provider/key 管理。
 - 异常任务队列。
 - 管理员操作日志。
+- 权利删除案件队列。
 
 管理员敏感操作必须写 `admin_audit_logs`：
 

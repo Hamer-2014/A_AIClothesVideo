@@ -14,7 +14,7 @@ import {
 const jobId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 
-function createReadStore() {
+function createReadStore(durationSeconds = 8) {
   return createInMemoryVideoJobReadStore({
     jobs: [
       {
@@ -24,14 +24,17 @@ function createReadStore() {
         userVisibleStatus: "assets_ready",
         lastError: null,
         failureReason: null,
-        durationSeconds: 8,
+        durationSeconds,
         aspectRatio: "9:16",
         presetId: null,
         presetSnapshot: null,
-        creditCost: 0,
-        billingMode: "free_trial",
-        generationProfile: "trial_540p_watermarked",
-        watermarkEnabled: true,
+        creditCost: durationSeconds === 40 ? 310 : 0,
+        billingMode: durationSeconds === 40 ? "paid" : "free_trial",
+        generationProfile:
+          durationSeconds === 40
+            ? "paid_720p_audio"
+            : "trial_540p_watermarked",
+        watermarkEnabled: durationSeconds !== 40,
       },
     ],
     assets: [{ assetId: "asset-front", role: "front", sortOrder: 0 }],
@@ -60,6 +63,107 @@ function createReadStore() {
 }
 
 describe("generate storyboard draft", () => {
+  it("rejects invalid five-slot composition before moderation", async () => {
+    let moderationCalled = false;
+
+    await expect(
+      generateStoryboardDraft({
+        jobReadStore: createReadStore(40),
+        jobStore: createInMemoryJobStore([
+          {
+            id: jobId,
+            userId,
+            status: "asset_analysis_passed",
+            lockedBy: null,
+            lockedUntil: null,
+            attemptCount: 0,
+            lastError: null,
+          },
+        ]),
+        storyboardStore: createInMemoryStoryboardStore(),
+        providerCallLogStore: createInMemoryProviderCallLogStore(),
+        moderationResultStore: createInMemoryModerationResultStore(),
+        jobId,
+        userId,
+        selectedTemplateIds: [
+          "front_push_in",
+          "front_push_in",
+          "front_pan",
+          "minimal_studio",
+          "front_pan",
+        ],
+        userPrompt: "Create a five-shot product video.",
+        templates: mvpShotTemplates,
+        moderatePrompt: async () => {
+          moderationCalled = true;
+          return { id: "mod-invalid-40", decision: "allow", raw: {} };
+        },
+      }),
+    ).rejects.toThrow("Invalid template slots: adjacent_duplicate_template.");
+
+    expect(moderationCalled).toBe(false);
+  });
+
+  it("sends ordered template slots and parses five 40-second segments", async () => {
+    const selectedTemplateIds = [
+      "front_push_in",
+      "front_pan",
+      "minimal_studio",
+      "front_push_in",
+      "front_pan",
+    ];
+    let capturedPrompt: Record<string, unknown> | null = null;
+
+    const result = await generateStoryboardDraft({
+      jobReadStore: createReadStore(40),
+      jobStore: createInMemoryJobStore([
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          lockedBy: null,
+          lockedUntil: null,
+          attemptCount: 0,
+          lastError: null,
+        },
+      ]),
+      storyboardStore: createInMemoryStoryboardStore(),
+      providerCallLogStore: createInMemoryProviderCallLogStore(),
+      moderationResultStore: createInMemoryModerationResultStore(),
+      jobId,
+      userId,
+      selectedTemplateIds,
+      userPrompt: "Create a five-shot product video.",
+      templates: mvpShotTemplates,
+      moderatePrompt: async () => ({ id: "mod-40", decision: "allow", raw: {} }),
+      createStoryboard: async (input) => {
+        capturedPrompt = JSON.parse(input.userPrompt) as Record<string, unknown>;
+        return {
+          provider: "deepseek",
+          model: "deepseek-v4-flash",
+          storyboardJson: {
+            duration_seconds: 40,
+            segments: selectedTemplateIds.map((templateId, index) => ({
+              index,
+              duration_seconds: 8,
+              template_id: templateId,
+              prompt: `Segment ${index + 1}`,
+            })),
+          },
+          raw: {},
+        };
+      },
+    });
+
+    expect(result.parsed.segments).toHaveLength(5);
+    expect(capturedPrompt).toMatchObject({
+      template_slots: selectedTemplateIds.map((templateId, index) => ({
+        index,
+        template_id: templateId,
+      })),
+    });
+  });
+
   it("moderates user input, calls DeepSeek, logs provider call, and stores draft", async () => {
     const storyboardStore = createInMemoryStoryboardStore();
     const providerCallLogStore = createInMemoryProviderCallLogStore();

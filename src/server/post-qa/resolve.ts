@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import {
@@ -55,6 +55,10 @@ export interface PostQaResultRecord {
 
 export interface PostQaStore {
   findJob(jobId: string): Promise<PostQaJobRecord | null>;
+  countResults(input: {
+    videoJobId: string;
+    failureCategory: string;
+  }): Promise<number>;
   createResult(input: {
     videoJobId: string;
     stitchJobId?: string | null;
@@ -239,6 +243,13 @@ export function createInMemoryPostQaStore({
       const job = jobRecords.get(jobId);
       return job ? { ...job } : null;
     },
+    async countResults({ videoJobId, failureCategory }) {
+      return results.filter(
+        (result) =>
+          result.videoJobId === videoJobId &&
+          result.failureCategory === failureCategory,
+      ).length;
+    },
     async createResult(input) {
       const now = new Date();
       const result: PostQaResultRecord = {
@@ -287,6 +298,18 @@ export function createDrizzlePostQaStore(db: DbClient = getDb()): PostQaStore {
         .limit(1);
 
       return (job as PostQaJobRecord | undefined) ?? null;
+    },
+    async countResults({ videoJobId, failureCategory }) {
+      const rows = await db
+        .select({ id: postQaResults.id })
+        .from(postQaResults)
+        .where(
+          and(
+            eq(postQaResults.videoJobId, videoJobId),
+            eq(postQaResults.failureCategory, failureCategory),
+          ),
+        );
+      return rows.length;
     },
     async createResult(input) {
       const [result] = await db

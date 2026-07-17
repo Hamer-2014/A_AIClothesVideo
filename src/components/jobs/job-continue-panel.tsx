@@ -4,16 +4,20 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { StoryboardConfirmation } from "@/components/workspace/storyboard-confirmation";
+import { TemplateSlotEditor } from "@/components/workspace/template-slot-editor";
 import {
   TemplatePicker,
   type TemplateAvailabilityCard,
 } from "@/components/workspace/template-picker";
+import { getVideoSpec, isVideoDuration } from "@/lib/video/specs";
+import { validateTemplateSlots } from "@/lib/video/template-slots";
 
 interface TemplateCatalogItem {
   templateId: string;
   displayName: string;
   description: string;
   riskLevel: string;
+  status?: string;
 }
 
 interface JobContinuePanelProps {
@@ -61,7 +65,7 @@ interface JobContinuePanelProps {
   templateCatalog: TemplateCatalogItem[];
 }
 
-function reasonLabel(reason: string) {
+export function continueReasonLabel(reason: string) {
   switch (reason) {
     case "back_asset_required":
       return "缺少背面图";
@@ -81,6 +85,30 @@ function reasonLabel(reason: string) {
       return "缺少白底/平铺素材";
     case "model_front_asset_required":
       return "缺少模特正面图";
+    case "model_side_asset_required":
+      return "缺少模特侧面图";
+    case "model_back_asset_required":
+      return "缺少模特背面图";
+    case "product_front_asset_required":
+      return "缺少商品正面图";
+    case "product_side_asset_required":
+      return "缺少商品侧面图";
+    case "product_back_asset_required":
+      return "缺少商品背面图";
+    case "matching_product_views_required":
+      return "多角度商品图尚未通过一致性校验";
+    case "product_view_consistency_failed":
+      return "多角度商品图不是同一件服装";
+    case "product_only_template":
+      return "仅支持无真人的商品图";
+    case "matching_model_garment_views_required":
+      return "模特视角中的服装尚未通过一致性校验";
+    case "model_garment_consistency_failed":
+      return "模特视角中的服装不一致";
+    case "matching_model_views_required":
+      return "多角度图片中的模特尚未通过一致性校验";
+    case "model_view_consistency_failed":
+      return "多角度图片中的模特不一致";
     default:
       return reason;
   }
@@ -91,14 +119,33 @@ function warningLabel(warning: string) {
     case "high_risk_motion":
       return "高风险镜头";
     case "strict_review_required":
-      return "需严格质检";
+      return "需要严格质检";
     default:
       return warning;
   }
 }
 
 function requiredTemplateCount(durationSeconds: number) {
-  return durationSeconds === 8 ? 1 : durationSeconds === 16 ? 2 : 3;
+  return isVideoDuration(durationSeconds)
+    ? getVideoSpec(durationSeconds).segmentCount
+    : 0;
+}
+
+function initialTemplateSelection(durationSeconds: number, templateIds: string[]) {
+  const target = requiredTemplateCount(durationSeconds);
+  if (durationSeconds !== 40) return templateIds.slice(0, target);
+  if (new Set(templateIds).size < 3) return templateIds;
+
+  const selected: string[] = [];
+  for (let pass = 0; selected.length < target && pass < 2; pass += 1) {
+    for (const templateId of templateIds) {
+      if (selected.length >= target) break;
+      if (selected.at(-1) === templateId) continue;
+      if (selected.filter((id) => id === templateId).length >= 2) continue;
+      selected.push(templateId);
+    }
+  }
+  return selected;
 }
 
 function canGenerateStoryboard(status: string) {
@@ -136,9 +183,9 @@ export function JobContinuePanel({
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>(
     Array.isArray(latestStoryboard?.selectedTemplateIds)
       ? latestStoryboard.selectedTemplateIds
-      : recommendations.availableTemplateIds.slice(
-          0,
-          requiredTemplateCount(job.durationSeconds),
+      : initialTemplateSelection(
+          job.durationSeconds,
+          recommendations.availableTemplateIds,
         ),
   );
 
@@ -151,6 +198,7 @@ export function JobContinuePanel({
         displayName: byId.get(item.templateId)?.displayName ?? item.templateId,
         description: byId.get(item.templateId)?.description ?? "",
         riskLevel: item.riskLevel,
+        status: byId.get(item.templateId)?.status,
         selectable: true,
         selected: selectedTemplateIds.includes(item.templateId),
         warnings: item.riskWarnings.map(warningLabel),
@@ -160,6 +208,7 @@ export function JobContinuePanel({
         displayName: byId.get(item.templateId)?.displayName ?? item.templateId,
         description: byId.get(item.templateId)?.description ?? "",
         riskLevel: item.riskLevel,
+        status: byId.get(item.templateId)?.status,
         selectable: true,
         selected: selectedTemplateIds.includes(item.templateId),
         warnings: item.riskWarnings.map(warningLabel),
@@ -169,12 +218,35 @@ export function JobContinuePanel({
         displayName: byId.get(item.templateId)?.displayName ?? item.templateId,
         description: byId.get(item.templateId)?.description ?? "",
         riskLevel: byId.get(item.templateId)?.riskLevel ?? "unknown",
+        status: byId.get(item.templateId)?.status,
         selectable: false,
         selected: false,
-        reasons: item.reasons.map(reasonLabel),
+        reasons: item.reasons.map(continueReasonLabel),
       })) satisfies TemplateAvailabilityCard[],
     };
   }, [recommendations, selectedTemplateIds, templateCatalog]);
+
+  const templateSlotOptions = useMemo(() => {
+    const byId = new Map(templateCatalog.map((item) => [item.templateId, item]));
+    return recommendations.availableTemplateIds.map((templateId) => ({
+      templateId,
+      label: byId.get(templateId)?.displayName ?? templateId,
+    }));
+  }, [recommendations.availableTemplateIds, templateCatalog]);
+
+  const slotReasons = isVideoDuration(job.durationSeconds)
+    ? validateTemplateSlots({
+        durationSeconds: job.durationSeconds,
+        templateIds: selectedTemplateIds,
+        highRiskTemplateIds: templateCatalog
+          .filter(
+            (template) =>
+              template.riskLevel === "medium_high" ||
+              template.riskLevel === "high",
+          )
+          .map((template) => template.templateId),
+      })
+    : ["template_count_mismatch"];
 
   function toggleTemplate(templateId: string) {
     setSelectedTemplateIds((current) => {
@@ -191,8 +263,12 @@ export function JobContinuePanel({
   }
 
   async function generateStoryboard() {
-    if (selectedTemplateIds.length !== requiredTemplateCount(job.durationSeconds)) {
-      setMessage(`请选择 ${requiredTemplateCount(job.durationSeconds)} 个模板后再生成分镜。`);
+    if (slotReasons.length > 0) {
+      setMessage(
+        job.durationSeconds === 40
+          ? "40 秒镜头组合需要 5 个槽位、至少 3 种模板，且相邻镜头不能重复。"
+          : `请选择 ${requiredTemplateCount(job.durationSeconds)} 个模板后再生成分镜。`,
+      );
       return;
     }
 
@@ -290,12 +366,23 @@ export function JobContinuePanel({
 
       {canGenerateStoryboard(job.status) ? (
         <>
-          <TemplatePicker
-            onToggle={toggleTemplate}
-            optional={templateCards.optional}
-            recommended={templateCards.recommended}
-            unavailable={templateCards.unavailable}
-          />
+          {job.durationSeconds === 40 ? (
+            <div className="space-y-3">
+              <p className="text-sm font-medium">40 秒镜头顺序</p>
+              <TemplateSlotEditor
+                onChange={setSelectedTemplateIds}
+                options={templateSlotOptions}
+                slots={selectedTemplateIds}
+              />
+            </div>
+          ) : (
+            <TemplatePicker
+              onToggle={toggleTemplate}
+              optional={templateCards.optional}
+              recommended={templateCards.recommended}
+              unavailable={templateCards.unavailable}
+            />
+          )}
           <div>
             <label className="text-sm font-medium" htmlFor="job-user-prompt">
               生成意图

@@ -26,6 +26,17 @@ describe("PricingPage", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("shows the enabled 40-second paid Beta price and segment count", async () => {
+    vi.stubEnv("VIDEO_DURATION_40_ENABLED", "true");
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await PricingPage());
+
+    expect(screen.getByText("40 秒 Beta")).toBeInTheDocument();
+    expect(screen.getByText("310 点 · 5 个片段")).toBeInTheDocument();
   });
 
   it("explains public trial, packages, duration credit costs, and failed generation credit handling", async () => {

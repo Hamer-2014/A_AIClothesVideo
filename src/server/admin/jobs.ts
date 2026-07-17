@@ -5,6 +5,7 @@ import {
   adminJobNotes,
   assets,
   assetAnalyses,
+  assetConsistencyAnalyses,
   creditLedger,
   jobStateEvents,
   postQaResults,
@@ -175,6 +176,20 @@ export interface AdminStateEventRecord {
   createdAt: Date;
 }
 
+export interface AdminConsistencyAnalysisRecord {
+  videoJobId: string;
+  analysisKind: string;
+  status: string;
+  garmentMatch: string;
+  modelMatch: string;
+  colorMatch: boolean;
+  patternMatch: boolean;
+  viewCoverage: unknown;
+  confidence: string | null;
+  riskFlags: unknown;
+  resultJson: unknown;
+}
+
 export interface AdminJobNoteRecord {
   id: string;
   jobId: string;
@@ -202,6 +217,7 @@ export interface AdminJobStore {
   findJob(jobId: string): Promise<AdminJobRecord | null>;
   listAssets(jobId: string): Promise<AdminAssetRecord[]>;
   listAnalyses(jobId: string): Promise<AdminAnalysisRecord[]>;
+  listConsistencyAnalyses(jobId: string): Promise<AdminConsistencyAnalysisRecord[]>;
   findLatestStoryboard(jobId: string): Promise<AdminStoryboardRecord | null>;
   listSegments(jobId: string): Promise<AdminSegmentRecord[]>;
   listProviderLogs(jobId: string): Promise<AdminProviderLogRecord[]>;
@@ -365,6 +381,7 @@ export async function getAdminJobDetail({
   const [
     assetRecords,
     analysisRecords,
+    consistencyAnalysisRecords,
     latestStoryboard,
     segmentRecords,
     providerLogRecords,
@@ -377,6 +394,7 @@ export async function getAdminJobDetail({
   ] = await Promise.all([
     store.listAssets(jobId),
     store.listAnalyses(jobId),
+    store.listConsistencyAnalyses(jobId),
     store.findLatestStoryboard(jobId),
     store.listSegments(jobId),
     store.listProviderLogs(jobId),
@@ -402,6 +420,7 @@ export async function getAdminJobDetail({
     diagnosis,
     assets: assetRecords,
     analyses: analysisRecords,
+    consistencyAnalyses: consistencyAnalysisRecords,
     latestStoryboard,
     segments: [...segmentRecords].sort(
       (left, right) => left.segmentIndex - right.segmentIndex,
@@ -438,6 +457,7 @@ export function createInMemoryAdminJobStore(input: {
   jobs: AdminJobRecord[];
   assets?: AdminAssetRecord[];
   analyses?: AdminAnalysisRecord[];
+  consistencyAnalyses?: AdminConsistencyAnalysisRecord[];
   storyboards?: AdminStoryboardRecord[];
   segments: AdminSegmentRecord[];
   providerLogs: AdminProviderLogRecord[];
@@ -485,6 +505,11 @@ export function createInMemoryAdminJobStore(input: {
     },
     async listStateEvents(jobId) {
       return (input.stateEvents ?? []).filter((event) => event.videoJobId === jobId);
+    },
+    async listConsistencyAnalyses(jobId) {
+      return (input.consistencyAnalyses ?? []).filter(
+        (analysis) => analysis.videoJobId === jobId,
+      );
     },
     async listNotes(jobId) {
       return (input.notes ?? []).filter((note) => note.jobId === jobId);
@@ -553,6 +578,24 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
         .innerJoin(videoJobAssets, eq(assetAnalyses.assetId, videoJobAssets.assetId))
         .where(eq(videoJobAssets.videoJobId, jobId))
         .orderBy(desc(assetAnalyses.createdAt));
+    },
+    async listConsistencyAnalyses(jobId) {
+      return db
+        .select({
+          videoJobId: assetConsistencyAnalyses.videoJobId,
+          analysisKind: assetConsistencyAnalyses.analysisKind,
+          status: assetConsistencyAnalyses.status,
+          garmentMatch: assetConsistencyAnalyses.garmentMatch,
+          modelMatch: assetConsistencyAnalyses.modelMatch,
+          colorMatch: assetConsistencyAnalyses.colorMatch,
+          patternMatch: assetConsistencyAnalyses.patternMatch,
+          viewCoverage: assetConsistencyAnalyses.viewCoverage,
+          confidence: assetConsistencyAnalyses.confidence,
+          riskFlags: assetConsistencyAnalyses.riskFlags,
+          resultJson: assetConsistencyAnalyses.resultJson,
+        })
+        .from(assetConsistencyAnalyses)
+        .where(eq(assetConsistencyAnalyses.videoJobId, jobId));
     },
     async findLatestStoryboard(jobId) {
       const [storyboard] = await db

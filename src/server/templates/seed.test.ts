@@ -19,6 +19,15 @@ describe("shot template seed and status service", () => {
     expect(
       store.listTemplates().filter((template) => template.templateId === "front_pan"),
     ).toHaveLength(1);
+    expect(
+      store
+        .listTemplates()
+        .find((template) => template.templateId === "product_half_rotation"),
+    ).toMatchObject({
+      subjectKind: "product",
+      consistencyRequirements: ["same_garment"],
+      autoSelectAllowed: false,
+    });
   });
 
   it("allows admin and operator to update template status", async () => {

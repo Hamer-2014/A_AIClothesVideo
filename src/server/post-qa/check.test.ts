@@ -4,6 +4,8 @@ import { grantTrialCredits, reserveCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
 import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
+import type { VideoSegmentRecord } from "@/server/storyboard/confirm";
+import { createInMemoryVideoSegmentStore } from "@/server/video/segments";
 
 import { runPostQaCheck } from "./check";
 import { createInMemoryPostQaStore } from "./resolve";
@@ -58,7 +60,239 @@ async function createStores() {
   return { creditStore, jobStore, postQaStore, providerCallLogStore };
 }
 
+function createFiveSegmentStore() {
+  const now = new Date("2026-07-11T00:00:00.000Z");
+  const segments: VideoSegmentRecord[] = Array.from(
+    { length: 5 },
+    (_, segmentIndex) => ({
+      id: `00000000-0000-4000-8000-00000000000${segmentIndex}`,
+      videoJobId: jobId,
+      storyboardId: "11111111-1111-4111-8111-111111111111",
+      segmentIndex,
+      status: "succeeded",
+      templateId: `template-${segmentIndex}`,
+      prompt: `Segment ${segmentIndex}`,
+      inputAssetSnapshot: {},
+      provider: "apimart",
+      model: "pixverse-v6",
+      providerTaskId: `task-${segmentIndex}`,
+      providerCallLogId: `call-${segmentIndex}`,
+      videoKey: `jobs/${jobId}/segments/${segmentIndex}.mp4`,
+      costEstimate: "1.00",
+      generationProfile: "paid_720p_audio",
+      resolution: "720p",
+      audioEnabled: true,
+      watermarkEnabled: false,
+      isTest: true,
+      lockedBy: null,
+      lockedUntil: null,
+      attemptCount: 1,
+      lastError: null,
+      nextRetryAt: null,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+  return createInMemoryVideoSegmentStore({
+    jobs: [
+      {
+        id: jobId,
+        userId,
+        status: "post_qa_running",
+        aspectRatio: "9:16",
+        creditCost: 310,
+      },
+    ],
+    segments,
+    assets: [],
+  });
+}
+
 describe("runPostQaCheck", () => {
+  it("passes human-turn QA requirements to the vision provider", async () => {
+    const stores = await createStores();
+    const seenRequirements: string[][] = [];
+
+    await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "strict",
+      selectedTemplateIds: ["model_half_turn"],
+      frameKeys: ["jobs/job-1/qa/frames/segment-0-frame-0.jpg"],
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      visionProvider: async (input) => {
+        seenRequirements.push(input.qaRequirements);
+        return {
+          provider: "vision",
+          model: "strict-test",
+          qaJson: {
+            passed: true,
+            failure_category: null,
+            checks: [],
+            risk_flags: [],
+            summary: "passed",
+          },
+          raw: {},
+        };
+      },
+    });
+
+    expect(seenRequirements[0]).toEqual(
+      expect.arrayContaining([
+        "same visible person across relevant frames",
+        "natural head, arm, hand, hip, and leg anatomy",
+        "garment front/side/back consistency",
+        "turn stops at the supported angle and never completes 360 degrees",
+      ]),
+    );
+  });
+
+  it("stores the failed segment index from semantic frame names", async () => {
+    const stores = await createStores();
+
+    await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "strict",
+      selectedTemplateIds: ["model_half_turn"],
+      frameKeys: ["jobs/job-1/qa/frames/segment-2-frame-0.jpg"],
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      visionProvider: async () => ({
+        provider: "vision",
+        model: "strict-test",
+        qaJson: {
+          passed: false,
+          failure_category: "human_anatomy",
+          checks: [],
+          risk_flags: ["unnatural_hand"],
+          summary: "Segment 2 has an unnatural hand.",
+        },
+        raw: {},
+      }),
+    });
+
+    expect(stores.postQaStore.listResults()[0]?.resultJson).toMatchObject({
+      failedSegmentIndexes: [2],
+    });
+  });
+  it("retries one precisely localized 40-second segment without releasing credits", async () => {
+    const stores = await createStores();
+    const segmentStore = createFiveSegmentStore();
+    const frameKeys = [
+      ...Array.from({ length: 5 }, (_, segmentIndex) =>
+        Array.from(
+          { length: 6 },
+          (_, frameIndex) =>
+            `jobs/job-1/qa/frames/segment-${segmentIndex}-frame-${frameIndex}.jpg`,
+        ),
+      ).flat(),
+      ...Array.from(
+        { length: 4 },
+        (_, index) => `jobs/job-1/qa/frames/transition-${index}-${index + 1}.jpg`,
+      ),
+    ];
+
+    const result = await runPostQaCheck({
+      ...stores,
+      segmentStore,
+      jobId,
+      userId,
+      mode: "strict",
+      frameKeys,
+      createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+      visionProvider: async ({ frameUrls }) => {
+        const passed = !frameUrls.some((url) => url.includes("segment-3-"));
+        return {
+          provider: "vision",
+          model: "strict-test",
+          qaJson: {
+            passed,
+            failure_category: passed ? null : "garment_mismatch",
+            checks: [],
+            risk_flags: [],
+            summary: passed ? "ok" : "segment 3 failed",
+          },
+          raw: {},
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      jobId,
+      status: "segments_queued",
+      retriedSegmentIndex: 3,
+      ledgerType: null,
+    });
+    expect(segmentStore.listSegments()[3]).toMatchObject({
+      status: "queued",
+      providerTaskId: null,
+      videoKey: null,
+    });
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
+  });
+
+  it("evaluates a 40-second plan in five segment batches plus transitions", async () => {
+    const stores = await createStores();
+    const frameKeys = [
+      ...Array.from({ length: 5 }, (_, segmentIndex) =>
+        Array.from(
+          { length: 4 },
+          (_, frameIndex) =>
+            `jobs/job-1/qa/frames/segment-${segmentIndex}-frame-${frameIndex}.jpg`,
+        ),
+      ).flat(),
+      ...Array.from(
+        { length: 4 },
+        (_, index) => `jobs/job-1/qa/frames/transition-${index}-${index + 1}.jpg`,
+      ),
+    ];
+    const providerInputs: string[][] = [];
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "standard",
+      frameKeys,
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async ({ frameUrls }) => {
+        providerInputs.push(frameUrls);
+        return {
+          provider: "openai",
+          model: "gpt-vision",
+          qaJson: {
+            passed: true,
+            failure_category: null,
+            risk_flags: [],
+            checks: [],
+          },
+          raw: {},
+        };
+      },
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "deliverable",
+      ledgerType: "capture",
+    });
+    expect(providerInputs).toHaveLength(6);
+    expect(Math.max(...providerInputs.map((input) => input.length))).toBe(4);
+    expect(stores.providerCallLogStore.listCallLogs()).toHaveLength(6);
+    expect(stores.postQaStore.listResults()[0]?.resultJson).toMatchObject({
+      passed: true,
+      batches: expect.arrayContaining([
+        expect.objectContaining({ batchId: "segment-0", kind: "segment" }),
+        expect.objectContaining({ batchId: "transitions", kind: "transition" }),
+      ]),
+    });
+  });
+
   it("checks stitched frames with vision and captures credits when QA passes", async () => {
     const stores = await createStores();
 

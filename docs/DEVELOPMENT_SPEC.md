@@ -138,6 +138,7 @@ GOOGLE_CLIENT_SECRET=
 
 RESEND_API_KEY=
 EMAIL_FROM=
+LEGAL_CONTACT_EMAIL=
 
 CREEM_API_KEY=
 CREEM_WEBHOOK_SECRET=
@@ -151,6 +152,7 @@ CLOUDFLARE_R2_PUBLIC_BASE_URL=
 
 INTERNAL_WORKER_SECRET=
 CRON_JOB_SECRET=
+ABUSE_HASH_SECRET=
 
 CLOUD_RUN_STITCH_URL=
 CLOUD_RUN_STITCH_SECRET=
@@ -429,6 +431,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - 8 秒：70 点。
 - 16 秒：130 点。
 - 24 秒：190 点。
+- 40 秒付费 Beta：310 点，5 个独立 8 秒片段，不开放免费试用。
 - Strict 质检：每 8 秒 +20 点。
 
 ### 5.4 任务
@@ -544,11 +547,27 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] signed URL 有效期可配置。
 - [ ] 删除采用 `deleted_at` + 异步清理。
 
+### 7.6 素材权利声明与上传门禁
+
+- [x] 所有已登录用户的服务端图片上传要求主动接受当前 `image_rights_v1`，复选框不得预选。
+- [x] 声明包含版权、商标、商业使用、真人肖像和商业宣传授权；未满 18 周岁真人素材还要求监护人授权。
+- [x] Presign 在事务中创建声明、`pending_upload` 资产和资产关联，上传完成 API 是唯一改为 `uploaded` 的入口。
+- [x] 历史资产可补签；Preflight 和任务创建均 fail closed，任务保存服务端声明快照。
+- [x] 游客选择图片只做本地预览，不得被记录为已同意声明。
+
+### 7.7 侵权删除与保留期
+
+- [x] `/takedown` 和 `POST /api/compliance/rights-removal` 提供公开肖像、版权、商标、隐私投诉入口。
+- [x] 公开提交不会自动删除内容；案件先入库，通知邮件失败不丢案件。
+- [x] 同一 IP 摘要 24 小时最多 5 次，生产缺 `ABUSE_HASH_SECRET` 时 fail closed，内容 URL 保存前去除 query/fragment。
+- [x] `operator` 只允许分诊，`admin` 才能结案；所有状态变化和处理结果写管理员审计日志。
+- [x] `POST /api/internal/compliance/retention` 对三年前的声明与案件个人信息执行去标识化，并校验 `Authorization: Bearer $CRON_JOB_SECRET`。
+
 ## 8. 镜头模板与规则引擎 SPEC
 
 ### 8.1 目标
 
-实现 12 个 MVP 镜头模板，并根据素材完整度输出推荐/可选/不可用模板。
+实现 17 个 MVP/付费 Beta 镜头模板，并根据素材完整度和任务内多图一致性输出推荐/可选/不可用模板。
 
 ### 8.2 文件边界
 
@@ -575,7 +594,12 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - `print_closeup`
 - `back_display`
 - `front_to_back_cut`
+- `scene_lifestyle_showcase`
 - `minimal_studio`
+- `product_quarter_rotation`
+- `product_half_rotation`
+- `model_quarter_turn`
+- `model_half_turn`
 
 ### 8.4 规则
 
@@ -584,6 +608,13 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - 免费试用只允许低风险模板。
 - 中高风险模板必须展示风险提示。
 - DeepSeek 只能引用当前任务可用模板 ID。
+- `product_quarter_rotation` 要求同款无模特商品正面 + 侧面图，只允许 15-45°，付费、Advanced-only、Strict QA、禁止自动选择。
+- `product_half_rotation` 要求同款无模特商品正面 + 侧面 + 背面图，只允许 front -> side -> back 的连续 180°，禁止 360°。
+- 两个商品旋转模板不得造人或执行虚拟穿衣；一致性 provider 失败、响应畸形或证据不足时 fail closed。
+- `model_quarter_turn` 要求同一真人模特穿同一服装的正面 + 侧面图，只允许 15-45°，付费、Advanced-only、Strict QA、禁止自动选择。
+- `model_half_turn` 要求同一真人模特穿同一服装的正面 + 侧面 + 背面图，只允许 front -> side -> back 的连续 180°，禁止 360°。
+- 两个真人转身模板必须同时通过 `model_views` 的服装一致性和当前任务内可见模特一致性；缺视角、人物不一致、服装不一致、provider 失败或证据不足均 fail closed。
+- 单张正面真人模特图仍允许 `model_front_pose`，但禁止据此生成侧面、背面或转身。商品图不得隐式造人；虚拟穿衣是未来独立上游模块，其输出仍需重新校验后才能复用模特模板。
 
 ### 8.5 验收
 
@@ -592,6 +623,8 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] 不可用模板显示原因。
 - [ ] 模板有状态和版本。
 - [ ] 后台可暂停模板。
+- [x] 工作台展示缺商品侧面/背面和多图一致性原因，后台展示 garment/model match、confidence、risk flags 且不暴露签名 URL。
+- [x] 工作台展示缺模特侧面/背面、人物不一致和模特视角服装不一致原因；后台明确其为任务内比较，不展示生物识别标识。
 
 ## 9. 视觉识别与素材分析 SPEC
 
@@ -616,6 +649,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - `garment_category`
 - `view_angle`
 - `human_present`
+- `subject_kind`: product / human_model / unknown
 - `visible_details`
 - `not_visible_details`
 - `quality`
@@ -630,6 +664,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] 保存 `asset_analysis_json`。
 - [ ] 视觉模型只输出观察结果，不直接决定模板权限。
 - [ ] 规则引擎根据分析结果决定模板可用性。
+- [x] 至少两张商品 front/side/back 素材触发 Strict 任务内一致性分析并写 `asset_consistency_analyses`。
 
 ### 9.5 验收
 
@@ -714,7 +749,7 @@ MVP 视频生成使用环境变量选择 provider/model/key，支持真实模型
 
 - [ ] 8 秒 storyboard 只包含 1 段。
 - [ ] 16 秒 storyboard 只包含 2 段。
-- [ ] 24 秒 storyboard 只包含 3 段。
+- [ ] 24 秒 storyboard 只包含 3 段；40 秒 storyboard 必须包含 5 个有序 8 秒段。
 - [ ] JSON schema 校验失败时不进入生成。
 - [ ] storyboards 可在后台查看。
 
@@ -804,7 +839,7 @@ MVP 视频生成使用环境变量选择 provider/model/key，支持真实模型
 
 - 8 秒任务生成 1 个 segment。
 - 16 秒任务生成 2 个 segment。
-- 24 秒任务生成 3 个 segment。
+- 24 秒任务生成 3 个 segment；40 秒 Beta 生成 5 个 segment。
 - 某个 segment 失败只重试该 segment。
 - 供应商输出链接必须及时转存 R2。
 - segment 保存 prompt、模板 ID、输入素材快照、provider task ID、成本、重试次数。
@@ -869,7 +904,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 ### 14.5 验收
 
 - [ ] Vercel 不执行 ffmpeg。
-- [ ] 16/24 秒任务输出一个完整视频。
+- [ ] 16/24/40 秒任务输出一个完整视频。
 - [ ] 抽帧图上传 R2。
 - [ ] 拼接失败可重试。
 - [ ] Cloud Run 日志可排查。
@@ -900,8 +935,11 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 
 - 普通用户不能关闭 Post-QA。
 - 免费试用和低风险 8 秒默认 lite。
-- 16/24 秒付费默认 standard。
-- 真人、背面、正背切换、中高风险模板强制 strict。
+- 16/24/40 秒付费默认 standard。
+- 40 秒 Standard 抽 24 帧，Strict 抽 34 帧；按 5 个片段批次和 1 个转场批次分析。
+- 40 秒只有一个精确定位片段失败时自动重试一次且不释放冻结点数；其他失败或重试耗尽 fail closed。
+- 真人、背面、正背切换、中高风险模板，以及商品旋转/真人转身付费 Beta 强制 strict。
+- 真人转身 Post-QA 必须检查同一可见人物连续性、头/手/臂/髋/腿自然度、服装 front/side/back 一致性和禁止继续到 360°。
 - 质检通过后执行 `credit_ledger.capture`。
 - 质检失败后进入重试、人工审核、释放或退款。
 - 前台不能承诺 100% 无异常。
@@ -937,7 +975,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - 用户自己选模板，系统给推荐。
 - 不可用模板置灰并显示原因。
 - 任务列表只显示完整视频任务。
-- 进度可显示“片段 2/3 生成中”。
+- 进度可显示“片段 2/3 生成中”或“片段 4/5 生成中”。
 - 最终只下载完整视频。
 - 失败原因必须用户可理解。
 - 点数冻结、扣除、退款要透明。
@@ -970,6 +1008,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - 镜头模板管理。
 - 点数与订单管理。
 - 管理员审计日志。
+- 权利删除案件队列。
 
 ### 17.3 必须操作
 
@@ -980,6 +1019,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - 查看 `is_test` 任务。
 - 筛选测试任务和正式任务。
 - 查看成本、耗时、fallback 原因。
+- 分诊权利删除案件；只有 `admin` 可以填写处理结论并结案。
 
 ### 17.4 验收
 
@@ -1030,6 +1070,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] 邮件域名配置。
 - [ ] Email OTP/Magic Link 到达。
 - [ ] 登录邮件限频生效。
+- [ ] `LEGAL_CONTACT_EMAIL` 可收到侵权案件通知，通知失败时案件仍保留在后台。
 
 ### 18.6 Google OAuth
 
@@ -1062,6 +1103,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] 每 1 分钟触发 worker tick。
 - [ ] secret 校验生效。
 - [ ] 重复触发幂等。
+- [ ] 每日以 `CRON_JOB_SECRET` Bearer 调用 `/api/internal/compliance/retention`。
 
 ### 18.10 端到端验收
 
@@ -1071,6 +1113,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] 付费 8 秒。
 - [ ] 付费 16 秒。
 - [ ] 付费 24 秒。
+- [ ] 开关开启时完成付费 40 秒 Beta：310 点、5 段、24/34 帧 QA 和一次局部重试。
 - [ ] 无背面图时背面模板不可用。
 - [ ] 有背面图时背面展示可选。
 - [ ] 无细节图时细节模板不可用。

@@ -31,4 +31,16 @@ describe("admin access helpers", () => {
     expect(canRolePerformAdminAction("operator", "job:reopen_post_qa")).toBe(true);
     expect(canRolePerformAdminAction("operator", "job:release_credits")).toBe(true);
   });
+
+  it("lets operators triage rights cases but reserves resolution for admins", () => {
+    expect(
+      canRolePerformAdminAction("operator", "rights_removal:triage"),
+    ).toBe(true);
+    expect(
+      canRolePerformAdminAction("operator", "rights_removal:resolve"),
+    ).toBe(false);
+    expect(canRolePerformAdminAction("admin", "rights_removal:resolve")).toBe(
+      true,
+    );
+  });
 });

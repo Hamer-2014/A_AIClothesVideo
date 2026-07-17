@@ -24,8 +24,15 @@ export default async function TermsPage() {
           <section>
             <h2 className="text-base font-medium text-[var(--ink)]">禁止内容</h2>
             <p className="mt-2">
-              禁止上传或生成违法、侵权、色情、仇恨、暴力、欺诈、误导性医疗或金融承诺，以及你无权使用的人像、商标或版权素材。
+              禁止上传或生成违法、侵权、色情化、仇恨、暴力、欺诈、政治宣传、冒充代言或其他误导性内容，以及你无权使用的人像、商标或版权素材。
               用户不得尝试通过 prompt 绕过素材规则、内容审核或试用限制。
+            </p>
+          </section>
+          <section>
+            <h2 className="text-base font-medium text-[var(--ink)]">肖像与未成年人授权</h2>
+            <p className="mt-2">
+              上传包含可识别人物的素材前，你必须已获得该人物的肖像权和商业宣传授权；人物未满 18 周岁时，还必须取得其监护人授权。
+              每次服务端上传都需要主动确认当前授权声明，声明不得预选或由系统代为同意。
             </p>
           </section>
           <section>
@@ -47,6 +54,12 @@ export default async function TermsPage() {
             <p className="mt-2">
               点数通常在确认生成后冻结，最终视频通过质量检查并可交付后正式扣除。
               如果任务失败、未生成或无法交付，系统会按状态释放冻结点数或退回点数；已交付内容不代表没有任何商业使用风险。
+            </p>
+          </section>
+          <section>
+            <h2 className="text-base font-medium text-[var(--ink)]">权利通知</h2>
+            <p className="mt-2">
+              权利人可通过侵权删除申请提交可定位的内容引用和权利说明。平台会保存案件编号并由管理员核验；提交投诉不会自动删除内容，恶意或信息不足的申请可被驳回。
             </p>
           </section>
         </div>

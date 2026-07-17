@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/redirects";
 import { getServerSession } from "@/lib/auth/server";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
+import { isVideoDurationEnabled } from "@/lib/video/specs";
 import { buildDashboardNav } from "@/app/app-shell";
 import {
   createDrizzleUserBillingStore,
@@ -27,6 +28,7 @@ export default async function WorkspacePage({
   const session = await getServerSession();
   const resolvedSearchParams = await searchParams;
   const initialMode = resolvedSearchParams?.mode === "trial" ? "trial" : "paid";
+  const duration40Enabled = isVideoDurationEnabled(40, process.env);
   if (!session?.user?.id) {
     const loginHref = buildLoginHrefForRedirect(
       buildRelativePathWithQuery("/workspace", {
@@ -72,6 +74,7 @@ export default async function WorkspacePage({
           <section className="px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl">
               <WorkspaceApp
+                duration40Enabled={duration40Enabled}
                 initialMode={initialMode}
                 initialPresetId={resolvedSearchParams?.preset ?? null}
                 isAuthenticated={false}
@@ -99,6 +102,7 @@ export default async function WorkspacePage({
       billing={overview.wallet}
     >
       <WorkspaceApp
+        duration40Enabled={duration40Enabled}
         initialMode={initialMode}
         initialPresetId={resolvedSearchParams?.preset ?? null}
         isAuthenticated

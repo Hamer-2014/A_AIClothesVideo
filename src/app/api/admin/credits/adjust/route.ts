@@ -18,6 +18,8 @@ interface AdjustCreditsDeps {
     targetUserId: string;
     amount: number;
     reason: string;
+    idempotencyKey?: string;
+    relatedJobId?: string;
   }) => Promise<unknown>;
 }
 
@@ -29,6 +31,14 @@ function parseBody(body: unknown) {
   const userId = typeof record.userId === "string" ? record.userId.trim() : "";
   const amount = typeof record.amount === "number" ? record.amount : Number.NaN;
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
+  const idempotencyKey =
+    typeof record.idempotencyKey === "string"
+      ? record.idempotencyKey.trim()
+      : undefined;
+  const relatedJobId =
+    typeof record.relatedJobId === "string"
+      ? record.relatedJobId.trim()
+      : undefined;
 
   if (
     !userId ||
@@ -43,6 +53,8 @@ function parseBody(body: unknown) {
     targetUserId: userId,
     amount,
     reason,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+    ...(relatedJobId ? { relatedJobId } : {}),
   };
 }
 
@@ -52,12 +64,16 @@ function defaultAdjustCredits({
   targetUserId,
   amount,
   reason,
+  idempotencyKey,
+  relatedJobId,
 }: {
   admin: AdminSession;
   request: Request;
   targetUserId: string;
   amount: number;
   reason: string;
+  idempotencyKey?: string;
+  relatedJobId?: string;
 }) {
   return adjustUserCreditsByAdmin({
     auditStore: createDrizzleAdminAuditStore(),
@@ -65,6 +81,8 @@ function defaultAdjustCredits({
     targetUserId,
     amount,
     reason,
+    idempotencyKey,
+    relatedJobId,
     requestMeta: getRequestMeta(request),
   });
 }
@@ -110,7 +128,13 @@ export async function handleAdjustCreditsRequest(
     }
 
     return NextResponse.json(
-      { error: "credit_adjust_failed" },
+      {
+        error: "credit_adjust_failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Credit adjustment failed.",
+      },
       { status: 500 },
     );
   }

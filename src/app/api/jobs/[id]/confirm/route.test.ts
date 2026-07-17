@@ -242,4 +242,25 @@ describe("POST /api/jobs/[id]/confirm", () => {
       error: "prompt_moderation_unavailable",
     });
   });
+
+  it("returns 409 when a trial confirmation loses the final trial grant race", async () => {
+    const response = await handleConfirmStoryboardRequest(
+      new Request("http://localhost/api/jobs/job-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ storyboardId: "storyboard-1" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        confirmStoryboard: async () => {
+          throw new Error("Free trial is not available.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "free_trial_unavailable",
+    });
+  });
 });

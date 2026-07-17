@@ -51,6 +51,34 @@ describe("JobDetailPanel", () => {
           },
           assets: [],
           analyses: [],
+          consistencyAnalyses: [
+            {
+              videoJobId: "job-1",
+              analysisKind: "product_views",
+              status: "failed",
+              garmentMatch: "fail",
+              modelMatch: "not_applicable",
+              colorMatch: false,
+              patternMatch: true,
+              viewCoverage: ["front", "side"],
+              confidence: "0.61",
+              riskFlags: ["pattern_mismatch"],
+              resultJson: { garment_match: "fail" },
+            },
+            {
+              videoJobId: "job-1",
+              analysisKind: "model_views",
+              status: "passed",
+              garmentMatch: "pass",
+              modelMatch: "pass",
+              colorMatch: true,
+              patternMatch: true,
+              viewCoverage: ["front", "side", "back"],
+              confidence: "0.94",
+              riskFlags: [],
+              resultJson: { garment_match: "pass", model_match: "pass" },
+            },
+          ],
           latestStoryboard: {
             id: "storyboard-1",
             videoJobId: "job-1",
@@ -150,6 +178,16 @@ describe("JobDetailPanel", () => {
     expect(screen.getByText("Provider Logs 表")).toBeInTheDocument();
     expect(screen.getByText("Trial Eligibility")).toBeInTheDocument();
     expect(screen.getByText("Style Preset Snapshot")).toBeInTheDocument();
+    expect(screen.getByText("任务内多图一致性")).toBeInTheDocument();
+    expect(
+      screen.getByText("仅比较本次任务中的可见模特与服装，不建立人脸库或跨任务身份标识。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("model_views")).toBeInTheDocument();
+    expect(screen.getByText("garment_match: fail")).toBeInTheDocument();
+    expect(screen.getByText("model_match: pass")).toBeInTheDocument();
+    expect(screen.getByText("置信度: 0.61")).toBeInTheDocument();
+    expect(screen.getByText(/pattern_mismatch/)).toBeInTheDocument();
+    expect(screen.queryByText(/signed\.example/)).not.toBeInTheDocument();
     expect(screen.getAllByText("minimal_studio").length).toBeGreaterThan(0);
     expect(screen.getByText(/email_trial_used/)).toBeInTheDocument();
     expect(screen.getByText("State Events Timeline")).toBeInTheDocument();

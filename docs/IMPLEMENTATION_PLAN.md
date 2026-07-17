@@ -40,7 +40,7 @@
 
 - MVP 产品口径改为：免费试用低分辨率、无音频、带水印；付费默认高分辨率、无水印、包含音频，用户侧不暴露供应商具体分辨率。
 - Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
-- stitch-worker 抽帧从固定 3 帧改为分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 转场帧策略仍是后续增强项。
+- stitch-worker 抽帧已分级：现有 8/16/24 秒保持 `off = 0`、`lite = 3`、`standard = 5`、`strict = 6`；40 秒 Standard 为 24 帧、Strict 为 34 帧，并保留片段/转场位置。
 - 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。
 - 2026-06-13 Env-only Video Generation Config：公开视频 `video_generation` 的 provider/model/key 改为只读取环境变量；health check 检查 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL` 和当前 provider 对应的 `APIMART_API_KEY` / `EVOLINK_API_KEY`，不再要求 `PROVIDER_KEY_ENCRYPTION_SECRET` 才能生成视频。
 - 2026-06-13 风险收敛子项目 C：Cloud Run `stitch-worker` 在 final mp4 后抽取 `jobs/{jobId}/covers/cover.webp`，封面生成失败只写 warning 且不阻断 final video / QA frames / callback；前台任务详情优先显示封面、无封面时回退视频预览，任务列表通过内部 cover API 的 R2 signed URL 展示可用封面缩略图。
@@ -237,13 +237,35 @@
 - [ ] signed URL 有效期可配置。
 - [ ] 删除不会在用户请求中同步阻塞。
 
-## 6. 镜头模板库与规则引擎
+### 5.1 素材授权与侵权删除合规
 
-**目标：** 实现 12 个 MVP 模板和可用性判断。
+**目标：** 让真人模特和普通商品素材进入生成链路前具备可审计的授权证据，并提供人工核验的侵权删除流程。
 
 **任务：**
 
-- [ ] 写入 12 个 MVP 模板：
+- [x] 所有服务端图片上传强制主动接受 `image_rights_v1`，未接受或版本过期时拒绝上传。
+- [x] 事务保存声明、`pending_upload` 资产和关联记录，`/api/uploads/complete` 是唯一完成入口。
+- [x] 历史资产支持补签，Preflight 和任务创建再次门禁，任务保存声明快照。
+- [x] 声明明确真人肖像和商业宣传授权；儿童真人素材必须有监护人授权。
+- [x] 提供 `/takedown` 与公开 API；公开提交只建案件，不自动删除内容。
+- [x] 后台提供权利删除案件队列，`operator` 只分诊，`admin` 才能结案，状态迁移写审计日志。
+- [x] 提供三年去标识化 retention endpoint，以 `CRON_JOB_SECRET` Bearer 鉴权。
+- [ ] 在 cron-job.org 配置每日调用 `/api/internal/compliance/retention`。
+
+**验收：**
+
+- [x] staging/production 缺少法律联系邮箱、Resend 配置或摘要密钥时 `/api/health` 为 `ready=false`。
+- [x] 投诉邮件失败不会丢失已受理案件。
+- [x] 未补签资产不能进入任务生成。
+- [ ] 生产环境完成真实投诉邮件、后台结案和三年到期样本演练。
+
+## 6. 镜头模板库与规则引擎
+
+**目标：** 实现 17 个 MVP/付费 Beta 模板和可用性判断。
+
+**任务：**
+
+- [x] 写入 17 个 MVP/付费 Beta 模板：
   - `front_push_in`
   - `front_pan`
   - `product_float`
@@ -255,7 +277,20 @@
   - `print_closeup`
   - `back_display`
   - `front_to_back_cut`
+  - `scene_lifestyle_showcase`
   - `minimal_studio`
+  - `product_quarter_rotation`
+  - `product_half_rotation`
+  - `model_quarter_turn`
+  - `model_half_turn`
+- [x] 商品旋转模板仅允许 `product` 主体、同款多视角一致性通过、付费和高级调整明确选择。
+- [x] 商品旋转模板不进入 Preset 自动编排，确认时强制 Strict QA，并按 front/side/back 顺序写素材快照。
+- [x] 商品旋转 Prompt 禁止生成真人、手、身体、模特或虚拟穿衣结果；180° 模板禁止继续到 360°。
+- [x] 真人模特转身模板只接受 `human_model` 多视角素材，并要求同服装、同模特任务内一致性均通过。
+- [x] 单张真人正面图继续允许 `model_front_pose`，但不能启用轻侧身或 180° 转身。
+- [x] 真人模特转身模板为付费 Beta、Advanced-only、禁止 Preset 自动选择，并强制 Strict QA。
+- [x] 模特转身 Prompt 固定同一可见人物、服装和自然人体，禁止换脸、体型/发型漂移及 360°；Post-QA 检查人物连续性和人体异常。
+- [x] 商品图不隐式造人；虚拟穿衣留作未来独立上游模块，输出仍需重新通过任务内一致性校验。
 - [ ] 每个模板包含素材要求、风险等级、禁用条件、试用权限、质检点。
 - [ ] 实现模板状态：draft / beta / active / paused。
 - [ ] 实现模板版本。
@@ -270,6 +305,8 @@
 - [ ] 没有细节图时细节模板不可用。
 - [ ] 免费试用只能使用低风险模板。
 - [ ] DeepSeek 只能引用 active/beta 且当前任务可用的模板 ID。
+- [x] 缺商品侧面图时轻旋转不可用；缺商品背面图时 180° 不可用；一致性 unknown/fail 时两者均不可用。
+- [x] 缺模特侧面/背面、模特不一致或模特视角服装不一致时，真人转身模板不可用并展示具体原因。
 
 ## 7. Creem Prompt Moderation
 
@@ -350,13 +387,14 @@
 
 **任务：**
 
-- [ ] 用户选择 8/16/24 秒。
+- [x] 用户选择 8/16/24 秒，服务端开关开放时可选择 40 秒付费 Beta。
 - [ ] 用户选择比例 9:16 / 1:1 / 16:9。
 - [ ] 用户选择模板。
 - [ ] 服务端校验模板数量：
   - 8 秒 1 个模板。
   - 16 秒 2 个模板。
   - 24 秒 3 个模板。
+  - 40 秒 5 个有序槽位，至少 3 种模板并限制重复和高风险镜头。
 - [ ] 调用 DeepSeek 生成 storyboard JSON。
 - [ ] 校验 JSON schema。
 - [ ] 追加系统硬约束。
@@ -413,7 +451,7 @@
 
 **验收：**
 
-- [ ] 16/24 秒不会因为某段失败整单重跑。
+- [ ] 16/24/40 秒不会因为某段生成失败整单重跑。
 - [ ] 供应商返回链接不会过期丢失，必须转存 R2。
 - [ ] 每个片段有 prompt、模板、输入素材快照和成本记录。
 
@@ -452,7 +490,7 @@
 - [ ] 支持 `post_qa_mode`: off / lite / standard / strict。
 - [ ] 普通用户不能选择 off。
 - [ ] 免费试用和低风险 8 秒默认 lite。
-- [ ] 16/24 秒付费默认 standard。
+- [x] 16/24/40 秒付费默认 standard；严格模板仍升级为 strict。
 - [ ] 真人、背面、正背切换、中高风险模板强制 strict。
 - [ ] 调用视觉模型分析抽帧图。
 - [ ] 保存 `post_qa_results`。
@@ -465,6 +503,15 @@
 - [ ] 质检通过前不能正式扣点。
 - [ ] `off` 只能用于管理员/内测。
 - [ ] 前台不承诺 100% 无异常。
+
+### 14.1 40 秒分段质检与局部重试
+
+- [x] Standard 40 秒抽取 24 帧，Strict 抽取 34 帧。
+- [x] QA 帧使用片段和转场语义文件名，不再依赖无位置的数字编号。
+- [x] 视觉模型按 5 个片段批次加 1 个转场批次调用，并聚合一次终态结果。
+- [x] 单个精确定位的片段失败自动重试一次，期间不释放冻结点数。
+- [x] 多段失败、转场失败、provider/schema 异常和重试耗尽沿用失败释放流程。
+- [x] 真人转身模板的 Strict Post-QA 追加同一可见人物、自然人体、服装 front/side/back 一致性和禁止 360° 检查。
 
 ## 15. 前台工作台
 
@@ -498,7 +545,7 @@
 **验收：**
 
 - [ ] 用户侧不默认显示每个 8 秒片段视频。
-- [ ] 用户能看到进度，例如“片段 2/3 生成中”。
+- [ ] 用户能看到进度，例如“片段 2/3 生成中”或“片段 4/5 生成中”。
 - [ ] 失败原因可理解。
 - [ ] 点数冻结、扣除、退款状态清楚。
 

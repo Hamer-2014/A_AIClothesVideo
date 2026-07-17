@@ -23,6 +23,8 @@ interface AdminActionFormProps {
   submitLabel: string;
   fields?: ActionField[];
   fixedPayload?: Record<string, string | number | boolean>;
+  idempotencyKey?: string;
+  disabledReason?: string | null;
 }
 
 export function AdminActionForm({
@@ -32,6 +34,8 @@ export function AdminActionForm({
   submitLabel,
   fields = [],
   fixedPayload,
+  idempotencyKey,
+  disabledReason,
 }: AdminActionFormProps) {
   const [reason, setReason] = useState("");
   const [values, setValues] = useState<Record<string, string>>(
@@ -41,8 +45,13 @@ export function AdminActionForm({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   async function handleSubmit() {
+    if (disabledReason) {
+      return;
+    }
+
     if (reason.trim().length < 6) {
       setMessage("原因至少 6 个字符，会写入审计日志。");
       return;
@@ -55,6 +64,9 @@ export function AdminActionForm({
       ...(fixedPayload ?? {}),
       reason: reason.trim(),
     };
+    if (idempotencyKey) {
+      payload.idempotencyKey = idempotencyKey;
+    }
 
     for (const field of fields) {
       const rawValue = values[field.name] ?? "";
@@ -75,11 +87,16 @@ export function AdminActionForm({
     setSubmitting(false);
 
     if (!response.ok) {
-      setMessage(`操作失败: ${body.error ?? response.status}`);
+      setMessage(`操作失败: ${body.message ?? body.error ?? response.status}`);
       return;
     }
 
-    setMessage("已提交。刷新页面可查看最新状态。");
+    setMessage(
+      body.idempotent
+        ? "该操作此前已经处理过，本次没有重复执行。刷新页面可查看最新状态。"
+        : "已提交。刷新页面可查看最新状态。",
+    );
+    setSubmitted(true);
     setReason("");
   }
 
@@ -87,6 +104,11 @@ export function AdminActionForm({
     <section className="rounded-lg border border-[var(--line)] bg-white p-5">
       <h3 className="text-sm font-medium">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{description}</p>
+      {disabledReason ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          {disabledReason}
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {fields.map((field) => (
@@ -151,7 +173,7 @@ export function AdminActionForm({
       <div className="mt-4 flex items-center gap-3">
         <button
           className="inline-flex h-10 items-center rounded-md bg-[var(--ink)] px-4 text-sm font-medium text-white disabled:opacity-50"
-          disabled={submitting}
+          disabled={Boolean(disabledReason) || submitting || submitted}
           onClick={handleSubmit}
           type="button"
         >

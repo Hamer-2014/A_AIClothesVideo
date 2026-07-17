@@ -40,6 +40,7 @@ describe("GET /api/jobs/[id]", () => {
           },
           assets: [{ assetId: "asset-1", role: "front", sortOrder: 0 }],
           analyses: [],
+          consistencyAnalyses: [],
           acceptable: true,
           assetCompleteness: {
             hasFront: true,
@@ -48,7 +49,15 @@ describe("GET /api/jobs/[id]", () => {
             hasDetail: false,
             hasScene: false,
             hasModelFront: false,
+            hasModelSide: false,
+            hasModelBack: false,
             hasFlatLayOrWhiteBackground: true,
+            hasProductFront: false,
+            hasProductSide: false,
+            hasProductBack: false,
+            garmentConsistency: "unknown",
+            modelGarmentConsistency: "unknown",
+            modelConsistency: "unknown",
             detailTypes: [],
           },
           recommendations: {

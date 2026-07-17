@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   assetAnalyses,
+  assetConsistencyAnalyses,
   storyboards,
   videoJobAssets,
   videoJobs,
@@ -12,6 +13,7 @@ import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { ShotTemplateDefinition } from "@/lib/templates/types";
 import { buildRecommendationsFromAnalyses } from "@/server/assets/analyze";
 import { parseAssetAnalysisJson, type AssetRole } from "@/server/assets/analysis-schema";
+import type { ParsedConsistency } from "@/server/assets/consistency";
 
 export interface VideoJobSummary {
   id: string;
@@ -41,6 +43,13 @@ export interface VideoJobAnalysisSummary {
   analysisJson: JsonValue;
 }
 
+export interface VideoJobConsistencySummary
+  extends Omit<ParsedConsistency, "raw"> {
+  videoJobId: string;
+  analysisKind: string;
+  resultJson: JsonValue;
+}
+
 export interface VideoJobStoryboardSummary {
   id: string;
   videoJobId: string;
@@ -54,6 +63,7 @@ export interface VideoJobReadStore {
   findJob(input: { jobId: string; userId: string }): Promise<VideoJobSummary | null>;
   listJobAssets(jobId: string): Promise<VideoJobAssetSummary[]>;
   listAnalyses(assetIds: string[]): Promise<VideoJobAnalysisSummary[]>;
+  listConsistencyAnalyses(jobId: string): Promise<VideoJobConsistencySummary[]>;
   findLatestStoryboard(jobId: string): Promise<VideoJobStoryboardSummary | null>;
 }
 
@@ -75,11 +85,13 @@ export function createInMemoryVideoJobReadStore({
   jobs,
   assets,
   analyses,
+  consistencyAnalyses = [],
   storyboards,
 }: {
   jobs: VideoJobSummary[];
   assets: VideoJobAssetSummary[];
   analyses: VideoJobAnalysisSummary[];
+  consistencyAnalyses?: VideoJobConsistencySummary[];
   storyboards?: VideoJobStoryboardSummary[];
 }): VideoJobReadStore {
   return {
@@ -91,6 +103,11 @@ export function createInMemoryVideoJobReadStore({
     },
     async listAnalyses(assetIds) {
       return analyses.filter((analysis) => assetIds.includes(analysis.assetId));
+    },
+    async listConsistencyAnalyses(jobId) {
+      return consistencyAnalyses.filter(
+        (analysis) => analysis.videoJobId === jobId,
+      );
     },
     async findLatestStoryboard(jobId) {
       return (
@@ -163,6 +180,34 @@ export function createDrizzleVideoJobReadStore(
         .from(assetAnalyses)
         .where(inArray(assetAnalyses.assetId, assetIds));
     },
+    async listConsistencyAnalyses(jobId) {
+      const records = await db
+        .select()
+        .from(assetConsistencyAnalyses)
+        .where(eq(assetConsistencyAnalyses.videoJobId, jobId));
+
+      return records.map((record) => ({
+        videoJobId: record.videoJobId,
+        analysisKind: record.analysisKind,
+        status: record.status as ParsedConsistency["status"],
+        garmentMatch: record.garmentMatch as ParsedConsistency["garmentMatch"],
+        modelMatch: record.modelMatch as ParsedConsistency["modelMatch"],
+        colorMatch: record.colorMatch,
+        patternMatch: record.patternMatch,
+        viewCoverage: Array.isArray(record.viewCoverage)
+          ? record.viewCoverage.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [],
+        confidence: record.confidence ?? "0",
+        riskFlags: Array.isArray(record.riskFlags)
+          ? record.riskFlags.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [],
+        resultJson: record.resultJson,
+      }));
+    },
     async findLatestStoryboard(jobId) {
       const [storyboard] = await db
         .select({
@@ -201,12 +246,19 @@ export async function getVideoJobDetail({
 
   const assets = await store.listJobAssets(jobId);
   const analyses = await store.listAnalyses(assets.map((asset) => asset.assetId));
+  const consistencyAnalyses = await store.listConsistencyAnalyses(jobId);
   const latestStoryboard = await store.findLatestStoryboard(jobId);
   const parsedAnalyses = analyses.map((analysis) =>
     ({
       assetId: analysis.assetId,
       parsed: parseAssetAnalysisJson(analysis.analysisJson),
     }),
+  );
+  const productConsistency = consistencyAnalyses.find(
+    (analysis) => analysis.analysisKind === "product_views",
+  );
+  const modelConsistency = consistencyAnalyses.find(
+    (analysis) => analysis.analysisKind === "model_views",
   );
   const recommendationResult = buildRecommendationsFromAnalyses({
     analyses: parsedAnalyses.map((analysis) => analysis.parsed),
@@ -216,6 +268,12 @@ export async function getVideoJobDetail({
       .map((asset) => declaredRoleFromJobAsset(asset.role))
       .filter((role): role is AssetRole => Boolean(role) && role !== "unknown"),
     presetId: job.presetId,
+    consistency: productConsistency
+      ? { ...productConsistency, raw: productConsistency.resultJson }
+      : null,
+    modelConsistency: modelConsistency
+      ? { ...modelConsistency, raw: modelConsistency.resultJson }
+      : null,
   });
 
   const declaredRoleByAssetId = new Map(
@@ -234,6 +292,7 @@ export async function getVideoJobDetail({
       riskFlags: analysis.parsed.riskFlags,
     })),
     latestStoryboard,
+    consistencyAnalyses,
     ...recommendationResult,
   };
 }

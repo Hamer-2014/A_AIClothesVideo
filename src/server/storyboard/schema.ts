@@ -1,4 +1,5 @@
 import type { JsonValue } from "@/lib/db/schema/common";
+import { getVideoSpec, isVideoDuration } from "@/lib/video/specs";
 
 export interface StoryboardSegment {
   index: number;
@@ -39,27 +40,16 @@ function requiredString(record: Record<string, unknown>, field: string) {
   return value;
 }
 
-function expectedSegmentsForDuration(durationSeconds: number) {
-  switch (durationSeconds) {
-    case 8:
-      return 1;
-    case 16:
-      return 2;
-    case 24:
-      return 3;
-    default:
-      throw new Error("Storyboard duration must be 8, 16, or 24 seconds.");
-  }
-}
-
 export function parseStoryboardJson(
   input: unknown,
   {
     durationSeconds,
     allowedTemplateIds,
+    selectedTemplateIds,
   }: {
     durationSeconds: number;
     allowedTemplateIds: string[];
+    selectedTemplateIds?: string[];
   },
 ): ParsedStoryboard {
   const record = asRecord(input);
@@ -73,7 +63,10 @@ export function parseStoryboardJson(
     throw new Error("Storyboard JSON is missing required field: segments.");
   }
 
-  const expectedSegmentCount = expectedSegmentsForDuration(durationSeconds);
+  if (!isVideoDuration(durationSeconds)) {
+    throw new Error("Storyboard duration is not supported.");
+  }
+  const expectedSegmentCount = getVideoSpec(durationSeconds).segmentCount;
   if (record.segments.length !== expectedSegmentCount) {
     throw new Error("Storyboard segment count does not match duration.");
   }
@@ -96,6 +89,13 @@ export function parseStoryboardJson(
 
     if (!allowed.has(templateId)) {
       throw new Error(`Storyboard contains unavailable template: ${templateId}.`);
+    }
+
+    if (
+      selectedTemplateIds &&
+      templateId !== selectedTemplateIds[expectedIndex]
+    ) {
+      throw new Error("Storyboard template does not match selected slot.");
     }
 
     return {

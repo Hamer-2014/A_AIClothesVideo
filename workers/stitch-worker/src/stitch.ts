@@ -13,6 +13,7 @@ import {
 } from "./ffmpeg.js";
 import type { StitchResult } from "./http.js";
 import type { StitchPayload } from "./payload.js";
+import { buildQaFramePlan } from "./qa-frame-plan.js";
 import { createR2Transfer, type ObjectTransferInput } from "./r2.js";
 
 interface RunStitchJobDeps {
@@ -38,23 +39,6 @@ function normalizedPath(...parts: string[]) {
   return path.join(...parts).replaceAll("\\", "/");
 }
 
-function frameKey(prefix: string, index: number) {
-  return `${prefix.replace(/\/+$/, "")}/${index}.jpg`;
-}
-
-function frameCountForPostQaMode(mode: StitchPayload["postQaMode"]) {
-  switch (mode) {
-    case "off":
-      return 0;
-    case "standard":
-      return 5;
-    case "strict":
-      return 6;
-    case "lite":
-      return 3;
-  }
-}
-
 export async function runStitchJob({
   payload,
   config,
@@ -63,7 +47,6 @@ export async function runStitchJob({
   stitchSegments = defaultStitchSegments,
   extractCoverFrame = defaultExtractCoverFrame,
   extractQaFrames = defaultExtractQaFrames,
-  listExtractedQaFrames = defaultListExtractedQaFrames,
   sendCallback = sendStitchCallback,
   cleanupWorkDir = (workDir) => rm(workDir, { recursive: true, force: true }),
   downloadObject,
@@ -82,7 +65,10 @@ export async function runStitchJob({
   const coverPath = normalizedPath(workDir, "cover.webp");
   const outputPath = normalizedPath(workDir, "final.mp4");
   const concatListPath = normalizedPath(workDir, "segments.txt");
-  const frameCount = frameCountForPostQaMode(payload.postQaMode);
+  const framePlan = buildQaFramePlan(
+    payload.postQaMode,
+    payload.segmentKeys.length,
+  );
 
   try {
     await mkdir(frameDirectory, { recursive: true });
@@ -116,22 +102,19 @@ export async function runStitchJob({
       }
     }
 
-    if (frameCount > 0) {
-      await extractQaFrames({
+    const localFramePaths =
+      framePlan.length > 0
+        ? await extractQaFrames({
         videoPath: outputPath,
         frameDirectory,
-        frameCount,
-      });
-    }
-    const localFramePaths =
-      frameCount > 0
-        ? await listExtractedQaFrames({
-            frameDirectory,
-            frameCount,
+            framePlan,
           })
         : [];
     const frameKeys = payload.frameKeyPrefix
-      ? localFramePaths.map((_, index) => frameKey(payload.frameKeyPrefix as string, index))
+      ? localFramePaths.map(
+          (localPath) =>
+            `${payload.frameKeyPrefix!.replace(/\/+$/, "")}/${path.basename(localPath)}`,
+        )
       : [];
 
     await upload({

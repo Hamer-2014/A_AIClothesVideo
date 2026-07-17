@@ -14,7 +14,15 @@ export type RequiredAssetKind =
   | "detail"
   | "scene"
   | "model_front"
-  | "flat_lay_or_white_background";
+  | "flat_lay_or_white_background"
+  | "product_front"
+  | "product_side"
+  | "product_back"
+  | "model_side"
+  | "model_back";
+
+export type TemplateSubjectKind = "any" | "product" | "human_model";
+export type ConsistencyRequirement = "same_garment" | "same_model";
 
 export type DetailType = "fabric" | "neckline" | "cuff" | "print";
 
@@ -25,7 +33,10 @@ export interface ShotTemplateDefinition {
   riskLevel: ShotTemplateRisk;
   displayName: string;
   description: string;
+  subjectKind: TemplateSubjectKind;
   requiredAssets: RequiredAssetKind[];
+  consistencyRequirements: ConsistencyRequirement[];
+  autoSelectAllowed: boolean;
   detailTypes?: DetailType[];
   blockedConditions: string[];
   allowedMotion: string[];

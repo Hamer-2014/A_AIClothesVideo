@@ -56,7 +56,7 @@ describe("runStitchJob", () => {
       status: "succeeded",
       finalVideoKey: "jobs/job-1/stitched/final.mp4",
       coverKey: "jobs/job-1/covers/cover.webp",
-      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      frameKeys: ["jobs/job-1/qa/frames/frame-1.jpg"],
     });
     expect(events).toContain("download:segments/a.mp4:/tmp/stitch-1/segment-0.mp4");
     expect(events).toContain(
@@ -223,8 +223,8 @@ describe("runStitchJob", () => {
     expect(callbacks).toEqual(["failed:ffmpeg failed"]);
   });
 
-  it("uses the post QA mode to choose frame count", async () => {
-    const frameCounts: number[] = [];
+  it("uses the post QA mode to build a frame plan", async () => {
+    const framePlanLengths: number[] = [];
 
     await runStitchJob({
       payload: {
@@ -250,9 +250,12 @@ describe("runStitchJob", () => {
       downloadObject: async () => {},
       uploadObject: async () => {},
       stitchSegments: async () => {},
-      extractQaFrames: async ({ frameCount }) => {
-        frameCounts.push(frameCount ?? 0);
-        return [];
+      extractQaFrames: async ({ framePlan }) => {
+        framePlanLengths.push(framePlan.length);
+        return framePlan.map(
+          (point) =>
+            `/tmp/stitch-1/frames/segment-${point.segmentIndex}-frame-${point.frameIndex}.jpg`,
+        );
       },
       listExtractedQaFrames: async () => [
         "/tmp/stitch-1/frames/frame-1.jpg",
@@ -266,6 +269,52 @@ describe("runStitchJob", () => {
       cleanupWorkDir: async () => {},
     });
 
-    expect(frameCounts).toEqual([6]);
+    expect(framePlanLengths).toEqual([6]);
+  });
+
+  it("uploads 34 named Strict frames for five segments", async () => {
+    const uploads: string[] = [];
+    const result = await runStitchJob({
+      payload: {
+        stitchJobId: "stitch-40",
+        videoJobId: "job-40",
+        segmentKeys: Array.from({ length: 5 }, (_, index) => `segments/${index}.mp4`),
+        finalVideoKey: "jobs/job-40/stitched/final.mp4",
+        coverKey: null,
+        frameKeyPrefix: "jobs/job-40/qa/frames",
+        postQaMode: "strict",
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      },
+      config: {
+        workerSecret: "secret",
+        callbackSecret: "callback-secret",
+        bucket: "bucket",
+        r2Endpoint: "https://account.r2.cloudflarestorage.com",
+        r2AccessKeyId: "access",
+        r2SecretAccessKey: "private",
+      },
+      createWorkDir: async () => "/tmp/stitch-40",
+      writeTextFile: async () => {},
+      downloadObject: async () => {},
+      uploadObject: async ({ key }) => {
+        uploads.push(key);
+      },
+      stitchSegments: async () => {},
+      extractQaFrames: async ({ framePlan }) =>
+        framePlan.map((point) =>
+          point.kind === "transition"
+            ? `/tmp/stitch-40/frames/transition-${point.segmentIndex}-${point.segmentIndex + 1}.jpg`
+            : `/tmp/stitch-40/frames/segment-${point.segmentIndex}-frame-${point.frameIndex}.jpg`,
+        ),
+      sendCallback: async () => {},
+      cleanupWorkDir: async () => {},
+    });
+
+    expect(result.status).toBe("succeeded");
+    expect(result.frameKeys).toHaveLength(34);
+    expect(result.frameKeys).toContain(
+      "jobs/job-40/qa/frames/transition-0-1.jpg",
+    );
+    expect(uploads.filter((key) => key.includes("/qa/frames/"))).toHaveLength(34);
   });
 });

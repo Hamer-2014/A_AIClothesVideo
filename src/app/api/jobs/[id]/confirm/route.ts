@@ -190,6 +190,16 @@ export async function handleConfirmStoryboardRequest(
 
     if (
       error instanceof Error &&
+      error.message === "Free trial is not available."
+    ) {
+      return NextResponse.json(
+        { error: "free_trial_unavailable" },
+        { status: 409 },
+      );
+    }
+
+    if (
+      error instanceof Error &&
       error.message === "Storyboard is not confirmable."
     ) {
       return NextResponse.json(

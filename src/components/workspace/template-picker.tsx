@@ -8,6 +8,7 @@ export interface TemplateAvailabilityCard {
   displayName: string;
   description: string;
   riskLevel: string;
+  status?: string;
   selectable: boolean;
   selected: boolean;
   reasons?: string[];
@@ -51,7 +52,12 @@ function TemplateCard({
             {template.description}
           </p>
         </div>
-        <span className="shrink-0 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+        <span className="flex shrink-0 items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+          {template.status === "beta" ? (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-medium normal-case tracking-normal text-amber-800">
+              付费 Beta
+            </span>
+          ) : null}
           {template.riskLevel}
         </span>
       </div>

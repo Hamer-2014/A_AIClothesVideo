@@ -14,8 +14,8 @@ export interface StylePreset {
   preferredTemplateIds: string[];
   discouragedTemplateIds?: string[];
   trialAllowed: boolean;
-  allowedDurationSeconds: Array<8 | 16 | 24>;
-  defaultDurationSeconds: 8 | 16 | 24;
+  allowedDurationSeconds: VideoDuration[];
+  defaultDurationSeconds: VideoDuration;
   defaultAspectRatio: "9:16" | "1:1" | "16:9";
   riskLevel: "low" | "medium";
 }
@@ -26,3 +26,4 @@ export interface StylePresetSnapshot {
   preferredTemplateIds: string[];
   promptStyleHint: string;
 }
+import type { VideoDuration } from "@/lib/video/specs";

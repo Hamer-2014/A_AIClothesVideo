@@ -50,6 +50,10 @@ export interface VideoSegmentStore {
     jobId: string;
     segmentId: string;
   }): Promise<VideoSegmentRecord | null>;
+  findSegmentByIndex(input: {
+    jobId: string;
+    segmentIndex: number;
+  }): Promise<VideoSegmentRecord | null>;
   claimQueuedSegment(input: {
     jobId: string;
     segmentId: string;
@@ -685,6 +689,13 @@ export function createInMemoryVideoSegmentStore({
       const segment = segmentRecords.get(segmentId);
       return segment && segment.videoJobId === jobId ? { ...segment } : null;
     },
+    async findSegmentByIndex({ jobId, segmentIndex }) {
+      const segment = Array.from(segmentRecords.values()).find(
+        (item) =>
+          item.videoJobId === jobId && item.segmentIndex === segmentIndex,
+      );
+      return segment ? { ...segment } : null;
+    },
     async claimQueuedSegment({ jobId, segmentId }) {
       const segment = segmentRecords.get(segmentId);
       if (!segment || segment.videoJobId !== jobId || segment.status !== "queued") {
@@ -760,6 +771,20 @@ export function createDrizzleVideoSegmentStore(
           and(
             eq(videoSegments.id, segmentId),
             eq(videoSegments.videoJobId, jobId),
+          ),
+        )
+        .limit(1);
+
+      return (segment as VideoSegmentRecord | undefined) ?? null;
+    },
+    async findSegmentByIndex({ jobId, segmentIndex }) {
+      const [segment] = await db
+        .select()
+        .from(videoSegments)
+        .where(
+          and(
+            eq(videoSegments.videoJobId, jobId),
+            eq(videoSegments.segmentIndex, segmentIndex),
           ),
         )
         .limit(1);

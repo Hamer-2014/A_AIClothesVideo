@@ -55,6 +55,7 @@ describe("POST /api/jobs", () => {
             generationProfile: "trial_540p_watermarked",
             watermarkEnabled: true,
             trialEligibilitySnapshot: null,
+            rightsAttestationSnapshot: null,
             presetId: "minimal_studio",
             presetSnapshot: null,
             isTest: false,
@@ -114,6 +115,7 @@ describe("POST /api/jobs", () => {
               generationProfile: "paid_720p_audio",
               watermarkEnabled: false,
               trialEligibilitySnapshot: null,
+              rightsAttestationSnapshot: null,
               presetId: "minimal_studio",
               presetSnapshot: null,
               isTest: false,
@@ -171,6 +173,7 @@ describe("POST /api/jobs", () => {
               generationProfile: "paid_720p_audio",
               watermarkEnabled: false,
               trialEligibilitySnapshot: null,
+              rightsAttestationSnapshot: null,
               presetId: "marketplace_clean",
               presetSnapshot: null,
               isTest: false,
@@ -218,6 +221,30 @@ describe("POST /api/jobs", () => {
     expect(await response.json()).toEqual({
       error: "free_trial_unavailable",
       message: "当前环境暂时无法使用免费试用，可购买点数继续生成。",
+    });
+  });
+
+  it("maps missing asset rights attestation to a conflict response", async () => {
+    const response = await handleCreateJobRequest(
+      new Request("http://localhost/api/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-1"],
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createJob: async () => {
+          throw new Error("Rights attestation is required for all assets.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "rights_attestation_required",
     });
   });
 
@@ -303,6 +330,7 @@ describe("POST /api/jobs", () => {
               generationProfile: "trial_540p_watermarked",
               watermarkEnabled: true,
               trialEligibilitySnapshot: null,
+              rightsAttestationSnapshot: null,
               presetId: "minimal_studio",
               presetSnapshot: null,
               isTest: false,

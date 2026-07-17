@@ -64,7 +64,26 @@ describe("global hard constraints", () => {
       hasBack: true,
       hasDetail: true,
       hasScene: true,
+      hasModelFront: false,
+      hasModelBack: false,
     });
+  });
+
+  it("forbids unsupported model back views for a front-only model", () => {
+    const facts = assetFactsSnapshotFromAssets([
+      { role: "front", subjectKind: "human_model" },
+    ]);
+    const constraints = buildGlobalHardConstraints({
+      hasBackAsset: facts.hasBack,
+      hasDetailAsset: facts.hasDetail,
+      hasSceneAsset: facts.hasScene,
+      hasModelFront: facts.hasModelFront,
+      hasModelBack: facts.hasModelBack,
+    });
+
+    expect(constraints).toContain(
+      "Do not show a model back view or complete a 180-degree turn.",
+    );
   });
 
   it("formats constraints as prompt bullet lines without empty items", () => {

@@ -16,10 +16,14 @@ const expectedIds = [
   "front_to_back_cut",
   "scene_lifestyle_showcase",
   "minimal_studio",
+  "product_quarter_rotation",
+  "product_half_rotation",
+  "model_quarter_turn",
+  "model_half_turn",
 ];
 
 describe("MVP shot template catalog", () => {
-  it("defines the 13 MVP templates exactly once", () => {
+  it("defines the 17 MVP and paid Beta templates exactly once", () => {
     const ids = mvpShotTemplates.map((template) => template.templateId);
 
     expect(ids).toEqual(expectedIds);
@@ -76,6 +80,58 @@ describe("MVP shot template catalog", () => {
       requiredAssets: ["front", "scene"],
       isTrialAllowed: false,
       requiresStrictReview: false,
+    });
+  });
+
+  it("defines paid-only product rotation templates with strict review", () => {
+    const templateById = (templateId: string) =>
+      mvpShotTemplates.find((template) => template.templateId === templateId);
+
+    expect(templateById("product_quarter_rotation")).toMatchObject({
+      status: "beta",
+      riskLevel: "medium_high",
+      subjectKind: "product",
+      requiredAssets: ["product_front", "product_side"],
+      consistencyRequirements: ["same_garment"],
+      isTrialAllowed: false,
+      requiresStrictReview: true,
+      autoSelectAllowed: false,
+    });
+    expect(templateById("product_half_rotation")).toMatchObject({
+      status: "beta",
+      riskLevel: "high",
+      subjectKind: "product",
+      requiredAssets: ["product_front", "product_side", "product_back"],
+      consistencyRequirements: ["same_garment"],
+      isTrialAllowed: false,
+      requiresStrictReview: true,
+      autoSelectAllowed: false,
+    });
+  });
+
+  it("defines paid-only human-model turn templates with strict review", () => {
+    const templateById = (templateId: string) =>
+      mvpShotTemplates.find((template) => template.templateId === templateId);
+
+    expect(templateById("model_quarter_turn")).toMatchObject({
+      status: "beta",
+      riskLevel: "medium_high",
+      subjectKind: "human_model",
+      requiredAssets: ["model_front", "model_side"],
+      consistencyRequirements: ["same_garment", "same_model"],
+      isTrialAllowed: false,
+      requiresStrictReview: true,
+      autoSelectAllowed: false,
+    });
+    expect(templateById("model_half_turn")).toMatchObject({
+      status: "beta",
+      riskLevel: "high",
+      subjectKind: "human_model",
+      requiredAssets: ["model_front", "model_side", "model_back"],
+      consistencyRequirements: ["same_garment", "same_model"],
+      isTrialAllowed: false,
+      requiresStrictReview: true,
+      autoSelectAllowed: false,
     });
   });
 });

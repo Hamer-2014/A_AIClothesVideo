@@ -53,20 +53,33 @@ describe("ffmpeg helpers", () => {
     const frames = await extractQaFrames({
       videoPath: "/tmp/final.mp4",
       frameDirectory: "/tmp/frames",
-      frameCount: 3,
+      framePlan: [
+        {
+          timestampSeconds: 1.6,
+          kind: "segment",
+          segmentIndex: 0,
+          frameIndex: 0,
+        },
+        {
+          timestampSeconds: 8,
+          kind: "transition",
+          segmentIndex: 0,
+          frameIndex: 0,
+        },
+      ],
       runCommand: async (command, args) => {
         commands.push({ command, args });
       },
     });
 
     expect(frames).toEqual([
-      "/tmp/frames/frame-0.jpg",
-      "/tmp/frames/frame-1.jpg",
-      "/tmp/frames/frame-2.jpg",
+      "/tmp/frames/segment-0-frame-0.jpg",
+      "/tmp/frames/transition-0-1.jpg",
     ]);
-    expect(commands[0]?.args).toContain("fps=1/3");
-    expect(commands[0]?.args).toContain("-start_number");
-    expect(commands[0]?.args).toContain("0");
+    expect(commands).toHaveLength(2);
+    expect(commands[0]?.args).toEqual(
+      expect.arrayContaining(["-ss", "1.6", "-frames:v", "1"]),
+    );
   });
 
   it("extracts a webp cover frame at the default timestamp", async () => {

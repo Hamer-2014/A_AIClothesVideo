@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
@@ -14,6 +14,11 @@ import {
 } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import { createPresetSnapshot, getStylePreset } from "@/lib/presets";
+import {
+  getVideoSpec,
+  isVideoDuration,
+  isVideoDurationEnabled,
+} from "@/lib/video/specs";
 import type { assetRoleValues, assetStatusValues } from "@/lib/db/schema/assets";
 import type {
   videoAspectRatioValues,
@@ -27,12 +32,10 @@ import {
 } from "@/server/analytics/funnel-events";
 import {
   evaluateTrialEligibility,
-  resolveAbuseHashSecret,
   type TrialAbuseSignalInput,
   type TrialEligibilityInput,
   type TrialEligibilityStore,
 } from "@/server/abuse/trial-eligibility";
-import { hashAbuseSignal } from "@/server/abuse/hash";
 
 export type AssetRole = (typeof assetRoleValues)[number];
 export type AssetStatus = (typeof assetStatusValues)[number];
@@ -46,6 +49,8 @@ export interface JobCreatableAsset {
   userId: string;
   status: AssetStatus;
   detectedRole: AssetRole | null;
+  rightsAttested: boolean;
+  rightsAttestationId: string | null;
 }
 
 export interface CreatedVideoJob {
@@ -64,6 +69,7 @@ export interface CreatedVideoJob {
   generationProfile: GenerationProfile;
   watermarkEnabled: boolean;
   trialEligibilitySnapshot: JsonValue | null;
+  rightsAttestationSnapshot: JsonValue | null;
   isTest: boolean;
 }
 
@@ -159,25 +165,7 @@ export interface VideoJobCreationStore {
   ): Promise<UserAccessEventRecord>;
 }
 
-const allowedDurations = [8, 16, 24] as const;
 const allowedAspectRatios: VideoAspectRatio[] = ["9:16", "1:1", "16:9"];
-
-function creditCostForDuration(durationSeconds: number, billingMode: BillingMode) {
-  if (billingMode === "free_trial") {
-    return 0;
-  }
-
-  switch (durationSeconds) {
-    case 8:
-      return 70;
-    case 16:
-      return 130;
-    case 24:
-      return 190;
-    default:
-      throw new Error("Unsupported video duration.");
-  }
-}
 
 function profileForBillingMode(billingMode: BillingMode) {
   if (billingMode === "free_trial") {
@@ -216,7 +204,7 @@ function assertValidInput({
     throw new Error("At least one asset is required to create a video job.");
   }
 
-  if (!allowedDurations.includes(durationSeconds as (typeof allowedDurations)[number])) {
+  if (!isVideoDuration(durationSeconds)) {
     throw new Error("Unsupported video duration.");
   }
 
@@ -232,7 +220,10 @@ function roleForAsset(asset: JobCreatableAsset) {
 }
 
 export function createInMemoryVideoJobCreationStore(
-  initialAssets: JobCreatableAsset[],
+  initialAssets: Array<
+    Omit<JobCreatableAsset, "rightsAttested" | "rightsAttestationId"> &
+      Partial<Pick<JobCreatableAsset, "rightsAttested" | "rightsAttestationId">>
+  >,
   options: {
     trialUsages?: Array<{
       userId: string;
@@ -258,7 +249,19 @@ export function createInMemoryVideoJobCreationStore(
   listAccessEvents: () => UserAccessEventRecord[];
   listTrialAbuseSignals: () => TrialAbuseSignalInput[];
 } {
-  const ownedAssets = new Map(initialAssets.map((asset) => [asset.id, asset]));
+  const ownedAssets = new Map(
+    initialAssets.map((asset) => [
+      asset.id,
+      {
+        ...asset,
+        rightsAttested: asset.rightsAttested ?? true,
+        rightsAttestationId:
+          asset.rightsAttestationId === undefined
+            ? `test-attestation-${asset.id}`
+            : asset.rightsAttestationId,
+      } satisfies JobCreatableAsset,
+    ]),
+  );
   const jobs: CreatedVideoJob[] = [];
   const boundAssets: CreatedVideoJobAsset[] = [];
   const events: VideoJobCreationEvent[] = [];
@@ -414,6 +417,24 @@ export function createDrizzleVideoJobCreationStore(
           userId: assets.userId,
           status: assets.status,
           detectedRole: assets.detectedRole,
+          rightsAttested: sql<boolean>`exists (
+            select 1
+            from "asset_rights_attestations" ara
+            inner join "rights_attestations" ra
+              on ra."id" = ara."rights_attestation_id"
+            where ara."asset_id" = ${assets.id}
+              and ra."version" = 'image_rights_v1'
+          )`,
+          rightsAttestationId: sql<string | null>`(
+            select ara."rights_attestation_id"
+            from "asset_rights_attestations" ara
+            inner join "rights_attestations" ra
+              on ra."id" = ara."rights_attestation_id"
+            where ara."asset_id" = ${assets.id}
+              and ra."version" = 'image_rights_v1'
+            order by ara."created_at" desc
+            limit 1
+          )`,
         })
         .from(assets)
         .where(
@@ -446,6 +467,7 @@ export function createDrizzleVideoJobCreationStore(
           generationProfile: videoJobs.generationProfile,
           watermarkEnabled: videoJobs.watermarkEnabled,
           trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
+          rightsAttestationSnapshot: videoJobs.rightsAttestationSnapshot,
           isTest: videoJobs.isTest,
         });
 
@@ -669,6 +691,7 @@ export async function createVideoJobWithAssets({
   deviceFingerprint,
   abuseHashSecret = process.env.ABUSE_HASH_SECRET,
   appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
+  videoSpecEnv = process.env,
   funnelEventStore,
 }: {
   store: VideoJobCreationStore;
@@ -688,10 +711,21 @@ export async function createVideoJobWithAssets({
   deviceFingerprint?: string | null;
   abuseHashSecret?: string | null;
   appEnvironment?: string;
+  videoSpecEnv?: Record<string, string | undefined>;
   funnelEventStore?: FunnelEventStore;
 }) {
   const uniqueAssetIds = Array.from(new Set(assetIds));
   assertValidInput({ assetIds: uniqueAssetIds, durationSeconds, aspectRatio });
+  if (!isVideoDuration(durationSeconds)) {
+    throw new Error("Unsupported video duration.");
+  }
+  if (!isVideoDurationEnabled(durationSeconds, videoSpecEnv)) {
+    throw new Error("40-second Beta is not enabled.");
+  }
+  const videoSpec = getVideoSpec(durationSeconds);
+  if (useFreeTrialIfAvailable === true && !videoSpec.trialAllowed) {
+    throw new Error("Free trial only supports 8-second video.");
+  }
 
   const ownedAssets = await store.findOwnedAssets({
     userId,
@@ -706,8 +740,29 @@ export async function createVideoJobWithAssets({
     throw new Error("One or more assets are not uploaded yet.");
   }
 
+  if (
+    ownedAssets.some(
+      (asset) => !asset.rightsAttested || !asset.rightsAttestationId,
+    )
+  ) {
+    throw new Error("Rights attestation is required for all assets.");
+  }
+
+  const rightsAttestationSnapshot = {
+    version: "image_rights_v1",
+    assetIds: uniqueAssetIds,
+    attestationIds: Array.from(
+      new Set(
+        ownedAssets.flatMap((asset) =>
+          asset.rightsAttestationId ? [asset.rightsAttestationId] : [],
+        ),
+      ),
+    ),
+    verifiedAt: now.toISOString(),
+  } satisfies JsonValue;
+
   const shouldAttemptFreeTrial =
-    durationSeconds === 8 && useFreeTrialIfAvailable === true;
+    videoSpec.trialAllowed && useFreeTrialIfAvailable === true;
   let trialEligibility:
     | Awaited<ReturnType<typeof evaluateTrialEligibility>>
     | null = null;
@@ -810,11 +865,12 @@ export async function createVideoJobWithAssets({
     presetSnapshot,
     postQaMode: profile.postQaMode,
     postQaRequired: "true",
-    creditCost: creditCostForDuration(durationSeconds, billingMode),
+    creditCost: billingMode === "free_trial" ? 0 : videoSpec.creditCost,
     billingMode,
     generationProfile: profile.generationProfile,
     watermarkEnabled: profile.watermarkEnabled,
     trialEligibilitySnapshot,
+    rightsAttestationSnapshot,
     isTest,
   });
 
@@ -831,82 +887,7 @@ export async function createVideoJobWithAssets({
     },
   });
 
-  if (billingMode === "free_trial") {
-    const resolvedAbuseHashSecret = resolveAbuseHashSecret({
-      hashSecret: abuseHashSecret,
-      environment: appEnvironment,
-    });
-
-    await store.createFreeTrialUsage({
-      userId,
-      videoJobId: job.id,
-      usedAt: now,
-      durationSeconds,
-      generationProfile: profile.generationProfile,
-      resolution: profile.resolution,
-      watermarkEnabled: profile.watermarkEnabled,
-      provider: "apimart",
-      model: "pixverse-v6",
-    });
-    await store.createTrialAbuseSignal({
-      userId,
-      videoJobId: job.id,
-      emailHash:
-        typeof trialEligibility?.signalSnapshot === "object" &&
-        trialEligibility.signalSnapshot !== null &&
-        !Array.isArray(trialEligibility.signalSnapshot) &&
-        typeof trialEligibility.signalSnapshot.emailHash === "string"
-          ? trialEligibility.signalSnapshot.emailHash
-          : null,
-      oauthProvider:
-        typeof trialEligibility?.signalSnapshot === "object" &&
-        trialEligibility.signalSnapshot !== null &&
-        !Array.isArray(trialEligibility.signalSnapshot) &&
-        Array.isArray(trialEligibility.signalSnapshot.oauthAccounts) &&
-        typeof trialEligibility.signalSnapshot.oauthAccounts[0] === "object" &&
-        trialEligibility.signalSnapshot.oauthAccounts[0] !== null &&
-        !Array.isArray(trialEligibility.signalSnapshot.oauthAccounts[0]) &&
-        typeof trialEligibility.signalSnapshot.oauthAccounts[0].provider === "string"
-          ? trialEligibility.signalSnapshot.oauthAccounts[0].provider
-          : null,
-      oauthAccountIdHash:
-        typeof trialEligibility?.signalSnapshot === "object" &&
-        trialEligibility.signalSnapshot !== null &&
-        !Array.isArray(trialEligibility.signalSnapshot) &&
-        Array.isArray(trialEligibility.signalSnapshot.oauthAccounts) &&
-        typeof trialEligibility.signalSnapshot.oauthAccounts[0] === "object" &&
-        trialEligibility.signalSnapshot.oauthAccounts[0] !== null &&
-        !Array.isArray(trialEligibility.signalSnapshot.oauthAccounts[0]) &&
-        typeof trialEligibility.signalSnapshot.oauthAccounts[0].accountHash === "string"
-          ? trialEligibility.signalSnapshot.oauthAccounts[0].accountHash
-          : null,
-      ipHash: hashAbuseSignal(
-        requestContext?.ipAddress,
-        resolvedAbuseHashSecret ?? "",
-      ),
-      deviceFingerprintHash: hashAbuseSignal(
-        deviceFingerprint,
-        resolvedAbuseHashSecret ?? "",
-      ),
-      userAgentHash: hashAbuseSignal(
-        requestContext?.userAgent,
-        resolvedAbuseHashSecret ?? "",
-      ),
-      eventType: "trial_granted",
-      decision: "allow",
-      riskScore: trialEligibility?.riskScore ?? 0,
-      reasonCodes: trialEligibility?.reasonCodes ?? [],
-      metadata: trialEligibility?.signalSnapshot ?? null,
-      createdAt: now,
-    });
-    await recordAccessEvent({
-      store,
-      userId,
-      eventType: "trial_granted",
-      requestContext,
-      metadata: { videoJobId: job.id, durationSeconds },
-    });
-  } else if (shouldAttemptFreeTrial) {
+  if (billingMode !== "free_trial" && shouldAttemptFreeTrial) {
     await recordAccessEvent({
       store,
       userId,
@@ -963,17 +944,16 @@ export async function createVideoJobWithAssets({
       path: requestContext?.path ?? null,
       metadata: commonMetadata,
     });
-    await recordFunnelEventSafely({
-      store: funnelEventStore,
-      eventName:
-        billingMode === "free_trial"
-          ? "trial_generation_started"
-          : "paid_generation_started",
-      source: "server",
-      userId,
-      path: requestContext?.path ?? null,
-      metadata: commonMetadata,
-    });
+    if (billingMode !== "free_trial") {
+      await recordFunnelEventSafely({
+        store: funnelEventStore,
+        eventName: "paid_generation_started",
+        source: "server",
+        userId,
+        path: requestContext?.path ?? null,
+        metadata: commonMetadata,
+      });
+    }
   }
 
   return {

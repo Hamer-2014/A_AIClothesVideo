@@ -115,6 +115,64 @@ describe("billing ops", () => {
     });
   });
 
+  it("keeps admin adjustment idempotent for the same operation key", async () => {
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    const auditStore = createInMemoryAdminAuditStore();
+
+    const first = await adjustUserCreditsByAdmin({
+      ledgerStore,
+      auditStore,
+      actor,
+      targetUserId: "user-1",
+      amount: 25,
+      reason: "manual compensation",
+      idempotencyKey: "admin_adjust:user-1:job-1:manual-compensation",
+    });
+    const second = await adjustUserCreditsByAdmin({
+      ledgerStore,
+      auditStore,
+      actor,
+      targetUserId: "user-1",
+      amount: 25,
+      reason: "manual compensation",
+      idempotencyKey: "admin_adjust:user-1:job-1:manual-compensation",
+    });
+
+    expect(first.idempotent).toBe(false);
+    expect(second.idempotent).toBe(true);
+    expect(ledgerStore.listLedger()).toHaveLength(1);
+    expect(auditStore.listAuditLogs()).toHaveLength(1);
+  });
+
+  it("associates job-level compensation with the job in ledger and audit", async () => {
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    const auditStore = createInMemoryAdminAuditStore();
+    const relatedJobId = "33333333-3333-4333-8333-333333333333";
+
+    const result = await adjustUserCreditsByAdmin({
+      ledgerStore,
+      auditStore,
+      actor,
+      targetUserId: "better-auth-user-id",
+      amount: 70,
+      reason: "compensate failed paid job",
+      idempotencyKey: `admin_adjust:job:${relatedJobId}`,
+      relatedJobId,
+    });
+
+    expect(result.ledger).toMatchObject({
+      userId: "better-auth-user-id",
+      type: "admin_adjust",
+      amount: 70,
+      relatedJobId,
+    });
+    expect(auditStore.listAuditLogs()[0]).toMatchObject({
+      action: "credits:admin_adjust",
+      targetType: "video_job",
+      targetId: relatedJobId,
+    });
+  });
+
   it("rejects admin credit adjustment when reason is too short", async () => {
     await expect(
       adjustUserCreditsByAdmin({

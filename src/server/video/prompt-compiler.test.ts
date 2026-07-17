@@ -162,6 +162,86 @@ describe("compileVideoPromptForSegment", () => {
     );
   });
 
+  it("labels ordered product-only references and restores rotation constraints", () => {
+    const result = compileVideoPromptForSegment({
+      inputAssetSnapshot: {
+        assets: [
+          {
+            assetId: "front-product",
+            role: "front",
+            subjectKind: "product",
+            sortOrder: 1,
+          },
+          {
+            assetId: "side-product",
+            role: "side",
+            subjectKind: "product",
+            sortOrder: 2,
+          },
+          {
+            assetId: "back-product",
+            role: "back",
+            subjectKind: "product",
+            sortOrder: 0,
+          },
+        ],
+      },
+      segment: {
+        templateId: "product_half_rotation",
+        prompt: "Rotate from front through side to back.",
+      },
+    });
+
+    expect(result.prompt).toContain(
+      "Image 1 is a front product-only garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Image 2 is a side product-only garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Image 3 is a back product-only garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Do not create a person, hand, body, or model.",
+    );
+    expect(result.prompt).toContain(
+      "Do not continue into a 360-degree rotation.",
+    );
+  });
+
+  it("labels ordered human-model references and restores turn constraints", () => {
+    const result = compileVideoPromptForSegment({
+      inputAssetSnapshot: {
+        assets: ["front", "side", "back"].map((role, sortOrder) => ({
+          assetId: `model-${role}`,
+          role,
+          subjectKind: "human_model",
+          sortOrder,
+        })),
+      },
+      segment: {
+        templateId: "model_half_turn",
+        prompt: "Turn naturally from front through side to back.",
+      },
+    });
+
+    expect(result.prompt).toContain(
+      "Image 1 is a front human-model garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Image 2 is a side human-model garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Image 3 is a back human-model garment reference.",
+    );
+    expect(result.prompt).toContain(
+      "Keep the same visible person throughout the shot.",
+    );
+    expect(result.prompt).toContain(
+      "End at the uploaded back view and do not continue into a 360-degree turn.",
+    );
+  });
+
   it("adds scene reference role constraints without dropping existing global constraints", () => {
     const result = compileVideoPromptForSegment({
       finalPromptSnapshot: {

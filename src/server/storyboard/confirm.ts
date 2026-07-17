@@ -1,12 +1,22 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import { reserveCredits, type CreditLedgerResult } from "@/lib/credits/ledger";
 import type { CreditLedgerStore } from "@/lib/credits/types";
 import { getDb } from "@/lib/db/client";
-import { storyboards, videoJobAssets, videoJobs, videoSegments } from "@/lib/db/schema";
+import {
+  freeTrialUsages,
+  assetAnalyses,
+  assetConsistencyAnalyses,
+  storyboards,
+  trialAbuseSignals,
+  userAccessEvents,
+  videoJobAssets,
+  videoJobs,
+  videoSegments,
+} from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import type { BillingMode, GenerationProfile } from "@/server/jobs/create-job";
 import type { CreemPromptModerationResult } from "@/lib/providers/creem/moderation";
@@ -54,7 +64,10 @@ export interface StoryboardConfirmJobRecord {
   billingMode: BillingMode;
   generationProfile: GenerationProfile;
   watermarkEnabled: boolean;
+  postQaMode: "off" | "lite" | "standard" | "strict";
+  postQaReason: string | null;
   reservedLedgerId?: string | null;
+  trialEligibilitySnapshot?: JsonValue | null;
   isTest: boolean;
 }
 
@@ -62,7 +75,18 @@ export interface StoryboardConfirmJobAssetRecord {
   videoJobId: string;
   assetId: string;
   role: string;
+  subjectKind: "product" | "human_model" | "unknown";
   sortOrder: number;
+}
+
+export interface StoryboardConfirmConsistencyRecord {
+  videoJobId: string;
+  analysisKind: string;
+  status: string;
+  garmentMatch: string;
+  modelMatch: string;
+  confidence: string | null;
+  riskFlags: JsonValue;
 }
 
 export interface VideoSegmentRecord {
@@ -108,6 +132,47 @@ export interface NewVideoSegmentRecord {
   isTest: boolean;
 }
 
+export interface FreeTrialUsageRecord {
+  id: string;
+  userId: string;
+  videoJobId: string;
+  usedAt: Date;
+  durationSeconds: number;
+  generationProfile: GenerationProfile;
+  resolution: string;
+  watermarkEnabled: boolean;
+  provider: string;
+  model: string;
+}
+
+export interface TrialGrantAuditRecord {
+  userId: string;
+  videoJobId: string;
+  emailHash?: string | null;
+  oauthProvider?: string | null;
+  oauthAccountIdHash?: string | null;
+  ipHash?: string | null;
+  deviceFingerprintHash?: string | null;
+  userAgentHash?: string | null;
+  eventType: "trial_granted";
+  decision: "allow";
+  riskScore: number;
+  reasonCodes: string[];
+  metadata?: JsonValue | null;
+  createdAt: Date;
+}
+
+export interface UserAccessEventRecord {
+  id: string;
+  userId: string | null;
+  eventType: "trial_granted";
+  ipAddress: string | null;
+  userAgent: string | null;
+  path: string | null;
+  metadata: JsonValue | null;
+  createdAt: Date;
+}
+
 export interface StoryboardConfirmationStore {
   findJob(input: {
     jobId: string;
@@ -118,6 +183,10 @@ export interface StoryboardConfirmationStore {
     jobId: string;
   }): Promise<StoryboardRecord | null>;
   listJobAssets(jobId: string): Promise<StoryboardConfirmJobAssetRecord[]>;
+  findConsistencyAnalysis(input: {
+    jobId: string;
+    analysisKind: string;
+  }): Promise<StoryboardConfirmConsistencyRecord | null>;
   confirmStoryboard(input: {
     storyboardId: string;
     finalPromptSnapshot: JsonValue;
@@ -126,11 +195,23 @@ export interface StoryboardConfirmationStore {
     jobId: string;
     reservedLedgerId: string;
   }): Promise<void>;
+  setPostQaMode(input: {
+    jobId: string;
+    mode: "strict";
+    reason: "template_requires_strict_review";
+  }): Promise<void>;
   listSegmentsForStoryboard(input: {
     storyboardId: string;
     jobId: string;
   }): Promise<VideoSegmentRecord[]>;
   createVideoSegments(input: NewVideoSegmentRecord[]): Promise<VideoSegmentRecord[]>;
+  grantFreeTrialUsageIfNeeded(input: {
+    job: StoryboardConfirmJobRecord;
+    usedAt: Date;
+    resolution: string;
+    provider: string;
+    model: string;
+  }): Promise<FreeTrialUsageRecord | null>;
 }
 
 type JsonObject = { [key: string]: JsonValue };
@@ -146,6 +227,8 @@ type AssetFactsSnapshot = JsonObject & {
   hasBack: boolean;
   hasDetail: boolean;
   hasScene: boolean;
+  hasModelFront: boolean;
+  hasModelBack: boolean;
 };
 
 type FinalPromptSnapshot = JsonObject & {
@@ -163,6 +246,7 @@ type FinalPromptSnapshot = JsonObject & {
   inputAssets: Array<{
     assetId: string;
     role: string;
+    subjectKind: string;
     sortOrder: number;
   }>;
   assetFactsSnapshot: AssetFactsSnapshot;
@@ -225,6 +309,8 @@ function buildFinalPromptSnapshot({
     hasBackAsset: assetFactsSnapshot.hasBack,
     hasDetailAsset: assetFactsSnapshot.hasDetail,
     hasSceneAsset: assetFactsSnapshot.hasScene,
+    hasModelFront: assetFactsSnapshot.hasModelFront,
+    hasModelBack: assetFactsSnapshot.hasModelBack,
   });
   const globalUserIntent =
     Object.keys(asRecord(rawStoryboard.globalUserIntent)).length > 0
@@ -245,12 +331,17 @@ function buildFinalPromptSnapshot({
           "Do not copy people, faces, logos, storefront names, or readable text from scene assets.",
         ]
       : []),
+    ...parsed.segments.flatMap((segment) =>
+      mvpShotTemplates.find(
+        (template) => template.templateId === segment.templateId,
+      )?.systemConstraints ?? [],
+    ),
   ];
 
   return {
     version: COMPILED_PROMPT_VERSION,
     durationSeconds: parsed.durationSeconds,
-    globalHardConstraints,
+    globalHardConstraints: [...new Set([...globalHardConstraints, ...systemConstraints])],
     globalUserIntent,
     segmentPrompts: parsed.segments.map((segment) => ({
       index: segment.index,
@@ -262,6 +353,7 @@ function buildFinalPromptSnapshot({
     inputAssets: assets.map((asset) => ({
       assetId: asset.assetId,
       role: asset.role,
+      subjectKind: asset.subjectKind,
       sortOrder: asset.sortOrder,
     })),
     assetFactsSnapshot,
@@ -299,8 +391,27 @@ function rolesForRequiredAsset(kind: RequiredAssetKind) {
       return [kind];
     case "model_front":
     case "flat_lay_or_white_background":
+    case "product_front":
       return ["front"];
+    case "product_side":
+    case "model_side":
+      return ["side"];
+    case "product_back":
+    case "model_back":
+      return ["back"];
   }
+}
+
+function subjectForRequiredAsset(kind: RequiredAssetKind) {
+  if (kind.startsWith("product_")) {
+    return "product";
+  }
+
+  if (kind.startsWith("model_")) {
+    return "human_model";
+  }
+
+  return null;
 }
 
 function assetsForSegmentTemplate({
@@ -317,25 +428,59 @@ function assetsForSegmentTemplate({
     return [];
   }
 
-  const allowedRoles = new Set(
-    template.requiredAssets.flatMap((requiredAsset) =>
-      rolesForRequiredAsset(requiredAsset),
-    ),
-  );
+  const selected = template.requiredAssets.map((requiredAsset) => {
+    const allowedRoles = new Set(rolesForRequiredAsset(requiredAsset));
+    const requiredSubject = subjectForRequiredAsset(requiredAsset);
 
-  return assets.filter((asset) => allowedRoles.has(asset.role));
+    return assets.find(
+      (asset) =>
+        allowedRoles.has(asset.role) &&
+        (requiredSubject === null || asset.subjectKind === requiredSubject),
+    );
+  });
+
+  if (
+    template.requiredAssets.some((kind) => kind.startsWith("product_")) &&
+    selected.some((asset) => !asset)
+  ) {
+    throw new Error("Product rotation is missing a verified product view.");
+  }
+
+  return [
+    ...new Map(
+      selected
+        .filter((asset): asset is StoryboardConfirmJobAssetRecord => Boolean(asset))
+        .map((asset) => [asset.assetId, asset]),
+    ).values(),
+  ];
 }
 
 function assetSnapshotForSegment({
   segment,
   assets,
   finalPromptSnapshot,
+  consistencyAnalyses,
 }: {
   segment: ParsedStoryboard["segments"][number];
   assets: StoryboardConfirmJobAssetRecord[];
   finalPromptSnapshot: FinalPromptSnapshot;
+  consistencyAnalyses: StoryboardConfirmConsistencyRecord[];
 }) {
   const segmentAssets = assetsForSegmentTemplate({ segment, assets });
+  const template = mvpShotTemplates.find(
+    (item) => item.templateId === segment.templateId,
+  );
+  const consistencyKind =
+    template?.subjectKind === "product"
+      ? "product_views"
+      : template?.subjectKind === "human_model"
+        ? "model_views"
+        : null;
+  const consistency = consistencyKind
+    ? consistencyAnalyses.find(
+        (analysis) => analysis.analysisKind === consistencyKind,
+      ) ?? null
+    : null;
 
   return {
     segmentIndex: segment.index,
@@ -343,8 +488,21 @@ function assetSnapshotForSegment({
     assets: segmentAssets.map((asset) => ({
       assetId: asset.assetId,
       role: asset.role,
+      subjectKind: asset.subjectKind,
       sortOrder: asset.sortOrder,
     })),
+    ...(consistency
+      ? {
+          consistency: {
+            analysisKind: consistency.analysisKind,
+            status: consistency.status,
+            garmentMatch: consistency.garmentMatch,
+            modelMatch: consistency.modelMatch,
+            confidence: consistency.confidence,
+            riskFlags: consistency.riskFlags,
+          },
+        }
+      : {}),
     promptCompiler: {
       version: finalPromptSnapshot.version,
       globalHardConstraints: finalPromptSnapshot.globalHardConstraints,
@@ -364,6 +522,7 @@ async function getOrCreateVideoSegments({
   job,
   storyboardStatus,
   generationParameters,
+  consistencyAnalyses,
 }: {
   storyboardStore: StoryboardConfirmationStore;
   storyboardId: string;
@@ -374,6 +533,7 @@ async function getOrCreateVideoSegments({
   job: StoryboardConfirmJobRecord;
   storyboardStatus: StoryboardRecord["status"];
   generationParameters: ReturnType<typeof generationParametersForProfile>;
+  consistencyAnalyses: StoryboardConfirmConsistencyRecord[];
 }) {
   const existingSegments = await storyboardStore.listSegmentsForStoryboard({
     storyboardId,
@@ -411,6 +571,7 @@ async function getOrCreateVideoSegments({
       segment,
       assets,
       finalPromptSnapshot,
+      consistencyAnalyses,
     }),
     generationProfile: job.generationProfile,
     resolution: generationParameters.resolution,
@@ -577,6 +738,31 @@ async function transitionIfNotReached({
   });
 }
 
+async function transitionToSegmentFailedIfPossible({
+  jobStore,
+  jobId,
+  reason,
+  eventSnapshot,
+}: {
+  jobStore: JobStore;
+  jobId: string;
+  reason: string;
+  eventSnapshot?: JsonValue;
+}) {
+  const status = await currentJobStatus({ jobStore, jobId });
+  if (status === "segment_failed") {
+    return;
+  }
+
+  await transitionJobStatus({
+    store: jobStore,
+    jobId,
+    toStatus: "segment_failed",
+    reason,
+    ...(eventSnapshot ? { eventSnapshot } : {}),
+  });
+}
+
 function generationParametersForProfile(profile: GenerationProfile) {
   const resolutionOverride = debugResolutionOverride();
   if (profile === "trial_540p_watermarked") {
@@ -606,6 +792,65 @@ function assertTrialAllowedTemplates(parsed: ParsedStoryboard) {
   if (hasNonTrialAllowedTemplate) {
     throw new Error("Free trial storyboard contains non trial-allowed templates.");
   }
+}
+
+function nullableString(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function trialGrantAuditFromJob({
+  job,
+  usedAt,
+}: {
+  job: StoryboardConfirmJobRecord;
+  usedAt: Date;
+}): TrialGrantAuditRecord {
+  const snapshot = asRecord(job.trialEligibilitySnapshot);
+  const signals = asRecord(snapshot.signals);
+  const oauthAccounts = Array.isArray(signals.oauthAccounts)
+    ? signals.oauthAccounts
+    : [];
+  const firstOauth = asRecord(oauthAccounts[0]);
+  const reasonCodes = readStringArray(snapshot.reasonCodes);
+
+  return {
+    userId: job.userId,
+    videoJobId: job.id,
+    emailHash: nullableString(signals.emailHash),
+    oauthProvider: nullableString(firstOauth.provider),
+    oauthAccountIdHash: nullableString(firstOauth.accountHash),
+    ipHash: nullableString(signals.ipHash),
+    deviceFingerprintHash: nullableString(signals.deviceFingerprintHash),
+    userAgentHash: nullableString(signals.userAgentHash),
+    eventType: "trial_granted",
+    decision: "allow",
+    riskScore:
+      typeof snapshot.riskScore === "number" ? snapshot.riskScore : 0,
+    reasonCodes,
+    metadata: {
+      ...(snapshot ? { trialEligibilitySnapshot: job.trialEligibilitySnapshot } : {}),
+      videoJobId: job.id,
+      durationSeconds: job.durationSeconds,
+      generationProfile: job.generationProfile,
+    },
+    createdAt: usedAt,
+  };
+}
+
+function trialGrantAccessEventMetadata({
+  job,
+  resolution,
+}: {
+  job: StoryboardConfirmJobRecord;
+  resolution: string;
+}) {
+  return {
+    videoJobId: job.id,
+    durationSeconds: job.durationSeconds,
+    generationProfile: job.generationProfile,
+    resolution,
+    watermarkEnabled: job.watermarkEnabled,
+  } satisfies JsonValue;
 }
 
 export async function confirmStoryboard({
@@ -648,11 +893,80 @@ export async function confirmStoryboard({
     allowedTemplateIds: Array.isArray(storyboard.selectedTemplateIds)
       ? storyboard.selectedTemplateIds.filter((id): id is string => typeof id === "string")
       : [],
+    selectedTemplateIds: Array.isArray(storyboard.selectedTemplateIds)
+      ? storyboard.selectedTemplateIds.filter(
+          (id): id is string => typeof id === "string",
+        )
+      : [],
   });
   if (job.billingMode === "free_trial") {
     assertTrialAllowedTemplates(parsed);
   }
   const assets = await storyboardStore.listJobAssets(jobId);
+  const selectedTemplates = parsed.segments.map((segment) =>
+    mvpShotTemplates.find(
+      (template) => template.templateId === segment.templateId,
+    ),
+  );
+  if (selectedTemplates.some((template) => !template)) {
+    throw new Error("Selected template snapshot is missing.");
+  }
+  const requiresProductConsistency = selectedTemplates.some(
+    (template) =>
+      template?.subjectKind === "product" &&
+      template.consistencyRequirements.includes("same_garment"),
+  );
+  const requiresModelConsistency = selectedTemplates.some(
+    (template) =>
+      template?.subjectKind === "human_model" &&
+      (template.consistencyRequirements.includes("same_garment") ||
+        template.consistencyRequirements.includes("same_model")),
+  );
+  const productConsistency = requiresProductConsistency
+    ? await storyboardStore.findConsistencyAnalysis({
+        jobId,
+        analysisKind: "product_views",
+      })
+    : null;
+  const modelConsistency = requiresModelConsistency
+    ? await storyboardStore.findConsistencyAnalysis({
+        jobId,
+        analysisKind: "model_views",
+      })
+    : null;
+  if (
+    requiresProductConsistency &&
+    (productConsistency?.status !== "passed" ||
+      productConsistency.garmentMatch !== "pass" ||
+      productConsistency.modelMatch !== "not_applicable")
+  ) {
+    throw new Error("Product rotation requires matching verified product views.");
+  }
+  if (
+    requiresModelConsistency &&
+    (modelConsistency?.status !== "passed" ||
+      modelConsistency.garmentMatch !== "pass" ||
+      modelConsistency.modelMatch !== "pass")
+  ) {
+    throw new Error("Model turn requires matching verified model views.");
+  }
+  const consistencyAnalyses = [productConsistency, modelConsistency].filter(
+    (analysis): analysis is StoryboardConfirmConsistencyRecord =>
+      analysis !== null,
+  );
+  for (const segment of parsed.segments) {
+    assetsForSegmentTemplate({ segment, assets });
+  }
+  if (
+    selectedTemplates.some((template) => template?.requiresStrictReview) &&
+    job.postQaMode !== "strict"
+  ) {
+    await storyboardStore.setPostQaMode({
+      jobId,
+      mode: "strict",
+      reason: "template_requires_strict_review",
+    });
+  }
   const finalPromptSnapshot = buildFinalPromptSnapshot({ parsed, assets });
   const shouldReserveCredits = job.creditCost > 0;
   const generationParameters = generationParametersForProfile(job.generationProfile);
@@ -745,6 +1059,7 @@ export async function confirmStoryboard({
     job,
     storyboardStatus: storyboard.status,
     generationParameters,
+    consistencyAnalyses,
   });
 
   const confirmedStoryboard =
@@ -794,6 +1109,31 @@ export async function confirmStoryboard({
     });
   }
 
+  if (job.billingMode === "free_trial") {
+    try {
+      await storyboardStore.grantFreeTrialUsageIfNeeded({
+        job,
+        usedAt: new Date(),
+        resolution: generationParameters.resolution,
+        provider: "apimart",
+        model: "pixverse-v6",
+      });
+    } catch (error) {
+      await transitionToSegmentFailedIfPossible({
+        jobStore,
+        jobId,
+        reason:
+          error instanceof Error &&
+          error.message === "Free trial is not available."
+            ? "free_trial_unavailable_after_queue"
+            : "free_trial_grant_failed_after_queue",
+        eventSnapshot: { storyboardId },
+      });
+
+      throw error;
+    }
+  }
+
   if (funnelEventStore) {
     const metadata = {
       jobId,
@@ -829,24 +1169,71 @@ export async function confirmStoryboard({
   };
 }
 
+type InMemoryConfirmJobInput = Omit<
+  StoryboardConfirmJobRecord,
+  "postQaMode" | "postQaReason"
+> &
+  Partial<
+    Pick<StoryboardConfirmJobRecord, "postQaMode" | "postQaReason">
+  >;
+type InMemoryConfirmAssetInput = Omit<
+  StoryboardConfirmJobAssetRecord,
+  "subjectKind"
+> &
+  Partial<Pick<StoryboardConfirmJobAssetRecord, "subjectKind">>;
+
 export function createInMemoryStoryboardConfirmationStore({
   jobs,
   jobAssets,
+  consistencyAnalyses = [],
   storyboards: initialStoryboards,
+  trialUsages: initialTrialUsages = [],
 }: {
-  jobs: StoryboardConfirmJobRecord[];
-  jobAssets: StoryboardConfirmJobAssetRecord[];
+  jobs: InMemoryConfirmJobInput[];
+  jobAssets: InMemoryConfirmAssetInput[];
+  consistencyAnalyses?: StoryboardConfirmConsistencyRecord[];
   storyboards: StoryboardRecord[];
+  trialUsages?: Array<{
+    userId: string;
+    videoJobId: string;
+    usedAt: Date;
+  }>;
 }): StoryboardConfirmationStore & {
   listJobs: () => StoryboardConfirmJobRecord[];
   listStoryboards: () => StoryboardRecord[];
   listSegments: () => VideoSegmentRecord[];
+  listTrialUsages: () => FreeTrialUsageRecord[];
+  listTrialAbuseSignals: () => TrialGrantAuditRecord[];
+  listAccessEvents: () => UserAccessEventRecord[];
 } {
-  const jobRecords = new Map(jobs.map((job) => [job.id, { ...job }]));
+  const jobRecords = new Map<string, StoryboardConfirmJobRecord>(
+    jobs.map((job) => [
+      job.id,
+      {
+        ...job,
+        postQaMode: job.postQaMode ?? "standard",
+        postQaReason: job.postQaReason ?? null,
+      },
+    ]),
+  );
   const storyboardRecords = new Map(
     initialStoryboards.map((storyboard) => [storyboard.id, { ...storyboard }]),
   );
   const segments: VideoSegmentRecord[] = [];
+  const trialUsages: FreeTrialUsageRecord[] = initialTrialUsages.map((usage) => ({
+    id: randomUUID(),
+    userId: usage.userId,
+    videoJobId: usage.videoJobId,
+    usedAt: usage.usedAt,
+    durationSeconds: 8,
+    generationProfile: "trial_540p_watermarked",
+    resolution: "540p",
+    watermarkEnabled: true,
+    provider: "apimart",
+    model: "pixverse-v6",
+  }));
+  const trialAbuseSignalRecords: TrialGrantAuditRecord[] = [];
+  const accessEvents: UserAccessEventRecord[] = [];
 
   return {
     async findJob({ jobId, userId }) {
@@ -863,7 +1250,19 @@ export function createInMemoryStoryboardConfirmationStore({
       return jobAssets
         .filter((asset) => asset.videoJobId === videoJobId)
         .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((asset) => ({ ...asset }));
+        .map((asset) => ({
+          ...asset,
+          subjectKind: asset.subjectKind ?? "unknown",
+        }));
+    },
+    async findConsistencyAnalysis({ jobId: id, analysisKind }) {
+      return (
+        consistencyAnalyses.find(
+          (analysis) =>
+            analysis.videoJobId === id &&
+            analysis.analysisKind === analysisKind,
+        ) ?? null
+      );
     },
     async confirmStoryboard({ storyboardId: id, finalPromptSnapshot }) {
       const storyboard = storyboardRecords.get(id);
@@ -886,6 +1285,20 @@ export function createInMemoryStoryboardConfirmationStore({
         throw new Error(`Video job not found: ${id}.`);
       }
       jobRecords.set(id, { ...job, reservedLedgerId });
+    },
+    async setPostQaMode({ jobId: id, mode, reason }) {
+      const job = jobRecords.get(id);
+      if (!job) {
+        throw new Error(`Video job not found: ${id}.`);
+      }
+      if (job.postQaMode === "strict") {
+        return;
+      }
+      jobRecords.set(id, {
+        ...job,
+        postQaMode: mode,
+        postQaReason: reason,
+      });
     },
     async listSegmentsForStoryboard({ storyboardId: id, jobId: videoJobId }) {
       return segments
@@ -923,6 +1336,47 @@ export function createInMemoryStoryboardConfirmationStore({
       segments.push(...created);
       return created.map((segment) => ({ ...segment }));
     },
+    async grantFreeTrialUsageIfNeeded({ job, usedAt, resolution, provider, model }) {
+      const existing = trialUsages.find((usage) => usage.videoJobId === job.id);
+      if (existing) {
+        return null;
+      }
+      if (trialUsages.some((usage) => usage.userId === job.userId)) {
+        throw new Error("Free trial is not available.");
+      }
+
+      const usage: FreeTrialUsageRecord = {
+        id: randomUUID(),
+        userId: job.userId,
+        videoJobId: job.id,
+        usedAt,
+        durationSeconds: job.durationSeconds,
+        generationProfile: job.generationProfile,
+        resolution,
+        watermarkEnabled: job.watermarkEnabled,
+        provider,
+        model,
+      };
+      trialUsages.push(usage);
+      trialAbuseSignalRecords.push(
+        trialGrantAuditFromJob({
+          job,
+          usedAt,
+        }),
+      );
+      accessEvents.push({
+        id: randomUUID(),
+        userId: job.userId,
+        eventType: "trial_granted",
+        ipAddress: null,
+        userAgent: null,
+        path: null,
+        metadata: trialGrantAccessEventMetadata({ job, resolution }),
+        createdAt: usedAt,
+      });
+
+      return { ...usage };
+    },
     listJobs() {
       return Array.from(jobRecords.values()).map((job) => ({ ...job }));
     },
@@ -933,6 +1387,15 @@ export function createInMemoryStoryboardConfirmationStore({
     },
     listSegments() {
       return segments.map((segment) => ({ ...segment }));
+    },
+    listTrialUsages() {
+      return trialUsages.map((usage) => ({ ...usage }));
+    },
+    listTrialAbuseSignals() {
+      return trialAbuseSignalRecords.map((signal) => ({ ...signal }));
+    },
+    listAccessEvents() {
+      return accessEvents.map((event) => ({ ...event }));
     },
   };
 }
@@ -955,6 +1418,9 @@ export function createDrizzleStoryboardConfirmationStore(
           billingMode: videoJobs.billingMode,
           generationProfile: videoJobs.generationProfile,
           watermarkEnabled: videoJobs.watermarkEnabled,
+          postQaMode: videoJobs.postQaMode,
+          postQaReason: videoJobs.postQaReason,
+          trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
           isTest: videoJobs.isTest,
         })
         .from(videoJobs)
@@ -978,7 +1444,7 @@ export function createDrizzleStoryboardConfirmationStore(
       return (storyboard as StoryboardRecord | undefined) ?? null;
     },
     async listJobAssets(jobId) {
-      return db
+      const jobAssetRows = await db
         .select({
           videoJobId: videoJobAssets.videoJobId,
           assetId: videoJobAssets.assetId,
@@ -988,6 +1454,55 @@ export function createDrizzleStoryboardConfirmationStore(
         .from(videoJobAssets)
         .where(eq(videoJobAssets.videoJobId, jobId))
         .orderBy(asc(videoJobAssets.sortOrder));
+      const assetIds = jobAssetRows.map((asset) => asset.assetId);
+      const analysisRows =
+        assetIds.length > 0
+          ? await db
+              .select({
+                assetId: assetAnalyses.assetId,
+                subjectKind: assetAnalyses.subjectKind,
+                createdAt: assetAnalyses.createdAt,
+              })
+              .from(assetAnalyses)
+              .where(inArray(assetAnalyses.assetId, assetIds))
+              .orderBy(desc(assetAnalyses.createdAt))
+          : [];
+      const subjectByAssetId = new Map<
+        string,
+        StoryboardConfirmJobAssetRecord["subjectKind"]
+      >();
+      for (const analysis of analysisRows) {
+        if (!subjectByAssetId.has(analysis.assetId)) {
+          subjectByAssetId.set(analysis.assetId, analysis.subjectKind);
+        }
+      }
+
+      return jobAssetRows.map((asset) => ({
+        ...asset,
+        subjectKind: subjectByAssetId.get(asset.assetId) ?? "unknown",
+      }));
+    },
+    async findConsistencyAnalysis({ jobId, analysisKind }) {
+      const [record] = await db
+        .select({
+          videoJobId: assetConsistencyAnalyses.videoJobId,
+          analysisKind: assetConsistencyAnalyses.analysisKind,
+          status: assetConsistencyAnalyses.status,
+          garmentMatch: assetConsistencyAnalyses.garmentMatch,
+          modelMatch: assetConsistencyAnalyses.modelMatch,
+          confidence: assetConsistencyAnalyses.confidence,
+          riskFlags: assetConsistencyAnalyses.riskFlags,
+        })
+        .from(assetConsistencyAnalyses)
+        .where(
+          and(
+            eq(assetConsistencyAnalyses.videoJobId, jobId),
+            eq(assetConsistencyAnalyses.analysisKind, analysisKind),
+          ),
+        )
+        .limit(1);
+
+      return record ?? null;
     },
     async confirmStoryboard({ storyboardId, finalPromptSnapshot }) {
       const [storyboard] = await db
@@ -1012,6 +1527,14 @@ export function createDrizzleStoryboardConfirmationStore(
         .set({ reservedLedgerId })
         .where(eq(videoJobs.id, jobId));
     },
+    async setPostQaMode({ jobId, mode, reason }) {
+      await db
+        .update(videoJobs)
+        .set({ postQaMode: mode, postQaReason: reason })
+        .where(
+          and(eq(videoJobs.id, jobId), ne(videoJobs.postQaMode, "strict")),
+        );
+    },
     async listSegmentsForStoryboard({ storyboardId, jobId }) {
       return db
         .select()
@@ -1035,6 +1558,81 @@ export function createDrizzleStoryboardConfirmationStore(
         .returning();
 
       return records as VideoSegmentRecord[];
+    },
+    async grantFreeTrialUsageIfNeeded({ job, usedAt, resolution, provider, model }) {
+      return db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`free_trial:${job.userId}`}))`,
+        );
+
+        const [existingForJob] = await tx
+          .select()
+          .from(freeTrialUsages)
+          .where(eq(freeTrialUsages.videoJobId, job.id))
+          .limit(1);
+
+        if (existingForJob) {
+          return null;
+        }
+
+        const [existingForUser] = await tx
+          .select({ id: freeTrialUsages.id })
+          .from(freeTrialUsages)
+          .where(eq(freeTrialUsages.userId, job.userId))
+          .limit(1);
+
+        if (existingForUser) {
+          throw new Error("Free trial is not available.");
+        }
+
+        const [usage] = await tx
+          .insert(freeTrialUsages)
+          .values({
+            userId: job.userId,
+            videoJobId: job.id,
+            usedAt,
+            durationSeconds: job.durationSeconds,
+            generationProfile: job.generationProfile,
+            resolution,
+            watermarkEnabled: job.watermarkEnabled,
+            provider,
+            model,
+          })
+          .returning();
+
+        if (!usage) {
+          throw new Error("Failed to create free trial usage.");
+        }
+
+        const grantSignal = trialGrantAuditFromJob({ job, usedAt });
+        await tx.insert(trialAbuseSignals).values({
+          userId: grantSignal.userId,
+          videoJobId: grantSignal.videoJobId,
+          emailHash: grantSignal.emailHash ?? null,
+          oauthProvider: grantSignal.oauthProvider ?? null,
+          oauthAccountIdHash: grantSignal.oauthAccountIdHash ?? null,
+          ipHash: grantSignal.ipHash ?? null,
+          deviceFingerprintHash: grantSignal.deviceFingerprintHash ?? null,
+          userAgentHash: grantSignal.userAgentHash ?? null,
+          eventType: grantSignal.eventType,
+          decision: grantSignal.decision,
+          riskScore: grantSignal.riskScore,
+          reasonCodes: grantSignal.reasonCodes,
+          metadata: grantSignal.metadata ?? null,
+          createdAt: grantSignal.createdAt,
+        });
+        await tx.insert(userAccessEvents).values({
+          userId: job.userId,
+          eventType: "trial_granted",
+          ipAddress: null,
+          userAgent: null,
+          path: null,
+          metadata: trialGrantAccessEventMetadata({ job, resolution }),
+          createdAt: usedAt,
+        });
+
+        return usage as FreeTrialUsageRecord;
+      });
     },
   };
 }

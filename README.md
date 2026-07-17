@@ -38,9 +38,28 @@ pnpm dev
 
 `PROMPT_MODERATION_MODE=dev_bypass` 只允许个人本地开发；共享环境、staging 和 production 必须使用 Creem Moderation 并 fail closed。
 
+staging/production 还必须配置 `LEGAL_CONTACT_EMAIL`、`RESEND_API_KEY`、`EMAIL_FROM` 和 `ABUSE_HASH_SECRET`。缺少任一项时 `/api/health` 会返回 `ready=false`，防止没有投诉受理和防滥用能力的版本上线。
+
+`VIDEO_DURATION_40_ENABLED=true` 开放 40 秒付费 Beta。关闭时前端不展示该规格，服务端 Preflight 和任务创建 API 也会拒绝新 40 秒任务；已创建任务不受开关回退影响。40 秒由 5 个独立 8 秒片段组成，消耗 310 点，免费试用仍仅支持 8 秒。
+
+## 当前素材与模板边界
+
+- 当前目录有 17 个模板。商品轻旋转/180° 和真人模特轻侧身/180° 均为付费 Beta、Advanced-only，并强制 Strict QA，不进入 Style Preset 自动编排。
+- 商品旋转只接受无真人的同款商品多视角图，不会生成真人或虚拟模特。
+- 真人模特转身要求同一可见真人穿着同一件服装的对应多视角图，并通过当前任务内的服装与模特一致性校验。单张正面真人图只能使用正面自然动作。
+- 虚拟穿衣尚未接入；后续应作为独立上游模块实现，输出仍需通过一致性校验后才能复用真人模特模板。
+
 ## 完整生成链路
 
 完整链路需要依次配置 Neon、Google OAuth、Resend、R2、Creem、DeepSeek、视觉模型、APIMart、Cloud Run 和 cron-job.org。先用 `/api/health` 检查配置，再创建真实测试任务。
+
+## 素材授权与侵权处理
+
+- 所有已登录用户的服务端上传都必须主动接受当前 `image_rights_v1` 声明；未勾选、版本过期或缺少声明时上传会被拒绝。
+- 素材中有可识别真人时，上传者必须拥有肖像和商业宣传授权；未满 18 周岁还必须取得监护人授权。
+- 公开侵权通知入口为 `/takedown`。提交只创建待核验案件，不会自动删除素材或视频。
+- 管理员在 `/admin/rights-removal` 核验、处理并留下审计记录；只有 `admin` 可以结案，`operator` 只能分诊。
+- `POST /api/internal/compliance/retention` 对三年前的声明和案件个人信息执行去标识化。生产环境应由 cron-job.org 每日调用，并发送 `Authorization: Bearer $CRON_JOB_SECRET`。
 
 ## 常用命令
 

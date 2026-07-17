@@ -20,6 +20,54 @@ describe("POST /api/admin/credits/adjust", () => {
   });
 
   it("adjusts credits for admins", async () => {
+    const receivedInputs: unknown[] = [];
+    const response = await handleAdjustCreditsRequest(
+      new Request("http://localhost/api/admin/credits/adjust", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: "user-1",
+          amount: 25,
+          reason: "compensation",
+          idempotencyKey: "admin_adjust:user-1:job-1:compensation",
+          relatedJobId: "33333333-3333-4333-8333-333333333333",
+        }),
+      }),
+      {
+        getAdminSession: async () => ({
+          userId: "admin-1",
+          email: "admin@example.com",
+          role: "admin",
+        }),
+        adjustCredits: async (input) => {
+          receivedInputs.push(input);
+          return {
+            ledger: {
+              userId: input.targetUserId,
+              amount: input.amount,
+              reason: input.reason,
+            },
+          };
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(receivedInputs).toEqual([
+      expect.objectContaining({
+        idempotencyKey: "admin_adjust:user-1:job-1:compensation",
+        relatedJobId: "33333333-3333-4333-8333-333333333333",
+      }),
+    ]);
+    expect(await response.json()).toEqual({
+      ledger: {
+        userId: "user-1",
+        amount: 25,
+        reason: "compensation",
+      },
+    });
+  });
+
+  it("returns the service error message for failed adjustments", async () => {
     const response = await handleAdjustCreditsRequest(
       new Request("http://localhost/api/admin/credits/adjust", {
         method: "POST",
@@ -35,23 +83,16 @@ describe("POST /api/admin/credits/adjust", () => {
           email: "admin@example.com",
           role: "admin",
         }),
-        adjustCredits: async (input) => ({
-          ledger: {
-            userId: input.targetUserId,
-            amount: input.amount,
-            reason: input.reason,
-          },
-        }),
+        adjustCredits: async () => {
+          throw new Error("Failed to create admin audit log.");
+        },
       },
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      ledger: {
-        userId: "user-1",
-        amount: 25,
-        reason: "compensation",
-      },
+      error: "credit_adjust_failed",
+      message: "Failed to create admin audit log.",
     });
   });
 

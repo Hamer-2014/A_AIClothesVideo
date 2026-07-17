@@ -14,6 +14,7 @@ function analysis(
     garmentCategory: "dress",
     viewAngle: "front",
     humanPresent: "no",
+    subjectKind: "product",
     visibleDetails: ["front_shape"],
     notVisibleDetails: [],
     quality: {
@@ -53,14 +54,92 @@ describe("asset role classification", () => {
       hasDetail: true,
       hasScene: true,
       hasModelFront: false,
+      hasModelSide: false,
+      hasModelBack: false,
       hasFlatLayOrWhiteBackground: true,
+      hasProductFront: true,
+      hasProductSide: false,
+      hasProductBack: true,
+      garmentConsistency: "unknown",
+      modelGarmentConsistency: "unknown",
+      modelConsistency: "unknown",
       detailTypes: ["fabric", "neckline"],
     });
   });
 
-  it("detects model front assets from human presence and front role", () => {
+  it("exposes verified product views only when task consistency passes", () => {
+    const completeness = buildAssetCompletenessFromAnalyses(
+      [
+        analysis({ assetRole: "front", subjectKind: "product" }),
+        analysis({ assetRole: "side", subjectKind: "product" }),
+        analysis({ assetRole: "back", subjectKind: "product" }),
+      ],
+      [],
+      {
+        garmentMatch: "pass",
+        modelMatch: "not_applicable",
+      },
+    );
+
+    expect(completeness).toMatchObject({
+      hasProductFront: true,
+      hasProductSide: true,
+      hasProductBack: true,
+      garmentConsistency: "pass",
+    });
+  });
+
+  it("tracks model front, side, and back separately", () => {
+    const completeness = buildAssetCompletenessFromAnalyses(
+      [
+        analysis({
+          assetRole: "front",
+          humanPresent: "yes",
+          subjectKind: "human_model",
+        }),
+        analysis({
+          assetRole: "side",
+          humanPresent: "yes",
+          subjectKind: "human_model",
+        }),
+        analysis({
+          assetRole: "back",
+          humanPresent: "yes",
+          subjectKind: "human_model",
+        }),
+      ],
+      [],
+      { garmentMatch: "pass", modelMatch: "pass" },
+    );
+
+    expect(completeness).toMatchObject({
+      hasModelFront: true,
+      hasModelSide: true,
+      hasModelBack: true,
+      garmentConsistency: "pass",
+      modelConsistency: "pass",
+    });
+  });
+
+  it("does not treat a merely present person as a model-worn garment", () => {
     const completeness = buildAssetCompletenessFromAnalyses([
-      analysis({ assetRole: "front", humanPresent: "yes" }),
+      analysis({
+        assetRole: "front",
+        humanPresent: "yes",
+        subjectKind: "unknown",
+      }),
+    ]);
+
+    expect(completeness.hasModelFront).toBe(false);
+  });
+
+  it("detects model front assets from explicit human-model subject kind", () => {
+    const completeness = buildAssetCompletenessFromAnalyses([
+      analysis({
+        assetRole: "front",
+        humanPresent: "yes",
+        subjectKind: "human_model",
+      }),
     ]);
 
     expect(completeness.hasModelFront).toBe(true);

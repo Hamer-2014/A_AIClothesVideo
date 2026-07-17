@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ImagePlus, RotateCcw, X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export type UploadSlotRole = "front" | "back" | "side" | "detail" | "scene";
 
@@ -21,6 +22,8 @@ interface UploadPanelProps {
   onUploaded: (asset: UploadedAssetItem) => void;
   onRemoveUploaded: (assetId: string) => void;
   onUploadingChange: (uploading: boolean) => void;
+  rightsAccepted: boolean;
+  onRightsAcceptedChange: (accepted: boolean) => void;
 }
 
 interface SlotConfig {
@@ -71,6 +74,10 @@ function humanReadableUploadError(error: string) {
       return "文件类型不支持";
     case "unauthorized":
       return "登录状态失效";
+    case "rights_attestation_required":
+      return "请先确认素材与肖像授权声明";
+    case "rights_attestation_version_mismatch":
+      return "授权声明已更新，请重新确认";
     default:
       return "上传失败";
   }
@@ -88,6 +95,8 @@ export function UploadPanel({
   onRemoveUploaded,
   onUploaded,
   onUploadingChange,
+  rightsAccepted,
+  onRightsAcceptedChange,
 }: UploadPanelProps) {
   const [slotFiles, setSlotFiles] = useState<
     Partial<Record<UploadSlotRole, SelectedSlotFile>>
@@ -197,6 +206,10 @@ export function UploadPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          rightsAttestation: {
+            accepted: true,
+            version: "image_rights_v1",
+          },
           files: [
             {
               fileName: file.name,
@@ -296,6 +309,30 @@ export function UploadPanel({
         className="space-y-4"
         data-testid="upload-panel-canvas"
       >
+        <div className="rounded-md border border-[var(--line)] bg-white p-3 text-xs leading-5 text-[var(--muted)]">
+          <label className="flex items-start gap-2" htmlFor="upload-rights-attestation">
+            <input
+              checked={rightsAccepted}
+              className="mt-1 h-4 w-4 shrink-0"
+              id="upload-rights-attestation"
+              onChange={(event) => onRightsAcceptedChange(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              我确认拥有或已获得上传素材的版权、商标及商业使用授权；如包含可识别人物，已获得其肖像与商业宣传授权；如人物未满 18 周岁，已获得监护人授权。
+            </span>
+          </label>
+          <p className="mt-2 pl-6">
+            查看
+            <Link className="mx-1 underline" href="/terms">
+              服务条款
+            </Link>
+            和
+            <Link className="ml-1 underline" href="/privacy">
+              隐私政策
+            </Link>
+          </p>
+        </div>
         <div data-testid="upload-primary-row">
           {uploadSlots.slice(0, 1).map((slot) => {
             const uploaded = uploadedByRole.get(slot.role);
@@ -381,7 +418,7 @@ export function UploadPanel({
                   accept={accept}
                   aria-label={`选择${slot.label}`}
                   className="sr-only"
-                  disabled={uploading}
+                  disabled={uploading || (isAuthenticated && !rightsAccepted)}
                   id={`upload-slot-${slot.role}`}
                   onChange={(event) => handleSlotFileChange(slot.role, event)}
                   type="file"
@@ -477,7 +514,7 @@ export function UploadPanel({
                   accept={accept}
                   aria-label={`选择${slot.label}`}
                   className="sr-only"
-                  disabled={uploading}
+                  disabled={uploading || (isAuthenticated && !rightsAccepted)}
                   id={`upload-slot-${slot.role}`}
                   onChange={(event) => handleSlotFileChange(slot.role, event)}
                   type="file"

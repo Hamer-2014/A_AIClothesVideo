@@ -75,18 +75,15 @@ describe("create video job", () => {
         reason: "job_created",
       }),
     ]);
-    expect(store.listTrialUsages()).toEqual([
-      expect.objectContaining({
-        userId,
-        videoJobId: result.job.id,
-        durationSeconds: 8,
-        generationProfile: "trial_540p_watermarked",
-        resolution: "540p",
-        watermarkEnabled: true,
-        provider: "apimart",
-        model: "pixverse-v6",
-      }),
-    ]);
+    expect(store.listTrialUsages()).toHaveLength(0);
+    expect(store.listTrialAbuseSignals()).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "trial_granted",
+          videoJobId: result.job.id,
+        }),
+      ]),
+    );
     expect(funnelStore.listEvents()).toEqual([
       expect.objectContaining({
         eventName: "job_created",
@@ -102,14 +99,65 @@ describe("create video job", () => {
           status: "asset_analysis_queued",
         }),
       }),
-      expect.objectContaining({
-        eventName: "trial_generation_started",
-        metadata: expect.objectContaining({
-          jobId: result.job.id,
-          billingMode: "free_trial",
-        }),
-      }),
     ]);
+  });
+
+  it("blocks direct job creation when any asset lacks rights attestation", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+        rightsAttested: false,
+        rightsAttestationId: null,
+      },
+    ]);
+
+    await expect(
+      createVideoJobWithAssets({
+        store,
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 8,
+        aspectRatio: "9:16",
+      }),
+    ).rejects.toThrow("Rights attestation is required for all assets.");
+
+    expect(store.listJobs()).toHaveLength(0);
+    expect(store.listEvents()).toHaveLength(0);
+    expect(store.listAccessEvents()).toHaveLength(0);
+    expect(store.listTrialUsages()).toHaveLength(0);
+  });
+
+  it("stores a server-verified rights attestation snapshot", async () => {
+    const now = new Date("2026-07-11T00:00:00.000Z");
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+        rightsAttested: true,
+        rightsAttestationId: "attestation-1",
+      },
+    ]);
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      now,
+    });
+
+    expect(result.job.rightsAttestationSnapshot).toEqual({
+      version: "image_rights_v1",
+      assetIds: ["asset-front"],
+      attestationIds: ["attestation-1"],
+      verifiedAt: now.toISOString(),
+    });
   });
 
   it("records paid generation funnel event and does not block job creation when analytics fails", async () => {
@@ -376,7 +424,7 @@ describe("create video job", () => {
     expect(store.listTrialAbuseSignals()).toHaveLength(0);
   });
 
-  it("uses the same dev fallback abuse hash secret for trial check and granted signals", async () => {
+  it("uses the dev fallback abuse hash secret for trial eligibility checks without granting usage at job creation", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {
         id: "asset-front",
@@ -411,13 +459,11 @@ describe("create video job", () => {
     const granted = signals.find((signal) => signal.eventType === "trial_granted");
 
     expect(check).toBeTruthy();
-    expect(granted).toBeTruthy();
-    expect(granted?.ipHash).toBe(check?.ipHash);
-    expect(granted?.deviceFingerprintHash).toBe(check?.deviceFingerprintHash);
-    expect(granted?.userAgentHash).toBe(check?.userAgentHash);
+    expect(granted).toBeUndefined();
+    expect(store.listTrialUsages()).toHaveLength(0);
   });
 
-  it("always creates paid jobs for 16 and 24 second durations", async () => {
+  it("creates paid jobs for 16 and 24 second durations when paid generation is selected", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {
         id: "asset-front",
@@ -433,7 +479,7 @@ describe("create video job", () => {
       assetIds: ["asset-front"],
       durationSeconds: 16,
       aspectRatio: "9:16",
-      useFreeTrialIfAvailable: true,
+      useFreeTrialIfAvailable: false,
     });
     const twentyFour = await createVideoJobWithAssets({
       store,
@@ -441,7 +487,7 @@ describe("create video job", () => {
       assetIds: ["asset-front"],
       durationSeconds: 24,
       aspectRatio: "9:16",
-      useFreeTrialIfAvailable: true,
+      useFreeTrialIfAvailable: false,
     });
 
     expect(sixteen.job).toMatchObject({
@@ -455,6 +501,30 @@ describe("create video job", () => {
       generationProfile: "paid_720p_audio",
     });
     expect(store.listTrialUsages()).toHaveLength(0);
+  });
+
+  it("rejects a free-trial request for paid-only durations", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    await expect(
+      createVideoJobWithAssets({
+        store,
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 16,
+        aspectRatio: "9:16",
+        useFreeTrialIfAvailable: true,
+      }),
+    ).rejects.toThrow("Free trial only supports 8-second video.");
+
+    expect(store.listJobs()).toHaveLength(0);
   });
 
   it("does not let legacy client trial intent force a free job when paid generation is selected", async () => {
@@ -532,10 +602,11 @@ describe("create video job", () => {
         eventType: "trial_eligibility_check",
         ipAddress: "203.0.113.10",
       }),
+    ]));
+    expect(store.listAccessEvents()).not.toEqual(expect.arrayContaining([
       expect.objectContaining({
         userId,
         eventType: "trial_granted",
-        ipAddress: "203.0.113.10",
       }),
     ]));
   });
@@ -624,5 +695,44 @@ describe("create video job", () => {
         isTrial: false,
       }),
     ).rejects.toThrow("Unsupported video duration.");
+  });
+
+  it("gates and prices 40-second paid jobs", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    await expect(
+      createVideoJobWithAssets({
+        store,
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 40,
+        aspectRatio: "9:16",
+        useFreeTrialIfAvailable: false,
+        videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "false" },
+      }),
+    ).rejects.toThrow("40-second Beta is not enabled.");
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 40,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "true" },
+    });
+
+    expect(result.job).toMatchObject({
+      durationSeconds: 40,
+      creditCost: 310,
+      billingMode: "paid",
+    });
   });
 });

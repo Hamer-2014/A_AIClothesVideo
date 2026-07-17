@@ -8,7 +8,7 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
   actorEmail: text("actor_email"),
   action: text("action").notNull(),
   targetType: text("target_type").notNull(),
-  targetId: uuid("target_id"),
+  targetId: text("target_id"),
   reason: text("reason"),
   beforeSnapshot: jsonSnapshot("before_snapshot"),
   afterSnapshot: jsonSnapshot("after_snapshot"),

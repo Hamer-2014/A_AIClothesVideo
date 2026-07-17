@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 
+import type { QaFramePoint } from "./qa-frame-plan.js";
+
 export type RunCommand = (command: string, args: string[]) => Promise<void>;
 
 export const defaultRunCommand: RunCommand = (command, args) =>
@@ -78,34 +80,36 @@ export async function extractCoverFrame({
 export async function extractQaFrames({
   videoPath,
   frameDirectory,
-  frameCount = 3,
+  framePlan,
   runCommand = defaultRunCommand,
 }: {
   videoPath: string;
   frameDirectory: string;
-  frameCount?: number;
+  framePlan: QaFramePoint[];
   runCommand?: RunCommand;
 }) {
-  const normalizedFrameCount = Math.max(1, frameCount);
-  const pattern = `${frameDirectory}/frame-%d.jpg`;
+  const outputPaths: string[] = [];
 
-  await runCommand("ffmpeg", [
-    "-y",
-    "-i",
-    videoPath,
-    "-vf",
-    `fps=1/${normalizedFrameCount}`,
-    "-start_number",
-    "0",
-    "-frames:v",
-    String(normalizedFrameCount),
-    pattern,
-  ]);
+  for (const point of framePlan) {
+    const fileName =
+      point.kind === "transition"
+        ? `transition-${point.segmentIndex}-${point.segmentIndex + 1}.jpg`
+        : `segment-${point.segmentIndex}-frame-${point.frameIndex}.jpg`;
+    const outputPath = `${frameDirectory}/${fileName}`;
+    await runCommand("ffmpeg", [
+      "-y",
+      "-ss",
+      String(point.timestampSeconds),
+      "-i",
+      videoPath,
+      "-frames:v",
+      "1",
+      outputPath,
+    ]);
+    outputPaths.push(outputPath);
+  }
 
-  return Array.from(
-    { length: normalizedFrameCount },
-    (_, index) => `${frameDirectory}/frame-${index}.jpg`,
-  );
+  return outputPaths;
 }
 
 export async function listExtractedQaFrames({

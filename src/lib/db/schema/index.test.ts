@@ -31,6 +31,12 @@ const requiredTables = [
   "abuseEvents",
 ] as const;
 
+const requiredComplianceTables = [
+  "rightsAttestations",
+  "assetRightsAttestations",
+  "rightsRemovalRequests",
+] as const;
+
 const requiredJobStatuses = [
   "draft_uploaded",
   "lite_check_queued",
@@ -67,6 +73,23 @@ describe("database schema", () => {
       expect(schema[tableName]).toBeDefined();
     }
     expect(schema).not.toHaveProperty("modelRoutes");
+  });
+
+  it("exports rights compliance tables and snapshots", () => {
+    for (const tableName of requiredComplianceTables) {
+      expect(schema[tableName]).toBeDefined();
+    }
+    expect(schema.videoJobs).toHaveProperty("rightsAttestationSnapshot");
+    expect(schema.rightsRemovalRequests).toHaveProperty("publicReference");
+    expect(schema.rightsRemovalRequests).toHaveProperty("resolutionSummary");
+  });
+
+  it("exports asset consistency and template capability fields", () => {
+    expect(schema.assetConsistencyAnalyses).toBeDefined();
+    expect(schema.assetAnalyses).toHaveProperty("subjectKind");
+    expect(schema.shotTemplates).toHaveProperty("subjectKind");
+    expect(schema.shotTemplates).toHaveProperty("consistencyRequirements");
+    expect(schema.shotTemplates).toHaveProperty("autoSelectAllowed");
   });
 
   it("exports required job states", () => {

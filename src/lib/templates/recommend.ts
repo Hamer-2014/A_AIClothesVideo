@@ -11,6 +11,7 @@ export interface AvailableTemplateRecommendation {
   version: number;
   riskLevel: ShotTemplateRisk;
   trialAllowed: boolean;
+  autoSelectAllowed: boolean;
   riskWarnings: string[];
 }
 
@@ -34,6 +35,7 @@ function toAvailableTemplate(
     version: template.version,
     riskLevel: template.riskLevel,
     trialAllowed: template.isTrialAllowed,
+    autoSelectAllowed: template.autoSelectAllowed,
     riskWarnings: getTemplateRiskWarnings(template),
   };
 }

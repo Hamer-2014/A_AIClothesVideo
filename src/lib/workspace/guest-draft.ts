@@ -1,8 +1,9 @@
 import { getStylePreset, type StylePresetId, type WorkspaceEntryMode } from "@/lib/presets";
+import { isVideoDuration, type VideoDuration } from "@/lib/video/specs";
 
 export const WORKSPACE_GUEST_DRAFT_KEY = "runwaytools_workspace_guest_draft_v1";
 
-export type WorkspaceDraftDuration = 8 | 16 | 24;
+export type WorkspaceDraftDuration = VideoDuration;
 export type WorkspaceDraftAspectRatio = "9:16" | "1:1" | "16:9";
 export type WorkspaceDraftAssetRole = "front" | "back" | "side" | "detail" | "scene";
 
@@ -16,15 +17,12 @@ export interface WorkspaceGuestDraft {
   fileNames: string[];
 }
 
-const validDurations = new Set([8, 16, 24]);
 const validAspectRatios = new Set(["9:16", "1:1", "16:9"]);
 const validModes = new Set(["trial", "paid"]);
 const validAssetRoles = new Set(["front", "back", "side", "detail", "scene"]);
 
 function normalizeDuration(value: unknown): WorkspaceDraftDuration {
-  return typeof value === "number" && validDurations.has(value)
-    ? (value as WorkspaceDraftDuration)
-    : 8;
+  return isVideoDuration(value) ? value : 8;
 }
 
 function normalizeAspectRatio(value: unknown): WorkspaceDraftAspectRatio {

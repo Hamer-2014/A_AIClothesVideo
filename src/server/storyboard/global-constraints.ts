@@ -2,6 +2,8 @@ export interface GlobalHardConstraintsInput {
   hasBackAsset: boolean;
   hasDetailAsset: boolean;
   hasSceneAsset: boolean;
+  hasModelFront?: boolean;
+  hasModelBack?: boolean;
 }
 
 export function buildGlobalHardConstraints(input: GlobalHardConstraintsInput): string[] {
@@ -26,6 +28,12 @@ export function buildGlobalHardConstraints(input: GlobalHardConstraintsInput): s
     );
   }
 
+  if (input.hasModelFront && !input.hasModelBack) {
+    constraints.push(
+      "Do not show a model back view or complete a 180-degree turn.",
+    );
+  }
+
   return constraints;
 }
 
@@ -33,10 +41,14 @@ export function formatGlobalHardConstraintsForPrompt(constraints: string[]): str
   return constraints.map((constraint) => constraint.trim()).filter(Boolean);
 }
 
-export function assetFactsSnapshotFromAssets(assets: Array<{ role: string }>): {
+export function assetFactsSnapshotFromAssets(
+  assets: Array<{ role: string; subjectKind?: string }>,
+): {
   hasBack: boolean;
   hasDetail: boolean;
   hasScene: boolean;
+  hasModelFront: boolean;
+  hasModelBack: boolean;
 } {
   const roles = new Set(assets.map((asset) => asset.role.trim().toLowerCase()));
 
@@ -44,5 +56,15 @@ export function assetFactsSnapshotFromAssets(assets: Array<{ role: string }>): {
     hasBack: roles.has("back"),
     hasDetail: roles.has("detail"),
     hasScene: roles.has("scene"),
+    hasModelFront: assets.some(
+      (asset) =>
+        asset.role.trim().toLowerCase() === "front" &&
+        asset.subjectKind === "human_model",
+    ),
+    hasModelBack: assets.some(
+      (asset) =>
+        asset.role.trim().toLowerCase() === "back" &&
+        asset.subjectKind === "human_model",
+    ),
   };
 }

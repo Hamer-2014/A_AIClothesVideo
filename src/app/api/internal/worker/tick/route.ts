@@ -145,6 +145,7 @@ async function defaultRunTick(): Promise<WorkerTickResult> {
         userId: input.userId,
         mode: input.mode,
         frameKeys: input.frameKeys,
+        selectedTemplateIds: input.selectedTemplateIds,
       });
     },
   });

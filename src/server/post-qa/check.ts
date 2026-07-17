@@ -14,16 +14,27 @@ import {
   type JobStore,
   transitionJobStatus,
 } from "@/server/jobs/state-machine";
+import {
+  createDrizzleVideoSegmentStore,
+  type VideoSegmentStore,
+} from "@/server/video/segments";
 
 import {
   createDrizzlePostQaStore,
   resolvePostQaResult,
   type PostQaStore,
 } from "./resolve";
+import {
+  buildPostQaFrameBatches,
+  type PostQaFrameBatch,
+  type QaFrameLocation,
+} from "./frame-batches";
+import { retryLocalizedPostQaSegment } from "./retry-localized-segment";
 
 export interface PostQaVisionInput {
   mode: VisionAnalysisMode;
   frameUrls: string[];
+  qaRequirements: string[];
 }
 
 export interface PostQaVisionResult {
@@ -179,8 +190,13 @@ function checksDoNotContainBlockingFailure(record: Record<string, unknown>) {
 async function defaultPostQaVisionProvider({
   mode,
   frameUrls,
+  qaRequirements,
 }: PostQaVisionInput): Promise<PostQaVisionResult> {
-  const result = await createVisionPostQaCheck({ mode, frameUrls });
+  const result = await createVisionPostQaCheck({
+    mode,
+    frameUrls,
+    qaRequirements,
+  });
 
   return {
     provider: result.provider,
@@ -190,10 +206,133 @@ async function defaultPostQaVisionProvider({
   };
 }
 
+type PostQaBatchResult = {
+  batchId: string;
+  kind: PostQaFrameBatch["kind"];
+  segmentIndex: number | null;
+  frameLocations: QaFrameLocation[];
+  passed: boolean;
+  failureCategory: string | null;
+  qaJson: JsonValue;
+};
+
+async function analyzeBatch({
+  batch,
+  mode,
+  jobId,
+  userId,
+  createSignedUrl,
+  visionProvider,
+  providerCallLogStore,
+  qaRequirements,
+}: {
+  batch: PostQaFrameBatch;
+  mode: VisionAnalysisMode;
+  jobId: string;
+  userId: string;
+  createSignedUrl: (input: { key: string }) => Promise<string>;
+  visionProvider: PostQaVisionProvider;
+  providerCallLogStore: ProviderCallLogStore;
+  qaRequirements: string[];
+}): Promise<PostQaBatchResult> {
+  const startedAt = Date.now();
+  const requestSnapshot = {
+    mode,
+    batchId: batch.batchId,
+    kind: batch.kind,
+    segmentIndex: batch.segmentIndex,
+    frameCount: batch.frameKeys.length,
+    frameLocations: batch.frameLocations,
+    humanTurnReview: qaRequirements.length > 0,
+  } as unknown as JsonValue;
+
+  let visionResult: PostQaVisionResult;
+  try {
+    const frameUrls = await Promise.all(
+      batch.frameKeys.map((key) => createSignedUrl({ key })),
+    );
+    visionResult = await visionProvider({ mode, frameUrls, qaRequirements });
+  } catch (error) {
+    const message = errorMessage(error);
+    await providerCallLogStore.createCallLog({
+      provider: "vision",
+      model: "unknown",
+      purpose: "post_qa",
+      userId,
+      videoJobId: jobId,
+      requestSnapshot,
+      durationMs: Date.now() - startedAt,
+      status: "failed",
+      errorCode: "post_qa_provider_error",
+      errorMessage: message,
+    });
+    return {
+      batchId: batch.batchId,
+      kind: batch.kind,
+      segmentIndex: batch.segmentIndex,
+      frameLocations: batch.frameLocations,
+      passed: false,
+      failureCategory: "provider_unavailable",
+      qaJson: { passed: false, error: message },
+    };
+  }
+
+  let parsed: ReturnType<typeof parseQaJson>;
+  try {
+    parsed = parseQaJson(visionResult.qaJson);
+  } catch (error) {
+    await providerCallLogStore.createCallLog({
+      provider: visionResult.provider,
+      model: visionResult.model,
+      purpose: "post_qa",
+      userId,
+      videoJobId: jobId,
+      requestSnapshot,
+      responseSummary: visionResult.qaJson,
+      durationMs: Date.now() - startedAt,
+      status: "failed",
+      errorCode: "post_qa_schema_error",
+      errorMessage: errorMessage(error),
+    });
+    return {
+      batchId: batch.batchId,
+      kind: batch.kind,
+      segmentIndex: batch.segmentIndex,
+      frameLocations: batch.frameLocations,
+      passed: false,
+      failureCategory: "provider_schema_error",
+      qaJson: visionResult.qaJson,
+    };
+  }
+
+  await providerCallLogStore.createCallLog({
+    provider: visionResult.provider,
+    model: visionResult.model,
+    purpose: "post_qa",
+    userId,
+    videoJobId: jobId,
+    requestSnapshot,
+    responseSummary: visionResult.qaJson,
+    durationMs: Date.now() - startedAt,
+    status: parsed.passed ? "succeeded" : "blocked",
+  });
+
+  return {
+    batchId: batch.batchId,
+    kind: batch.kind,
+    segmentIndex: batch.segmentIndex,
+    frameLocations: batch.frameLocations,
+    passed: parsed.passed,
+    failureCategory: parsed.failureCategory,
+    qaJson: visionResult.qaJson,
+  };
+}
+
 export async function runPostQaCheck({
   jobStore = createDrizzleJobStore(),
   postQaStore = createDrizzlePostQaStore(),
   providerCallLogStore = createDrizzleProviderCallLogStore(),
+  segmentStore,
   creditStore,
   jobId,
   userId,
@@ -201,10 +340,12 @@ export async function runPostQaCheck({
   frameKeys,
   createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
   visionProvider = defaultPostQaVisionProvider,
+  selectedTemplateIds = [],
 }: {
   jobStore?: JobStore;
   postQaStore?: PostQaStore;
   providerCallLogStore?: ProviderCallLogStore;
+  segmentStore?: VideoSegmentStore;
   creditStore?: CreditLedgerStore;
   jobId: string;
   userId: string;
@@ -212,7 +353,19 @@ export async function runPostQaCheck({
   frameKeys: string[];
   createSignedUrl?: (input: { key: string }) => Promise<string>;
   visionProvider?: PostQaVisionProvider;
+  selectedTemplateIds?: string[];
 }) {
+  const hasHumanTurn = selectedTemplateIds.some((templateId) =>
+    ["model_quarter_turn", "model_half_turn"].includes(templateId),
+  );
+  const qaRequirements = hasHumanTurn
+    ? [
+        "same visible person across relevant frames",
+        "natural head, arm, hand, hip, and leg anatomy",
+        "garment front/side/back consistency",
+        "turn stops at the supported angle and never completes 360 degrees",
+      ]
+    : [];
   if (frameKeys.length === 0) {
     const currentJob = await jobStore.findJob(jobId);
     if (currentJob?.status === "post_qa_queued") {
@@ -249,97 +402,85 @@ export async function runPostQaCheck({
     });
   }
 
-  const startedAt = Date.now();
-  const frameUrls = await Promise.all(
-    frameKeys.map((key) => createSignedUrl({ key })),
-  );
-  const requestSnapshot: JsonValue = {
-    mode,
-    frameCount: frameKeys.length,
-  };
-
-  let visionResult: PostQaVisionResult;
-  try {
-    visionResult = await visionProvider({ mode, frameUrls });
-  } catch (error) {
-    await providerCallLogStore.createCallLog({
-      provider: "vision",
-      model: "unknown",
-      purpose: "post_qa",
-      userId,
-      videoJobId: jobId,
-      requestSnapshot,
-      durationMs: Date.now() - startedAt,
-      status: "failed",
-      errorCode: "post_qa_provider_error",
-      errorMessage: errorMessage(error),
-    });
-
-    return resolvePostQaResult({
-      jobStore,
-      postQaStore,
-      ...(creditStore ? { creditStore } : {}),
-      jobId,
-      status: "failed",
-      mode,
-      frameKeys,
-      resultJson: { passed: false, error: errorMessage(error) },
-      failureCategory: "provider_unavailable",
-    });
+  const batchResults: PostQaBatchResult[] = [];
+  for (const batch of buildPostQaFrameBatches(frameKeys)) {
+    batchResults.push(
+      await analyzeBatch({
+        batch,
+        mode,
+        jobId,
+        userId,
+        createSignedUrl,
+        visionProvider,
+        providerCallLogStore,
+        qaRequirements,
+      }),
+    );
   }
 
-  let parsed: ReturnType<typeof parseQaJson>;
-  try {
-    parsed = parseQaJson(visionResult.qaJson);
-  } catch (error) {
-    await providerCallLogStore.createCallLog({
-      provider: visionResult.provider,
-      model: visionResult.model,
-      purpose: "post_qa",
-      userId,
-      videoJobId: jobId,
-      requestSnapshot,
-      responseSummary: visionResult.qaJson,
-      durationMs: Date.now() - startedAt,
-      status: "failed",
-      errorCode: "post_qa_schema_error",
-      errorMessage: errorMessage(error),
-    });
+  const failedSegmentIndexes = [
+    ...new Set(
+      batchResults
+        .filter((batch) => !batch.passed && batch.kind === "segment")
+        .flatMap((batch) =>
+          batch.segmentIndex === null ? [] : [batch.segmentIndex],
+        ),
+    ),
+  ].sort((left, right) => left - right);
+  const failedTransitionLocations = batchResults
+    .filter((batch) => !batch.passed && batch.kind === "transition")
+    .flatMap((batch) => batch.frameLocations);
+  const passed = batchResults.every((batch) => batch.passed);
+  const failureCategory =
+    batchResults.find((batch) => !batch.passed)?.failureCategory ?? null;
+  const resultJson = {
+    passed,
+    batches: batchResults,
+    failedSegmentIndexes,
+    failedTransitionLocations,
+  } as unknown as JsonValue;
 
-    return resolvePostQaResult({
+  const isLocalizedSingleSegmentFailure =
+    (frameKeys.length === 24 || frameKeys.length === 34) &&
+    failedSegmentIndexes.length === 1 &&
+    failedTransitionLocations.length === 0 &&
+    batchResults.every(
+      (batch) =>
+        batch.passed ||
+        (batch.kind === "segment" &&
+          batch.failureCategory !== "provider_unavailable" &&
+          batch.failureCategory !== "provider_schema_error"),
+    );
+  if (isLocalizedSingleSegmentFailure) {
+    const retryResult = await retryLocalizedPostQaSegment({
       jobStore,
+      segmentStore: segmentStore ?? createDrizzleVideoSegmentStore(),
       postQaStore,
-      ...(creditStore ? { creditStore } : {}),
       jobId,
-      status: "failed",
+      segmentIndex: failedSegmentIndexes[0] as number,
       mode,
       frameKeys,
-      resultJson: visionResult.qaJson,
-      failureCategory: "provider_schema_error",
+      resultJson,
     });
+    if (retryResult.requeued) {
+      return {
+        jobId,
+        status: "segments_queued" as const,
+        retriedSegmentIndex: retryResult.segmentIndex,
+        ledgerType: null,
+      };
+    }
   }
-
-  await providerCallLogStore.createCallLog({
-    provider: visionResult.provider,
-    model: visionResult.model,
-    purpose: "post_qa",
-    userId,
-    videoJobId: jobId,
-    requestSnapshot,
-    responseSummary: visionResult.qaJson,
-    durationMs: Date.now() - startedAt,
-    status: parsed.passed ? "succeeded" : "blocked",
-  });
 
   return resolvePostQaResult({
     jobStore,
     postQaStore,
     ...(creditStore ? { creditStore } : {}),
     jobId,
-    status: parsed.passed ? "passed" : "failed",
+    status: passed ? "passed" : "failed",
     mode,
     frameKeys,
-    resultJson: visionResult.qaJson,
-    failureCategory: parsed.failureCategory,
+    resultJson,
+    failureCategory,
   });
 }

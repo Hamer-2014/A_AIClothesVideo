@@ -334,6 +334,34 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
         ])}
       />
 
+      <section className="space-y-3">
+        <p className="text-xs leading-5 text-[var(--muted)]">
+          仅比较本次任务中的可见模特与服装，不建立人脸库或跨任务身份标识。
+        </p>
+        <SectionTable
+          title="任务内多图一致性"
+          columns={[
+            "类型",
+            "状态",
+            "Garment",
+            "Model",
+            "Confidence",
+            "覆盖视角",
+            "Risk Flags",
+          ]}
+          emptyText="当前没有任务内多图一致性分析记录。"
+          rows={detail.consistencyAnalyses.map((analysis) => [
+            analysis.analysisKind,
+            analysis.status,
+            `garment_match: ${analysis.garmentMatch}`,
+            `model_match: ${analysis.modelMatch}`,
+            `置信度: ${analysis.confidence ?? "-"}`,
+            stringifyJson(analysis.viewCoverage),
+            stringifyJson(analysis.riskFlags),
+          ])}
+        />
+      </section>
+
       <section className="rounded-lg border border-[var(--line)] bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-base font-medium">管理员备注</h3>
