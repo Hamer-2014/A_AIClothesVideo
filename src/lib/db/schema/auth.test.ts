@@ -3,7 +3,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { users, verifications, authEmailEvents } from "./auth";
+import {
+  authEmailEvents,
+  authEmailEventStatusValues,
+  users,
+  verifications,
+} from "./auth";
 import { assets } from "./assets";
 import { adminAuditLogs, abuseEvents } from "./audit";
 import { creditLedger, creditWallets, orders } from "./credits";
@@ -12,6 +17,22 @@ import { promptModerationResults, providerCallLogs } from "./providers";
 import { adminRoles, userProfiles } from "./users";
 
 describe("auth schema compatibility", () => {
+  it("supports reserving an auth email before provider delivery", () => {
+    expect(authEmailEventStatusValues).toEqual(["pending", "sent", "failed"]);
+    expect(authEmailEvents.status.hasDefault).toBe(false);
+
+    const migrationPath = path.resolve(
+      process.cwd(),
+      "drizzle",
+      "0017_auth_email_rate_limit.sql",
+    );
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain("ADD VALUE IF NOT EXISTS 'pending' BEFORE 'sent'");
+    expect(sql).toContain("auth_email_events_email_created_at_idx");
+    expect(sql).toContain("auth_email_events_ip_created_at_idx");
+  });
+
   it("stores users.emailVerified as a boolean field for Better Auth", () => {
     expect(users.emailVerified.columnType).toBe("PgBoolean");
   });
