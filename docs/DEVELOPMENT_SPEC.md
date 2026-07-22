@@ -382,6 +382,9 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] 配置 better-auth。
 - [ ] 配置 Google OAuth。
 - [ ] 配置 Resend Email OTP/Magic Link。
+- [ ] 登录邮件服务端限频：同一规范化邮箱在 OTP/Magic Link 间共享 60 秒冷却和每小时 5 次配额；同一 IP 共享每 10 分钟 10 次配额。
+- [ ] 限频在调用 Resend 前通过数据库事务原子预占；Vercel 实例内存和前端按钮状态不能作为安全边界。
+- [ ] `pending`、`sent`、`failed` 邮件事件均计入配额，成功或失败后保存 provider message ID 或错误信息。
 - [ ] 禁用密码登录。
 - [ ] 首次登录创建 `user_profiles`。
 - [ ] 邮箱验证完成后才可发放免费试用。
