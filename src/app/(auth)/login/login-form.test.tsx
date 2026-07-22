@@ -119,7 +119,14 @@ describe("LoginForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "发送邮箱验证码" }));
 
-    expect(await screen.findAllByText(/60 秒后可重发/)).toHaveLength(2);
+    expect(await screen.findByText("验证码 60s")).toHaveClass(
+      "whitespace-nowrap",
+      "tabular-nums",
+    );
+    expect(screen.getByText("Magic Link 60s")).toHaveClass(
+      "whitespace-nowrap",
+      "tabular-nums",
+    );
     expect(mocks.magicLinkSignIn).not.toHaveBeenCalled();
   });
 
@@ -137,14 +144,16 @@ describe("LoginForm", () => {
       );
       await Promise.resolve();
     });
-    expect(screen.getAllByText(/60 秒后可重发/)).toHaveLength(2);
+    expect(screen.getByText("验证码 60s")).toBeInTheDocument();
+    expect(screen.getByText("Magic Link 60s")).toBeInTheDocument();
 
     vi.setSystemTime(new Date("2026-07-22T00:00:30.000Z"));
     await act(async () => {
       vi.advanceTimersToNextTimer();
     });
 
-    expect(screen.getAllByText(/29 秒后可重发/)).toHaveLength(2);
+    expect(screen.getByText("验证码 29s")).toBeInTheDocument();
+    expect(screen.getByText("Magic Link 29s")).toBeInTheDocument();
   });
 
   it("shows rate limit feedback instead of a false success", async () => {

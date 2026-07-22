@@ -143,7 +143,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button
-          className="flex h-11 items-center justify-center gap-2 rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-60"
           disabled={emailActionsDisabled}
           onClick={sendOtp}
           type="button"
@@ -152,11 +152,11 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
           {pendingAction === "otp"
             ? "发送中..."
             : cooldownSeconds > 0
-              ? `验证码 ${cooldownSeconds} 秒后可重发`
+              ? `验证码 ${cooldownSeconds}s`
               : "发送邮箱验证码"}
         </button>
         <button
-          className="flex h-11 items-center justify-center gap-2 rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-60"
           disabled={emailActionsDisabled}
           onClick={sendMagicLink}
           type="button"
@@ -165,7 +165,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
           {pendingAction === "magic-link"
             ? "发送中..."
             : cooldownSeconds > 0
-              ? `Magic Link ${cooldownSeconds} 秒后可重发`
+              ? `Magic Link ${cooldownSeconds}s`
               : "发送 Magic Link"}
         </button>
       </div>
