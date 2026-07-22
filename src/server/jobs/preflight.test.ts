@@ -6,6 +6,90 @@ import { preflightVideoJob } from "./preflight";
 const userId = "22222222-2222-4222-8222-222222222222";
 
 describe("video job preflight", () => {
+  it("requires front back and detail for the product showcase protocol", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+
+    const result = await preflightVideoJob({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      captureProtocol: "product_showcase",
+    });
+
+    expect(result.canCreateJob).toBe(false);
+    expect(result.requiredAssetRoles).toEqual(["front", "back", "detail"]);
+    expect(result.blockingReasons).toEqual(
+      expect.arrayContaining([
+        {
+          code: "back_asset_required",
+          message: "三图商品展示还需要一张背面图。",
+        },
+        {
+          code: "detail_asset_required",
+          message: "三图商品展示还需要一张细节图。",
+        },
+      ]),
+    );
+  });
+
+  it("accepts exactly three matching product showcase roles", async () => {
+    const store = createInMemoryVideoJobCreationStore(
+      ["front", "back", "detail"].map((role) => ({
+        id: `asset-${role}`,
+        userId,
+        status: "uploaded" as const,
+        detectedRole: role as "front" | "back" | "detail",
+      })),
+    );
+
+    const result = await preflightVideoJob({
+      store,
+      userId,
+      assetIds: ["asset-front", "asset-back", "asset-detail"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      captureProtocol: "product_showcase",
+    });
+
+    expect(result.canCreateJob).toBe(true);
+    expect(result.requiredAssetRoles).toEqual(["front", "back", "detail"]);
+    expect(result.blockingReasons).toEqual([]);
+  });
+
+  it("rejects more than three assets for an explicit three-image protocol", async () => {
+    const store = createInMemoryVideoJobCreationStore(
+      ["front", "back", "detail", "scene"].map((role) => ({
+        id: `asset-${role}`,
+        userId,
+        status: "uploaded" as const,
+        detectedRole: role as "front" | "back" | "detail" | "scene",
+      })),
+    );
+
+    const result = await preflightVideoJob({
+      store,
+      userId,
+      assetIds: ["asset-front", "asset-back", "asset-detail", "asset-scene"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      captureProtocol: "product_showcase",
+    });
+
+    expect(result.blockingReasons).toContainEqual({
+      code: "asset_count_mismatch",
+      message: "请选择当前生成方式要求的 3 张图片。",
+    });
+  });
+
   it("blocks assets without rights attestation before job creation", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

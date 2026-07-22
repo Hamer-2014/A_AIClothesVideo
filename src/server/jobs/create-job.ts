@@ -27,6 +27,10 @@ import type {
   generationProfileValues,
 } from "@/lib/db/schema/jobs";
 import {
+  getCaptureProtocol,
+  type CaptureProtocolId,
+} from "@/lib/video/capture-protocols";
+import {
   recordFunnelEventSafely,
   type FunnelEventStore,
 } from "@/server/analytics/funnel-events";
@@ -60,6 +64,8 @@ export interface CreatedVideoJob {
   userVisibleStatus: string;
   durationSeconds: number;
   aspectRatio: VideoAspectRatio;
+  captureProtocol: CaptureProtocolId;
+  skuName: string | null;
   presetId: string | null;
   presetSnapshot: JsonValue | null;
   postQaMode: "lite" | "standard" | "strict" | "off";
@@ -217,6 +223,10 @@ function roleForAsset(asset: JobCreatableAsset) {
   return asset.detectedRole && asset.detectedRole !== "unknown"
     ? asset.detectedRole
     : "unknown";
+}
+
+function normalizeSkuName(value: string | null | undefined) {
+  return value?.trim().slice(0, 80) || null;
 }
 
 export function createInMemoryVideoJobCreationStore(
@@ -458,6 +468,8 @@ export function createDrizzleVideoJobCreationStore(
           userVisibleStatus: videoJobs.userVisibleStatus,
           durationSeconds: videoJobs.durationSeconds,
           aspectRatio: videoJobs.aspectRatio,
+          captureProtocol: videoJobs.captureProtocol,
+          skuName: videoJobs.skuName,
           presetId: videoJobs.presetId,
           presetSnapshot: videoJobs.presetSnapshot,
           postQaMode: videoJobs.postQaMode,
@@ -683,6 +695,8 @@ export async function createVideoJobWithAssets({
   useFreeTrialIfAvailable,
   isTest = false,
   presetId,
+  captureProtocol,
+  skuName,
   now = new Date(),
   requestContext,
   email,
@@ -703,6 +717,8 @@ export async function createVideoJobWithAssets({
   useFreeTrialIfAvailable?: boolean;
   isTest?: boolean;
   presetId?: string | null;
+  captureProtocol?: CaptureProtocolId | null;
+  skuName?: string | null;
   now?: Date;
   requestContext?: RequestContext;
   email?: string | null;
@@ -715,6 +731,8 @@ export async function createVideoJobWithAssets({
   funnelEventStore?: FunnelEventStore;
 }) {
   const uniqueAssetIds = Array.from(new Set(assetIds));
+  const enforceCaptureProtocol = captureProtocol != null;
+  const resolvedCaptureProtocol = getCaptureProtocol(captureProtocol);
   assertValidInput({ assetIds: uniqueAssetIds, durationSeconds, aspectRatio });
   if (!isVideoDuration(durationSeconds)) {
     throw new Error("Unsupported video duration.");
@@ -746,6 +764,19 @@ export async function createVideoJobWithAssets({
     )
   ) {
     throw new Error("Rights attestation is required for all assets.");
+  }
+
+  if (enforceCaptureProtocol) {
+    const assetRoles = new Set(ownedAssets.map(roleForAsset));
+    const hasRequiredRoles = resolvedCaptureProtocol.slots.every((slot) =>
+      assetRoles.has(slot.role),
+    );
+    if (
+      uniqueAssetIds.length !== resolvedCaptureProtocol.slots.length ||
+      !hasRequiredRoles
+    ) {
+      throw new Error("Capture protocol assets do not match the required slots.");
+    }
   }
 
   const rightsAttestationSnapshot = {
@@ -861,6 +892,8 @@ export async function createVideoJobWithAssets({
     userVisibleStatus: "analyzing_assets",
     durationSeconds,
     aspectRatio: aspectRatio as VideoAspectRatio,
+    captureProtocol: resolvedCaptureProtocol.id,
+    skuName: normalizeSkuName(skuName),
     presetId: preset.id,
     presetSnapshot,
     postQaMode: profile.postQaMode,

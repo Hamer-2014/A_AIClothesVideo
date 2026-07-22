@@ -7,17 +7,15 @@ const mocks = vi.hoisted(() => ({
   emailOTP: vi.fn((options) => ({ id: "email-otp", options })),
   magicLink: vi.fn((options) => ({ id: "magic-link", options })),
   getDb: vi.fn(() => ({ db: true })),
-  buildMagicLinkEmail: vi.fn(() => ({
-    subject: "magic",
-    html: "<p>magic</p>",
-    text: "magic",
-  })),
   buildOtpEmail: vi.fn(() => ({
     subject: "otp",
     html: "<p>otp</p>",
     text: "otp",
   })),
   sendAuthEmail: vi.fn(),
+  deliverRateLimitedAuthEmail: vi.fn(),
+  recordAuthEmailDeliveryError: vi.fn(),
+  recordAuthEmailRateLimitError: vi.fn(),
 }));
 
 vi.mock("better-auth", () => ({
@@ -37,8 +35,20 @@ vi.mock("@/lib/db/client", () => ({
   getDb: mocks.getDb,
 }));
 
+vi.mock("@/server/auth/email-rate-limit", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/server/auth/email-rate-limit")
+  >("@/server/auth/email-rate-limit");
+
+  return {
+    ...actual,
+    deliverRateLimitedAuthEmail: mocks.deliverRateLimitedAuthEmail,
+    recordAuthEmailDeliveryError: mocks.recordAuthEmailDeliveryError,
+    recordAuthEmailRateLimitError: mocks.recordAuthEmailRateLimitError,
+  };
+});
+
 vi.mock("./email", () => ({
-  buildMagicLinkEmail: mocks.buildMagicLinkEmail,
   buildOtpEmail: mocks.buildOtpEmail,
   sendAuthEmail: mocks.sendAuthEmail,
 }));
@@ -48,6 +58,101 @@ describe("auth config", () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  it("enables burst limits for Email OTP without initializing Magic Link", async () => {
+    const { createAuth } = await import("./config");
+
+    createAuth();
+
+    expect(mocks.betterAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rateLimit: { enabled: true },
+      }),
+    );
+    expect(mocks.emailOTP).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rateLimit: { window: 60, max: 3 },
+      }),
+    );
+    expect(mocks.magicLink).not.toHaveBeenCalled();
+  });
+
+  it("passes request context through the Email OTP delivery", async () => {
+    const { createAuth } = await import("./config");
+    const request = new Request("https://app.example/api/auth", {
+      headers: { "x-forwarded-for": "203.0.113.10" },
+    });
+    mocks.deliverRateLimitedAuthEmail.mockResolvedValue({
+      provider: "resend",
+      providerMessageId: "email-1",
+    });
+
+    createAuth();
+    const otpOptions = mocks.emailOTP.mock.calls.at(-1)?.[0];
+
+    await otpOptions.sendVerificationOTP(
+      { email: "seller@example.com", otp: "123456", type: "sign-in" },
+      { request },
+    );
+    expect(mocks.deliverRateLimitedAuthEmail).toHaveBeenCalledOnce();
+    expect(mocks.deliverRateLimitedAuthEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "seller@example.com",
+        type: "sign_in_otp",
+        request,
+      }),
+    );
+  });
+
+  it("maps persistent email limits to a structured 429 response", async () => {
+    const { AuthEmailRateLimitError } = await import(
+      "@/server/auth/email-rate-limit"
+    );
+    const { createAuth } = await import("./config");
+    mocks.deliverRateLimitedAuthEmail.mockRejectedValue(
+      new AuthEmailRateLimitError(42),
+    );
+
+    createAuth();
+    const otpOptions = mocks.emailOTP.mock.calls.at(-1)?.[0];
+
+    await expect(
+      otpOptions.sendVerificationOTP(
+        { email: "seller@example.com", otp: "123456", type: "sign-in" },
+        { request: new Request("https://app.example/api/auth") },
+      ),
+    ).rejects.toMatchObject({
+      status: "TOO_MANY_REQUESTS",
+      statusCode: 429,
+      body: {
+        code: "AUTH_EMAIL_RATE_LIMITED",
+        retryAfterSeconds: 42,
+      },
+      headers: { "Retry-After": "42" },
+    });
+    expect(mocks.recordAuthEmailRateLimitError).toHaveBeenCalledWith(
+      expect.objectContaining({ retryAfterSeconds: 42 }),
+    );
+  });
+
+  it("captures non-rate-limit delivery failures before rethrowing", async () => {
+    const deliveryError = new Error("resend unavailable");
+    const { createAuth } = await import("./config");
+    mocks.deliverRateLimitedAuthEmail.mockRejectedValue(deliveryError);
+
+    createAuth();
+    const otpOptions = mocks.emailOTP.mock.calls.at(-1)?.[0];
+
+    await expect(
+      otpOptions.sendVerificationOTP(
+        { email: "seller@example.com", otp: "123456", type: "sign-in" },
+        { request: new Request("https://app.example/api/auth") },
+      ),
+    ).rejects.toBe(deliveryError);
+    expect(mocks.recordAuthEmailDeliveryError).toHaveBeenCalledWith(
+      deliveryError,
+    );
   });
 
   it("does not throw on module import when auth env vars are missing", async () => {

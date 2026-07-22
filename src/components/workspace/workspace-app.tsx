@@ -21,6 +21,11 @@ import {
   type WorkspaceEntryMode,
 } from "@/lib/presets";
 import { getVideoSpec, type VideoDuration } from "@/lib/video/specs";
+import {
+  defaultCaptureProtocolId,
+  getCaptureProtocol,
+  type CaptureProtocolId,
+} from "@/lib/video/capture-protocols";
 import { validateTemplateSlots } from "@/lib/video/template-slots";
 import {
   WORKSPACE_GUEST_DRAFT_KEY,
@@ -31,6 +36,7 @@ import type { TrialStatus } from "@/server/trial/status";
 
 import { StylePresetSelector } from "./style-preset-selector";
 import { TemplateSlotEditor } from "./template-slot-editor";
+import { CaptureProtocolSelector } from "./capture-protocol-selector";
 
 interface TemplateCatalogItem {
   templateId: string;
@@ -312,6 +318,9 @@ export function WorkspaceApp({
   const [selectedPresetId, setSelectedPresetId] = useState<StylePresetId>(
     initialPreset.id,
   );
+  const [captureProtocolId, setCaptureProtocolId] =
+    useState<CaptureProtocolId>(defaultCaptureProtocolId);
+  const [skuName, setSkuName] = useState("");
   const [durationSeconds, setDurationSeconds] = useState<VideoDuration>(
     initialMode === "trial" ? 8 : initialPreset.defaultDurationSeconds,
   );
@@ -390,6 +399,8 @@ export function WorkspaceApp({
       setSelectedPresetId(draft.presetId);
       setDurationSeconds(draft.durationSeconds);
       setAspectRatio(draft.aspectRatio);
+      setCaptureProtocolId(draft.captureProtocol);
+      setSkuName(draft.skuName);
       setUserPrompt(draft.userPrompt);
       setMessage("已恢复刚才的配置，请重新选择图片后生成。");
       void trackFunnelEvent("guest_draft_restored", {
@@ -423,8 +434,10 @@ export function WorkspaceApp({
     previewableAssetStatuses.has(asset.status),
   );
   const currentPreset = getStylePreset(selectedPresetId);
+  const currentCaptureProtocol = getCaptureProtocol(captureProtocolId);
   const canUseFreeTrial =
     durationSeconds === 8 &&
+    captureProtocolId === "product_showcase" &&
     (!trialStatus || trialStatus.state === "available");
   const showAdvancedManualControls = advancedOpen;
   const uploadedRoles = useMemo(
@@ -436,22 +449,18 @@ export function WorkspaceApp({
       ),
     [assets, previewableAssetStatuses],
   );
-  const hasFrontAsset = uploadedRoles.has("front");
+  const missingCaptureSlots = currentCaptureProtocol.slots.filter(
+    (slot) => !uploadedRoles.has(slot.role),
+  );
+  const hasRequiredAssets = missingCaptureSlots.length === 0;
   const generationDisabled =
-    busyAction !== null || imagesUploading || !hasFrontAsset;
-  const frontGateMessage = hasFrontAsset ? null : "请先上传正面图。";
-  const presetRequirementText = useMemo(() => {
-    switch (selectedPresetId) {
-      case "marketplace_clean":
-        return "电商主图动效必须正面图；场景图/细节图可辅助背景、氛围和可见细节判断。";
-      case "social_lifestyle":
-        return "社媒氛围短片必须正面图；推荐补充场景图。";
-      case "minimal_studio":
-      default:
-        return "极简棚拍必须正面图；背面/细节/场景为可选。";
-    }
-  }, [selectedPresetId]);
-  const controlStatusMessage = generationStatus ?? frontGateMessage;
+    busyAction !== null || imagesUploading || !hasRequiredAssets;
+  const assetGateMessage = hasRequiredAssets
+    ? null
+    : `还需上传${missingCaptureSlots
+        .map((slot) => slot.label)
+        .join(missingCaptureSlots.length === 2 ? "和" : "、")}。`;
+  const controlStatusMessage = generationStatus ?? assetGateMessage;
   const materialWarnings = useMemo(() => {
     if (!jobDetail) {
       return [];
@@ -511,6 +520,20 @@ export function WorkspaceApp({
         sourcePage: "workspace",
       });
     }
+  }
+
+  function changeCaptureProtocol(protocolId: CaptureProtocolId) {
+    const nextProtocol = getCaptureProtocol(protocolId);
+    const nextRoles = new Set<string>(
+      nextProtocol.slots.map((slot) => slot.role),
+    );
+    setCaptureProtocolId(nextProtocol.id);
+    setAssets((current) =>
+      current.filter((asset) => nextRoles.has(asset.intendedRole)),
+    );
+    setMessage(null);
+    setJobDetail(null);
+    setSelectedTemplateIds([]);
   }
 
   function changeDurationSeconds(value: VideoDuration) {
@@ -764,6 +787,8 @@ export function WorkspaceApp({
           presetId: selectedPresetId,
           durationSeconds,
           aspectRatio,
+          captureProtocol: captureProtocolId,
+          skuName,
           userPrompt,
           intendedAssetRoles: assets.map((asset) => asset.intendedRole),
           fileNames: assets.map((asset) => asset.fileName),
@@ -778,9 +803,9 @@ export function WorkspaceApp({
       return;
     }
 
-    if (!hasFrontAsset) {
+    if (!hasRequiredAssets) {
       setGenerationStatus(null);
-      setMessage("请先上传正面图。");
+      setMessage(assetGateMessage);
       return;
     }
 
@@ -788,8 +813,8 @@ export function WorkspaceApp({
       .filter((asset) => asset.status === "uploaded")
       .map((asset) => asset.assetId);
 
-    if (uploadedAssetIds.length === 0) {
-      setMessage("请先上传至少一张素材图。");
+    if (uploadedAssetIds.length !== currentCaptureProtocol.slots.length) {
+      setMessage("请选择当前生成方式要求的 3 张图片。");
       return;
     }
 
@@ -798,6 +823,8 @@ export function WorkspaceApp({
       assetIds: uploadedAssetIds,
       durationSeconds,
       aspectRatio,
+      captureProtocol: captureProtocolId,
+      skuName: skuName.trim() || null,
       presetId: selectedPresetId,
       useFreeTrialIfAvailable,
       deviceFingerprint,
@@ -1130,16 +1157,16 @@ export function WorkspaceApp({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-[var(--line)] bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
+      <section className="bg-transparent sm:rounded-[var(--radius-lg)] sm:border sm:border-[var(--line)] sm:bg-white sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] pb-3 sm:gap-4 sm:pb-5">
           <div>
             <h2 className="text-base font-medium">创建商品短视频</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-              先上传正面主图，再补背面、细节、侧面或场景素材。系统会自动分析素材、选择安全模板并提交生成。
+            <p className="mt-2 hidden max-w-3xl text-sm leading-6 text-[var(--muted)] sm:block">
+              选择一种三图生成方式，按对应视角上传同一件服装。系统会先检查一致性，再选择安全镜头并提交生成。
             </p>
           </div>
           <div className="space-y-2 text-right">
-            <div className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-medium text-[var(--accent)]">
+            <div className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-xs font-medium text-[var(--action-hover)]">
               {durationSeconds} 秒 · {aspectRatio} · {paidCost} 点
             </div>
             {message ? (
@@ -1151,11 +1178,45 @@ export function WorkspaceApp({
         </div>
 
         <div
-          className="mt-5 grid gap-6 xl:min-h-[calc(100svh-13rem)] xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)] xl:items-stretch"
+          className="mt-3 grid gap-5 sm:mt-5 xl:min-h-[calc(100svh-13rem)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:items-stretch"
           data-testid="workspace-main-stage"
         >
+          <section
+            className="space-y-4 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-subtle)] p-3 sm:space-y-5 sm:p-4 xl:min-h-full"
+            data-testid="workspace-material-panel"
+          >
+            <div
+              className="flex min-h-0 items-start justify-between gap-3 sm:min-h-16"
+              data-testid="workspace-panel-header"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--brand)]">
+                  01 / 素材
+                </p>
+                <h3 className="mt-2 text-base font-medium">选择生成方式并上传三张图</h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {currentCaptureProtocol.slots.map((slot) => slot.label).join("、")}
+                </p>
+              </div>
+            </div>
+            <CaptureProtocolSelector
+              onChange={changeCaptureProtocol}
+              selectedId={captureProtocolId}
+            />
+            <UploadPanel
+              assets={assets}
+              isAuthenticated={isAuthenticated}
+              onRemoveUploaded={removeUploadedAsset}
+              onRightsAcceptedChange={setRightsAccepted}
+              onUploaded={addUploadedAsset}
+              onUploadingChange={setImagesUploading}
+              rightsAccepted={rightsAccepted}
+              slots={currentCaptureProtocol.slots}
+            />
+          </section>
+
           <aside
-            className="space-y-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:min-h-full"
+            className="space-y-5 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-raised)] p-4 xl:min-h-full"
             data-testid="workspace-control-rail"
           >
             <div
@@ -1163,11 +1224,30 @@ export function WorkspaceApp({
               data-testid="workspace-panel-header"
             >
               <div>
-                <h3 className="text-sm font-medium">生成控制</h3>
+                <p className="text-xs font-semibold uppercase text-[var(--brand)]">
+                  02 / 设置
+                </p>
+                <h3 className="mt-2 text-base font-medium">配置输出</h3>
                 <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
                   主按钮会按推荐模板自动完成分析、分镜和提交。
                 </p>
               </div>
+            </div>
+            <div>
+              <label
+                className="text-xs font-medium text-[var(--muted)]"
+                htmlFor="workspace-sku-name"
+              >
+                商品名称或 SKU（可选）
+              </label>
+              <input
+                className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-3 text-sm outline-none transition focus:border-[var(--action)] focus:ring-2 focus:ring-[var(--focus)]"
+                id="workspace-sku-name"
+                maxLength={80}
+                onChange={(event) => setSkuName(event.target.value)}
+                placeholder="例如 Linen Dress / SKU-1024"
+                value={skuName}
+              />
             </div>
             <SpecSelector
               aspectRatio={aspectRatio}
@@ -1182,28 +1262,32 @@ export function WorkspaceApp({
             />
             <section
               aria-label="当前风格素材要求"
-              className="rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-slate-800"
+              className="rounded-[var(--radius-md)] border border-[var(--line-strong)] bg-[var(--brand-soft)] px-3 py-2 text-xs leading-5 text-[var(--ink)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">
-                    当前风格素材要求 / 生成前检查
+                    三图要求 / 生成前检查
                   </p>
-                  <p className="mt-1 text-slate-700">{presetRequirementText}</p>
+                  <p className="mt-1 text-[var(--muted)]">
+                    {currentCaptureProtocol.description}
+                  </p>
                   {uploadedRoles.has("scene") ? (
-                    <p className="mt-1 text-slate-700">
+                    <p className="mt-1 text-[var(--muted)]">
                       场景图只作为背景和氛围参考，不作为服装细节来源。
                     </p>
                   ) : null}
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    hasFrontAsset
-                      ? "bg-white text-emerald-700"
-                      : "bg-white text-amber-700"
+                    hasRequiredAssets
+                      ? "bg-white text-[var(--success)]"
+                      : "bg-white text-[var(--warning)]"
                   }`}
                 >
-                  {hasFrontAsset ? "正面图已就绪" : "缺少正面图"}
+                  {hasRequiredAssets
+                    ? "3 / 3 已就绪"
+                    : `${3 - missingCaptureSlots.length} / 3 已就绪`}
                 </span>
               </div>
             </section>
@@ -1236,7 +1320,7 @@ export function WorkspaceApp({
                 aria-live="polite"
                 className={`rounded-md border px-3 py-2 text-sm leading-5 ${
                   generationStatus
-                    ? "border-cyan-300 bg-cyan-50 text-cyan-950"
+                    ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--ink)]"
                     : "border-amber-300 bg-amber-50 text-amber-900"
                 }`}
               >
@@ -1279,31 +1363,6 @@ export function WorkspaceApp({
             ) : null}
           </aside>
 
-          <section
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 xl:min-h-full"
-            data-testid="workspace-material-panel"
-          >
-            <div
-              className="mb-4 flex min-h-16 items-start justify-between gap-3"
-              data-testid="workspace-panel-header"
-            >
-              <div>
-                <h3 className="text-sm font-medium">素材画布</h3>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  正面图是主素材；其他素材用于开放背面、细节和场景模板。
-                </p>
-              </div>
-            </div>
-            <UploadPanel
-              assets={assets}
-              isAuthenticated={isAuthenticated}
-              onRemoveUploaded={removeUploadedAsset}
-              onRightsAcceptedChange={setRightsAccepted}
-              onUploaded={addUploadedAsset}
-              onUploadingChange={setImagesUploading}
-              rightsAccepted={rightsAccepted}
-            />
-          </section>
         </div>
       </section>
 

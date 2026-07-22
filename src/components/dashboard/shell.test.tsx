@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./shell";
 
 vi.mock("@/components/brand/logo", () => ({
-  LogoLockup: () => <div>RunwayTools</div>,
+  LogoLockup: () => <div>AI Clothes Video</div>,
 }));
 
 vi.mock("@/components/layout/app-footer", () => ({
@@ -42,6 +42,9 @@ describe("DashboardShell", () => {
     expect(screen.getByTestId("dashboard-header")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-page-intro")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-content")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "AI Clothes Video 工作台" }),
+    ).toHaveAttribute("href", "/workspace");
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /100 可用 \/ 20 冻结/ })).toHaveAttribute(
       "href",
@@ -50,7 +53,7 @@ describe("DashboardShell", () => {
     expect(screen.getByText("footer")).toBeInTheDocument();
   });
 
-  it("uses a soft brand selected state for dashboard nav items", () => {
+  it("uses the coral brand selected state for dashboard nav items", () => {
     render(
       <DashboardShell
         nav={[
@@ -66,9 +69,9 @@ describe("DashboardShell", () => {
     );
 
     const activeItem = screen.getByRole("link", { name: "工作台" });
-    expect(activeItem.className).toContain("bg-cyan-50");
-    expect(activeItem.className).toContain("text-[var(--accent-strong)]");
-    expect(activeItem.className).toContain("border-[var(--accent)]");
+    expect(activeItem.className).toContain("bg-[var(--brand-soft)]");
+    expect(activeItem.className).toContain("text-[var(--action-hover)]");
+    expect(activeItem.className).toContain("border-[var(--action)]");
     expect(activeItem.className).not.toContain("bg-[var(--ink)]");
     expect(activeItem.className).not.toContain("text-white");
   });

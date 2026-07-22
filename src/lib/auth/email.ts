@@ -42,37 +42,16 @@ export function buildOtpEmail({
         : "登录验证码";
 
   return {
-    subject: `RunwayTools ${purpose}`,
+    subject: `AI Clothes Video ${purpose}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #171715;">
         <p>${email}，你好。</p>
-        <p>你的 RunwayTools ${purpose}是：</p>
+        <p>你的 AI Clothes Video ${purpose}是：</p>
         <p style="font-size: 28px; letter-spacing: 4px; font-weight: 700;">${otp}</p>
         <p>验证码有效期约 10 分钟。如果不是你本人操作，可以忽略这封邮件。</p>
       </div>
     `,
-    text: `${email}，你好。\n\n你的 RunwayTools ${purpose}是：${otp}\n\n验证码有效期约 10 分钟。如果不是你本人操作，可以忽略这封邮件。`,
-  };
-}
-
-export function buildMagicLinkEmail({
-  email,
-  url,
-}: {
-  email: string;
-  url: string;
-}): AuthEmailContent {
-  return {
-    subject: "RunwayTools 登录链接",
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #171715;">
-        <p>${email}，你好。</p>
-        <p>点击下面的链接登录 RunwayTools：</p>
-        <p><a href="${url}">${url}</a></p>
-        <p>链接有效期较短。如果不是你本人操作，可以忽略这封邮件。</p>
-      </div>
-    `,
-    text: `${email}，你好。\n\n点击下面的链接登录 RunwayTools：\n${url}\n\n链接有效期较短。如果不是你本人操作，可以忽略这封邮件。`,
+    text: `${email}，你好。\n\n你的 AI Clothes Video ${purpose}是：${otp}\n\n验证码有效期约 10 分钟。如果不是你本人操作，可以忽略这封邮件。`,
   };
 }
 

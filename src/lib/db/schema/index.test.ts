@@ -98,6 +98,16 @@ describe("database schema", () => {
     );
   });
 
+  it("stores the three-image capture protocol and an optional sku name", () => {
+    expect(schema.captureProtocolValues).toEqual([
+      "product_showcase",
+      "product_rotation",
+      "model_turn",
+    ]);
+    expect(schema.videoJobs).toHaveProperty("captureProtocol");
+    expect(schema.videoJobs).toHaveProperty("skuName");
+  });
+
   it("keeps segments, ledger, provider calls, and state events as first-class tables", () => {
     expect(schema.videoSegments).toHaveProperty("providerTaskId");
     expect(schema.videoSegments).toHaveProperty("templateId");

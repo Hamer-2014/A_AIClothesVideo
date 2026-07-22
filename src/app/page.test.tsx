@@ -28,6 +28,27 @@ describe("Home", () => {
     vi.clearAllMocks();
   });
 
+  it("leads with the AI Clothes Video brand and real three-image proof", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await Home());
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "AI Clothes Video" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/上传 3 张服装图/)).toBeInTheDocument();
+    expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
+      "src",
+      "/demo/red-dress-video.mp4",
+    );
+    expect(screen.getByAltText("红色礼服正面原始素材")).toHaveAttribute(
+      "src",
+      expect.stringContaining("/demo/red-dress-front.webp"),
+    );
+    expect(screen.getByAltText("红色礼服背面原始素材")).toBeInTheDocument();
+    expect(screen.getByAltText("红色礼服细节原始素材")).toBeInTheDocument();
+  });
+
   it("shows anonymous trial actions to visitors", async () => {
     mocks.getServerSession.mockResolvedValue(null);
 

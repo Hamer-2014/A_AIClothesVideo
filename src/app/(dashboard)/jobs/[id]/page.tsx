@@ -109,7 +109,7 @@ export default async function JobDetailPage({
     >
       <div className="space-y-6">
         <JobLivePanels
-          defaultFilename={`runwaytools-${detail.job.id.slice(0, 8)}.mp4`}
+          defaultFilename={`ai-clothes-video-${detail.job.id.slice(0, 8)}.mp4`}
           initialPreviewUrl={previewUrl}
           initialProgress={progress}
           jobId={detail.job.id}

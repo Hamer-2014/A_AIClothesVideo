@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 import { trackFunnelEvent } from "@/lib/analytics/client-funnel";
 
@@ -21,7 +22,7 @@ export function TrialCtaLink({
 }) {
   return (
     <Link
-      className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)]"
+      className="group inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--action)] px-5 text-sm font-semibold text-white transition-colors hover:bg-[var(--action-hover)]"
       href={trialWorkspaceHref()}
       onClick={() => {
         void trackFunnelEvent("trial_cta_clicked", {
@@ -32,6 +33,11 @@ export function TrialCtaLink({
       }}
     >
       {children}
+      <ArrowRight
+        aria-hidden="true"
+        className="transition-transform group-hover:translate-x-0.5"
+        size={16}
+      />
     </Link>
   );
 }

@@ -1,4 +1,8 @@
 import { getStylePreset, type StylePresetId, type WorkspaceEntryMode } from "@/lib/presets";
+import {
+  getCaptureProtocol,
+  type CaptureProtocolId,
+} from "@/lib/video/capture-protocols";
 import { isVideoDuration, type VideoDuration } from "@/lib/video/specs";
 
 export const WORKSPACE_GUEST_DRAFT_KEY = "runwaytools_workspace_guest_draft_v1";
@@ -12,6 +16,8 @@ export interface WorkspaceGuestDraft {
   presetId: StylePresetId;
   durationSeconds: WorkspaceDraftDuration;
   aspectRatio: WorkspaceDraftAspectRatio;
+  captureProtocol: CaptureProtocolId;
+  skuName: string;
   userPrompt: string;
   intendedAssetRoles: WorkspaceDraftAssetRole[];
   fileNames: string[];
@@ -58,6 +64,8 @@ export function serializeWorkspaceGuestDraft(draft: WorkspaceGuestDraft) {
     presetId: getStylePreset(draft.presetId).id,
     durationSeconds: draft.durationSeconds,
     aspectRatio: draft.aspectRatio,
+    captureProtocol: getCaptureProtocol(draft.captureProtocol).id,
+    skuName: draft.skuName.trim().slice(0, 80),
     userPrompt: draft.userPrompt,
     intendedAssetRoles: draft.intendedAssetRoles,
     fileNames: draft.fileNames,
@@ -78,6 +86,11 @@ export function parseWorkspaceGuestDraft(value: string | null | undefined) {
       ).id,
       durationSeconds: normalizeDuration(parsed.durationSeconds),
       aspectRatio: normalizeAspectRatio(parsed.aspectRatio),
+      captureProtocol: getCaptureProtocol(parsed.captureProtocol).id,
+      skuName:
+        typeof parsed.skuName === "string"
+          ? parsed.skuName.trim().slice(0, 80)
+          : "",
       userPrompt: typeof parsed.userPrompt === "string" ? parsed.userPrompt : "",
       intendedAssetRoles: normalizeAssetRoles(parsed.intendedAssetRoles),
       fileNames: normalizeFileNames(parsed.fileNames),

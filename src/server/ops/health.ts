@@ -6,7 +6,7 @@ export interface RuntimeHealthCheck {
 
 export interface RuntimeHealthReport {
   ok: true;
-  service: "a-runwaytools";
+  service: "a-ai-clothes-video";
   environment: string;
   ready: boolean;
   timestamp: string;
@@ -140,7 +140,7 @@ export function getRuntimeHealth(
 
   return {
     ok: true,
-    service: "a-runwaytools",
+    service: "a-ai-clothes-video",
     environment,
     ready: missing.length === 0,
     checks,

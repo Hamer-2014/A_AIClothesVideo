@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   pgEnum,
   pgTable,
   text,
@@ -19,7 +20,7 @@ export const authEmailEventTypeEnum = pgEnum(
   authEmailEventTypeValues,
 );
 
-export const authEmailEventStatusValues = ["sent", "failed"] as const;
+export const authEmailEventStatusValues = ["pending", "sent", "failed"] as const;
 export const authEmailEventStatusEnum = pgEnum(
   "auth_email_event_status",
   authEmailEventStatusValues,
@@ -71,16 +72,31 @@ export const verifications = pgTable("verifications", {
   ...timestamps,
 });
 
-export const authEmailEvents = pgTable("auth_email_events", {
-  ...id,
-  userId: text("user_id"),
-  email: text("email").notNull(),
-  type: authEmailEventTypeEnum("type").notNull(),
-  status: authEmailEventStatusEnum("status").notNull(),
-  provider: text("provider").notNull().default("resend"),
-  providerMessageId: text("provider_message_id"),
-  errorMessage: text("error_message"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const authEmailEvents = pgTable(
+  "auth_email_events",
+  {
+    ...id,
+    userId: text("user_id"),
+    email: text("email").notNull(),
+    type: authEmailEventTypeEnum("type").notNull(),
+    status: authEmailEventStatusEnum("status").notNull(),
+    provider: text("provider").notNull().default("resend"),
+    providerMessageId: text("provider_message_id"),
+    errorMessage: text("error_message"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("auth_email_events_email_created_at_idx").on(
+      table.email,
+      table.createdAt,
+    ),
+    index("auth_email_events_ip_created_at_idx").on(
+      table.ipAddress,
+      table.createdAt,
+    ),
+  ],
+);

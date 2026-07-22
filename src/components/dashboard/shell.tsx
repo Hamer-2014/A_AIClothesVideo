@@ -50,7 +50,7 @@ export function DashboardShell({
       >
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <Link href="/workspace" aria-label="RunwayTools 工作台">
+            <Link href="/workspace" aria-label="AI Clothes Video 工作台">
               <LogoLockup />
             </Link>
             <div className="flex flex-col items-start gap-3 lg:items-end">
@@ -88,8 +88,8 @@ export function DashboardShell({
               <Link
                 className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
                   item.active
-                    ? "border-[var(--accent)] bg-cyan-50 text-[var(--accent-strong)] shadow-[inset_0_0_0_1px_rgba(8,145,178,0.08)]"
-                    : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)] hover:bg-cyan-50/60 hover:text-[var(--accent-strong)]"
+                    ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--action-hover)]"
+                    : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--action)] hover:bg-[var(--brand-soft)] hover:text-[var(--action-hover)]"
                 }`}
                 href={item.href}
                 key={item.href}

@@ -12,6 +12,32 @@ import {
 const userId = "22222222-2222-4222-8222-222222222222";
 
 describe("create video job", () => {
+  it("stores an explicit capture protocol and normalized sku name", async () => {
+    const store = createInMemoryVideoJobCreationStore(
+      ["front", "back", "detail"].map((role) => ({
+        id: `asset-${role}`,
+        userId,
+        status: "uploaded" as const,
+        detectedRole: role as "front" | "back" | "detail",
+      })),
+    );
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front", "asset-back", "asset-detail"],
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      captureProtocol: "product_showcase",
+      skuName: "Linen Dress",
+    });
+
+    expect(result.job).toMatchObject({
+      captureProtocol: "product_showcase",
+      skuName: "Linen Dress",
+    });
+  });
+
   it("creates an asset-analysis queued job and binds owned assets", async () => {
     const funnelStore = createInMemoryFunnelEventStore();
     const store = createInMemoryVideoJobCreationStore([

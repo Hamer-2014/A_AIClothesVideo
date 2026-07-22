@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { Play } from "lucide-react";
 
 interface LogoMarkProps {
   className?: string;
@@ -10,31 +10,26 @@ interface LogoLockupProps {
   markSize?: number;
 }
 
-export function LogoMark({ className, size = 34 }: LogoMarkProps) {
+export function LogoMark({ className, size = 32 }: LogoMarkProps) {
   return (
-    <Image
-      alt="RunwayTools"
-      className={className}
-      height={size}
-      priority
-      src="/brand/logo.png"
-      width={size}
-    />
+    <span
+      aria-label="AI Clothes Video"
+      className={`inline-flex shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--brand)] text-white ${className ?? ""}`}
+      role="img"
+      style={{ height: size, width: size }}
+    >
+      <Play aria-hidden="true" fill="currentColor" size={Math.round(size * 0.48)} />
+    </span>
   );
 }
 
-export function LogoLockup({ className, markSize = 34 }: LogoLockupProps) {
+export function LogoLockup({ className, markSize = 32 }: LogoLockupProps) {
   return (
-    <div className={`flex items-center gap-3 ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`}>
       <LogoMark size={markSize} />
-      <div className="leading-none">
-        <p className="text-base font-semibold tracking-normal text-[var(--ink)]">
-          RunwayTools
-        </p>
-        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--accent)]">
-          Fashion video studio
-        </p>
-      </div>
-    </div>
+      <span className="whitespace-nowrap text-sm font-semibold text-[var(--ink)] sm:text-base">
+        AI Clothes Video
+      </span>
+    </span>
   );
 }

@@ -8,6 +8,11 @@ import {
   preflightVideoJob,
   type JobPreflightResult,
 } from "@/server/jobs/preflight";
+import {
+  defaultCaptureProtocolId,
+  isCaptureProtocolId,
+  type CaptureProtocolId,
+} from "@/lib/video/capture-protocols";
 
 type JobSession = {
   user?: {
@@ -23,6 +28,7 @@ interface JobPreflightRouteDeps {
     durationSeconds: number;
     aspectRatio: string;
     presetId?: string | null;
+    captureProtocol?: CaptureProtocolId | null;
     useFreeTrialIfAvailable?: boolean;
   }) => Promise<JobPreflightResult>;
 }
@@ -54,6 +60,9 @@ export async function handleJobPreflightRequest(
   const durationSeconds = numberValue(input.durationSeconds);
   const aspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "";
   const presetId = typeof input.presetId === "string" ? input.presetId : null;
+  const captureProtocol = isCaptureProtocolId(input.captureProtocol)
+    ? input.captureProtocol
+    : defaultCaptureProtocolId;
   const useFreeTrialIfAvailable =
     typeof input.useFreeTrialIfAvailable === "boolean"
       ? input.useFreeTrialIfAvailable
@@ -72,6 +81,7 @@ export async function handleJobPreflightRequest(
     durationSeconds,
     aspectRatio,
     presetId,
+    captureProtocol,
     useFreeTrialIfAvailable,
   });
 

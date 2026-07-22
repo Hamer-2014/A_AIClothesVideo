@@ -19,6 +19,13 @@ import {
   softDelete,
   timestamps,
 } from "./common";
+import { captureProtocolIds } from "@/lib/video/capture-protocols";
+
+export const captureProtocolValues = captureProtocolIds;
+export const captureProtocolEnum = pgEnum(
+  "capture_protocol",
+  captureProtocolValues,
+);
 
 export const jobStatusValues = [
   "draft_uploaded",
@@ -104,6 +111,10 @@ export const videoJobs = pgTable("video_jobs", {
   userVisibleStatus: text("user_visible_status").notNull().default("uploaded"),
   durationSeconds: integer("duration_seconds").notNull(),
   aspectRatio: videoAspectRatioEnum("aspect_ratio").notNull(),
+  captureProtocol: captureProtocolEnum("capture_protocol")
+    .notNull()
+    .default("product_showcase"),
+  skuName: text("sku_name"),
   presetId: text("preset_id"),
   presetSnapshot: jsonSnapshot("preset_snapshot"),
   postQaMode: postQaModeEnum("post_qa_mode").notNull().default("standard"),

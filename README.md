@@ -1,4 +1,4 @@
-# A RunwayTools
+# AI Clothes Video
 
 面向跨境与独立站中小服装卖家的商品短视频生成工具。主应用使用 Next.js，长时间视频拼接由独立 Cloud Run `stitch-worker` 执行。
 

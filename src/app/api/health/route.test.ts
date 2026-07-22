@@ -44,7 +44,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       ok: true,
-      service: "a-runwaytools",
+      service: "a-ai-clothes-video",
       environment: "production",
       ready: true,
       checks: {

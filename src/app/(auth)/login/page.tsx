@@ -19,7 +19,7 @@ export default async function LoginPage({
       <section className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
         <div className="mb-8">
           <Link
-            aria-label="RunwayTools 首页"
+            aria-label="AI Clothes Video 首页"
             className="inline-flex"
             href="/"
           >

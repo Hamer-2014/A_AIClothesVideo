@@ -55,7 +55,7 @@ MVP 核心：
 - Vercel 不执行 ffmpeg 拼接，拼接由 Cloud Run worker 处理。
 - 不要把 Cloud Run worker 源码混入 `src/`；worker 必须保持在 `workers/stitch-worker/`，部署构建上下文也必须指向该目录。
 - 对象存储使用 Cloudflare R2。
-- 登录使用 better-auth，支持 Google OAuth 和 Resend Email OTP/Magic Link，MVP 不做密码登录。
+- 登录使用 better-auth，支持 Google OAuth 和 Resend Email OTP，不提供 Magic Link 或密码登录。
 - 接入 Creem 后，所有进入图片/视频生成链路的用户 prompt 和最终视频 prompt 必须先过 Creem Moderation；`flag` 和 `deny` 都阻止生成，审核失败时 fail closed。
 
 ## 协作要求

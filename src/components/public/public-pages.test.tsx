@@ -39,6 +39,7 @@ describe("public trust pages", () => {
     expect(screen.getByRole("heading", { name: "删除" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "声明与投诉数据" })).toBeInTheDocument();
     expect(container).toHaveTextContent(/三年/);
+    expect(container.textContent).not.toMatch(/RunwayTools/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
@@ -55,6 +56,7 @@ describe("public trust pages", () => {
       screen.getByRole("heading", { name: "肖像与未成年人授权" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "权利通知" })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/RunwayTools/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
@@ -82,10 +84,10 @@ describe("public trust pages", () => {
     rerender(<PublicFooter />);
 
     expect(
-      screen.getByText("2026 RunwayTools. All rights reserved."),
+      screen.getByText("2026 AI Clothes Video. All rights reserved."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("服装商品图生成宣传短视频工具"),
+      screen.getByText("三张服装图，生成可发布宣传视频"),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "隐私" })).toHaveAttribute(
       "href",

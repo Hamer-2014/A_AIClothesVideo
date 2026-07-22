@@ -364,7 +364,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 
 ### 4.1 目标
 
-使用 better-auth 支持 Google OAuth 与 Resend Email OTP/Magic Link，不做密码登录。
+使用 better-auth 支持 Google OAuth 与 Resend Email OTP，不做 Magic Link 或密码登录。
 
 ### 4.2 文件边界
 
@@ -381,7 +381,10 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 
 - [ ] 配置 better-auth。
 - [ ] 配置 Google OAuth。
-- [ ] 配置 Resend Email OTP/Magic Link。
+- [ ] 配置 Resend Email OTP。
+- [ ] 登录邮件服务端限频：同一规范化邮箱 60 秒冷却、每小时 5 次配额；同一 IP 每 10 分钟 10 次配额。
+- [ ] 限频在调用 Resend 前通过数据库事务原子预占；Vercel 实例内存和前端按钮状态不能作为安全边界。
+- [ ] `pending`、`sent`、`failed` 邮件事件均计入配额，成功或失败后保存 provider message ID 或错误信息。
 - [ ] 禁用密码登录。
 - [ ] 首次登录创建 `user_profiles`。
 - [ ] 邮箱验证完成后才可发放免费试用。
@@ -392,7 +395,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 ### 4.4 验收
 
 - [ ] Google 登录成功。
-- [ ] Email OTP/Magic Link 登录成功。
+- [ ] Email OTP 登录成功。
 - [ ] 密码登录入口不存在。
 - [ ] 非白名单用户不能进入后台。
 - [ ] `admin` 可以访问全部后台功能。
@@ -1068,7 +1071,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 ### 18.5 Resend
 
 - [ ] 邮件域名配置。
-- [ ] Email OTP/Magic Link 到达。
+- [ ] Email OTP 到达。
 - [ ] 登录邮件限频生效。
 - [ ] `LEGAL_CONTACT_EMAIL` 可收到侵权案件通知，通知失败时案件仍保留在后台。
 

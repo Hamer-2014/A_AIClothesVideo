@@ -57,7 +57,7 @@ function buildRightsRemovalEmail(
     .join("");
 
   return {
-    subject: `[RunwayTools 权利通知] ${record.publicReference}`,
+    subject: `[AI Clothes Video 权利通知] ${record.publicReference}`,
     text,
     html: `<p>收到新的权利通知：<strong>${escapeHtml(record.publicReference)}</strong></p><p>权利类型：${escapeHtml(record.rightsType)}</p><ul>${htmlReferences}</ul><p><a href="${escapeHtml(adminUrl)}">进入后台处理</a></p>`,
   };

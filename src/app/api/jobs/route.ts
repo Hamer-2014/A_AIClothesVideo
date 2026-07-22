@@ -8,6 +8,11 @@ import {
   type CreatedVideoJob,
   type CreatedVideoJobAsset,
 } from "@/server/jobs/create-job";
+import {
+  defaultCaptureProtocolId,
+  isCaptureProtocolId,
+  type CaptureProtocolId,
+} from "@/lib/video/capture-protocols";
 
 type JobSession = {
   user?: {
@@ -27,6 +32,8 @@ interface CreateJobRouteDeps {
     useFreeTrialIfAvailable?: boolean;
     isTest?: boolean;
     presetId?: string | null;
+    captureProtocol?: CaptureProtocolId;
+    skuName?: string | null;
     requestContext?: {
       ipAddress: string | null;
       userAgent: string | null;
@@ -49,6 +56,13 @@ function stringArray(value: unknown) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" ? value : Number.NaN;
+}
+
+function normalizedSkuName(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return value.trim().slice(0, 80) || null;
 }
 
 function requestIp(request: Request) {
@@ -83,6 +97,10 @@ export async function handleCreateJobRequest(
   const isTest = input.isTest === true;
   const presetId =
     typeof input.presetId === "string" ? input.presetId : null;
+  const captureProtocol = isCaptureProtocolId(input.captureProtocol)
+    ? input.captureProtocol
+    : defaultCaptureProtocolId;
+  const skuName = normalizedSkuName(input.skuName);
   const deviceFingerprint =
     typeof input.deviceFingerprint === "string" ? input.deviceFingerprint : null;
   const createJob =
@@ -103,6 +121,8 @@ export async function handleCreateJobRequest(
       useFreeTrialIfAvailable,
       isTest,
       presetId,
+      captureProtocol,
+      skuName,
       email: session?.user?.email ?? null,
       emailVerified: session?.user?.emailVerified ?? null,
       deviceFingerprint,

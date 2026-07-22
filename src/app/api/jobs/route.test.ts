@@ -3,6 +3,35 @@ import { describe, expect, it } from "vitest";
 import { handleCreateJobRequest } from "./route";
 
 describe("POST /api/jobs", () => {
+  it("forwards a valid capture protocol and normalized sku name", async () => {
+    const seenInputs: unknown[] = [];
+    const response = await handleCreateJobRequest(
+      new Request("http://localhost/api/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-front", "asset-back", "asset-detail"],
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          captureProtocol: "product_showcase",
+          skuName: "  Linen Dress  ",
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createJob: async (input) => {
+          seenInputs.push(input);
+          throw new Error("stop_after_capture");
+        },
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(seenInputs[0]).toMatchObject({
+      captureProtocol: "product_showcase",
+      skuName: "Linen Dress",
+    });
+  });
+
   it("returns 401 when unauthenticated", async () => {
     const response = await handleCreateJobRequest(
       new Request("http://localhost/api/jobs", {
@@ -48,6 +77,8 @@ describe("POST /api/jobs", () => {
             userVisibleStatus: "analyzing_assets",
             durationSeconds: input.durationSeconds,
             aspectRatio: "9:16",
+            captureProtocol: "product_showcase",
+            skuName: null,
             postQaMode: "lite",
             postQaRequired: "true",
             creditCost: 0,
@@ -108,6 +139,8 @@ describe("POST /api/jobs", () => {
               userVisibleStatus: "analyzing_assets",
               durationSeconds: input.durationSeconds,
               aspectRatio: "9:16",
+              captureProtocol: "product_showcase",
+              skuName: null,
               postQaMode: "standard",
               postQaRequired: "true",
               creditCost: 70,
@@ -166,6 +199,8 @@ describe("POST /api/jobs", () => {
               userVisibleStatus: "analyzing_assets",
               durationSeconds: input.durationSeconds,
               aspectRatio: "9:16",
+              captureProtocol: "product_showcase",
+              skuName: null,
               postQaMode: "standard",
               postQaRequired: "true",
               creditCost: 70,
@@ -323,6 +358,8 @@ describe("POST /api/jobs", () => {
               userVisibleStatus: "analyzing_assets",
               durationSeconds: input.durationSeconds,
               aspectRatio: "9:16",
+              captureProtocol: "product_showcase",
+              skuName: null,
               postQaMode: "lite",
               postQaRequired: "true",
               creditCost: 0,

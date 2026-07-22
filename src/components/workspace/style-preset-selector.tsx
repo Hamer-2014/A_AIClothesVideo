@@ -26,9 +26,9 @@ export function StylePresetSelector({
           return (
             <button
               aria-pressed={selected}
-              className={`rounded-md border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-cyan-100 ${
+              className={`rounded-md border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[var(--focus)] ${
                 selected
-                  ? "border-[var(--accent-strong)] bg-cyan-50 text-[var(--ink)]"
+                  ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--ink)]"
                   : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)]"
               }`}
               key={preset.id}

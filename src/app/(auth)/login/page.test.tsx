@@ -27,12 +27,12 @@ describe("login page", () => {
   it("renders the login shell with the default workspace callback URL", async () => {
     render(await LoginPage({}));
 
-    expect(screen.getByRole("link", { name: "RunwayTools 首页" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "AI Clothes Video 首页" })).toHaveAttribute(
       "href",
       "/",
     );
     expect(screen.getByText("登录工作台")).toBeInTheDocument();
-    expect(screen.getByText("RunwayTools")).toBeInTheDocument();
+    expect(screen.getByText("AI Clothes Video")).toBeInTheDocument();
     expect(
       screen.getByText("使用 Google 或邮箱验证码进入工作台。"),
     ).toBeInTheDocument();

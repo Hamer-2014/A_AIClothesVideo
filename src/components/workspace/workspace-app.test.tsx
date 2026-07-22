@@ -20,6 +20,7 @@ vi.mock("./upload-panel", () => ({
     onUploadingChange,
     rightsAccepted,
     onRightsAcceptedChange,
+    slots,
   }: {
     onUploaded: (asset: {
       assetId: string;
@@ -30,9 +31,11 @@ vi.mock("./upload-panel", () => ({
     onUploadingChange: (uploading: boolean) => void;
     rightsAccepted: boolean;
     onRightsAcceptedChange: (accepted: boolean) => void;
+    slots: Array<{ role: string }>;
   }) => (
     <div
       data-rights-accepted={String(rightsAccepted)}
+      data-slot-roles={slots.map((slot) => slot.role).join(",")}
       data-testid="mock-upload-panel"
     >
       <button
@@ -118,6 +121,32 @@ vi.mock("./upload-panel", () => ({
         type="button"
       >
         mock-local-front
+      </button>
+      <button
+        onClick={() =>
+          onUploaded({
+            assetId: "local-back",
+            fileName: "guest-back.jpg",
+            intendedRole: "back",
+            status: "local",
+          })
+        }
+        type="button"
+      >
+        mock-local-back
+      </button>
+      <button
+        onClick={() =>
+          onUploaded({
+            assetId: "local-detail",
+            fileName: "guest-detail.jpg",
+            intendedRole: "detail",
+            status: "local",
+          })
+        }
+        type="button"
+      >
+        mock-local-detail
       </button>
       <button onClick={() => onUploadingChange(true)} type="button">
         mock-uploading
@@ -303,6 +332,18 @@ function preflightRightsBlockedResponse() {
   );
 }
 
+function uploadProductShowcaseAssets() {
+  fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+  fireEvent.click(screen.getByRole("button", { name: "mock-upload-back" }));
+  fireEvent.click(screen.getByRole("button", { name: "mock-upload-detail" }));
+}
+
+function selectGuestProductShowcaseAssets() {
+  fireEvent.click(screen.getByRole("button", { name: "mock-local-front" }));
+  fireEvent.click(screen.getByRole("button", { name: "mock-local-back" }));
+  fireEvent.click(screen.getByRole("button", { name: "mock-local-detail" }));
+}
+
 describe("WorkspaceApp", () => {
   it("uses actionable product rotation reason labels", () => {
     expect(reasonLabel("product_side_asset_required")).toBe(
@@ -406,6 +447,77 @@ describe("WorkspaceApp", () => {
     );
   });
 
+  it("requires all three product showcase images before generation", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-slot-roles",
+      "front,back,detail",
+    );
+    const generateButton = screen.getByRole("button", {
+      name: "付费生成高清无水印 · 70 点",
+    });
+    expect(generateButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-back" }));
+    expect(generateButton).toBeDisabled();
+    expect(screen.getByText("还需上传细节图。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-detail" }));
+    expect(generateButton).toBeEnabled();
+  });
+
+  it("switches the three slots for product rotation", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /商品旋转/ }));
+
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-slot-roles",
+      "front,side,back",
+    );
+  });
+
+  it("sends capture protocol and sku name through preflight and creation", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(preflightPassResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "stop_after_create" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    fireEvent.change(screen.getByLabelText("商品名称或 SKU（可选）"), {
+      target: { value: "Linen Dress" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-back" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-upload-detail" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const preflightBody = JSON.parse(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string,
+    );
+    const createBody = JSON.parse(
+      (fetchMock.mock.calls[1]?.[1] as RequestInit).body as string,
+    );
+    expect(preflightBody).toMatchObject({
+      captureProtocol: "product_showcase",
+      assetIds: ["asset-1", "asset-back", "asset-detail"],
+    });
+    expect(createBody).toMatchObject({
+      captureProtocol: "product_showcase",
+      skuName: "Linen Dress",
+    });
+  });
+
   it("shows 40-second Beta cost and five-segment summary only when enabled", () => {
     const { rerender } = render(
       <WorkspaceApp duration40Enabled={false} templateCatalog={templateCatalog} />,
@@ -444,7 +556,7 @@ describe("WorkspaceApp", () => {
       .mockResolvedValueOnce(preflightRightsBlockedResponse());
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "mock-accept-rights" }));
     fireEvent.click(
       screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
@@ -495,7 +607,7 @@ describe("WorkspaceApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "mock-duration-16" }));
     fireEvent.click(screen.getByRole("button", { name: "mock-aspect-1-1" }));
-    fireEvent.click(screen.getByRole("button", { name: "mock-local-front" }));
+    selectGuestProductShowcaseAssets();
     fireEvent.change(screen.getByLabelText("生成意图"), {
       target: { value: "突出连衣裙垂坠感" },
     });
@@ -510,9 +622,11 @@ describe("WorkspaceApp", () => {
       presetId: "marketplace_clean",
       durationSeconds: 16,
       aspectRatio: "1:1",
+      captureProtocol: "product_showcase",
+      skuName: "",
       userPrompt: "突出连衣裙垂坠感",
-      intendedAssetRoles: ["front"],
-      fileNames: ["guest-front.jpg"],
+      intendedAssetRoles: ["front", "back", "detail"],
+      fileNames: ["guest-front.jpg", "guest-back.jpg", "guest-detail.jpg"],
     });
     expect(window.location.href).toBe(
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dmarketplace_clean%26resumeDraft%3D1",
@@ -848,7 +962,9 @@ describe("WorkspaceApp", () => {
     expect(
       screen.getByRole("button", { name: /免费试用生成/ }),
     ).toBeDisabled();
-    expect(screen.getByText("请先上传正面图。")).toBeInTheDocument();
+    expect(
+      screen.getByText("还需上传正面主图、背面图、细节图。"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /付费生成高清无水印/ }));
     expect(fetchMock).not.toHaveBeenCalledWith("/api/jobs", expect.anything());
@@ -869,8 +985,8 @@ describe("WorkspaceApp", () => {
       screen.getByText("场景图只作为背景和氛围参考，不作为服装细节来源。"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/场景图\/细节图可辅助背景、氛围和可见细节判断。/),
-    ).toBeInTheDocument();
+      screen.getAllByText(/正面、背面和细节图制作稳定的商品宣传视频/),
+    ).toHaveLength(2);
   });
 
   it("checks preflight before creating a job", async () => {
@@ -892,7 +1008,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
@@ -936,7 +1052,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     expect(await screen.findByText(/后端提示：缺少正面图/)).toBeInTheDocument();
@@ -962,7 +1078,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     expect(screen.getByText("正在检查素材...")).toBeInTheDocument();
@@ -1081,7 +1197,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
@@ -1140,7 +1256,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     expect(await screen.findByText("服务暂时异常，请稍后重试。")).toBeInTheDocument();
@@ -1256,7 +1372,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
@@ -1292,7 +1408,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     expect(
       screen.getByText("免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板"),
     ).toBeInTheDocument();
@@ -1304,9 +1420,11 @@ describe("WorkspaceApp", () => {
         "/api/jobs/preflight",
         expect.objectContaining({
           body: JSON.stringify({
-            assetIds: ["asset-1"],
+            assetIds: ["asset-1", "asset-back", "asset-detail"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            captureProtocol: "product_showcase",
+            skuName: null,
             presetId: "minimal_studio",
             useFreeTrialIfAvailable: false,
             deviceFingerprint: "device-existing",
@@ -1317,9 +1435,11 @@ describe("WorkspaceApp", () => {
         "/api/jobs",
         expect.objectContaining({
           body: JSON.stringify({
-            assetIds: ["asset-1"],
+            assetIds: ["asset-1", "asset-back", "asset-detail"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            captureProtocol: "product_showcase",
+            skuName: null,
             presetId: "minimal_studio",
             useFreeTrialIfAvailable: false,
             deviceFingerprint: "device-existing",
@@ -1351,9 +1471,11 @@ describe("WorkspaceApp", () => {
         "/api/jobs/preflight",
         expect.objectContaining({
           body: JSON.stringify({
-            assetIds: ["asset-1"],
+            assetIds: ["asset-1", "asset-back", "asset-detail"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            captureProtocol: "product_showcase",
+            skuName: null,
             presetId: "minimal_studio",
             useFreeTrialIfAvailable: true,
             deviceFingerprint: "device-existing",
@@ -1364,9 +1486,11 @@ describe("WorkspaceApp", () => {
         "/api/jobs",
         expect.objectContaining({
           body: JSON.stringify({
-            assetIds: ["asset-1"],
+            assetIds: ["asset-1", "asset-back", "asset-detail"],
             durationSeconds: 8,
             aspectRatio: "9:16",
+            captureProtocol: "product_showcase",
+            skuName: null,
             presetId: "minimal_studio",
             useFreeTrialIfAvailable: true,
             deviceFingerprint: "device-existing",
@@ -1432,19 +1556,21 @@ describe("WorkspaceApp", () => {
     expect(mainStage).toBeInTheDocument();
     expect(mainStage.className).toContain("xl:min-h-[calc(100svh-13rem)]");
     expect(mainStage.className).toContain("xl:items-stretch");
-    expect(mainStage.className).toContain("xl:grid-cols-[minmax(400px,432px)_minmax(0,1fr)]");
-    expect(mainStage.firstElementChild).toBe(controlRail);
-    expect(mainStage.lastElementChild).toBe(materialPanel);
+    expect(mainStage.className).toContain(
+      "xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]",
+    );
+    expect(mainStage.firstElementChild).toBe(materialPanel);
+    expect(mainStage.lastElementChild).toBe(controlRail);
     expect(panelHeaders).toHaveLength(2);
     panelHeaders.forEach((header) => {
       expect(header.className).toContain("min-h-16");
     });
     expect(materialPanel).toBeInTheDocument();
-    expect(materialPanel.className).toContain("rounded-lg");
-    expect(materialPanel.className).toContain("bg-[var(--surface)]");
+    expect(materialPanel.className).toContain("rounded-[var(--radius-lg)]");
+    expect(materialPanel.className).toContain("bg-[var(--surface-subtle)]");
     expect(materialPanel.className).toContain("xl:min-h-full");
     expect(controlRail).toBeInTheDocument();
-    expect(controlRail.className).toContain("bg-[var(--surface)]");
+    expect(controlRail.className).toContain("bg-[var(--surface-raised)]");
     expect(controlRail.className).toContain("xl:min-h-full");
     expect(controlRail.className).not.toContain("sticky");
     expect(materialPanel.className).not.toContain("sticky");
@@ -1583,7 +1709,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
@@ -1702,7 +1828,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {
@@ -1856,7 +1982,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await screen.findByText("审核服务暂时不可用，请稍后再试。");
@@ -1990,7 +2116,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await screen.findByText(
@@ -2148,8 +2274,7 @@ describe("WorkspaceApp", () => {
 
     render(<WorkspaceApp templateCatalog={templateCatalog} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload" }));
-    fireEvent.click(screen.getByRole("button", { name: "mock-upload-scene" }));
+    uploadProductShowcaseAssets();
     fireEvent.click(screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }));
 
     await waitFor(() => {

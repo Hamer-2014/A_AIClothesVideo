@@ -29,4 +29,14 @@ describe("job detail page server imports", () => {
       "JSON.stringify(detail.latestStoryboard.storyboardJson, null, 2)",
     );
   });
+
+  it("uses the AI Clothes Video brand in the default download filename", () => {
+    const source = readFileSync(
+      "src/app/(dashboard)/jobs/[id]/page.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("ai-clothes-video-${detail.job.id.slice(0, 8)}.mp4");
+    expect(source).not.toContain("runwaytools-${detail.job.id.slice(0, 8)}.mp4");
+  });
 });

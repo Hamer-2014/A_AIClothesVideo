@@ -46,6 +46,10 @@ describe("PricingPage", () => {
     expect(screen.getByText("Starter")).toBeInTheDocument();
     expect(screen.getByText("Creator")).toBeInTheDocument();
     expect(screen.getByText("Studio")).toBeInTheDocument();
+    expect(screen.getByText("约 1 条 8 秒视频")).toBeInTheDocument();
+    expect(screen.getByText("约 2 条 16 秒视频")).toBeInTheDocument();
+    expect(screen.getByText("约 5 条 24 秒视频")).toBeInTheDocument();
+    expect(screen.getByText(/按当前点数消耗估算/)).toBeInTheDocument();
     expect(screen.getAllByText(/8 秒/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/16 秒/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/24 秒/).length).toBeGreaterThan(0);

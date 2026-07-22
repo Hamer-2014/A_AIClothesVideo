@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getCaptureProtocol } from "@/lib/video/capture-protocols";
 import { UploadPanel, type UploadedAssetItem } from "./upload-panel";
 
 function UploadPanelHarness({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -17,6 +18,7 @@ function UploadPanelHarness({ isAuthenticated }: { isAuthenticated: boolean }) {
       onUploadingChange={() => {}}
       rightsAccepted={rightsAccepted}
       onRightsAcceptedChange={setRightsAccepted}
+      slots={getCaptureProtocol("product_showcase").slots}
     />
   );
 }
@@ -47,7 +49,7 @@ describe("UploadPanel", () => {
       name: /我确认拥有或已获得/,
     });
     expect(checkbox).not.toBeChecked();
-    expect(screen.getByLabelText("选择正面图")).toBeDisabled();
+    expect(screen.getByLabelText("选择正面主图")).toBeDisabled();
     expect(screen.getByRole("link", { name: "服务条款" })).toHaveAttribute(
       "href",
       "/terms",
@@ -62,7 +64,7 @@ describe("UploadPanel", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     renderUploadPanel({ isAuthenticated: false });
 
-    expect(screen.getByLabelText("选择正面图")).toBeEnabled();
+    expect(screen.getByLabelText("选择正面主图")).toBeEnabled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -101,17 +103,18 @@ describe("UploadPanel", () => {
         onRemoveUploaded={vi.fn()}
         rightsAccepted
         onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_showcase").slots}
       />,
     );
 
     const file = new File(["front"], "very-long-front-product-photo-name-that-should-not-break-layout.jpg", {
       type: "image/jpeg",
     });
-    fireEvent.change(screen.getByLabelText("选择正面图"), {
+    fireEvent.change(screen.getByLabelText("选择正面主图"), {
       target: { files: [file] },
     });
 
-    expect(screen.getByAltText("正面图预览")).toHaveAttribute("src", "blob:front-preview");
+    expect(screen.getByAltText("正面主图预览")).toHaveAttribute("src", "blob:front-preview");
     expect(screen.queryByRole("button", { name: "上传已选择图片" })).not.toBeInTheDocument();
     expect(screen.getByText(file.name)).toHaveClass("truncate");
 
@@ -163,17 +166,18 @@ describe("UploadPanel", () => {
         onRemoveUploaded={vi.fn()}
         rightsAccepted={false}
         onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_showcase").slots}
       />,
     );
 
     const file = new File(["front"], "guest-front.jpg", {
       type: "image/jpeg",
     });
-    fireEvent.change(screen.getByLabelText("选择正面图"), {
+    fireEvent.change(screen.getByLabelText("选择正面主图"), {
       target: { files: [file] },
     });
 
-    expect(screen.getByAltText("正面图预览")).toHaveAttribute("src", "blob:front-preview");
+    expect(screen.getByAltText("正面主图预览")).toHaveAttribute("src", "blob:front-preview");
     expect(screen.getByText("guest-front.jpg")).toBeInTheDocument();
     expect(screen.getByText("本地预览")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -187,7 +191,7 @@ describe("UploadPanel", () => {
     expect(onUploadingChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("uses a vertical canvas with the front slot above the supporting images", () => {
+  it("renders exactly the three product showcase slots", () => {
     render(
       <UploadPanel
         assets={[]}
@@ -196,26 +200,40 @@ describe("UploadPanel", () => {
         onRemoveUploaded={vi.fn()}
         rightsAccepted
         onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_showcase").slots}
       />,
     );
 
     expect(screen.getByTestId("upload-panel-canvas")).toBeInTheDocument();
-    const primaryRow = screen.getByTestId("upload-primary-row");
-    const secondaryGrid = screen.getByTestId("upload-secondary-grid");
-    expect(primaryRow).toBeInTheDocument();
-    expect(secondaryGrid).toBeInTheDocument();
-    expect(primaryRow.compareDocumentPosition(secondaryGrid)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(screen.getByTestId("upload-panel-canvas").className).toContain("space-y-4");
-    expect(screen.getByTestId("upload-panel-canvas").className).not.toContain("lg:grid-cols");
+    expect(screen.getAllByTestId("upload-slot")).toHaveLength(3);
     expect(screen.getByTestId("upload-slot-front")).toHaveAttribute(
       "data-primary-slot",
       "true",
     );
-    expect(screen.getAllByTestId("upload-secondary-slot")).toHaveLength(4);
-    expect(screen.getByLabelText("选择正面图")).toBeInTheDocument();
-    expect(screen.getByLabelText("选择场景图")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择正面主图")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择背面图")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择细节图")).toBeInTheDocument();
+    expect(screen.queryByLabelText("选择侧面图")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("选择场景图")).not.toBeInTheDocument();
+  });
+
+  it("renders front side back for the product rotation protocol", () => {
+    render(
+      <UploadPanel
+        assets={[]}
+        onUploaded={vi.fn()}
+        onUploadingChange={vi.fn()}
+        onRemoveUploaded={vi.fn()}
+        rightsAccepted
+        onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_rotation").slots}
+      />,
+    );
+
+    expect(screen.getByLabelText("选择商品正面")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择商品侧面")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择商品背面")).toBeInTheDocument();
+    expect(screen.queryByLabelText("选择细节图")).not.toBeInTheDocument();
   });
 
   it("clears a selected uploaded slot when the user removes it", () => {
@@ -236,10 +254,11 @@ describe("UploadPanel", () => {
         onRemoveUploaded={onRemoveUploaded}
         rightsAccepted
         onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_showcase").slots}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "删除正面图" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除正面主图" }));
 
     expect(onRemoveUploaded).toHaveBeenCalledWith("asset-front");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:front-preview");

@@ -27,7 +27,7 @@ export function AdminShell({
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
-                RunwayTools Admin
+                AI Clothes Video Admin
               </p>
               <div>
                 <h1 className="text-2xl font-semibold tracking-normal">{title}</h1>

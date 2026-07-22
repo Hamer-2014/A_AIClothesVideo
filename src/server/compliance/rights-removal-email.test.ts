@@ -51,7 +51,7 @@ describe("rights removal email", () => {
       expect.objectContaining({
         from: "RunwayTools <legal@example.com>",
         to: ["legal@example.com"],
-        subject: expect.stringContaining("RR-TEST123"),
+        subject: expect.stringMatching(/^\[AI Clothes Video 权利通知\].*RR-TEST123$/),
         text: expect.stringContaining(
           "https://app.example/admin/rights-removal",
         ),

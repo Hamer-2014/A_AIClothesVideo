@@ -10,10 +10,10 @@ describe("SiteFooterContent", () => {
     render(<SiteFooterContent />);
 
     expect(
-      screen.getByText("2026 RunwayTools. All rights reserved."),
+      screen.getByText("2026 AI Clothes Video. All rights reserved."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("服装商品图生成宣传短视频工具"),
+      screen.getByText("三张服装图，生成可发布宣传视频"),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "隐私" })).toHaveAttribute(
       "href",

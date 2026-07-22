@@ -10,6 +10,12 @@ import {
 } from "@/lib/video/specs";
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
+const packageVideoEstimates = {
+  starter: "约 1 条 8 秒视频",
+  creator: "约 2 条 16 秒视频",
+  studio: "约 5 条 24 秒视频",
+} as const;
+
 export default async function PricingPage() {
   const session = await getServerSession();
   const user = session?.user ?? null;
@@ -62,12 +68,18 @@ export default async function PricingPage() {
                 ${(item.amountCents / 100).toFixed(2)}
               </p>
               <p className="mt-2 text-sm text-[var(--muted)]">{item.credits} 点</p>
+              <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm font-medium">
+                {packageVideoEstimates[item.code]}
+              </p>
               <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
                 适合{item.name === "Starter" ? "先跑少量 SKU 验证效果" : item.name === "Creator" ? "连续生成多条商品短视频" : "小团队集中制作多款商品素材"}。
               </p>
             </div>
           ))}
         </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+          按当前点数消耗估算；混合生成不同视频规格时，以每次确认生成页面显示的实际点数为准。
+        </p>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">

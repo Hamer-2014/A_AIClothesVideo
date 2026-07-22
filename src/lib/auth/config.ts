@@ -1,16 +1,42 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
-import { emailOTP, magicLink } from "better-auth/plugins";
+import { APIError } from "better-auth/api";
+import { emailOTP } from "better-auth/plugins";
 
 import { getDb } from "@/lib/db/client";
 import * as schema from "@/lib/db/schema";
-
 import {
-  buildMagicLinkEmail,
-  buildOtpEmail,
-  sendAuthEmail,
-  type OtpEmailType,
-} from "./email";
+  AuthEmailRateLimitError,
+  deliverRateLimitedAuthEmail,
+  recordAuthEmailDeliveryError,
+  recordAuthEmailRateLimitError,
+} from "@/server/auth/email-rate-limit";
+
+import { buildOtpEmail, type OtpEmailType } from "./email";
+
+async function deliverOrThrowApiError(
+  input: Parameters<typeof deliverRateLimitedAuthEmail>[0],
+) {
+  try {
+    return await deliverRateLimitedAuthEmail(input);
+  } catch (error) {
+    if (error instanceof AuthEmailRateLimitError) {
+      recordAuthEmailRateLimitError(error);
+      throw new APIError(
+        "TOO_MANY_REQUESTS",
+        {
+          code: error.code,
+          message: "发送过于频繁，请稍后重试。",
+          retryAfterSeconds: error.retryAfterSeconds,
+        },
+        { "Retry-After": String(error.retryAfterSeconds) },
+      );
+    }
+
+    recordAuthEmailDeliveryError(error);
+    throw error;
+  }
+}
 
 function getRequiredEnv(name: string) {
   const value = process.env[name];
@@ -43,6 +69,9 @@ export function createAuth() {
     emailAndPassword: {
       enabled: false,
     },
+    rateLimit: {
+      enabled: true,
+    },
     socialProviders: {
       google: {
         clientId: getRequiredEnv("GOOGLE_CLIENT_ID"),
@@ -56,21 +85,23 @@ export function createAuth() {
         expiresIn: 600,
         resendStrategy: "reuse",
         overrideDefaultEmailVerification: true,
-        async sendVerificationOTP({ email, otp, type }) {
+        rateLimit: { window: 60, max: 3 },
+        async sendVerificationOTP({ email, otp, type }, ctx) {
           const content = buildOtpEmail({
             email,
             otp,
             type: type as OtpEmailType,
           });
 
-          await sendAuthEmail({ to: email, content });
-        },
-      }),
-      magicLink({
-        async sendMagicLink({ email, url }) {
-          const content = buildMagicLinkEmail({ email, url });
-
-          await sendAuthEmail({ to: email, content });
+          await deliverOrThrowApiError({
+            email,
+            type:
+              type === "email-verification"
+                ? "email_verification"
+                : "sign_in_otp",
+            content,
+            request: ctx?.request,
+          });
         },
       }),
     ],

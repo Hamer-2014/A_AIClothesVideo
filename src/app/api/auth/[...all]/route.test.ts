@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  AuthEmailRateLimitError,
+  recordAuthEmailDeliveryError,
+  recordAuthEmailRateLimitError,
+} from "@/server/auth/email-rate-limit";
+
 const mocks = vi.hoisted(() => ({
   getAuthMock: vi.fn(),
   nextHandlerMock: {
@@ -60,5 +66,117 @@ describe("better-auth route", () => {
         }),
       ),
     ).rejects.toBe(databaseError);
+  });
+
+  it("returns a structured 429 when the OTP plugin swallows the delivery error", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockImplementationOnce(async () => {
+      recordAuthEmailRateLimitError(new AuthEmailRateLimitError(42));
+      return Response.json({ success: true });
+    });
+
+    const response = await POST(
+      new Request(
+        "http://localhost/api/auth/email-otp/send-verification-otp",
+        { method: "POST" },
+      ),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("42");
+    await expect(response.json()).resolves.toEqual({
+      code: "AUTH_EMAIL_RATE_LIMITED",
+      message: "发送过于频繁，请稍后重试。",
+      retryAfterSeconds: 42,
+    });
+  });
+
+  it("returns a structured 503 when the OTP plugin swallows a delivery failure", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockImplementationOnce(async () => {
+      recordAuthEmailDeliveryError(new Error("resend unavailable"));
+      return Response.json({ success: true });
+    });
+
+    const response = await POST(
+      new Request(
+        "http://localhost/api/auth/email-otp/send-verification-otp",
+        { method: "POST" },
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      code: "AUTH_EMAIL_DELIVERY_FAILED",
+      message: "邮件发送失败，请稍后重试。",
+    });
+  });
+
+  it("returns a structured 503 when a delivery failure escapes Better Auth", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockImplementationOnce(async () => {
+      const error = new Error("database unavailable");
+      recordAuthEmailDeliveryError(error);
+      throw error;
+    });
+
+    const response = await POST(
+      new Request(
+        "http://localhost/api/auth/email-otp/send-verification-otp",
+        { method: "POST" },
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      code: "AUTH_EMAIL_DELIVERY_FAILED",
+      message: "邮件发送失败，请稍后重试。",
+    });
+  });
+
+  it("normalizes Better Auth burst-limit responses for email send endpoints", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: "Too many requests. Please try again later.",
+        }),
+        {
+          status: 429,
+          headers: { "X-Retry-After": "17" },
+        },
+      ),
+    );
+
+    const response = await POST(
+      new Request(
+        "http://localhost/api/auth/email-otp/send-verification-otp",
+        { method: "POST" },
+      ),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("17");
+    await expect(response.json()).resolves.toMatchObject({
+      code: "AUTH_EMAIL_RATE_LIMITED",
+      retryAfterSeconds: 17,
+    });
+  });
+
+  it("does not classify the removed Magic Link route as an email send endpoint", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockImplementationOnce(async () => {
+      recordAuthEmailDeliveryError(new Error("resend unavailable"));
+      return Response.json({ code: "NOT_FOUND" }, { status: 404 });
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/auth/sign-in/magic-link", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ code: "NOT_FOUND" });
   });
 });

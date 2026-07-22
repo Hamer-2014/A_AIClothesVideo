@@ -11,7 +11,7 @@ export default async function PrivacyPage() {
       <article className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-normal">隐私政策</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          这是 RunwayTools 的基础隐私说明，用于解释我们如何处理你上传的素材、生成结果和账号数据。
+          这是 AI Clothes Video 的基础隐私说明，用于解释我们如何处理你上传的素材、生成结果和账号数据。
         </p>
         <div className="mt-8 space-y-8 text-sm leading-7 text-[var(--muted)]">
           <section>

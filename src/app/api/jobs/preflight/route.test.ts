@@ -3,6 +3,40 @@ import { describe, expect, it } from "vitest";
 import { handleJobPreflightRequest } from "./route";
 
 describe("POST /api/jobs/preflight", () => {
+  it("forwards the capture protocol to preflight", async () => {
+    const seenInputs: unknown[] = [];
+    await handleJobPreflightRequest(
+      new Request("http://localhost/api/jobs/preflight", {
+        method: "POST",
+        body: JSON.stringify({
+          assetIds: ["asset-front", "asset-back", "asset-detail"],
+          durationSeconds: 8,
+          aspectRatio: "9:16",
+          captureProtocol: "product_showcase",
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        preflight: async (input) => {
+          seenInputs.push(input);
+          return {
+            canCreateJob: true,
+            requiredAssetRoles: ["front", "back", "detail"],
+            uploadedAssetRoles: ["front", "back", "detail"],
+            blockingReasons: [],
+            warnings: [],
+            recommendedTemplateIds: ["front_push_in"],
+            missingRightsAttestationAssetIds: [],
+          };
+        },
+      },
+    );
+
+    expect(seenInputs[0]).toMatchObject({
+      captureProtocol: "product_showcase",
+    });
+  });
+
   it("returns 401 when unauthenticated", async () => {
     const response = await handleJobPreflightRequest(
       new Request("http://localhost/api/jobs/preflight", {

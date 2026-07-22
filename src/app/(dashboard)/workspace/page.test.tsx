@@ -94,9 +94,12 @@ describe("WorkspacePage", () => {
     expect(screen.getByTestId("public-footer")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
-        name: "先试做一条服装短视频，再登录生成",
+        name: "服装视频工作台",
       }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("guest-workspace-intro").className).toContain(
+      "py-3",
+    );
     expect(screen.getByRole("link", { name: "登录后继续生成" })).toHaveAttribute(
       "href",
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dminimal_studio%26resumeDraft%3D1",

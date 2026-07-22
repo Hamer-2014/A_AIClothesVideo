@@ -12,6 +12,11 @@ import {
   isVideoDurationEnabled,
 } from "@/lib/video/specs";
 import type { AssetRole, VideoJobCreationStore } from "./create-job";
+import {
+  getCaptureProtocol,
+  type CaptureProtocolId,
+  type CaptureProtocolSlotRole,
+} from "@/lib/video/capture-protocols";
 
 export interface JobPreflightReason {
   code: string;
@@ -35,6 +40,7 @@ export interface JobPreflightInput {
   durationSeconds: number;
   aspectRatio: string;
   presetId?: string | null;
+  captureProtocol?: CaptureProtocolId | null;
   useFreeTrialIfAvailable?: boolean;
   videoSpecEnv?: Record<string, string | undefined>;
 }
@@ -78,15 +84,35 @@ function completenessFromRoles(roles: AssetRole[]): AssetCompleteness {
   };
 }
 
-function emptyPreflight(blockingReasons: JobPreflightReason[]): JobPreflightResult {
+function emptyPreflight(
+  blockingReasons: JobPreflightReason[],
+  requiredAssetRoles: AssetRole[] = ["front"],
+): JobPreflightResult {
   return {
     canCreateJob: false,
-    requiredAssetRoles: ["front"],
+    requiredAssetRoles,
     uploadedAssetRoles: [],
     blockingReasons,
     warnings: [],
     recommendedTemplateIds: [],
     missingRightsAttestationAssetIds: [],
+  };
+}
+
+function missingProtocolRoleReason(
+  role: CaptureProtocolSlotRole,
+  protocolLabel: string,
+): JobPreflightReason {
+  const labels: Record<CaptureProtocolSlotRole, string> = {
+    front: "正面图",
+    back: "背面图",
+    side: "侧面图",
+    detail: "细节图",
+  };
+
+  return {
+    code: `${role}_asset_required`,
+    message: `${protocolLabel}还需要一张${labels[role]}。`,
   };
 }
 
@@ -97,13 +123,18 @@ export async function preflightVideoJob({
   durationSeconds,
   aspectRatio,
   presetId,
+  captureProtocol,
   useFreeTrialIfAvailable,
   videoSpecEnv = process.env,
 }: JobPreflightInput): Promise<JobPreflightResult> {
   const uniqueAssetIds = Array.from(new Set(assetIds));
   const blockingReasons: JobPreflightReason[] = [];
   const warnings: JobPreflightReason[] = [];
-  const requiredAssetRoles: AssetRole[] = ["front"];
+  const protocol = getCaptureProtocol(captureProtocol);
+  const enforceCaptureProtocol = captureProtocol != null;
+  const requiredAssetRoles: AssetRole[] = enforceCaptureProtocol
+    ? protocol.slots.map((slot) => slot.role)
+    : ["front"];
 
   if (uniqueAssetIds.length === 0) {
     return emptyPreflight([
@@ -111,7 +142,14 @@ export async function preflightVideoJob({
         code: "asset_required",
         message: "至少需要上传一张服装正面图。",
       },
-    ]);
+    ], requiredAssetRoles);
+  }
+
+  if (enforceCaptureProtocol && uniqueAssetIds.length !== protocol.slots.length) {
+    blockingReasons.push({
+      code: "asset_count_mismatch",
+      message: "请选择当前生成方式要求的 3 张图片。",
+    });
   }
 
   if (!isVideoDuration(durationSeconds)) {
@@ -176,11 +214,21 @@ export async function preflightVideoJob({
       .filter(isAssetRole),
   );
 
-  if (!uploadedAssetRoles.includes("front")) {
-    blockingReasons.push({
-      code: "front_asset_required",
-      message: "至少需要上传一张服装正面图。",
-    });
+  for (const requiredRole of requiredAssetRoles) {
+    if (uploadedAssetRoles.includes(requiredRole)) {
+      continue;
+    }
+    blockingReasons.push(
+      enforceCaptureProtocol
+        ? missingProtocolRoleReason(
+            requiredRole as CaptureProtocolSlotRole,
+            protocol.label,
+          )
+        : {
+            code: "front_asset_required",
+            message: "至少需要上传一张服装正面图。",
+          },
+    );
   }
 
   if (useFreeTrialIfAvailable === true && !videoSpec.trialAllowed) {

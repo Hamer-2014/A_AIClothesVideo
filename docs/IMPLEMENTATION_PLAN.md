@@ -166,7 +166,7 @@
 
 - [ ] 接入 better-auth。
 - [ ] 支持 Google OAuth。
-- [ ] 支持 Resend Email OTP/Magic Link。
+- [ ] 支持 Resend Email OTP。
 - [ ] 禁用传统密码登录。
 - [ ] 首次登录创建 `user_profiles`。
 - [ ] 建立管理员白名单。
@@ -177,7 +177,7 @@
 **验收：**
 
 - [ ] Google 登录可用。
-- [ ] Email OTP/Magic Link 可用。
+- [ ] Email OTP 可用。
 - [ ] 非管理员无法进入后台。
 - [ ] 密码登录入口不存在。
 - [ ] 登录邮件有限频。

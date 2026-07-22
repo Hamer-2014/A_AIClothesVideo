@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildMagicLinkEmail,
-  buildOtpEmail,
-  getResendEmailConfig,
-} from "./email";
+import { buildOtpEmail, getResendEmailConfig } from "./email";
+import * as authEmail from "./email";
 
 describe("auth email helpers", () => {
   it("fails closed when Resend configuration is missing", () => {
@@ -31,17 +28,13 @@ describe("auth email helpers", () => {
     });
 
     expect(email.subject).toContain("登录验证码");
+    expect(email.subject).toContain("AI Clothes Video");
     expect(email.html).toContain("123456");
+    expect(email.html).toContain("AI Clothes Video");
     expect(email.html).not.toContain("password");
   });
 
-  it("renders magic link email", () => {
-    const email = buildMagicLinkEmail({
-      email: "seller@example.com",
-      url: "https://example.com/auth/callback?token=abc",
-    });
-
-    expect(email.subject).toContain("登录链接");
-    expect(email.html).toContain("https://example.com/auth/callback?token=abc");
+  it("does not expose a Magic Link email builder", () => {
+    expect(authEmail).not.toHaveProperty("buildMagicLinkEmail");
   });
 });

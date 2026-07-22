@@ -44,7 +44,7 @@ MVP 优先服务跨境/独立站中小服装卖家，尤其是已有产品图但
 ### 3.1 必做
 
 - Google OAuth 登录。
-- Email OTP/Magic Link 登录，邮件服务使用 Resend。
+- Email OTP 登录，邮件服务使用 Resend。
 - 免费试用 + 点数包商业模式，支付默认使用 Creem。
 - Creem Prompt Moderation，所有进入图片/视频生成链路的用户输入和最终生成 prompt 都必须先过审。
 - 用户上传服装素材图片。
@@ -309,7 +309,7 @@ MVP 使用 better-auth。
 支持：
 
 - Google OAuth。
-- Email OTP/Magic Link。
+- Email OTP。
 - 邮件服务：Resend。
 
 暂不支持：
@@ -322,13 +322,12 @@ MVP 使用 better-auth。
 - 跨境/独立站用户通常接受 Google 登录和邮箱验证码。
 - MVP 应优先验证视频生成与付费闭环，而不是扩展认证复杂度。
 
-Email 登录建议：
+Email 登录要求：
 
-- 优先 Email OTP。
-- Magic Link 可作为邮件中的备用登录链接。
-- OTP/Magic Link 有效期 10-15 分钟。
+- 仅支持 Email OTP，不提供 Magic Link 登录入口。
+- OTP 有效期 10-15 分钟。
 - 同邮箱 60 秒内只能发送一次。
-- 同 IP 每小时限制发送次数。
+- 同 IP 每 10 分钟最多发送 10 次。
 - 登录邮件发送记录要保存成功/失败、错误码、provider message ID。
 - 不在日志保存完整 token。
 

@@ -29,7 +29,7 @@
 | ORM/数据库访问 | Drizzle |
 | 认证 | better-auth |
 | OAuth | Google OAuth |
-| 邮件登录 | Resend + Email OTP/Magic Link |
+| 邮件登录 | Resend + Email OTP |
 | 支付 | Creem |
 | Prompt 合规 | Creem Moderation |
 | 对象存储 | Cloudflare R2 |
@@ -268,7 +268,7 @@ src/
 
 ### 5.1 登录
 
-1. 用户使用 Google OAuth 或 Email OTP/Magic Link 登录。
+1. 用户使用 Google OAuth 或 Email OTP 登录。
 2. better-auth 完成认证。
 3. 首次登录创建 `user_profiles`。
 4. 邮箱验证完成后，系统判断是否发放免费试用额度。

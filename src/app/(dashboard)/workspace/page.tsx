@@ -42,28 +42,30 @@ export default async function WorkspacePage({
         <PublicHeader user={session?.user ?? null} />
         <main>
           <section className="border-b border-[var(--line)] bg-white">
-            <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-5 px-4 py-6 sm:px-6 lg:px-8">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.14em] text-[var(--accent)]">
-                  免登录先配置
+            <div
+              className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8"
+              data-testid="guest-workspace-intro"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[var(--brand)]">
+                  免登录配置
                 </p>
-                <h1 className="mt-3 text-2xl font-semibold tracking-normal md:text-3xl">
-                  先试做一条服装短视频，再登录生成
+                <h1 className="mt-1 text-lg font-semibold sm:text-xl">
+                  服装视频工作台
                 </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-                  可以先选择风格、规格、提示词并本地预览素材。点击生成时再登录；
-                  为了保护素材和计费链路，登录后需要重新选择图片并正式上传。
+                <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-[var(--muted)] sm:block">
+                  先配置规格并本地预览素材，点击生成时再登录并正式上传。
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex shrink-0 gap-2">
                 <a
-                  className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--ink)] px-5 text-sm font-medium text-white"
+                  className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--ink)] px-4 text-sm font-medium text-white"
                   href={loginHref}
                 >
                   登录后继续生成
                 </a>
                 <a
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium"
+                  className="hidden h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] bg-white px-4 text-sm font-medium sm:inline-flex"
                   href="/pricing"
                 >
                   查看价格
@@ -71,7 +73,7 @@ export default async function WorkspacePage({
               </div>
             </div>
           </section>
-          <section className="px-4 py-6 sm:px-6 lg:px-8">
+          <section className="px-4 py-3 sm:px-6 sm:py-5 lg:px-8">
             <div className="mx-auto max-w-7xl">
               <WorkspaceApp
                 duration40Enabled={duration40Enabled}
