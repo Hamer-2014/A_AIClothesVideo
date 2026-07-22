@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   AuthEmailRateLimitError,
+  recordAuthEmailDeliveryError,
   recordAuthEmailRateLimitError,
 } from "@/server/auth/email-rate-limit";
 
@@ -87,6 +88,27 @@ describe("better-auth route", () => {
       code: "AUTH_EMAIL_RATE_LIMITED",
       message: "发送过于频繁，请稍后重试。",
       retryAfterSeconds: 42,
+    });
+  });
+
+  it("returns a structured failure when the OTP plugin swallows a provider error", async () => {
+    mocks.getAuthMock.mockReturnValue({});
+    mocks.nextHandlerMock.POST.mockImplementationOnce(async () => {
+      recordAuthEmailDeliveryError(new Error("resend unavailable"));
+      return Response.json({ success: true });
+    });
+
+    const response = await POST(
+      new Request(
+        "http://localhost/api/auth/email-otp/send-verification-otp",
+        { method: "POST" },
+      ),
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      code: "AUTH_EMAIL_DELIVERY_FAILED",
+      message: "邮件发送失败，请稍后重试。",
     });
   });
 

@@ -8,6 +8,7 @@ import * as schema from "@/lib/db/schema";
 import {
   AuthEmailRateLimitError,
   deliverRateLimitedAuthEmail,
+  recordAuthEmailDeliveryError,
   recordAuthEmailRateLimitError,
 } from "@/server/auth/email-rate-limit";
 
@@ -36,6 +37,7 @@ async function deliverOrThrowApiError(
       );
     }
 
+    recordAuthEmailDeliveryError(error);
     throw error;
   }
 }

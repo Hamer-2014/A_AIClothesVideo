@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   })),
   sendAuthEmail: vi.fn(),
   deliverRateLimitedAuthEmail: vi.fn(),
+  recordAuthEmailDeliveryError: vi.fn(),
   recordAuthEmailRateLimitError: vi.fn(),
 }));
 
@@ -47,6 +48,7 @@ vi.mock("@/server/auth/email-rate-limit", async () => {
   return {
     ...actual,
     deliverRateLimitedAuthEmail: mocks.deliverRateLimitedAuthEmail,
+    recordAuthEmailDeliveryError: mocks.recordAuthEmailDeliveryError,
     recordAuthEmailRateLimitError: mocks.recordAuthEmailRateLimitError,
   };
 });
@@ -161,6 +163,25 @@ describe("auth config", () => {
     });
     expect(mocks.recordAuthEmailRateLimitError).toHaveBeenCalledWith(
       expect.objectContaining({ retryAfterSeconds: 42 }),
+    );
+  });
+
+  it("captures provider failures that the OTP plugin runs in the background", async () => {
+    const providerError = new Error("resend unavailable");
+    const { createAuth } = await import("./config");
+    mocks.deliverRateLimitedAuthEmail.mockRejectedValue(providerError);
+
+    createAuth();
+    const otpOptions = mocks.emailOTP.mock.calls.at(-1)?.[0];
+
+    await expect(
+      otpOptions.sendVerificationOTP(
+        { email: "seller@example.com", otp: "123456", type: "sign-in" },
+        { request: new Request("https://app.example/api/auth") },
+      ),
+    ).rejects.toBe(providerError);
+    expect(mocks.recordAuthEmailDeliveryError).toHaveBeenCalledWith(
+      providerError,
     );
   });
 

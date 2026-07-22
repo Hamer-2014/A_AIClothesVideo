@@ -15,7 +15,17 @@ import { LoginForm } from "./login-form";
 const mocks = vi.hoisted(() => ({
   socialSignIn: vi.fn(),
   magicLinkSignIn: vi.fn(),
+  emailOtpSignIn: vi.fn(),
   sendVerificationOtp: vi.fn(),
+  routerReplace: vi.fn(),
+  routerRefresh: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: mocks.routerReplace,
+    refresh: mocks.routerRefresh,
+  }),
 }));
 
 vi.mock("@/lib/auth/client", () => ({
@@ -23,6 +33,7 @@ vi.mock("@/lib/auth/client", () => ({
     signIn: {
       social: mocks.socialSignIn,
       magicLink: mocks.magicLinkSignIn,
+      emailOtp: mocks.emailOtpSignIn,
     },
     emailOtp: {
       sendVerificationOtp: mocks.sendVerificationOtp,
@@ -39,9 +50,17 @@ describe("LoginForm", () => {
   beforeEach(() => {
     mocks.socialSignIn.mockReset();
     mocks.magicLinkSignIn.mockReset();
+    mocks.emailOtpSignIn.mockReset();
     mocks.sendVerificationOtp.mockReset();
+    mocks.routerReplace.mockReset();
+    mocks.routerRefresh.mockReset();
+    mocks.socialSignIn.mockResolvedValue({ data: null, error: null });
     mocks.magicLinkSignIn.mockResolvedValue({
       data: { status: true },
+      error: null,
+    });
+    mocks.emailOtpSignIn.mockResolvedValue({
+      data: { token: "session-token" },
       error: null,
     });
     mocks.sendVerificationOtp.mockResolvedValue({
@@ -77,6 +96,75 @@ describe("LoginForm", () => {
         callbackURL: "/workspace?mode=trial&preset=minimal_studio",
       });
     });
+  });
+
+  it("reveals the OTP input after sending and signs in with the sent email", async () => {
+    render(
+      <LoginForm callbackURL="/workspace?mode=trial&preset=minimal_studio" />,
+    );
+    fireEvent.change(screen.getByLabelText("邮箱"), {
+      target: { value: " Seller@Example.COM " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送邮箱验证码" }));
+
+    const otpInput = await screen.findByLabelText("邮箱验证码");
+    expect(screen.getByLabelText("邮箱")).toBeDisabled();
+
+    fireEvent.change(otpInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
+
+    await waitFor(() => {
+      expect(mocks.emailOtpSignIn).toHaveBeenCalledWith({
+        email: "seller@example.com",
+        otp: "123456",
+      });
+      expect(mocks.routerReplace).toHaveBeenCalledWith(
+        "/workspace?mode=trial&preset=minimal_studio",
+      );
+      expect(mocks.routerRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("shows a useful error for an invalid OTP", async () => {
+    mocks.emailOtpSignIn.mockResolvedValue({
+      data: null,
+      error: { status: 400, code: "INVALID_OTP" },
+    });
+    render(<LoginForm callbackURL="/workspace" />);
+    fireEvent.change(screen.getByLabelText("邮箱"), {
+      target: { value: "seller@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送邮箱验证码" }));
+
+    fireEvent.change(await screen.findByLabelText("邮箱验证码"), {
+      target: { value: "000000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
+
+    expect(
+      await screen.findByText("验证码错误，请检查后重试。"),
+    ).toBeInTheDocument();
+  });
+
+  it("submits only one Google request for rapid repeated clicks", async () => {
+    let resolveRequest!: (value: { data: null; error: null }) => void;
+    mocks.socialSignIn.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    render(<LoginForm callbackURL="/workspace" />);
+
+    const googleButton = screen.getByRole("button", {
+      name: "使用 Google 登录",
+    });
+    fireEvent.click(googleButton);
+    fireEvent.click(googleButton);
+
+    expect(mocks.socialSignIn).toHaveBeenCalledTimes(1);
+    expect(googleButton).toBeDisabled();
+
+    resolveRequest({ data: null, error: null });
   });
 
   it("submits only one OTP request for rapid repeated clicks", async () => {
@@ -149,7 +237,7 @@ describe("LoginForm", () => {
 
     vi.setSystemTime(new Date("2026-07-22T00:00:30.000Z"));
     await act(async () => {
-      vi.advanceTimersToNextTimer();
+      vi.advanceTimersByTime(1000);
     });
 
     expect(screen.getByText("验证码 29s")).toBeInTheDocument();

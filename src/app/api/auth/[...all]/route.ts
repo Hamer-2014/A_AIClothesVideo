@@ -32,6 +32,16 @@ function createAuthEmailRateLimitResponse(retryAfterSeconds: number) {
   );
 }
 
+function createAuthEmailDeliveryFailureResponse() {
+  return NextResponse.json(
+    {
+      code: "AUTH_EMAIL_DELIVERY_FAILED",
+      message: "邮件发送失败，请稍后重试。",
+    },
+    { status: 502 },
+  );
+}
+
 function getBetterAuthRetryAfter(response: Response) {
   const value =
     response.headers.get("Retry-After") ??
@@ -44,12 +54,16 @@ function normalizeAuthEmailRateLimitResponse(
   request: Request,
   response: Response,
   capturedError: AuthEmailRateLimitError | null,
+  deliveryError: Error | null,
 ) {
   if (capturedError) {
     return createAuthEmailRateLimitResponse(capturedError.retryAfterSeconds);
   }
   if (response.status === 429 && isAuthEmailSendRequest(request)) {
     return createAuthEmailRateLimitResponse(getBetterAuthRetryAfter(response));
+  }
+  if (deliveryError && isAuthEmailSendRequest(request)) {
+    return createAuthEmailDeliveryFailureResponse();
   }
   return response;
 }
@@ -58,12 +72,13 @@ function createHandler(method: "GET" | "POST") {
   return async (request: Request) => {
     try {
       const handler = toNextJsHandler(getAuth())[method];
-      const { result, rateLimitError } =
+      const { result, rateLimitError, deliveryError } =
         await runWithAuthEmailRateLimitCapture(() => handler(request));
       return normalizeAuthEmailRateLimitResponse(
         request,
         result,
         rateLimitError,
+        deliveryError,
       );
     } catch (error) {
       if (

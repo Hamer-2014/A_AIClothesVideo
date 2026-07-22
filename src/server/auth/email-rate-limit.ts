@@ -50,6 +50,7 @@ export class AuthEmailRateLimitError extends Error {
 
 interface AuthEmailRateLimitContext {
   error: AuthEmailRateLimitError | null;
+  deliveryError: Error | null;
 }
 
 const authEmailRateLimitContext =
@@ -60,12 +61,27 @@ export function recordAuthEmailRateLimitError(error: AuthEmailRateLimitError) {
   if (context) context.error = error;
 }
 
+export function recordAuthEmailDeliveryError(error: unknown) {
+  const context = authEmailRateLimitContext.getStore();
+  if (context) {
+    context.deliveryError =
+      error instanceof Error ? error : new Error("auth_email_delivery_failed");
+  }
+}
+
 export async function runWithAuthEmailRateLimitCapture<T>(
   operation: () => Promise<T>,
 ) {
-  const context: AuthEmailRateLimitContext = { error: null };
+  const context: AuthEmailRateLimitContext = {
+    error: null,
+    deliveryError: null,
+  };
   const result = await authEmailRateLimitContext.run(context, operation);
-  return { result, rateLimitError: context.error };
+  return {
+    result,
+    rateLimitError: context.error,
+    deliveryError: context.deliveryError,
+  };
 }
 
 export function normalizeAuthEmail(email: string) {
