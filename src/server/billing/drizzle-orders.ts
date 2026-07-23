@@ -30,10 +30,45 @@ export function createDrizzleOrderStore(db: DbClient = getDb()): OrderStore {
 
       return (order as BillingOrder | undefined) ?? null;
     },
+    async updateCheckoutSnapshot(externalOrderId, checkoutSnapshot) {
+      const [order] = await db
+        .update(orders)
+        .set({ checkoutSnapshot, updatedAt: new Date() })
+        .where(eq(orders.externalOrderId, externalOrderId))
+        .returning();
+
+      if (!order) {
+        throw new Error(`Order not found: ${externalOrderId}.`);
+      }
+
+      return order as BillingOrder;
+    },
+    async markOrderStatus(externalOrderId, status, webhook) {
+      const [order] = await db
+        .update(orders)
+        .set({
+          status,
+          ...(webhook
+            ? {
+                webhookEventId: webhook.eventId,
+                webhookSnapshot: webhook.snapshot,
+              }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.externalOrderId, externalOrderId))
+        .returning();
+
+      if (!order) {
+        throw new Error(`Order not found: ${externalOrderId}.`);
+      }
+
+      return order as BillingOrder;
+    },
     async markOrderPaid(externalOrderId, changes) {
       const [order] = await db
         .update(orders)
-        .set(changes)
+        .set({ ...changes, updatedAt: new Date() })
         .where(eq(orders.externalOrderId, externalOrderId))
         .returning();
 

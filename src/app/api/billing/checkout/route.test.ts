@@ -1,12 +1,19 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CreemUnavailableError } from "@/lib/providers/creem/client";
+import {
+  CreemCheckoutError,
+  CreemUnavailableError,
+} from "@/lib/providers/creem/client";
 import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryOrderStore } from "@/server/billing/orders";
 
 import { handleBillingCheckoutRequest } from "./route";
 
 describe("POST /api/billing/checkout", () => {
+  beforeEach(() => {
+    vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -60,6 +67,70 @@ describe("POST /api/billing/checkout", () => {
     });
   });
 
+  it("rejects a client-supplied Creem product ID", async () => {
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({
+          packageCode: "starter",
+          productId: "prod_attacker",
+        }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "client_price_fields_not_allowed",
+    });
+  });
+
+  it.each(["", "null", "[]", "not-json"])(
+    "returns 400 for malformed checkout body %s",
+    async (body) => {
+      const response = await handleBillingCheckoutRequest(
+        new Request("http://localhost/api/billing/checkout", {
+          method: "POST",
+          body,
+        }),
+        {
+          getSession: async () => ({ user: { id: "user-1" } }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "invalid_checkout_request",
+      });
+    },
+  );
+
+  it("does not create an order while production purchases are disabled", async () => {
+    vi.stubEnv("CREEM_PURCHASES_ENABLED", "false");
+    vi.stubEnv("CREEM_PRODUCT_ID_STARTER", "prod_starter");
+    const orderStore = createInMemoryOrderStore();
+    const createCheckout = vi.fn();
+
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "starter" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        orderStore,
+        createCheckout,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "billing_disabled" });
+    expect(orderStore.listOrders()).toHaveLength(0);
+    expect(createCheckout).not.toHaveBeenCalled();
+  });
+
   it("creates a Creem checkout and records a local order", async () => {
     vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
@@ -76,6 +147,15 @@ describe("POST /api/billing/checkout", () => {
         orderStore,
         createCheckout: async (input) => {
           expect(input.productId).toBe("prod_creator");
+          expect(orderStore.listOrders()).toHaveLength(1);
+          expect(orderStore.listOrders()[0]).toMatchObject({
+            externalOrderId: input.requestId,
+            status: "created",
+            checkoutSnapshot: { creemProductId: "prod_creator" },
+          });
+          expect(input.successUrl).toBe(
+            `http://localhost:3000/billing/success?order=${input.requestId}`,
+          );
           return {
             id: "checkout_1",
             externalOrderId: input.requestId,
@@ -143,7 +223,30 @@ describe("POST /api/billing/checkout", () => {
     expect(await response.json()).toEqual({
       error: "billing_provider_unavailable",
     });
-    expect(orderStore.listOrders()).toHaveLength(0);
+    expect(orderStore.listOrders()).toHaveLength(1);
+    expect(orderStore.listOrders()[0]?.status).toBe("failed");
+  });
+
+  it("maps Creem checkout failures to a safe 502 response", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
+    const orderStore = createInMemoryOrderStore();
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "creator" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        orderStore,
+        createCheckout: async () => {
+          throw new CreemCheckoutError(400);
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "billing_provider_error" });
+    expect(orderStore.listOrders()[0]?.status).toBe("failed");
   });
 
   it("fails closed without a configured Creem product ID and does not create checkout", async () => {

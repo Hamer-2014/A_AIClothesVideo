@@ -5,8 +5,10 @@ import { getServerSession } from "@/lib/auth/server";
 import { getCreditPackage } from "@/lib/credits/packages";
 import {
   createCreemCheckout,
+  CreemCheckoutError,
   CreemUnavailableError,
 } from "@/lib/providers/creem/client";
+import { isCreemPurchasesEnabled } from "@/lib/providers/creem/config";
 import {
   createRuntimeFunnelEventStore,
   recordFunnelEventSafely,
@@ -59,7 +61,16 @@ interface BillingCheckoutDeps {
 }
 
 function getAppUrl() {
-  return process.env.APP_URL ?? "http://localhost:3000";
+  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
+async function readCheckoutBody(request: Request) {
+  const value = await request.json().catch(() => null);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
 }
 
 export async function handleBillingCheckoutRequest(
@@ -73,12 +84,18 @@ export async function handleBillingCheckoutRequest(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
+  const body = await readCheckoutBody(request);
+  if (!body) {
+    return NextResponse.json(
+      { error: "invalid_checkout_request" },
+      { status: 400 },
+    );
+  }
+
   if (
-    body &&
-    typeof body === "object" &&
-    !Array.isArray(body) &&
-    ("amountCents" in body || "credits" in body)
+    "amountCents" in body ||
+    "credits" in body ||
+    "productId" in body
   ) {
     return NextResponse.json(
       { error: "client_price_fields_not_allowed" },
@@ -95,6 +112,10 @@ export async function handleBillingCheckoutRequest(
       { error: "unknown_credit_package" },
       { status: 400 },
     );
+  }
+
+  if (!isCreemPurchasesEnabled()) {
+    return NextResponse.json({ error: "billing_disabled" }, { status: 503 });
   }
 
   if (!selectedPackage.creemProductId) {
@@ -118,27 +139,34 @@ export async function handleBillingCheckoutRequest(
         externalOrderId: input.requestId,
       })));
   const orderStore = deps.orderStore ?? createDrizzleOrderStore();
+  await createCheckoutOrder({
+    store: orderStore,
+    userId,
+    packageCode: selectedPackage.code,
+    externalOrderId: requestId,
+    checkoutSnapshot: {
+      creemProductId: selectedPackage.creemProductId,
+    },
+  });
+
   try {
     const checkout = await createCheckout({
       productId: selectedPackage.creemProductId,
       requestId,
-      successUrl: `${getAppUrl()}/billing/success`,
+      successUrl: `${getAppUrl()}/billing/success?order=${encodeURIComponent(requestId)}`,
       metadata: {
         userId,
         packageCode: selectedPackage.code,
       },
     });
 
-    await createCheckoutOrder({
-      store: orderStore,
-      userId,
-      packageCode: selectedPackage.code,
-      externalOrderId: checkout.externalOrderId ?? requestId,
-      checkoutSnapshot: {
+    await orderStore.updateCheckoutSnapshot(
+      requestId,
+      {
         creemProductId: selectedPackage.creemProductId,
         provider: snapshotProviderCheckout(checkout.raw),
       } as never,
-    });
+    );
     await recordFunnelEventSafely({
       store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
       eventName: "checkout_started",
@@ -155,10 +183,19 @@ export async function handleBillingCheckoutRequest(
       checkoutUrl: checkout.checkoutUrl,
     });
   } catch (error) {
+    await orderStore.markOrderStatus(requestId, "failed");
+
     if (error instanceof CreemUnavailableError) {
       return NextResponse.json(
         { error: "billing_provider_unavailable" },
         { status: 503 },
+      );
+    }
+
+    if (error instanceof CreemCheckoutError) {
+      return NextResponse.json(
+        { error: "billing_provider_error" },
+        { status: 502 },
       );
     }
 

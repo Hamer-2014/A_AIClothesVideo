@@ -45,6 +45,15 @@ interface OrderPaidChanges {
 export interface OrderStore {
   createOrder(input: NewBillingOrder): Promise<BillingOrder>;
   findOrderByExternalOrderId(externalOrderId: string): Promise<BillingOrder | null>;
+  updateCheckoutSnapshot(
+    externalOrderId: string,
+    checkoutSnapshot: JsonValue,
+  ): Promise<BillingOrder>;
+  markOrderStatus(
+    externalOrderId: string,
+    status: Extract<OrderStatus, "failed" | "cancelled" | "refunded">,
+    webhook?: { eventId: string; snapshot: JsonValue },
+  ): Promise<BillingOrder>;
   markOrderPaid(
     externalOrderId: string,
     changes: OrderPaidChanges,
@@ -75,6 +84,40 @@ export function createInMemoryOrderStore(): OrderStore & {
     },
     async findOrderByExternalOrderId(externalOrderId) {
       return orders.get(externalOrderId) ?? null;
+    },
+    async updateCheckoutSnapshot(externalOrderId, checkoutSnapshot) {
+      const order = orders.get(externalOrderId);
+      if (!order) {
+        throw new Error(`Order not found: ${externalOrderId}.`);
+      }
+
+      const updated = {
+        ...order,
+        checkoutSnapshot,
+        updatedAt: new Date(),
+      };
+      orders.set(externalOrderId, updated);
+      return updated;
+    },
+    async markOrderStatus(externalOrderId, status, webhook) {
+      const order = orders.get(externalOrderId);
+      if (!order) {
+        throw new Error(`Order not found: ${externalOrderId}.`);
+      }
+
+      const updated = {
+        ...order,
+        status,
+        ...(webhook
+          ? {
+              webhookEventId: webhook.eventId,
+              webhookSnapshot: webhook.snapshot,
+            }
+          : {}),
+        updatedAt: new Date(),
+      };
+      orders.set(externalOrderId, updated);
+      return updated;
     },
     async markOrderPaid(externalOrderId, changes) {
       const order = orders.get(externalOrderId);
