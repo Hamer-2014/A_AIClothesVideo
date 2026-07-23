@@ -36,5 +36,5 @@ jobs:
           git add .
           git commit -m "sync from source repo ${GITHUB_SHA}"
 
-          git remote add origin https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/Haha372-art/video_tools.git
+          git remote add origin https://x-access-token:${DEPLOY_REPO_TOKEN}@github.com/Haha372-art/A_AIClothesVideo_Mirror
           git push origin main --force        
