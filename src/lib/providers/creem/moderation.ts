@@ -1,5 +1,11 @@
 import type { JsonValue } from "@/lib/db/schema/common";
 
+import {
+  CREEM_PRODUCTION_BASE_URL,
+  isCreemLiveApiKey,
+  isCreemProductionEnvironment,
+} from "./config";
+
 export type CreemModerationDecision = "allow" | "flag" | "deny";
 
 export class CreemModerationUnavailableError extends Error {
@@ -30,19 +36,28 @@ interface CreemModerationDeps {
   timeoutMs?: number;
 }
 
-export const CREEM_MODERATION_TIMEOUT_MS = 8_000;
+export const CREEM_MODERATION_TIMEOUT_MS = 5_000;
 
 export function getCreemModerationConfig(): CreemModerationConfig {
-  const apiKey = process.env.CREEM_MODERATION_API_KEY;
+  const apiKey = process.env.CREEM_MODERATION_API_KEY?.trim();
 
   if (!apiKey) {
     throw new CreemModerationUnavailableError();
   }
 
-  return {
-    apiKey,
-    baseUrl: process.env.CREEM_BASE_URL ?? "https://api.creem.io",
-  };
+  const baseUrl =
+    process.env.CREEM_BASE_URL?.trim() || CREEM_PRODUCTION_BASE_URL;
+
+  if (
+    isCreemProductionEnvironment() &&
+    (baseUrl !== CREEM_PRODUCTION_BASE_URL || !isCreemLiveApiKey(apiKey))
+  ) {
+    throw new CreemModerationUnavailableError(
+      "Creem production moderation credentials are not configured.",
+    );
+  }
+
+  return { apiKey, baseUrl };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -73,20 +88,44 @@ export async function createCreemPromptModeration(
     deps.timeoutMs ?? CREEM_MODERATION_TIMEOUT_MS,
   );
   let response: Response;
+  let raw: Record<string, unknown>;
 
   try {
-    response = await fetchImpl(`${config.baseUrl}/v1/moderation/prompt`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": config.apiKey,
-      },
-      body: JSON.stringify({
-        prompt: input.prompt,
-        ...(input.externalId ? { external_id: input.externalId } : {}),
-      }),
-      signal: controller.signal,
+    const request = (async () => {
+      const requestResponse = await fetchImpl(
+        `${config.baseUrl}/v1/moderation/prompt`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": config.apiKey,
+          },
+          body: JSON.stringify({
+            prompt: input.prompt,
+            ...(input.externalId ? { external_id: input.externalId } : {}),
+          }),
+          signal: controller.signal,
+        },
+      );
+
+      return {
+        response: requestResponse,
+        raw: asRecord(await requestResponse.json()),
+      };
+    })();
+    const timedOut = new Promise<never>((_resolve, reject) => {
+      controller.signal.addEventListener(
+        "abort",
+        () =>
+          reject(
+            new CreemModerationUnavailableError(
+              "Creem moderation request timed out.",
+            ),
+          ),
+        { once: true },
+      );
     });
+    ({ response, raw } = await Promise.race([request, timedOut]));
   } catch (error) {
     if (controller.signal.aborted) {
       throw new CreemModerationUnavailableError(
@@ -98,7 +137,6 @@ export async function createCreemPromptModeration(
   } finally {
     clearTimeout(timeout);
   }
-  const raw = asRecord(await response.json());
 
   if (!response.ok) {
     throw new Error(`Creem moderation failed with status ${response.status}.`);

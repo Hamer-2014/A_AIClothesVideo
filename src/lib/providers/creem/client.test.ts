@@ -28,6 +28,25 @@ describe("Creem client", () => {
     expect(() => getCreemConfig()).toThrow(CreemUnavailableError);
   });
 
+  it("rejects sandbox checkout credentials in production", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("CREEM_API_KEY", "creem_test_key");
+    vi.stubEnv("CREEM_BASE_URL", "https://test-api.creem.io");
+
+    expect(() => getCreemConfig()).toThrow(CreemUnavailableError);
+  });
+
+  it("accepts live checkout credentials in production", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("CREEM_API_KEY", "creem_live_api_key");
+    vi.stubEnv("CREEM_BASE_URL", "https://api.creem.io");
+
+    expect(getCreemConfig()).toEqual({
+      apiKey: "creem_live_api_key",
+      baseUrl: "https://api.creem.io",
+    });
+  });
+
   it("creates a checkout through the Creem API", async () => {
     vi.stubEnv("CREEM_API_KEY", "creem_test_key");
     vi.stubEnv("CREEM_BASE_URL", "https://test-api.creem.io");

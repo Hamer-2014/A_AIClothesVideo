@@ -27,9 +27,10 @@ describe("GET /api/health", () => {
       "https://stitch-worker-hebafdmksq-uc.a.run.app",
     );
     vi.stubEnv("CLOUD_RUN_STITCH_SECRET", "cloud-run-secret");
-    vi.stubEnv("CREEM_API_KEY", "creem-api-key");
+    vi.stubEnv("CREEM_BASE_URL", "https://api.creem.io");
+    vi.stubEnv("CREEM_API_KEY", "creem_live_api_key");
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "creem-webhook-secret");
-    vi.stubEnv("CREEM_MODERATION_API_KEY", "creem-moderation-secret");
+    vi.stubEnv("CREEM_MODERATION_API_KEY", "creem_live_moderation_key");
     vi.stubEnv("DEEPSEEK_API_KEY", "deepseek-key");
     vi.stubEnv("VISION_PROVIDER", "openai");
     vi.stubEnv("VISION_API_KEY", "vision-key");

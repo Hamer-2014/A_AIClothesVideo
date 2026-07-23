@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CREEM_MODERATION_TIMEOUT_MS,
   createCreemPromptModeration,
   CreemModerationUnavailableError,
   getCreemModerationConfig,
@@ -26,6 +27,31 @@ describe("Creem prompt moderation client", () => {
     expect(getCreemModerationConfig()).toEqual({
       apiKey: "mod_test_key",
       baseUrl: "https://test-api.creem.io",
+    });
+  });
+
+  it("uses Creem's recommended five-second timeout", () => {
+    expect(CREEM_MODERATION_TIMEOUT_MS).toBe(5_000);
+  });
+
+  it("rejects the sandbox URL and test key in production", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("CREEM_MODERATION_API_KEY", "creem_test_moderation_key");
+    vi.stubEnv("CREEM_BASE_URL", "https://test-api.creem.io");
+
+    expect(() => getCreemModerationConfig()).toThrow(
+      CreemModerationUnavailableError,
+    );
+  });
+
+  it("accepts the live URL and live key in production", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("CREEM_MODERATION_API_KEY", "creem_live_moderation_key");
+    vi.stubEnv("CREEM_BASE_URL", "https://api.creem.io");
+
+    expect(getCreemModerationConfig()).toEqual({
+      apiKey: "creem_live_moderation_key",
+      baseUrl: "https://api.creem.io",
     });
   });
 
@@ -119,6 +145,23 @@ describe("Creem prompt moderation client", () => {
     await expect(
       createCreemPromptModeration(
         { prompt: "A prompt that does not return." },
+        { fetch: fetchMock, timeoutMs: 0 },
+      ),
+    ).rejects.toThrow("Creem moderation request timed out.");
+  });
+
+  it("times out when response headers arrive but the body never finishes", async () => {
+    vi.stubEnv("CREEM_MODERATION_API_KEY", "mod_test_key");
+    const fetchMock: typeof fetch = async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: () => new Promise<never>(() => undefined),
+      }) as unknown as Response;
+
+    await expect(
+      createCreemPromptModeration(
+        { prompt: "A response with a stalled body." },
         { fetch: fetchMock, timeoutMs: 0 },
       ),
     ).rejects.toThrow("Creem moderation request timed out.");

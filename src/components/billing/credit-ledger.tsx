@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from "@/lib/support-email";
+
 interface BillingOverviewProps {
   wallet: {
     availableBalance: number;
@@ -106,6 +108,20 @@ export function CreditLedger({ wallet, orders, ledger }: BillingOverviewProps) {
             ))
           )}
         </div>
+      </section>
+
+      <section className="border-t border-[var(--line)] pt-5">
+        <h3 className="text-base font-medium">Support</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          For billing, generation, or account help, email{" "}
+          <a
+            className="font-medium text-[var(--accent)] underline underline-offset-4"
+            href={`mailto:${SUPPORT_EMAIL}`}
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          . We aim to respond within three business days.
+        </p>
       </section>
     </div>
   );

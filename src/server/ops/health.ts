@@ -1,4 +1,9 @@
 import { SUPPORT_EMAIL } from "@/lib/support-email";
+import {
+  CREEM_PRODUCTION_BASE_URL,
+  getCreemEnvironment,
+  isCreemLiveApiKey,
+} from "@/lib/providers/creem/config";
 
 export interface RuntimeHealthCheck {
   configured: boolean;
@@ -44,13 +49,48 @@ function buildCheck(env: EnvSource, keys: string[]): RuntimeHealthCheck {
   };
 }
 
-function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
+function buildOptionalPaymentCheck(
+  env: EnvSource,
+  environment: string,
+): RuntimeHealthCheck {
   const required = ["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"];
   const missing = required.filter((key) => !trimEnv(env, key));
+  const attempted = required.some((key) => Boolean(trimEnv(env, key)));
+  if (environment === "production" && trimEnv(env, "CREEM_API_KEY")) {
+    if (trimEnv(env, "CREEM_BASE_URL") !== CREEM_PRODUCTION_BASE_URL) {
+      missing.push("CREEM_BASE_URL");
+    }
+    if (!isCreemLiveApiKey(trimEnv(env, "CREEM_API_KEY"))) {
+      missing.push("CREEM_API_KEY");
+    }
+  }
+  return {
+    configured: missing.length === 0,
+    missing: [...new Set(missing)],
+    status: missing.length === 0 ? "ready" : attempted ? "missing" : "pending",
+  };
+}
+
+function buildModerationCheck(
+  env: EnvSource,
+  environment: string,
+): RuntimeHealthCheck {
+  if (environment !== "production") {
+    return buildCheck(env, ["CREEM_MODERATION_API_KEY"]);
+  }
+
+  const missing: string[] = [];
+  if (trimEnv(env, "CREEM_BASE_URL") !== CREEM_PRODUCTION_BASE_URL) {
+    missing.push("CREEM_BASE_URL");
+  }
+  if (!isCreemLiveApiKey(trimEnv(env, "CREEM_MODERATION_API_KEY"))) {
+    missing.push("CREEM_MODERATION_API_KEY");
+  }
+
   return {
     configured: missing.length === 0,
     missing,
-    status: missing.length === 0 ? "ready" : "pending",
+    status: missing.length === 0 ? "ready" : "missing",
   };
 }
 
@@ -116,8 +156,7 @@ function buildAiProvidersCheck(env: EnvSource): RuntimeHealthCheck {
 export function getRuntimeHealth(
   env: EnvSource = process.env,
 ): Omit<RuntimeHealthReport, "timestamp"> {
-  const environment =
-    trimEnv(env, "APP_ENV") || trimEnv(env, "NODE_ENV") || "development";
+  const environment = getCreemEnvironment(env);
   const checks = {
     database: buildCheck(env, ["DATABASE_URL"]),
     auth: buildCheck(env, ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]),
@@ -137,9 +176,9 @@ export function getRuntimeHealth(
       "CLOUD_RUN_STITCH_SECRET",
     ]),
     billing: buildCheck(env, []),
-    moderation: buildCheck(env, ["CREEM_MODERATION_API_KEY"]),
+    moderation: buildModerationCheck(env, environment),
     legalCompliance: buildLegalComplianceCheck(env, environment),
-    creemPayment: buildOptionalPaymentCheck(env),
+    creemPayment: buildOptionalPaymentCheck(env, environment),
     aiProviders: buildAiProvidersCheck(env),
   };
 

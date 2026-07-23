@@ -78,9 +78,10 @@ describe("getRuntimeHealth", () => {
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
-      CREEM_API_KEY: "creem-api-key",
+      CREEM_BASE_URL: "https://api.creem.io",
+      CREEM_API_KEY: "creem_live_api_key",
       CREEM_WEBHOOK_SECRET: "creem-webhook-secret",
-      CREEM_MODERATION_API_KEY: "creem-moderation-secret",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -148,9 +149,10 @@ describe("getRuntimeHealth", () => {
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
+      CREEM_BASE_URL: "https://api.creem.io",
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
-      CREEM_MODERATION_API_KEY: "moderation-key",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -215,9 +217,10 @@ describe("getRuntimeHealth", () => {
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
+      CREEM_BASE_URL: "https://api.creem.io",
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
-      CREEM_MODERATION_API_KEY: "moderation-key",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -324,9 +327,10 @@ describe("getRuntimeHealth", () => {
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
       CLOUD_RUN_STITCH_SECRET: "cloud-run-secret",
+      CREEM_BASE_URL: "https://api.creem.io",
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
-      CREEM_MODERATION_API_KEY: "moderation-key",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -405,6 +409,62 @@ describe("getRuntimeHealth", () => {
     });
 
     expect(report.checks.legalCompliance.missing).toContain("SUPPORT_EMAIL");
+    expect(report.ready).toBe(false);
+  });
+
+  it("rejects Creem sandbox credentials for production moderation readiness", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_BASE_URL: "https://test-api.creem.io",
+      CREEM_MODERATION_API_KEY: "creem_test_moderation_key",
+    });
+
+    expect(report.checks.moderation).toEqual({
+      configured: false,
+      missing: ["CREEM_BASE_URL", "CREEM_MODERATION_API_KEY"],
+      status: "missing",
+    });
+  });
+
+  it("accepts Creem live credentials for production moderation readiness", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_BASE_URL: "https://api.creem.io",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+    });
+
+    expect(report.checks.moderation).toEqual({
+      configured: true,
+      missing: [],
+      status: "ready",
+    });
+  });
+
+  it("normalizes the production environment before applying Creem gates", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: " Production ",
+      CREEM_BASE_URL: "https://test-api.creem.io",
+      CREEM_MODERATION_API_KEY: "creem_test_moderation_key",
+    });
+
+    expect(report.environment).toBe("production");
+    expect(report.checks.moderation.status).toBe("missing");
+  });
+
+  it("blocks readiness when payment credentials are partially configured or sandbox-only", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_BASE_URL: "https://test-api.creem.io",
+      CREEM_API_KEY: "creem_test_api_key",
+      CREEM_WEBHOOK_SECRET: "live-webhook-secret",
+      CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+    });
+
+    expect(report.checks.creemPayment).toEqual({
+      configured: false,
+      missing: ["CREEM_BASE_URL", "CREEM_API_KEY"],
+      status: "missing",
+    });
     expect(report.ready).toBe(false);
   });
 });

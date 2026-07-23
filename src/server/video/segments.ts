@@ -227,6 +227,10 @@ export async function submitQueuedSegment({
     throw new Error("Video job not found.");
   }
 
+  if (job.status !== "segments_queued" && job.status !== "segment_generating") {
+    throw new Error("Video job is not ready for segment generation.");
+  }
+
   const segment = await segmentStore.claimQueuedSegment({ jobId, segmentId });
   if (!segment) {
     const existingSegment = await segmentStore.findSegment({ jobId, segmentId });
@@ -267,6 +271,19 @@ export async function submitQueuedSegment({
   let successfulAttempt: number | null = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const latestJob = await segmentStore.findJob(jobId);
+    if (
+      !latestJob ||
+      (latestJob.status !== "segments_queued" &&
+        latestJob.status !== "segment_generating")
+    ) {
+      await segmentStore.updateSegment(segmentId, {
+        status: "queued",
+        lastError: "Video job is not ready for segment generation.",
+      });
+      throw new Error("Video job is not ready for segment generation.");
+    }
+
     try {
       await segmentStore.updateSegment(segmentId, {
         attemptCount: segment.attemptCount + attempt,

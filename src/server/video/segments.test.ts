@@ -159,6 +159,77 @@ describe("video segment services", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not submit a queued segment before the job reaches generation states", async () => {
+    const stores = createStores();
+    const unsafeStore = createInMemoryVideoSegmentStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "prompt_moderation_running",
+          aspectRatio: "9:16",
+          creditCost: 70,
+        },
+      ],
+      segments: stores.segmentStore.listSegments(),
+      assets: [],
+    });
+    let providerCalled = false;
+
+    await expect(
+      submitQueuedSegment({
+        jobStore: stores.jobStore,
+        segmentStore: unsafeStore,
+        jobId,
+        segmentId,
+        createVideoGeneration: async () => {
+          providerCalled = true;
+          throw new Error("provider must not be called");
+        },
+      }),
+    ).rejects.toThrow("Video job is not ready for segment generation.");
+
+    expect(providerCalled).toBe(false);
+    expect(unsafeStore.listSegments()[0]?.status).toBe("queued");
+  });
+
+  it("rechecks the latest job state immediately before provider submission", async () => {
+    const stores = createStores();
+    let jobReads = 0;
+    let providerCalled = false;
+    const racingStore = {
+      ...stores.segmentStore,
+      async findJob(id: string) {
+        jobReads += 1;
+        const job = await stores.segmentStore.findJob(id);
+        return jobReads === 1
+          ? job
+          : job
+            ? { ...job, status: "segment_failed" }
+            : null;
+      },
+    };
+
+    await expect(
+      submitQueuedSegment({
+        jobStore: stores.jobStore,
+        segmentStore: racingStore,
+        providerCallLogStore: stores.providerCallLogStore,
+        jobId,
+        segmentId,
+        createSignedUrl: async ({ key }) => `https://signed.example/${key}`,
+        createVideoGeneration: async () => {
+          providerCalled = true;
+          throw new Error("provider must not be called");
+        },
+      }),
+    ).rejects.toThrow("Video job is not ready for segment generation.");
+
+    expect(jobReads).toBeGreaterThanOrEqual(2);
+    expect(providerCalled).toBe(false);
+    expect(racingStore.listSegments()[0]).toMatchObject({ status: "queued" });
+  });
+
   it("kicks all queued segments for a job concurrently", async () => {
     const stores = createStoresWithSegments(["segment-1", "segment-2", "segment-3"]);
     const started: string[] = [];

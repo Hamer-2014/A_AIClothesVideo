@@ -1,5 +1,11 @@
 import type { JsonValue } from "@/lib/db/schema/common";
 
+import {
+  CREEM_PRODUCTION_BASE_URL,
+  isCreemLiveApiKey,
+  isCreemProductionEnvironment,
+} from "./config";
+
 export class CreemUnavailableError extends Error {
   constructor(message = "Creem API key is not configured.") {
     super(message);
@@ -30,16 +36,25 @@ interface CreemClientDeps {
 }
 
 export function getCreemConfig(): CreemConfig {
-  const apiKey = process.env.CREEM_API_KEY;
+  const apiKey = process.env.CREEM_API_KEY?.trim();
 
   if (!apiKey) {
     throw new CreemUnavailableError();
   }
 
-  return {
-    apiKey,
-    baseUrl: process.env.CREEM_BASE_URL ?? "https://api.creem.io",
-  };
+  const baseUrl =
+    process.env.CREEM_BASE_URL?.trim() || CREEM_PRODUCTION_BASE_URL;
+
+  if (
+    isCreemProductionEnvironment() &&
+    (baseUrl !== CREEM_PRODUCTION_BASE_URL || !isCreemLiveApiKey(apiKey))
+  ) {
+    throw new CreemUnavailableError(
+      "Creem production checkout credentials are not configured.",
+    );
+  }
+
+  return { apiKey, baseUrl };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
