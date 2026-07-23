@@ -128,6 +128,7 @@ npm run build
 ```env
 APP_URL=http://localhost:3000
 NODE_ENV=development
+APP_ENV=development
 
 DATABASE_URL=
 
@@ -139,9 +140,16 @@ GOOGLE_CLIENT_SECRET=
 RESEND_API_KEY=
 EMAIL_FROM=
 LEGAL_CONTACT_EMAIL=
+SUPPORT_EMAIL=
 
+CREEM_BASE_URL=https://test-api.creem.io
 CREEM_API_KEY=
 CREEM_WEBHOOK_SECRET=
+CREEM_PURCHASES_ENABLED=false
+CREEM_PRODUCT_ID_STARTER=
+CREEM_PRODUCT_ID_CREATOR=
+CREEM_PRODUCT_ID_STUDIO=
+PROMPT_MODERATION_MODE=creem
 CREEM_MODERATION_API_KEY=
 
 CLOUDFLARE_R2_ACCOUNT_ID=
@@ -453,6 +461,16 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] 免费试用发放写账本流水。
 - [ ] 后台可查看订单、钱包、流水。
 
+代码实现状态（2026-07-23）：
+
+- [x] 价格页三个点数包均提供购买入口；未登录用户登录后返回原套餐。
+- [x] 浏览器只提交 `packageCode`；价格、点数和 Creem Product ID 由服务端决定。
+- [x] 服务端先创建本地订单，再调用 Creem Checkout。
+- [x] Success 页面轮询当前用户自己的本地订单，不把重定向当作付款成功。
+- [x] `checkout.completed` 签名验证、订单匹配和入账幂等已由自动化测试覆盖。
+- [x] 完整 `refund.created` 产生一次 `purchase_reversal` 负向流水；部分退款自动处理 fail closed。
+- [ ] 生产 Checkout、webhook 重放和完整退款尚需真实付款验收；自动化测试不能替代该项。
+
 ### 5.5 验收
 
 - [ ] 支付成功只充值一次。
@@ -461,7 +479,53 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - [ ] Post-QA 通过后才正式扣点。
 - [ ] 供应商失败释放冻结点数。
 - [ ] 系统不可交付可退款。
+- [ ] Creem 全额退款将订单标为 `refunded`，并且只产生一条 `purchase_reversal`。
 - [ ] 所有点数变化能从 `credit_ledger` 查到。
+
+### 5.6 Creem 生产支付配置与验收
+
+生产配置只能写入 Vercel Production Environment Variables 或批准的密钥系统，禁止写入 `.env.example`、文档、Issue、构建日志或 Git 历史。先保持 `CREEM_PURCHASES_ENABLED=false`。
+
+Creem Dashboard 必须创建三个 active、one-time 产品，站内固定映射如下：
+
+| Package | Creem 金额 | 币种 | 到账点数 | Vercel 变量 |
+|---|---:|---|---:|---|
+| Starter | 999 cents | USD | 100 | `CREEM_PRODUCT_ID_STARTER` |
+| Creator | 2999 cents | USD | 360 | `CREEM_PRODUCT_ID_CREATOR` |
+| Studio | 7999 cents | USD | 1100 | `CREEM_PRODUCT_ID_STUDIO` |
+
+Vercel Production 必须配置：
+
+```env
+APP_ENV=production
+APP_URL=https://aiclothesvideo.com
+CREEM_BASE_URL=https://api.creem.io
+CREEM_API_KEY=<Creem production live key>
+CREEM_WEBHOOK_SECRET=<production webhook secret>
+CREEM_PRODUCT_ID_STARTER=<prod_...>
+CREEM_PRODUCT_ID_CREATOR=<prod_...>
+CREEM_PRODUCT_ID_STUDIO=<prod_...>
+CREEM_PURCHASES_ENABLED=false
+```
+
+Creem 生产 webhook endpoint：
+
+```text
+https://aiclothesvideo.com/api/webhooks/creem
+```
+
+至少订阅 `checkout.completed` 和 `refund.created`。部署和验收顺序：
+
+1. 在生产数据库执行 `pnpm db:migrate`，确认 `0019_purchase_reversal_ledger.sql` 成功登记。
+2. 部署应用但保持 `CREEM_PURCHASES_ENABLED=false`；`/api/health` 中 payment 应为 `pending` 且不得暴露变量值。
+3. 确认全部生产变量无缺失后设置 `CREEM_PURCHASES_ENABLED=true` 并重新部署。
+4. `/api/health` 必须返回 `ready=true`、`checks.creemPayment.status="ready"` 和空的 `missing`；否则禁止实付。
+5. 使用专用生产验收账号只购买一次 Starter，确认 Creem 实收、Success 状态、Billing 订单和 100 点入账一致。
+6. 在 Creem Dashboard 重放同一 `checkout.completed`，确认余额不再增加。
+7. 对该 Starter 订单执行一次全额退款，确认订单为 `refunded`、账本只有一条 `-100 purchase_reversal`；再次重放退款，余额不得再次减少。
+8. 将部署 commit、Checkout ID、webhook event ID、验收账号、时间和退款结果写入私有运维记录；公共文档不得记录这些值。
+
+出现 Checkout 金额/Product ID 不一致、webhook 400、重复入账、退款未撤销或 health 非 ready 时，立即把 `CREEM_PURCHASES_ENABLED` 改回 `false` 并重新部署。该开关只停止新 Checkout，不会替代 webhook 修复和账务对账。
 
 ## 6. Creem Prompt Moderation SPEC
 
@@ -1060,9 +1124,14 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 
 ### 18.4 Creem
 
+- [ ] 三个生产 one-time Product 与代码金额、币种和点数完全一致。
+- [ ] Vercel Production 已配置 live API key、webhook secret 和三个 Product ID，仓库无真实值。
+- [ ] 生产数据库已执行 `0019_purchase_reversal_ledger.sql`。
+- [ ] `/api/health` 在开启购买后报告 Creem payment ready。
 - [ ] checkout 测试成功。
 - [ ] webhook 测试成功。
 - [ ] webhook 重放不会重复充值。
+- [ ] 真实全额退款只生成一次 `purchase_reversal`，重放不会重复扣减。
 - [ ] moderation `allow` 用例通过。
 - [ ] moderation `flag` 用例阻止生成。
 - [ ] moderation `deny` 用例阻止生成。
