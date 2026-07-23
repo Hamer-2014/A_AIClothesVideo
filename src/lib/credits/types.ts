@@ -74,8 +74,7 @@ export interface CreditLedgerTransaction {
   findLedgerByIdempotencyKey(
     idempotencyKey: string,
   ): Promise<CreditLedgerEntry | null>;
-  findWalletByUserId(userId: string): Promise<CreditWallet | null>;
-  createWallet(input: NewCreditWallet): Promise<CreditWallet>;
+  getOrCreateWalletForUpdate(userId: string): Promise<CreditWallet>;
   updateWallet(userId: string, changes: WalletChanges): Promise<CreditWallet>;
   createLedgerEntry(input: NewCreditLedgerEntry): Promise<CreditLedgerEntry>;
 }

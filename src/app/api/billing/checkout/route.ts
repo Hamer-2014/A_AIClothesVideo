@@ -14,7 +14,11 @@ import {
   recordFunnelEventSafely,
   type FunnelEventStore,
 } from "@/server/analytics/funnel-events";
-import { createCheckoutOrder, type OrderStore } from "@/server/billing/orders";
+import {
+  createCheckoutOrder,
+  OrderStateConflictError,
+  type OrderStore,
+} from "@/server/billing/orders";
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 
 function snapshotProviderCheckout(value: unknown): unknown {
@@ -183,7 +187,13 @@ export async function handleBillingCheckoutRequest(
       checkoutUrl: checkout.checkoutUrl,
     });
   } catch (error) {
-    await orderStore.markOrderStatus(requestId, "failed");
+    try {
+      await orderStore.markOrderStatus(requestId, "failed");
+    } catch (statusError) {
+      if (!(statusError instanceof OrderStateConflictError)) {
+        throw statusError;
+      }
+    }
 
     if (error instanceof CreemUnavailableError) {
       return NextResponse.json(

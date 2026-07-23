@@ -37,16 +37,6 @@ function assertReason(reason: string) {
   }
 }
 
-async function getOrCreateWallet(
-  tx: CreditLedgerTransaction,
-  userId: string,
-) {
-  return (
-    (await tx.findWalletByUserId(userId)) ??
-    (await tx.createWallet({ userId }))
-  );
-}
-
 async function applyCreditOperation({
   input,
   type,
@@ -63,13 +53,12 @@ async function applyCreditOperation({
   assertReason(input.reason);
 
   return input.store.transaction(async (tx) => {
+    const wallet = await tx.getOrCreateWalletForUpdate(input.userId);
     const existing = await tx.findLedgerByIdempotencyKey(input.idempotencyKey);
     if (existing) {
-      const wallet = await getOrCreateWallet(tx, input.userId);
       return { wallet, ledger: existing, idempotent: true };
     }
 
-    const wallet = await getOrCreateWallet(tx, input.userId);
     const balanceBefore = wallet.availableBalance;
     const reservedBefore = wallet.reservedBalance;
     const { walletChanges, amountForLedger = input.amount } = mutate(wallet);

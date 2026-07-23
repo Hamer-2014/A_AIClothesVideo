@@ -38,6 +38,55 @@ describe("credit ledger service", () => {
     expect(store.listLedger()).toHaveLength(1);
   });
 
+  it("does not lose balance updates for concurrent purchases", async () => {
+    const store = createInMemoryCreditLedgerStore();
+
+    const [first, second] = await Promise.all([
+      purchaseCredits({
+        store,
+        userId,
+        amount: 100,
+        reason: "Starter order 1",
+        idempotencyKey: "purchase:concurrent-1",
+      }),
+      purchaseCredits({
+        store,
+        userId,
+        amount: 100,
+        reason: "Starter order 2",
+        idempotencyKey: "purchase:concurrent-2",
+      }),
+    ]);
+
+    expect(Math.max(first.wallet.availableBalance, second.wallet.availableBalance)).toBe(
+      200,
+    );
+    expect(store.listLedger()).toHaveLength(2);
+    expect(store.listLedger().map((entry) => entry.balanceAfter).sort()).toEqual([
+      100,
+      200,
+    ]);
+  });
+
+  it("applies a concurrently replayed purchase once", async () => {
+    const store = createInMemoryCreditLedgerStore();
+    const operation = () =>
+      purchaseCredits({
+        store,
+        userId,
+        amount: 100,
+        reason: "Starter replay",
+        idempotencyKey: "purchase:concurrent-replay",
+      });
+
+    const [first, replay] = await Promise.all([operation(), operation()]);
+
+    expect([first.idempotent, replay.idempotent].sort()).toEqual([false, true]);
+    expect(first.ledger.id).toBe(replay.ledger.id);
+    expect(replay.wallet.availableBalance).toBe(100);
+    expect(store.listLedger()).toHaveLength(1);
+  });
+
   it("reverses purchased credits once and allows a negative balance", async () => {
     const store = createInMemoryCreditLedgerStore();
     await purchaseCredits({

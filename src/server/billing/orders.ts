@@ -12,6 +12,13 @@ import type {
 
 export type OrderStatus = "created" | "paid" | "failed" | "refunded" | "cancelled";
 
+export class OrderStateConflictError extends Error {
+  constructor(externalOrderId: string, from: OrderStatus, to: OrderStatus) {
+    super(`Order ${externalOrderId} cannot transition from ${from} to ${to}.`);
+    this.name = "OrderStateConflictError";
+  }
+}
+
 export interface BillingOrder {
   id: string;
   userId: string;
@@ -108,6 +115,16 @@ export function createInMemoryOrderStore(): OrderStore & {
         throw new Error(`Order not found: ${externalOrderId}.`);
       }
 
+      const allowedStatuses: OrderStatus[] =
+        status === "refunded"
+          ? ["paid", "refunded"]
+          : status === "failed"
+            ? ["created", "failed"]
+            : ["created", "cancelled"];
+      if (!allowedStatuses.includes(order.status)) {
+        throw new OrderStateConflictError(externalOrderId, order.status, status);
+      }
+
       const updated = {
         ...order,
         status,
@@ -126,6 +143,13 @@ export function createInMemoryOrderStore(): OrderStore & {
       const order = orders.get(externalOrderId);
       if (!order) {
         throw new Error(`Order not found: ${externalOrderId}.`);
+      }
+      if (!["created", "failed", "paid"].includes(order.status)) {
+        throw new OrderStateConflictError(
+          externalOrderId,
+          order.status,
+          "paid",
+        );
       }
 
       const updated: BillingOrder = {
@@ -241,6 +265,14 @@ export async function handleCreemCheckoutCompleted({
 
   assertPaidEventMatchesOrder(event, order);
 
+  if (order.status === "cancelled") {
+    throw new OrderStateConflictError(
+      order.externalOrderId,
+      order.status,
+      "paid",
+    );
+  }
+
   const ledgerResult = await purchaseCredits({
     store: ledgerStore,
     userId: order.userId,
@@ -256,11 +288,28 @@ export async function handleCreemCheckoutCompleted({
       customerEmail: event.customerEmail,
     },
   });
-  const paidOrder = await orderStore.markOrderPaid(order.externalOrderId, {
-    status: "paid",
-    webhookEventId: event.id,
-    webhookSnapshot: event.raw,
-  });
+  if (order.status === "refunded") {
+    return { order, ledgerResult };
+  }
+
+  let paidOrder: BillingOrder;
+  try {
+    paidOrder = await orderStore.markOrderPaid(order.externalOrderId, {
+      status: "paid",
+      webhookEventId: event.id,
+      webhookSnapshot: event.raw,
+    });
+  } catch (error) {
+    if (error instanceof OrderStateConflictError) {
+      const currentOrder = await orderStore.findOrderByExternalOrderId(
+        order.externalOrderId,
+      );
+      if (currentOrder?.status === "refunded") {
+        return { order: currentOrder, ledgerResult };
+      }
+    }
+    throw error;
+  }
 
   return {
     order: paidOrder,

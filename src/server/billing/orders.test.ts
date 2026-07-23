@@ -229,6 +229,62 @@ describe("billing orders", () => {
     ).rejects.toThrow("Creem order has already been refunded.");
   });
 
+  it("keeps a refunded order terminal when checkout.completed is replayed", async () => {
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
+    });
+    await handleCreemCheckoutCompleted({
+      orderStore,
+      ledgerStore,
+      event: completedEvent({ productId: "prod_creator" }),
+    });
+    await handleCreemRefundCreated({
+      orderStore,
+      ledgerStore,
+      event: refundEvent(),
+    });
+
+    const replay = await handleCreemCheckoutCompleted({
+      orderStore,
+      ledgerStore,
+      event: completedEvent({ id: "evt_paid_replay", productId: "prod_creator" }),
+    });
+
+    expect(replay.order.status).toBe("refunded");
+    expect(replay.ledgerResult.idempotent).toBe(true);
+    expect(orderStore.listOrders()[0]?.status).toBe("refunded");
+    expect(ledgerStore.listLedger()).toHaveLength(2);
+  });
+
+  it("does not let failure or paid updates overwrite terminal states", async () => {
+    const orderStore = createInMemoryOrderStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "req_1",
+    });
+    await orderStore.markOrderStatus("req_1", "cancelled");
+
+    await expect(
+      orderStore.markOrderStatus("req_1", "failed"),
+    ).rejects.toThrow("cannot transition");
+    await expect(
+      orderStore.markOrderPaid("req_1", {
+        status: "paid",
+        webhookEventId: "evt_late",
+        webhookSnapshot: { id: "evt_late" },
+      }),
+    ).rejects.toThrow("cannot transition");
+    expect(orderStore.listOrders()[0]?.status).toBe("cancelled");
+  });
+
   it("rejects refunds that do not match a paid local order", async () => {
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();

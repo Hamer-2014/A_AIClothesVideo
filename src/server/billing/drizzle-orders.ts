@@ -1,13 +1,39 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { orders } from "@/lib/db/schema";
 
-import type { BillingOrder, OrderStore } from "./orders";
+import {
+  OrderStateConflictError,
+  type BillingOrder,
+  type OrderStatus,
+  type OrderStore,
+} from "./orders";
 
 type DbClient = ReturnType<typeof getDb>;
 
 export function createDrizzleOrderStore(db: DbClient = getDb()): OrderStore {
+  async function throwOrderUpdateError(
+    externalOrderId: string,
+    targetStatus: OrderStatus,
+  ): Promise<never> {
+    const [existing] = await db
+      .select({ status: orders.status })
+      .from(orders)
+      .where(eq(orders.externalOrderId, externalOrderId))
+      .limit(1);
+
+    if (!existing) {
+      throw new Error(`Order not found: ${externalOrderId}.`);
+    }
+
+    throw new OrderStateConflictError(
+      externalOrderId,
+      existing.status,
+      targetStatus,
+    );
+  }
+
   return {
     async createOrder(input) {
       const [order] = await db
@@ -44,6 +70,12 @@ export function createDrizzleOrderStore(db: DbClient = getDb()): OrderStore {
       return order as BillingOrder;
     },
     async markOrderStatus(externalOrderId, status, webhook) {
+      const allowedStatuses =
+        status === "refunded"
+          ? (["paid", "refunded"] as const)
+          : status === "failed"
+            ? (["created", "failed"] as const)
+            : (["created", "cancelled"] as const);
       const [order] = await db
         .update(orders)
         .set({
@@ -56,11 +88,16 @@ export function createDrizzleOrderStore(db: DbClient = getDb()): OrderStore {
             : {}),
           updatedAt: new Date(),
         })
-        .where(eq(orders.externalOrderId, externalOrderId))
+        .where(
+          and(
+            eq(orders.externalOrderId, externalOrderId),
+            inArray(orders.status, allowedStatuses),
+          ),
+        )
         .returning();
 
       if (!order) {
-        throw new Error(`Order not found: ${externalOrderId}.`);
+        return throwOrderUpdateError(externalOrderId, status);
       }
 
       return order as BillingOrder;
@@ -69,11 +106,16 @@ export function createDrizzleOrderStore(db: DbClient = getDb()): OrderStore {
       const [order] = await db
         .update(orders)
         .set({ ...changes, updatedAt: new Date() })
-        .where(eq(orders.externalOrderId, externalOrderId))
+        .where(
+          and(
+            eq(orders.externalOrderId, externalOrderId),
+            inArray(orders.status, ["created", "failed", "paid"]),
+          ),
+        )
         .returning();
 
       if (!order) {
-        throw new Error(`Order not found: ${externalOrderId}.`);
+        return throwOrderUpdateError(externalOrderId, "paid");
       }
 
       return order as BillingOrder;

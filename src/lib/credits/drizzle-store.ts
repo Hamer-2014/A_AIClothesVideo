@@ -9,7 +9,6 @@ import type {
   CreditLedgerTransaction,
   CreditWallet,
   NewCreditLedgerEntry,
-  NewCreditWallet,
   WalletChanges,
 } from "./types";
 
@@ -27,23 +26,21 @@ function createTransactionAdapter(tx: TransactionClient): CreditLedgerTransactio
 
       return (entry as CreditLedgerEntry | undefined) ?? null;
     },
-    async findWalletByUserId(userId) {
+    async getOrCreateWalletForUpdate(userId) {
+      await tx
+        .insert(creditWallets)
+        .values({ userId })
+        .onConflictDoNothing({ target: creditWallets.userId });
+
       const [wallet] = await tx
         .select()
         .from(creditWallets)
         .where(eq(creditWallets.userId, userId))
-        .limit(1);
-
-      return (wallet as CreditWallet | undefined) ?? null;
-    },
-    async createWallet(input: NewCreditWallet) {
-      const [wallet] = await tx
-        .insert(creditWallets)
-        .values(input)
-        .returning();
+        .limit(1)
+        .for("update");
 
       if (!wallet) {
-        throw new Error("Failed to create credit wallet.");
+        throw new Error(`Failed to lock credit wallet for user ${userId}.`);
       }
 
       return wallet as CreditWallet;

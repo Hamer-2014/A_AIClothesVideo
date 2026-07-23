@@ -6,7 +6,6 @@ import type {
   CreditLedgerTransaction,
   CreditWallet,
   NewCreditLedgerEntry,
-  NewCreditWallet,
 } from "./types";
 
 export function createInMemoryCreditLedgerStore(): CreditLedgerStore & {
@@ -14,24 +13,25 @@ export function createInMemoryCreditLedgerStore(): CreditLedgerStore & {
 } {
   const wallets = new Map<string, CreditWallet>();
   const ledger = new Map<string, CreditLedgerEntry>();
+  let transactionTail = Promise.resolve();
 
   const tx: CreditLedgerTransaction = {
     async findLedgerByIdempotencyKey(idempotencyKey) {
       return ledger.get(idempotencyKey) ?? null;
     },
-    async findWalletByUserId(userId) {
-      return wallets.get(userId) ?? null;
-    },
-    async createWallet(input: NewCreditWallet) {
+    async getOrCreateWalletForUpdate(userId) {
+      const existing = wallets.get(userId);
+      if (existing) return existing;
+
       const now = new Date();
       const wallet: CreditWallet = {
         id: randomUUID(),
-        userId: input.userId,
-        availableBalance: input.availableBalance ?? 0,
-        reservedBalance: input.reservedBalance ?? 0,
-        totalPurchased: input.totalPurchased ?? 0,
-        totalGranted: input.totalGranted ?? 0,
-        totalCaptured: input.totalCaptured ?? 0,
+        userId,
+        availableBalance: 0,
+        reservedBalance: 0,
+        totalPurchased: 0,
+        totalGranted: 0,
+        totalCaptured: 0,
         createdAt: now,
         updatedAt: now,
       };
@@ -67,7 +67,18 @@ export function createInMemoryCreditLedgerStore(): CreditLedgerStore & {
 
   return {
     async transaction(callback) {
-      return callback(tx);
+      let releaseTransaction: () => void = () => undefined;
+      const previousTransaction = transactionTail;
+      transactionTail = new Promise<void>((resolve) => {
+        releaseTransaction = resolve;
+      });
+
+      await previousTransaction;
+      try {
+        return await callback(tx);
+      } finally {
+        releaseTransaction();
+      }
     },
     listLedger() {
       return Array.from(ledger.values());
