@@ -23,10 +23,7 @@ describe("SiteFooterContent", () => {
       "href",
       "/terms",
     );
-    expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute(
-      "href",
-      "/faq",
-    );
+    expect(screen.queryByRole("link", { name: "FAQ" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
       "href",
       "/pricing",

@@ -15,6 +15,24 @@ import {
 import { createCheckoutOrder, type OrderStore } from "@/server/billing/orders";
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 
+function snapshotProviderCheckout(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(snapshotProviderCheckout);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, entry]) =>
+      /api[_-]?key|authorization|secret|token|password/i.test(key)
+        ? []
+        : [[key, snapshotProviderCheckout(entry)]],
+    ),
+  );
+}
+
 type BillingSession = {
   user?: {
     id?: string;
@@ -116,7 +134,10 @@ export async function handleBillingCheckoutRequest(
       userId,
       packageCode: selectedPackage.code,
       externalOrderId: checkout.externalOrderId ?? requestId,
-      checkoutSnapshot: checkout.raw as never,
+      checkoutSnapshot: {
+        creemProductId: selectedPackage.creemProductId,
+        provider: snapshotProviderCheckout(checkout.raw),
+      } as never,
     });
     await recordFunnelEventSafely({
       store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),

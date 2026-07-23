@@ -106,4 +106,21 @@ describe("Creem prompt moderation client", () => {
       ),
     ).rejects.toThrow("Creem moderation failed with status 503.");
   });
+
+  it("aborts a pending moderation request and reports it as unavailable", async () => {
+    vi.stubEnv("CREEM_MODERATION_API_KEY", "mod_test_key");
+    const fetchMock: typeof fetch = async (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+
+    await expect(
+      createCreemPromptModeration(
+        { prompt: "A prompt that does not return." },
+        { fetch: fetchMock, timeoutMs: 0 },
+      ),
+    ).rejects.toThrow("Creem moderation request timed out.");
+  });
 });

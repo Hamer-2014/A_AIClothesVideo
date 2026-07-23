@@ -133,6 +133,17 @@ function metadataString(
   return typeof value === "string" ? value : null;
 }
 
+function checkoutSnapshotProductId(snapshot: JsonValue | null) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return null;
+  }
+
+  const productId = (snapshot as Record<string, unknown>).creemProductId;
+  return typeof productId === "string" && productId.trim()
+    ? productId.trim()
+    : null;
+}
+
 function assertPaidEventMatchesOrder(
   event: CreemCheckoutCompletedEvent,
   order: BillingOrder,
@@ -144,13 +155,18 @@ function assertPaidEventMatchesOrder(
   }
 
   const selectedPackage = getCreditPackage(order.productCode);
-  if (!selectedPackage?.creemProductId) {
-    throw new Error("Creem credit package is not configured.");
+  if (!selectedPackage) {
+    throw new Error(`Unknown credit package: ${order.productCode}.`);
+  }
+
+  const checkoutProductId = checkoutSnapshotProductId(order.checkoutSnapshot);
+  if (!checkoutProductId) {
+    throw new Error("Creem checkout product snapshot is missing.");
   }
 
   if (
     metadataString(event.metadata, "packageCode") !== order.productCode ||
-    event.productId !== selectedPackage.creemProductId ||
+    event.productId !== checkoutProductId ||
     event.amountCents !== order.amountCents ||
     event.currency !== order.currency ||
     order.amountCents !== selectedPackage.amountCents ||

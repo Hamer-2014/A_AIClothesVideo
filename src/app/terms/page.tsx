@@ -1,6 +1,7 @@
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { getServerSession } from "@/lib/auth/server";
+import { SUPPORT_EMAIL } from "@/lib/support-email";
 
 export default async function TermsPage() {
   const session = await getServerSession();
@@ -53,7 +54,7 @@ export default async function TermsPage() {
           <section>
             <h2 className="text-base font-medium text-[var(--ink)]">Rights notices</h2>
             <p className="mt-2">
-              Rights holders can submit a takedown request with a locatable content reference and rights explanation. The platform records a case number for administrator review. A notice does not automatically remove content, and bad-faith or incomplete requests may be rejected. Contact support@aiclothesvideo.com for support and rights notices.
+              Rights holders can submit a takedown request with a locatable content reference and rights explanation. The platform records a case number for administrator review. A notice does not automatically remove content, and bad-faith or incomplete requests may be rejected. Contact {SUPPORT_EMAIL} for support and rights notices.
             </p>
           </section>
         </div>

@@ -1,6 +1,7 @@
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
 import { getServerSession } from "@/lib/auth/server";
+import { SUPPORT_EMAIL } from "@/lib/support-email";
 
 export default async function AcceptableUsePage() {
   const session = await getServerSession();
@@ -29,7 +30,7 @@ export default async function AcceptableUsePage() {
           <section>
             <h2 className="text-base font-medium text-[var(--ink)]">Enforcement</h2>
             <p className="mt-2">
-              We may block or remove prohibited requests, suspend access, and preserve information required for safety, fraud prevention, or legal compliance. For questions or rights notices, contact support@aiclothesvideo.com.
+              We may block or remove prohibited requests, suspend access, and preserve information required for safety, fraud prevention, or legal compliance. For questions or rights notices, contact {SUPPORT_EMAIL}.
             </p>
           </section>
         </div>

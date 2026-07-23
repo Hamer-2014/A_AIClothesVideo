@@ -13,6 +13,7 @@ const payload = JSON.stringify({
   eventType: "checkout.completed",
   object: {
     id: "checkout_1",
+    request_id: "req_1",
     order: {
       id: "ord_1",
       amount: 2999,
@@ -65,7 +66,7 @@ describe("Creem webhook", () => {
     expect(event).toEqual({
       id: "evt_1",
       type: "checkout.completed",
-      externalOrderId: "ord_1",
+      externalOrderId: "req_1",
       checkoutId: "checkout_1",
       productId: "creator",
       amountCents: 2999,

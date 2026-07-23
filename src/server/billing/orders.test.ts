@@ -14,7 +14,7 @@ function completedEvent(overrides: Record<string, unknown> = {}) {
   return {
     id: "evt_1",
     type: "checkout.completed" as const,
-    externalOrderId: "ord_1",
+    externalOrderId: "req_1",
     checkoutId: "checkout_1",
     productId: "creator",
     amountCents: 2999,
@@ -41,14 +41,14 @@ describe("billing orders", () => {
       store: orderStore,
       userId,
       packageCode: "creator",
-      externalOrderId: "ord_1",
-      checkoutSnapshot: { checkoutId: "checkout_1" },
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
     });
 
     expect(order).toMatchObject({
       userId,
       status: "created",
-      externalOrderId: "ord_1",
+      externalOrderId: "req_1",
       productCode: "creator",
       amountCents: 2999,
       currency: "USD",
@@ -64,8 +64,8 @@ describe("billing orders", () => {
       store: orderStore,
       userId,
       packageCode: "creator",
-      externalOrderId: "ord_1",
-      checkoutSnapshot: { checkoutId: "checkout_1" },
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
     });
 
     const first = await handleCreemCheckoutCompleted({
@@ -94,8 +94,8 @@ describe("billing orders", () => {
       store: orderStore,
       userId,
       packageCode: "creator",
-      externalOrderId: "ord_1",
-      checkoutSnapshot: { checkoutId: "checkout_1" },
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
     });
 
     await expect(
@@ -129,7 +129,8 @@ describe("billing orders", () => {
       store: orderStore,
       userId,
       packageCode: "creator",
-      externalOrderId: "ord_1",
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
     });
 
     await expect(
@@ -139,5 +140,28 @@ describe("billing orders", () => {
         event: completedEvent({ productId: "prod_creator" }),
       }),
     ).resolves.toMatchObject({ order: { status: "paid" } });
+  });
+
+  it("fails closed when the checkout snapshot lacks the Creem product ID", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "req_missing_snapshot",
+    });
+
+    await expect(
+      handleCreemCheckoutCompleted({
+        orderStore,
+        ledgerStore,
+        event: completedEvent({
+          externalOrderId: "req_missing_snapshot",
+          productId: "prod_creator",
+        }),
+      }),
+    ).rejects.toThrow("Creem checkout product snapshot is missing.");
   });
 });

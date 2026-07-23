@@ -27,7 +27,10 @@ export interface CreemPromptModerationResult {
 
 interface CreemModerationDeps {
   fetch?: typeof fetch;
+  timeoutMs?: number;
 }
+
+export const CREEM_MODERATION_TIMEOUT_MS = 8_000;
 
 export function getCreemModerationConfig(): CreemModerationConfig {
   const apiKey = process.env.CREEM_MODERATION_API_KEY;
@@ -64,17 +67,37 @@ export async function createCreemPromptModeration(
 ): Promise<CreemPromptModerationResult> {
   const config = getCreemModerationConfig();
   const fetchImpl = deps.fetch ?? fetch;
-  const response = await fetchImpl(`${config.baseUrl}/v1/moderation/prompt`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-    },
-    body: JSON.stringify({
-      prompt: input.prompt,
-      ...(input.externalId ? { external_id: input.externalId } : {}),
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    deps.timeoutMs ?? CREEM_MODERATION_TIMEOUT_MS,
+  );
+  let response: Response;
+
+  try {
+    response = await fetchImpl(`${config.baseUrl}/v1/moderation/prompt`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": config.apiKey,
+      },
+      body: JSON.stringify({
+        prompt: input.prompt,
+        ...(input.externalId ? { external_id: input.externalId } : {}),
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new CreemModerationUnavailableError(
+        "Creem moderation request timed out.",
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const raw = asRecord(await response.json());
 
   if (!response.ok) {

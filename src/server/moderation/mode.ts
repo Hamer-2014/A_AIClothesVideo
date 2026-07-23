@@ -16,5 +16,11 @@ export function canUseDevBypass(
   env: Record<string, string | undefined> = process.env,
 ) {
   const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
-  return nodeEnv === "development" || nodeEnv === "test";
+  const appEnv = env.APP_ENV?.trim().toLowerCase();
+
+  return (
+    appEnv !== "production" &&
+    appEnv !== "staging" &&
+    (nodeEnv === "development" || nodeEnv === "test")
+  );
 }

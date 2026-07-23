@@ -73,13 +73,10 @@ describe("public trust pages", () => {
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
-  it("links FAQ from the public header and footer", () => {
+  it("does not link the untranslated FAQ from the public header or footer", () => {
     const { rerender } = render(<PublicHeader />);
 
-    expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute(
-      "href",
-      "/faq",
-    );
+    expect(screen.queryByRole("link", { name: "FAQ" })).not.toBeInTheDocument();
 
     rerender(<PublicFooter />);
 
@@ -97,10 +94,7 @@ describe("public trust pages", () => {
       "href",
       "/terms",
     );
-    expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute(
-      "href",
-      "/faq",
-    );
+    expect(screen.queryByRole("link", { name: "FAQ" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
       "href",
       "/pricing",

@@ -116,7 +116,7 @@ export function parseCreemWebhookEvent(rawBody: string): ParsedCreemWebhookEvent
   const order = asRecord(object.order);
   const product = asRecord(object.product);
   const customer = asRecord(object.customer);
-  const externalOrderId = stringValue(order.id) ?? stringValue(object.order_id);
+  const externalOrderId = stringValue(object.request_id);
   const checkoutId = stringValue(object.id);
   const productId = stringValue(product.id) ?? stringValue(object.product_id);
   const amountCents =

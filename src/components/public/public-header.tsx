@@ -25,9 +25,6 @@ export function PublicHeader({ user }: PublicHeaderProps) {
           <Link className="hidden text-[var(--muted)] hover:text-[var(--ink)] sm:inline-flex" href="/pricing">
             Pricing
           </Link>
-          <Link className="hidden text-[var(--muted)] hover:text-[var(--ink)] md:inline-flex" href="/faq">
-            FAQ
-          </Link>
           {user ? (
             <>
               <Link

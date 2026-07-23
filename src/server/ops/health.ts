@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from "@/lib/support-email";
+
 export interface RuntimeHealthCheck {
   configured: boolean;
   missing: string[];
@@ -65,7 +67,16 @@ function buildLegalComplianceCheck(
   ];
   const check = buildCheck(env, required);
   if (environment === "production" || environment === "staging") {
-    return check;
+    const missing = [...check.missing];
+    if (trimEnv(env, "SUPPORT_EMAIL") !== SUPPORT_EMAIL) {
+      missing.push("SUPPORT_EMAIL");
+    }
+
+    return {
+      configured: missing.length === 0,
+      missing: [...new Set(missing)],
+      status: missing.length === 0 ? "ready" : "missing",
+    };
   }
   return {
     ...check,

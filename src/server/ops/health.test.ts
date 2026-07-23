@@ -73,7 +73,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
-      SUPPORT_EMAIL: "support@example.com",
+      SUPPORT_EMAIL: "support@aiclothesvideo.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -143,7 +143,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
-      SUPPORT_EMAIL: "support@example.com",
+      SUPPORT_EMAIL: "support@aiclothesvideo.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -210,7 +210,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
-      SUPPORT_EMAIL: "support@example.com",
+      SUPPORT_EMAIL: "support@aiclothesvideo.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -248,7 +248,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
-      SUPPORT_EMAIL: "support@example.com",
+      SUPPORT_EMAIL: "support@aiclothesvideo.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -319,7 +319,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
-      SUPPORT_EMAIL: "support@example.com",
+      SUPPORT_EMAIL: "support@aiclothesvideo.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -387,6 +387,20 @@ describe("getRuntimeHealth", () => {
       SUPPORT_EMAIL: "",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "AI Clothes Video <support@example.com>",
+      ABUSE_HASH_SECRET: "abuse-secret",
+    });
+
+    expect(report.checks.legalCompliance.missing).toContain("SUPPORT_EMAIL");
+    expect(report.ready).toBe(false);
+  });
+
+  it("fails production readiness when the support email does not match the public brand address", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "wrong@example.com",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "AI Clothes Video <support@aiclothesvideo.com>",
       ABUSE_HASH_SECRET: "abuse-secret",
     });
 

@@ -80,7 +80,7 @@ describe("POST /api/billing/checkout", () => {
             id: "checkout_1",
             externalOrderId: input.requestId,
             checkoutUrl: "https://checkout.creem.io/checkout_1",
-            raw: { id: "checkout_1" },
+            raw: { id: "checkout_1", api_key: "provider_secret" },
           };
         },
         funnelEventStore: funnelStore,
@@ -96,7 +96,14 @@ describe("POST /api/billing/checkout", () => {
       productCode: "creator",
       externalOrderId: expect.any(String),
       status: "created",
+      checkoutSnapshot: {
+        creemProductId: "prod_creator",
+        provider: { id: "checkout_1" },
+      },
     });
+    expect(JSON.stringify(orderStore.listOrders()[0]?.checkoutSnapshot)).not.toContain(
+      "provider_secret",
+    );
     expect(funnelStore.listEvents()).toEqual([
       expect.objectContaining({
         eventName: "checkout_started",

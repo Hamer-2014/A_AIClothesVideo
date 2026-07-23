@@ -107,7 +107,7 @@ export async function checkPrompt(
         decision: "error",
         errorCode: "prompt_moderation_off_forbidden",
         errorMessage:
-          "PROMPT_MODERATION_MODE=off is only allowed in development or test.",
+          "PROMPT_MODERATION_MODE=off is only allowed outside production or staging during development or test.",
         latencyMs: 0,
       });
 
@@ -142,7 +142,7 @@ export async function checkPrompt(
         decision: "error",
         errorCode: "prompt_moderation_dev_bypass_forbidden",
         errorMessage:
-          "PROMPT_MODERATION_MODE=dev_bypass is only allowed in development or test.",
+          "PROMPT_MODERATION_MODE=dev_bypass is only allowed outside production or staging during development or test.",
         latencyMs: 0,
       });
 

@@ -8,6 +8,8 @@ import {
   createInMemoryOrderStore,
 } from "@/server/billing/orders";
 
+import { handleBillingCheckoutRequest } from "../../billing/checkout/route";
+
 import { handleCreemWebhookRequest } from "./route";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -74,15 +76,17 @@ describe("POST /api/webhooks/creem", () => {
       store: orderStore,
       userId,
       packageCode: "creator",
-      externalOrderId: "ord_1",
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
     });
     const payload = JSON.stringify({
       id: "evt_1",
       type: "checkout.completed",
       object: {
         id: "checkout_1",
+        request_id: "req_1",
         order: {
-          id: "ord_1",
+          id: "ord_provider_1",
           amount: 2999,
           currency: "USD",
         },
@@ -138,15 +142,17 @@ describe("POST /api/webhooks/creem", () => {
       store: orderStore,
       userId,
       packageCode: "starter",
-      externalOrderId: "ord_replay",
+      externalOrderId: "req_replay",
+      checkoutSnapshot: { creemProductId: "prod_starter" },
     });
     const payload = JSON.stringify({
       id: "evt_replay",
       type: "checkout.completed",
       object: {
         id: "checkout_replay",
+        request_id: "req_replay",
         order: {
-          id: "ord_replay",
+          id: "ord_provider_replay",
           amount: 999,
           currency: "USD",
         },
@@ -172,5 +178,60 @@ describe("POST /api/webhooks/creem", () => {
 
     expect(ledgerStore.listLedger()).toHaveLength(1);
     expect(ledgerStore.listLedger()[0]?.amount).toBe(100);
+  });
+
+  it("credits an order created at checkout when Creem returns a distinct provider order id after product configuration changes", async () => {
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator_at_checkout");
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+
+    const checkoutResponse = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "creator" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: userId } }),
+        orderStore,
+        createCheckout: async (input) => ({
+          id: "checkout_2",
+          externalOrderId: input.requestId,
+          checkoutUrl: "https://checkout.creem.io/checkout_2",
+          raw: { id: "checkout_2" },
+        }),
+        funnelEventStore: createInMemoryFunnelEventStore(),
+      },
+    );
+
+    expect(checkoutResponse.status).toBe(200);
+    const order = orderStore.listOrders()[0];
+    expect(order).toBeDefined();
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator_rotated");
+    const payload = JSON.stringify({
+      id: "evt_checkout_to_webhook",
+      type: "checkout.completed",
+      object: {
+        id: "checkout_2",
+        request_id: order?.externalOrderId,
+        order: {
+          id: "ord_provider_2",
+          amount: 2999,
+          currency: "USD",
+        },
+        product: { id: "prod_creator_at_checkout" },
+        metadata: { userId, packageCode: "creator" },
+      },
+    });
+    const signature = signCreemWebhookPayloadForTest(payload, "whsec_test");
+
+    const webhookResponse = await handleCreemWebhookRequest(
+      signedRequest(payload, signature),
+      { orderStore, ledgerStore },
+    );
+
+    expect(webhookResponse.status).toBe(200);
+    expect(ledgerStore.listLedger()).toHaveLength(1);
+    expect(orderStore.listOrders()[0]).toMatchObject({ status: "paid" });
   });
 });

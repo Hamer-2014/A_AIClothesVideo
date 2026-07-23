@@ -215,4 +215,45 @@ describe("checkPrompt", () => {
       errorCode: "prompt_moderation_dev_bypass_forbidden",
     });
   });
+
+  it.each([
+    ["off", "production", "development", "prompt_moderation_off_forbidden"],
+    ["off", "staging", "test", "prompt_moderation_off_forbidden"],
+    [
+      "dev_bypass",
+      "production",
+      "development",
+      "prompt_moderation_dev_bypass_forbidden",
+    ],
+    [
+      "dev_bypass",
+      "staging",
+      "test",
+      "prompt_moderation_dev_bypass_forbidden",
+    ],
+  ])(
+    "fails closed for %s when APP_ENV=%s and NODE_ENV=%s",
+    async (mode, appEnv, nodeEnv, errorCode) => {
+      vi.stubEnv("PROMPT_MODERATION_MODE", mode);
+      vi.stubEnv("APP_ENV", appEnv);
+      vi.stubEnv("NODE_ENV", nodeEnv);
+      const store = createInMemoryModerationResultStore();
+
+      const result = await checkPrompt(
+        { userId, source: "user_input", prompt: "This must be moderated." },
+        {
+          resultStore: store,
+          moderatePrompt: async () => {
+            throw new Error("must not call Creem");
+          },
+        },
+      );
+
+      expect(result).toMatchObject({
+        allowed: false,
+        decision: "error",
+        errorCode,
+      });
+    },
+  );
 });
