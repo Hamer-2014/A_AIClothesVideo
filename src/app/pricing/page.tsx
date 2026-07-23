@@ -1,8 +1,10 @@
 import { TrialCtaLink } from "@/components/public/cta-link";
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicHeader } from "@/components/public/public-header";
+import { PurchaseButton } from "@/components/billing/purchase-button";
 import { getServerSession } from "@/lib/auth/server";
 import { creditPackages } from "@/lib/credits/packages";
+import { isCreemPurchasesEnabled } from "@/lib/providers/creem/config";
 import {
   getVideoSpec,
   isVideoDurationEnabled,
@@ -19,6 +21,7 @@ const packageVideoEstimates = {
 export default async function PricingPage() {
   const session = await getServerSession();
   const user = session?.user ?? null;
+  const purchasesEnabled = isCreemPurchasesEnabled();
   const duration40Enabled = isVideoDurationEnabled(40, process.env);
   const availableDurations = videoDurations.filter(
     (duration) => duration !== 40 || duration40Enabled,
@@ -59,9 +62,9 @@ export default async function PricingPage() {
           )}
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+        <div className="mt-8 grid gap-4 md:grid-cols-3" id="credit-packs">
           {creditPackages.map((item) => (
-            <div className="rounded-lg border border-[var(--line)] bg-white p-5" key={item.code}>
+            <div className="flex flex-col rounded-lg border border-[var(--line)] bg-white p-5" key={item.code}>
               <h2 className="text-base font-medium">{item.name}</h2>
               <p className="mt-3 text-3xl font-semibold">
                 {`$${(item.amountCents / 100).toFixed(2)}`}
@@ -70,13 +73,19 @@ export default async function PricingPage() {
               <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm font-medium">
                 {packageVideoEstimates[item.code]}
               </p>
-              <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-4 flex-1 text-sm leading-6 text-[var(--muted)]">
                 {item.name === "Starter"
                   ? "For testing a small number of product videos."
                   : item.name === "Creator"
                     ? "For producing several product videos."
                     : "For teams producing videos for multiple products."}
               </p>
+              <PurchaseButton
+                authenticated={Boolean(user)}
+                packageCode={item.code}
+                packageName={item.name}
+                purchasesEnabled={purchasesEnabled}
+              />
             </div>
           ))}
         </div>

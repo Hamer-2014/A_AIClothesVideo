@@ -74,6 +74,7 @@ describe("PricingPage", () => {
   });
 
   it("shows a signed-in workspace CTA instead of anonymous header actions", async () => {
+    vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
     mocks.getServerSession.mockResolvedValue({
       user: { id: "user-1", email: "merchant@example.com" },
     });
@@ -102,5 +103,28 @@ describe("PricingPage", () => {
         metadata: { sourcePage: "pricing" },
       }),
     );
+    expect(screen.getByRole("button", { name: "Buy Starter" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Buy Creator" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Buy Studio" })).toBeEnabled();
+  });
+
+  it("preserves package selection when anonymous users sign in to buy", async () => {
+    vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await PricingPage());
+
+    expect(
+      screen.getByRole("link", { name: "Sign in to buy Starter" }),
+    ).toHaveAttribute(
+      "href",
+      `/login?next=${encodeURIComponent("/pricing?package=starter#credit-packs")}`,
+    );
+    expect(
+      screen.getByRole("link", { name: "Sign in to buy Creator" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Sign in to buy Studio" }),
+    ).toBeInTheDocument();
   });
 });
