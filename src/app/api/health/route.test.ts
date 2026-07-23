@@ -8,6 +8,7 @@ describe("GET /api/health", () => {
 
   it("returns service health metadata and readiness checks", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PROMPT_MODERATION_MODE", "creem");
     vi.stubEnv("DATABASE_URL", "postgres://example");
     vi.stubEnv("BETTER_AUTH_SECRET", "secret");
     vi.stubEnv("BETTER_AUTH_URL", "https://tools.runwaymotion.com");

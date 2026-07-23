@@ -13,6 +13,13 @@ export class CreemUnavailableError extends Error {
   }
 }
 
+export class CreemCheckoutError extends Error {
+  constructor(readonly status: number) {
+    super(`Creem checkout failed with status ${status}.`);
+    this.name = "CreemCheckoutError";
+  }
+}
+
 export interface CreemConfig {
   apiKey: string;
   baseUrl: string;
@@ -74,7 +81,7 @@ export async function createCreemCheckout(
   const response = await fetchImpl(`${config.baseUrl}/v1/checkouts`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${config.apiKey}`,
+      "x-api-key": config.apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -88,7 +95,7 @@ export async function createCreemCheckout(
   const raw = asRecord(await response.json());
 
   if (!response.ok) {
-    throw new Error(`Creem checkout failed with status ${response.status}.`);
+    throw new CreemCheckoutError(response.status);
   }
 
   const id = raw.id;

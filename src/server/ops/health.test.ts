@@ -81,7 +81,12 @@ describe("getRuntimeHealth", () => {
       CREEM_BASE_URL: "https://api.creem.io",
       CREEM_API_KEY: "creem_live_api_key",
       CREEM_WEBHOOK_SECRET: "creem-webhook-secret",
+      CREEM_PURCHASES_ENABLED: "true",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      PROMPT_MODERATION_MODE: "creem",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -153,6 +158,7 @@ describe("getRuntimeHealth", () => {
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      PROMPT_MODERATION_MODE: "creem",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -221,6 +227,7 @@ describe("getRuntimeHealth", () => {
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      PROMPT_MODERATION_MODE: "creem",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -331,6 +338,7 @@ describe("getRuntimeHealth", () => {
       CREEM_API_KEY: "",
       CREEM_WEBHOOK_SECRET: "",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      PROMPT_MODERATION_MODE: "creem",
       DEEPSEEK_API_KEY: "deepseek-key",
       VISION_PROVIDER: "openai",
       VISION_API_KEY: "vision-key",
@@ -415,6 +423,7 @@ describe("getRuntimeHealth", () => {
   it("rejects Creem sandbox credentials for production moderation readiness", () => {
     const report = getRuntimeHealth({
       APP_ENV: "production",
+      PROMPT_MODERATION_MODE: "creem",
       CREEM_BASE_URL: "https://test-api.creem.io",
       CREEM_MODERATION_API_KEY: "creem_test_moderation_key",
     });
@@ -429,6 +438,7 @@ describe("getRuntimeHealth", () => {
   it("accepts Creem live credentials for production moderation readiness", () => {
     const report = getRuntimeHealth({
       APP_ENV: "production",
+      PROMPT_MODERATION_MODE: "creem",
       CREEM_BASE_URL: "https://api.creem.io",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
     });
@@ -438,6 +448,57 @@ describe("getRuntimeHealth", () => {
       missing: [],
       status: "ready",
     });
+  });
+
+  it.each(["off", "dev_bypass"])(
+    "rejects production moderation mode %s even with live credentials",
+    (mode) => {
+      const report = getRuntimeHealth({
+        APP_ENV: "production",
+        PROMPT_MODERATION_MODE: mode,
+        CREEM_BASE_URL: "https://api.creem.io",
+        CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      });
+
+      expect(report.checks.moderation).toEqual({
+        configured: false,
+        missing: ["PROMPT_MODERATION_MODE"],
+        status: "missing",
+      });
+    },
+  );
+
+  it.each([undefined, "cream"])(
+    "requires an explicit creem mode in production (received %s)",
+    (mode) => {
+      const report = getRuntimeHealth({
+        APP_ENV: "production",
+        PROMPT_MODERATION_MODE: mode,
+        CREEM_BASE_URL: "https://api.creem.io",
+        CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
+      });
+
+      expect(report.checks.moderation.missing).toEqual([
+        "PROMPT_MODERATION_MODE",
+      ]);
+      expect(report.checks.moderation.status).toBe("missing");
+    },
+  );
+
+  it("applies production Creem gates when APP_ENV is unknown", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "prod",
+      NODE_ENV: "production",
+      PROMPT_MODERATION_MODE: "creem",
+      CREEM_BASE_URL: "https://test-api.creem.io",
+      CREEM_MODERATION_API_KEY: "creem_test_moderation_key",
+    });
+
+    expect(report.environment).toBe("production");
+    expect(report.checks.moderation.missing).toEqual([
+      "CREEM_BASE_URL",
+      "CREEM_MODERATION_API_KEY",
+    ]);
   });
 
   it("normalizes the production environment before applying Creem gates", () => {
@@ -454,9 +515,13 @@ describe("getRuntimeHealth", () => {
   it("blocks readiness when payment credentials are partially configured or sandbox-only", () => {
     const report = getRuntimeHealth({
       APP_ENV: "production",
+      CREEM_PURCHASES_ENABLED: "true",
       CREEM_BASE_URL: "https://test-api.creem.io",
       CREEM_API_KEY: "creem_test_api_key",
       CREEM_WEBHOOK_SECRET: "live-webhook-secret",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
       CREEM_MODERATION_API_KEY: "creem_live_moderation_key",
     });
 
@@ -466,6 +531,68 @@ describe("getRuntimeHealth", () => {
       status: "missing",
     });
     expect(report.ready).toBe(false);
+  });
+
+  it("keeps payment pending while the production purchase switch is disabled", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_PURCHASES_ENABLED: "false",
+      CREEM_BASE_URL: "https://api.creem.io",
+      CREEM_API_KEY: "creem_live_api_key",
+      CREEM_WEBHOOK_SECRET: "live-webhook-secret",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
+    });
+
+    expect(report.checks.creemPayment).toEqual({
+      configured: false,
+      missing: [],
+      status: "pending",
+    });
+    expect(report.summary.missing).not.toContain("CREEM_API_KEY");
+  });
+
+  it("requires every product ID when production purchases are enabled", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_PURCHASES_ENABLED: "true",
+      CREEM_BASE_URL: "https://api.creem.io",
+      CREEM_API_KEY: "creem_live_api_key",
+      CREEM_WEBHOOK_SECRET: "live-webhook-secret",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "",
+      CREEM_PRODUCT_ID_STUDIO: "",
+    });
+
+    expect(report.checks.creemPayment).toEqual({
+      configured: false,
+      missing: [
+        "CREEM_PRODUCT_ID_CREATOR",
+        "CREEM_PRODUCT_ID_STUDIO",
+      ],
+      status: "missing",
+    });
+    expect(report.ready).toBe(false);
+  });
+
+  it("marks fully configured production purchases ready", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      CREEM_PURCHASES_ENABLED: "true",
+      CREEM_BASE_URL: "https://api.creem.io",
+      CREEM_API_KEY: "creem_live_api_key",
+      CREEM_WEBHOOK_SECRET: "live-webhook-secret",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
+    });
+
+    expect(report.checks.creemPayment).toEqual({
+      configured: true,
+      missing: [],
+      status: "ready",
+    });
   });
 });
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createCreemCheckout,
+  CreemCheckoutError,
   CreemUnavailableError,
   getCreemConfig,
 } from "./client";
@@ -79,7 +80,7 @@ describe("Creem client", () => {
       expect.objectContaining({
         method: "POST",
         headers: {
-          Authorization: "Bearer creem_test_key",
+          "x-api-key": "creem_test_key",
           "Content-Type": "application/json",
         },
       }),
@@ -109,7 +110,7 @@ describe("Creem client", () => {
     const fetchMock: typeof fetch = async () =>
       Response.json({ error: "invalid_product" }, { status: 400 });
 
-    await expect(
+    const promise =
       createCreemCheckout(
         {
           productId: "missing",
@@ -118,7 +119,9 @@ describe("Creem client", () => {
           metadata: { userId: "user-1" },
         },
         { fetch: fetchMock },
-      ),
-    ).rejects.toThrow("Creem checkout failed with status 400.");
+      );
+
+    await expect(promise).rejects.toBeInstanceOf(CreemCheckoutError);
+    await expect(promise).rejects.toMatchObject({ status: 400 });
   });
 });

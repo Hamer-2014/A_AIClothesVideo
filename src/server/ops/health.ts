@@ -3,6 +3,7 @@ import {
   CREEM_PRODUCTION_BASE_URL,
   getCreemEnvironment,
   isCreemLiveApiKey,
+  isCreemPurchasesEnabled,
 } from "@/lib/providers/creem/config";
 
 export interface RuntimeHealthCheck {
@@ -53,10 +54,30 @@ function buildOptionalPaymentCheck(
   env: EnvSource,
   environment: string,
 ): RuntimeHealthCheck {
-  const required = ["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"];
+  if (!isCreemPurchasesEnabled(env)) {
+    return {
+      configured: false,
+      missing: [],
+      status: "pending",
+    };
+  }
+
+  const required = [
+    "CREEM_API_KEY",
+    "CREEM_WEBHOOK_SECRET",
+    "CREEM_PRODUCT_ID_STARTER",
+    "CREEM_PRODUCT_ID_CREATOR",
+    "CREEM_PRODUCT_ID_STUDIO",
+  ];
   const missing = required.filter((key) => !trimEnv(env, key));
-  const attempted = required.some((key) => Boolean(trimEnv(env, key)));
-  if (environment === "production" && trimEnv(env, "CREEM_API_KEY")) {
+  for (const key of required.filter((item) => item.startsWith("CREEM_PRODUCT_ID_"))) {
+    const productId = trimEnv(env, key);
+    if (productId && !productId.startsWith("prod_")) {
+      missing.push(key);
+    }
+  }
+
+  if (environment === "production") {
     if (trimEnv(env, "CREEM_BASE_URL") !== CREEM_PRODUCTION_BASE_URL) {
       missing.push("CREEM_BASE_URL");
     }
@@ -67,7 +88,7 @@ function buildOptionalPaymentCheck(
   return {
     configured: missing.length === 0,
     missing: [...new Set(missing)],
-    status: missing.length === 0 ? "ready" : attempted ? "missing" : "pending",
+    status: missing.length === 0 ? "ready" : "missing",
   };
 }
 
@@ -80,6 +101,9 @@ function buildModerationCheck(
   }
 
   const missing: string[] = [];
+  if (trimEnv(env, "PROMPT_MODERATION_MODE").toLowerCase() !== "creem") {
+    missing.push("PROMPT_MODERATION_MODE");
+  }
   if (trimEnv(env, "CREEM_BASE_URL") !== CREEM_PRODUCTION_BASE_URL) {
     missing.push("CREEM_BASE_URL");
   }
