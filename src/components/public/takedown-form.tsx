@@ -45,14 +45,14 @@ export function TakedownForm({
       if (!response.ok || !body?.reference) {
         setError(
           response.status === 429
-            ? "提交过于频繁，请稍后再试。"
-            : "暂时无法提交，请检查内容后重试。",
+            ? "Too many submissions. Please try again later."
+            : "We could not submit your notice. Check the information and try again.",
         );
         return;
       }
       setReference(body.reference);
     } catch {
-      setError("暂时无法提交，请稍后重试。");
+      setError("We could not submit your notice. Please try again later.");
     } finally {
       setSubmitting(false);
     }
@@ -61,16 +61,16 @@ export function TakedownForm({
   if (reference) {
     return (
       <section aria-live="polite" className="space-y-4">
-        <h2 className="text-lg font-medium text-[var(--ink)]">权利通知已受理</h2>
+        <h2 className="text-lg font-medium text-[var(--ink)]">Rights notice received</h2>
         <p className="text-sm leading-6 text-[var(--muted)]">
-          公开编号：<strong className="text-[var(--ink)]">{reference}</strong>
+          Public reference: <strong className="text-[var(--ink)]">{reference}</strong>
         </p>
         <p className="text-sm leading-6 text-[var(--muted)]">
-          请保存该编号。我们会先核验材料，不会仅凭提交自动删除内容。
+          Save this reference. We review the materials before taking action; submitting a notice does not automatically remove content.
         </p>
         {legalContactEmail ? (
           <p className="text-sm text-[var(--muted)]">
-            补充信息可发送至
+            Send additional information to
             <a
               className="ml-1 underline focus-visible:outline-2 focus-visible:outline-offset-2"
               href={`mailto:${legalContactEmail}`}
@@ -90,7 +90,7 @@ export function TakedownForm({
     <form className="space-y-6" onSubmit={submit}>
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="text-sm font-medium text-[var(--ink)]">
-          举报人姓名
+          Your name
           <input
             className={inputClass}
             maxLength={100}
@@ -100,7 +100,7 @@ export function TakedownForm({
           />
         </label>
         <label className="text-sm font-medium text-[var(--ink)]">
-          联系邮箱
+          Email address
           <input
             className={inputClass}
             maxLength={254}
@@ -112,31 +112,31 @@ export function TakedownForm({
       </div>
 
       <label className="block text-sm font-medium text-[var(--ink)]">
-        权利类型
+        Type of right
         <select className={inputClass} defaultValue="" name="rightsType" required>
-          <option disabled value="">请选择</option>
-          <option value="likeness">肖像权</option>
-          <option value="copyright">版权</option>
-          <option value="trademark">商标权</option>
-          <option value="privacy">隐私权</option>
-          <option value="other">其他</option>
+          <option disabled value="">Select a right</option>
+          <option value="likeness">Likeness</option>
+          <option value="copyright">Copyright</option>
+          <option value="trademark">Trademark</option>
+          <option value="privacy">Privacy</option>
+          <option value="other">Other</option>
         </select>
       </label>
 
       <label className="block text-sm font-medium text-[var(--ink)]">
-        涉及内容
+        Content references
         <textarea
           className={inputClass}
           maxLength={2504}
           name="contentReferences"
-          placeholder="每行一个任务链接、视频链接或可定位编号，最多 5 项"
+          placeholder="One job URL, video URL, or locatable reference per line, up to 5 items"
           required
           rows={4}
         />
       </label>
 
       <label className="block text-sm font-medium text-[var(--ink)]">
-        权利说明
+        Description of your rights
         <textarea
           className={inputClass}
           maxLength={5000}
@@ -155,7 +155,7 @@ export function TakedownForm({
             required
             type="checkbox"
           />
-          <span>诚信声明：我确信所述内容未经授权使用了相关权利。</span>
+          <span>I have a good-faith belief that the reported content uses these rights without authorization.</span>
         </label>
         <label className="flex items-start gap-3">
           <input
@@ -164,12 +164,12 @@ export function TakedownForm({
             required
             type="checkbox"
           />
-          <span>准确性声明：以上信息真实准确，并同意为核验目的接受联系。</span>
+          <span>I confirm that this information is accurate and complete, and I agree to be contacted for verification.</span>
         </label>
       </div>
 
       <label aria-hidden="true" className="sr-only">
-        公司网站
+        Company website
         <input
           autoComplete="off"
           name="companyWebsite"
@@ -188,7 +188,7 @@ export function TakedownForm({
         disabled={submitting}
         type="submit"
       >
-        {submitting ? "正在提交..." : "提交权利通知"}
+        {submitting ? "Submitting..." : "Submit rights notice"}
       </button>
     </form>
   );

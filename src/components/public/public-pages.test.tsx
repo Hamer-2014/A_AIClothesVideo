@@ -19,7 +19,7 @@ vi.mock("@/lib/auth/server", () => ({
 }));
 
 vi.mock("@/components/dashboard/sign-out-button", () => ({
-  SignOutButton: () => <button type="button">退出</button>,
+  SignOutButton: () => <button type="button">Sign out</button>,
 }));
 
 describe("public trust pages", () => {
@@ -105,6 +105,10 @@ describe("public trust pages", () => {
       "href",
       "/pricing",
     );
+    expect(screen.getByRole("link", { name: "Takedown requests" })).toHaveAttribute(
+      "href",
+      "/takedown",
+    );
     expect(screen.getByRole("link", { name: "Acceptable Use" })).toHaveAttribute(
       "href",
       "/acceptable-use",
@@ -116,14 +120,14 @@ describe("public trust pages", () => {
     render(<PublicHeader user={{ email: "merchant@example.com" }} />);
 
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "工作台" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Workspace" })).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("button", { name: "退出" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "免费试用" }),
+      screen.queryByRole("link", { name: "Free trial" }),
     ).not.toBeInTheDocument();
   });
 });

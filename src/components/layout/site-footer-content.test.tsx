@@ -13,13 +13,13 @@ describe("SiteFooterContent", () => {
       screen.getByText("2026 AI Clothes Video. All rights reserved."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("三张服装图，生成可发布宣传视频"),
+      screen.getByText("Three clothing images. One product video."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "隐私" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
       "href",
       "/privacy",
     );
-    expect(screen.getByRole("link", { name: "条款" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
       "href",
       "/terms",
     );
@@ -27,11 +27,11 @@ describe("SiteFooterContent", () => {
       "href",
       "/faq",
     );
-    expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
       "href",
       "/pricing",
     );
-    expect(screen.getByRole("link", { name: "侵权删除" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Takedown requests" })).toHaveAttribute(
       "href",
       "/takedown",
     );

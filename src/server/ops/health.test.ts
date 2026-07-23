@@ -377,7 +377,7 @@ describe("getRuntimeHealth", () => {
       "RESEND_API_KEY",
       "EMAIL_FROM",
       "ABUSE_HASH_SECRET",
-  ]);
+    ]);
   });
 
   it("requires a support email for production readiness", () => {

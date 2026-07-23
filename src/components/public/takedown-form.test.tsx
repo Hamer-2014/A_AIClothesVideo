@@ -6,26 +6,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TakedownForm } from "./takedown-form";
 
 function fillValidRightsRemovalForm() {
-  fireEvent.change(screen.getByLabelText("举报人姓名"), {
-    target: { value: "权利人" },
+  fireEvent.change(screen.getByLabelText("Your name"), {
+    target: { value: "Rights holder" },
   });
-  fireEvent.change(screen.getByLabelText("联系邮箱"), {
+  fireEvent.change(screen.getByLabelText("Email address"), {
     target: { value: "owner@example.com" },
   });
-  fireEvent.change(screen.getByLabelText("权利类型"), {
+  fireEvent.change(screen.getByLabelText("Type of right"), {
     target: { value: "likeness" },
   });
-  fireEvent.change(screen.getByLabelText("涉及内容"), {
+  fireEvent.change(screen.getByLabelText("Content references"), {
     target: { value: "https://app.example/jobs/job-1" },
   });
-  fireEvent.change(screen.getByLabelText("权利说明"), {
+  fireEvent.change(screen.getByLabelText("Description of your rights"), {
     target: {
       value:
-        "我是相关人物的合法权利人，该内容未经授权使用了人物肖像，请核验并处理对应内容。此说明仅用于自动化测试。",
+        "I am the authorized rights holder. This content uses the person's likeness without permission. Please review and process this notice.",
     },
   });
-  fireEvent.click(screen.getByRole("checkbox", { name: /诚信声明/ }));
-  fireEvent.click(screen.getByRole("checkbox", { name: /准确性声明/ }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /good-faith belief/ }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /accurate and complete/ }));
 }
 
 describe("TakedownForm", () => {
@@ -42,7 +42,7 @@ describe("TakedownForm", () => {
     );
     render(<TakedownForm legalContactEmail="legal@example.com" />);
     fillValidRightsRemovalForm();
-    fireEvent.click(screen.getByRole("button", { name: "提交权利通知" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit rights notice" }));
 
     expect(await screen.findByText(/RR-TEST123/)).toBeInTheDocument();
     expect(
@@ -55,10 +55,10 @@ describe("TakedownForm", () => {
     render(<TakedownForm legalContactEmail="legal@example.com" />);
 
     expect(
-      screen.getByRole("checkbox", { name: /诚信声明/ }),
+      screen.getByRole("checkbox", { name: /good-faith belief/ }),
     ).not.toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: /准确性声明/ }),
+      screen.getByRole("checkbox", { name: /accurate and complete/ }),
     ).not.toBeChecked();
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });

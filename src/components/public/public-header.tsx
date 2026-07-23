@@ -13,17 +13,17 @@ interface PublicHeaderProps {
 }
 
 export function PublicHeader({ user }: PublicHeaderProps) {
-  const displayName = user?.name || user?.email || "当前用户";
+  const displayName = user?.name || user?.email || "Current user";
 
   return (
     <header className="relative z-20 border-b border-[var(--line)] bg-[var(--surface-raised)]">
       <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-3 px-4 sm:px-8 lg:px-12">
-        <Link href="/" aria-label="AI Clothes Video 首页">
+        <Link href="/" aria-label="AI Clothes Video home">
           <LogoLockup />
         </Link>
-        <nav aria-label="主导航" className="flex items-center gap-3 text-sm sm:gap-4">
+        <nav aria-label="Primary navigation" className="flex items-center gap-3 text-sm sm:gap-4">
           <Link className="hidden text-[var(--muted)] hover:text-[var(--ink)] sm:inline-flex" href="/pricing">
-            价格
+            Pricing
           </Link>
           <Link className="hidden text-[var(--muted)] hover:text-[var(--ink)] md:inline-flex" href="/faq">
             FAQ
@@ -34,7 +34,7 @@ export function PublicHeader({ user }: PublicHeaderProps) {
                 className="text-[var(--muted)] hover:text-[var(--ink)]"
                 href="/workspace"
               >
-                工作台
+                Workspace
               </Link>
               <span className="hidden max-w-40 truncate text-[var(--muted)] lg:inline">
                 {displayName}
@@ -47,9 +47,9 @@ export function PublicHeader({ user }: PublicHeaderProps) {
                 className="text-[var(--muted)] hover:text-[var(--ink)]"
                 href="/login"
               >
-                登录
+                Sign in
               </Link>
-              <TrialCtaLink>免费试用</TrialCtaLink>
+              <TrialCtaLink>Free trial</TrialCtaLink>
             </>
           )}
         </nav>

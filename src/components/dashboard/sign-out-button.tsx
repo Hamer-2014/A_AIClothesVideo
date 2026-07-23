@@ -17,7 +17,7 @@ export function SignOutButton() {
       type="button"
     >
       <LogOut aria-hidden="true" size={15} />
-      退出
+      Sign out
     </button>
   );
 }

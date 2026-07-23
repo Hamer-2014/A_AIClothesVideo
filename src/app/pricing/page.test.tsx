@@ -19,7 +19,7 @@ vi.mock("@/server/analytics/funnel-events", () => ({
 }));
 
 vi.mock("@/components/dashboard/sign-out-button", () => ({
-  SignOutButton: () => <button type="button">退出</button>,
+  SignOutButton: () => <button type="button">Sign out</button>,
 }));
 
 describe("PricingPage", () => {
@@ -47,7 +47,7 @@ describe("PricingPage", () => {
     expect(screen.getByText("$9.99")).toBeInTheDocument();
     expect(screen.getByText("Creator")).toBeInTheDocument();
     expect(screen.getByText("Studio")).toBeInTheDocument();
-    expect(screen.getByText("Free trial")).toBeInTheDocument();
+    expect(screen.getAllByText("Free trial").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Credits are reserved before generation/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/only captured after quality checks pass/).length).toBeGreaterThan(0);
     expect(screen.getByText("About one 8-second video")).toBeInTheDocument();
@@ -85,13 +85,13 @@ describe("PricingPage", () => {
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("link", { name: "工作台" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Workspace" })).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "免费试用" }),
+      screen.queryByRole("link", { name: "Free trial" }),
     ).not.toBeInTheDocument();
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
