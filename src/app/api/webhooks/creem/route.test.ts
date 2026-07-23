@@ -66,6 +66,7 @@ describe("POST /api/webhooks/creem", () => {
 
   it("credits the matching local order for checkout.completed", async () => {
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
     const funnelStore = createInMemoryFunnelEventStore();
@@ -86,7 +87,7 @@ describe("POST /api/webhooks/creem", () => {
           currency: "USD",
         },
         product: {
-          id: "creator",
+          id: "prod_creator",
         },
         customer: {
           email: "buyer@example.com",
@@ -130,6 +131,7 @@ describe("POST /api/webhooks/creem", () => {
 
   it("does not grant credits twice for replayed paid webhook events", async () => {
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("CREEM_PRODUCT_ID_STARTER", "prod_starter");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
     await createCheckoutOrder({
@@ -149,7 +151,7 @@ describe("POST /api/webhooks/creem", () => {
           currency: "USD",
         },
         product: {
-          id: "starter",
+          id: "prod_starter",
         },
         metadata: {
           userId,

@@ -35,8 +35,8 @@ describe("PricingPage", () => {
 
     render(await PricingPage());
 
-    expect(screen.getByText("40 秒 Beta")).toBeInTheDocument();
-    expect(screen.getByText("310 点 · 5 个片段")).toBeInTheDocument();
+    expect(screen.getByText("40-second Beta")).toBeInTheDocument();
+    expect(screen.getByText("310 credits · 5 segments")).toBeInTheDocument();
   });
 
   it("explains public trial, packages, duration credit costs, and failed generation credit handling", async () => {
@@ -44,20 +44,24 @@ describe("PricingPage", () => {
     render(await PricingPage());
 
     expect(screen.getByText("Starter")).toBeInTheDocument();
+    expect(screen.getByText("$9.99")).toBeInTheDocument();
     expect(screen.getByText("Creator")).toBeInTheDocument();
     expect(screen.getByText("Studio")).toBeInTheDocument();
-    expect(screen.getByText("约 1 条 8 秒视频")).toBeInTheDocument();
-    expect(screen.getByText("约 2 条 16 秒视频")).toBeInTheDocument();
-    expect(screen.getByText("约 5 条 24 秒视频")).toBeInTheDocument();
-    expect(screen.getByText(/按当前点数消耗估算/)).toBeInTheDocument();
-    expect(screen.getAllByText(/8 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/16 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/24 秒/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/免费试用/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Free trial")).toBeInTheDocument();
+    expect(screen.getAllByText(/Credits are reserved before generation/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/only captured after quality checks pass/).length).toBeGreaterThan(0);
+    expect(screen.getByText("About one 8-second video")).toBeInTheDocument();
+    expect(screen.getByText("About two 16-second videos")).toBeInTheDocument();
+    expect(screen.getByText("About five 24-second videos")).toBeInTheDocument();
+    expect(screen.getByText(/Estimates are based on current credit costs/)).toBeInTheDocument();
+    expect(screen.getAllByText(/8 seconds/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/16 seconds/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/24 seconds/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Free trial/).length).toBeGreaterThan(0);
     expect(
-      screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
+      screen.getByRole("link", { name: "Create one free trial video" }),
     ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
-    expect(screen.getByText(/失败会释放或退回点数/)).toBeInTheDocument();
+    expect(screen.getByText(/will be released or returned/)).toBeInTheDocument();
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "pricing_viewed",
@@ -77,7 +81,7 @@ describe("PricingPage", () => {
     render(await PricingPage());
 
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "进入工作台" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Go to workspace" })[0]).toHaveAttribute(
       "href",
       "/workspace",
     );

@@ -94,6 +94,31 @@ export async function checkPrompt(
   const mode = getPromptModerationMode();
 
   if (mode === "off") {
+    if (!canUseDevBypass()) {
+      await resultStore.createResult({
+        userId: input.userId,
+        videoJobId: input.videoJobId ?? null,
+        segmentId: input.segmentId ?? null,
+        source: input.source,
+        promptHash,
+        promptSummary,
+        externalId: input.externalId ?? null,
+        moderationId: null,
+        decision: "error",
+        errorCode: "prompt_moderation_off_forbidden",
+        errorMessage:
+          "PROMPT_MODERATION_MODE=off is only allowed in development or test.",
+        latencyMs: 0,
+      });
+
+      return {
+        allowed: false,
+        decision: "error",
+        moderationId: null,
+        errorCode: "prompt_moderation_off_forbidden",
+      };
+    }
+
     return storeBypassResult({
       resultStore,
       input,

@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { creditPackages, getCreditPackage } from "./packages";
+import { getCreditPackage, getCreditPackages } from "./packages";
 
 describe("credit packages", () => {
-  it("defines the MVP credit packages from the spec", () => {
-    expect(creditPackages).toEqual([
+  it("reads Creem product IDs from configuration while keeping price and credits server-side", () => {
+    expect(
+      getCreditPackages({
+        CREEM_PRODUCT_ID_STARTER: "prod_starter",
+        CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+        CREEM_PRODUCT_ID_STUDIO: "prod_studio",
+      }),
+    ).toEqual([
       {
         code: "starter",
         name: "Starter",
-        creemProductId: "starter",
+        creemProductId: "prod_starter",
         amountCents: 999,
         currency: "USD",
         credits: 100,
@@ -16,7 +22,7 @@ describe("credit packages", () => {
       {
         code: "creator",
         name: "Creator",
-        creemProductId: "creator",
+        creemProductId: "prod_creator",
         amountCents: 2999,
         currency: "USD",
         credits: 360,
@@ -24,12 +30,33 @@ describe("credit packages", () => {
       {
         code: "studio",
         name: "Studio",
-        creemProductId: "studio",
+        creemProductId: "prod_studio",
         amountCents: 7999,
         currency: "USD",
         credits: 1100,
       },
     ]);
+  });
+
+  it("does not expose placeholder product IDs when product configuration is missing", () => {
+    expect(getCreditPackage("starter", { NODE_ENV: "production" })).toMatchObject({
+      creemProductId: null,
+      amountCents: 999,
+      currency: "USD",
+      credits: 100,
+    });
+    expect(getCreditPackage("creator", { NODE_ENV: "production" })).toMatchObject({
+      creemProductId: null,
+      amountCents: 2999,
+      currency: "USD",
+      credits: 360,
+    });
+    expect(getCreditPackage("studio", { NODE_ENV: "production" })).toMatchObject({
+      creemProductId: null,
+      amountCents: 7999,
+      currency: "USD",
+      credits: 1100,
+    });
   });
 
   it("returns null for unknown package codes", () => {

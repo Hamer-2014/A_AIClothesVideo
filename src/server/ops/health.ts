@@ -58,6 +58,7 @@ function buildLegalComplianceCheck(
 ): RuntimeHealthCheck {
   const required = [
     "LEGAL_CONTACT_EMAIL",
+    "SUPPORT_EMAIL",
     "RESEND_API_KEY",
     "EMAIL_FROM",
     "ABUSE_HASH_SECRET",

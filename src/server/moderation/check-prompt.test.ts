@@ -154,7 +154,7 @@ describe("checkPrompt", () => {
     });
   });
 
-  it("allows prompts in off mode without calling Creem", async () => {
+  it("fails closed when off mode is used in production", async () => {
     vi.stubEnv("PROMPT_MODERATION_MODE", "off");
     vi.stubEnv("NODE_ENV", "production");
     const store = createInMemoryModerationResultStore();
@@ -174,14 +174,14 @@ describe("checkPrompt", () => {
     );
 
     expect(result).toEqual({
-      allowed: true,
-      decision: "allow",
+      allowed: false,
+      decision: "error",
       moderationId: null,
-      errorCode: "prompt_moderation_off",
+      errorCode: "prompt_moderation_off_forbidden",
     });
     expect(store.listResults()[0]).toMatchObject({
-      decision: "allow",
-      errorCode: "prompt_moderation_off",
+      decision: "error",
+      errorCode: "prompt_moderation_off_forbidden",
     });
   });
 

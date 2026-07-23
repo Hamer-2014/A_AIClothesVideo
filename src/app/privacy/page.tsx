@@ -9,51 +9,45 @@ export default async function PrivacyPage() {
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
       <PublicHeader user={session?.user ?? null} />
       <article className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-3xl font-semibold tracking-normal">隐私政策</h1>
+        <h1 className="text-3xl font-semibold tracking-normal">Privacy Policy</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          这是 AI Clothes Video 的基础隐私说明，用于解释我们如何处理你上传的素材、生成结果和账号数据。
+          This Privacy Policy explains how AI Clothes Video handles your uploaded materials, generated results, and account data.
         </p>
         <div className="mt-8 space-y-8 text-sm leading-7 text-[var(--muted)]">
           <section>
-            <h2 className="text-base font-medium text-[var(--ink)]">上传图片</h2>
+            <h2 className="text-base font-medium text-[var(--ink)]">Uploaded images</h2>
             <p className="mt-2">
-              你上传的服装商品图、背面图、细节图、场景图和生成结果会用于创建视频任务、展示历史记录、下载交付和排障。
-              请只上传你有权使用的素材。
+              We use your clothing product images, back views, detail images, scene references, and generated results to create video jobs, show history, provide downloads, troubleshoot, and meet compliance obligations. Upload only material you have the right to use.
             </p>
           </section>
           <section>
-            <h2 className="text-base font-medium text-[var(--ink)]">模型调用</h2>
+            <h2 className="text-base font-medium text-[var(--ink)]">Model processing</h2>
             <p className="mt-2">
-              生成链路会把必要的图片、素材分析结果、用户填写文本和最终视频 prompt 发送给模型服务，用于素材识别、分镜生成、视频生成和质量检查。
-              我们不会把 API Key、内部风控信号或完整供应商调试信息展示给普通用户。
+              The generation workflow sends necessary images, material analysis, user-provided text, and final video prompts to model providers for analysis, storyboard generation, video generation, and quality checks. We do not expose API keys, internal safety signals, or full provider debugging data to regular users.
             </p>
           </section>
           <section>
             <h2 className="text-base font-medium text-[var(--ink)]">Cloudflare R2</h2>
             <p className="mt-2">
-              上传图片、片段视频、最终视频、封面和质检抽帧默认保存在私有 Cloudflare R2 对象存储中。
-              用户访问文件时使用短期 signed URL，bucket 不作为公开目录开放。
+              Uploaded images, video segments, final videos, covers, and quality-check frames are stored in private Cloudflare R2 object storage. Access uses short-lived signed URLs; the bucket is not a public directory.
             </p>
           </section>
           <section>
-            <h2 className="text-base font-medium text-[var(--ink)]">保存周期</h2>
+            <h2 className="text-base font-medium text-[var(--ink)]">Retention</h2>
             <p className="mt-2">
-              默认保存周期：上传原图和最终视频约 180 天，片段视频和普通质检抽帧约 30 天，异常或申诉相关文件可保留更久用于排障。
-              账务、订单和必要审计记录会按合规与对账需要保留。
+              Uploaded originals and final videos are normally retained for about 180 days; video segments and ordinary quality-check frames for about 30 days. Files connected to incidents or appeals may be retained longer for troubleshooting. Billing, order, and required audit records are retained as needed for compliance and reconciliation.
             </p>
           </section>
           <section>
-            <h2 className="text-base font-medium text-[var(--ink)]">删除</h2>
+            <h2 className="text-base font-medium text-[var(--ink)]">Deletion</h2>
             <p className="mt-2">
-              你可以请求删除任务素材或账号数据。删除通常先在数据库标记，再由后台清理任务异步移除 R2 文件；
-              已产生的订单、点数流水和安全审计记录可能需要保留。
+              You may request deletion of job materials or account data. Deletion is normally marked in the database first, then an asynchronous cleanup removes R2 files. Completed orders, credit ledgers, and safety audit records may need to be retained.
             </p>
           </section>
           <section>
-            <h2 className="text-base font-medium text-[var(--ink)]">声明与投诉数据</h2>
+            <h2 className="text-base font-medium text-[var(--ink)]">Notices and complaints</h2>
             <p className="mt-2">
-              上传授权声明会保存声明版本、文本快照、关联素材和去标识化的请求摘要。侵权通知会保存举报人联系方式、权利类型、去敏后的内容引用、说明、处理状态和审计记录。
-              已结案投诉以及不再关联有效素材的声明，在三年保留期届满后执行去标识化；公开编号、状态和必要审计关系可继续保留。
+              Upload authorization declarations retain the declaration version, text snapshot, linked material, and a de-identified request summary. Rights notices retain the reporter contact, rights type, redacted content reference, explanation, status, and audit record. Closed complaints and declarations no longer linked to active materials are de-identified after a three years retention period; public reference numbers, status, and necessary audit relationships may remain.
             </p>
           </section>
         </div>

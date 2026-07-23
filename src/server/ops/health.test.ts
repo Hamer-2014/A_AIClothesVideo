@@ -73,6 +73,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "support@example.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -142,6 +143,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "support@example.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -208,6 +210,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "support@example.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -245,6 +248,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "support@example.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -315,6 +319,7 @@ describe("getRuntimeHealth", () => {
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
       LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "support@example.com",
       RESEND_API_KEY: "resend-key",
       EMAIL_FROM: "RunwayTools <legal@example.com>",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -360,6 +365,7 @@ describe("getRuntimeHealth", () => {
     const report = getRuntimeHealth({
       APP_ENV: "production",
       LEGAL_CONTACT_EMAIL: "",
+      SUPPORT_EMAIL: "",
       RESEND_API_KEY: "",
       EMAIL_FROM: "",
       ABUSE_HASH_SECRET: "",
@@ -367,10 +373,25 @@ describe("getRuntimeHealth", () => {
 
     expect(report.checks.legalCompliance.missing).toEqual([
       "LEGAL_CONTACT_EMAIL",
+      "SUPPORT_EMAIL",
       "RESEND_API_KEY",
       "EMAIL_FROM",
       "ABUSE_HASH_SECRET",
-    ]);
+  ]);
+  });
+
+  it("requires a support email for production readiness", () => {
+    const report = getRuntimeHealth({
+      APP_ENV: "production",
+      LEGAL_CONTACT_EMAIL: "legal@example.com",
+      SUPPORT_EMAIL: "",
+      RESEND_API_KEY: "resend-key",
+      EMAIL_FROM: "AI Clothes Video <support@example.com>",
+      ABUSE_HASH_SECRET: "abuse-secret",
+    });
+
+    expect(report.checks.legalCompliance.missing).toContain("SUPPORT_EMAIL");
+    expect(report.ready).toBe(false);
   });
 });
 

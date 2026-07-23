@@ -36,17 +36,17 @@ describe("Home", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "AI Clothes Video" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/上传 3 张服装图/)).toBeInTheDocument();
+    expect(screen.getByText(/Use exactly three clothing images/)).toBeInTheDocument();
     expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
       "src",
       "/demo/red-dress-video.mp4",
     );
-    expect(screen.getByAltText("红色礼服正面原始素材")).toHaveAttribute(
+    expect(screen.getByAltText("Original front image of a red dress")).toHaveAttribute(
       "src",
       expect.stringContaining("/demo/red-dress-front.webp"),
     );
-    expect(screen.getByAltText("红色礼服背面原始素材")).toBeInTheDocument();
-    expect(screen.getByAltText("红色礼服细节原始素材")).toBeInTheDocument();
+    expect(screen.getByAltText("Original back image of a red dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Original detail image of a red dress")).toBeInTheDocument();
   });
 
   it("shows anonymous trial actions to visitors", async () => {
@@ -60,7 +60,7 @@ describe("Home", () => {
     );
     expect(screen.getByRole("link", { name: "免费试用" })).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "免费生成 1 条试用视频" }),
+      screen.getByRole("link", { name: "Create one free trial video" }),
     ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -85,7 +85,7 @@ describe("Home", () => {
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("link", { name: "进入工作台" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Go to workspace" })).toHaveAttribute(
       "href",
       "/workspace",
     );

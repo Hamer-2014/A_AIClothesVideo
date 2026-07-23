@@ -143,10 +143,19 @@ function assertPaidEventMatchesOrder(
     throw new Error("Creem paid event user does not match the local order.");
   }
 
+  const selectedPackage = getCreditPackage(order.productCode);
+  if (!selectedPackage?.creemProductId) {
+    throw new Error("Creem credit package is not configured.");
+  }
+
   if (
-    event.productId !== order.productCode ||
+    metadataString(event.metadata, "packageCode") !== order.productCode ||
+    event.productId !== selectedPackage.creemProductId ||
     event.amountCents !== order.amountCents ||
-    event.currency !== order.currency
+    event.currency !== order.currency ||
+    order.amountCents !== selectedPackage.amountCents ||
+    order.currency !== selectedPackage.currency ||
+    order.creditsGranted !== selectedPackage.credits
   ) {
     throw new Error("Creem paid event does not match the local order.");
   }

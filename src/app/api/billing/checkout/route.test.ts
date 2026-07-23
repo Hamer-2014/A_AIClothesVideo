@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CreemUnavailableError } from "@/lib/providers/creem/client";
 import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
@@ -7,6 +7,10 @@ import { createInMemoryOrderStore } from "@/server/billing/orders";
 import { handleBillingCheckoutRequest } from "./route";
 
 describe("POST /api/billing/checkout", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns 401 when unauthenticated", async () => {
     const response = await handleBillingCheckoutRequest(
       new Request("http://localhost/api/billing/checkout", {
@@ -57,6 +61,7 @@ describe("POST /api/billing/checkout", () => {
   });
 
   it("creates a Creem checkout and records a local order", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
     const funnelStore = createInMemoryFunnelEventStore();
     const response = await handleBillingCheckoutRequest(
@@ -69,12 +74,15 @@ describe("POST /api/billing/checkout", () => {
           user: { id: "11111111-1111-4111-8111-111111111111" },
         }),
         orderStore,
-        createCheckout: async (input) => ({
-          id: "checkout_1",
-          externalOrderId: input.requestId,
-          checkoutUrl: "https://checkout.creem.io/checkout_1",
-          raw: { id: "checkout_1" },
-        }),
+        createCheckout: async (input) => {
+          expect(input.productId).toBe("prod_creator");
+          return {
+            id: "checkout_1",
+            externalOrderId: input.requestId,
+            checkoutUrl: "https://checkout.creem.io/checkout_1",
+            raw: { id: "checkout_1" },
+          };
+        },
         funnelEventStore: funnelStore,
       },
     );
@@ -106,6 +114,7 @@ describe("POST /api/billing/checkout", () => {
   });
 
   it("fails closed when the Creem checkout provider is unavailable", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
     const response = await handleBillingCheckoutRequest(
       new Request("http://localhost/api/billing/checkout", {
@@ -128,5 +137,23 @@ describe("POST /api/billing/checkout", () => {
       error: "billing_provider_unavailable",
     });
     expect(orderStore.listOrders()).toHaveLength(0);
+  });
+
+  it("fails closed without a configured Creem product ID and does not create checkout", async () => {
+    const createCheckout = vi.fn();
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "starter" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        createCheckout,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "billing_not_configured" });
+    expect(createCheckout).not.toHaveBeenCalled();
   });
 });

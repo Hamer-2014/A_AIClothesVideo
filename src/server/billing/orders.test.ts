@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
 
@@ -30,6 +30,10 @@ function completedEvent(overrides: Record<string, unknown> = {}) {
 }
 
 describe("billing orders", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("creates a local checkout order before redirecting to Creem", async () => {
     const orderStore = createInMemoryOrderStore();
 
@@ -53,6 +57,7 @@ describe("billing orders", () => {
   });
 
   it("credits a paid Creem order once even when the webhook is replayed", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
     await createCheckoutOrder({
@@ -66,12 +71,12 @@ describe("billing orders", () => {
     const first = await handleCreemCheckoutCompleted({
       orderStore,
       ledgerStore,
-      event: completedEvent(),
+      event: completedEvent({ productId: "prod_creator" }),
     });
     const second = await handleCreemCheckoutCompleted({
       orderStore,
       ledgerStore,
-      event: completedEvent({ id: "evt_1_replay" }),
+      event: completedEvent({ id: "evt_1_replay", productId: "prod_creator" }),
     });
 
     expect(first.ledgerResult.idempotent).toBe(false);
@@ -82,6 +87,7 @@ describe("billing orders", () => {
   });
 
   it("rejects product, amount, currency, and user mismatches", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
     await createCheckoutOrder({
@@ -96,7 +102,7 @@ describe("billing orders", () => {
       handleCreemCheckoutCompleted({
         orderStore,
         ledgerStore,
-        event: completedEvent({ amountCents: 999 }),
+        event: completedEvent({ productId: "prod_creator", amountCents: 999 }),
       }),
     ).rejects.toThrow("Creem paid event does not match the local order.");
 
@@ -105,6 +111,7 @@ describe("billing orders", () => {
         orderStore,
         ledgerStore,
         event: completedEvent({
+          productId: "prod_creator",
           metadata: {
             userId: "33333333-3333-4333-8333-333333333333",
             packageCode: "creator",
@@ -112,5 +119,25 @@ describe("billing orders", () => {
         }),
       }),
     ).rejects.toThrow("Creem paid event user does not match the local order.");
+  });
+
+  it("accepts the configured Creem product ID rather than the local package code", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "ord_1",
+    });
+
+    await expect(
+      handleCreemCheckoutCompleted({
+        orderStore,
+        ledgerStore,
+        event: completedEvent({ productId: "prod_creator" }),
+      }),
+    ).resolves.toMatchObject({ order: { status: "paid" } });
   });
 });

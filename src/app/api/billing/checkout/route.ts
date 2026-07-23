@@ -79,6 +79,13 @@ export async function handleBillingCheckoutRequest(
     );
   }
 
+  if (!selectedPackage.creemProductId) {
+    return NextResponse.json(
+      { error: "billing_not_configured" },
+      { status: 503 },
+    );
+  }
+
   const requestId = randomUUID();
   const createCheckout =
     deps.createCheckout ??

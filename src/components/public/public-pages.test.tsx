@@ -32,13 +32,13 @@ describe("public trust pages", () => {
     mocks.getServerSession.mockResolvedValue(null);
     const { container } = render(await PrivacyPage());
 
-    expect(screen.getByRole("heading", { name: "上传图片" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "模型调用" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Uploaded images" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Model processing" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cloudflare R2" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "保存周期" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "删除" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "声明与投诉数据" })).toBeInTheDocument();
-    expect(container).toHaveTextContent(/三年/);
+    expect(screen.getByRole("heading", { name: "Retention" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Deletion" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Notices and complaints" })).toBeInTheDocument();
+    expect(container).toHaveTextContent(/three years/);
     expect(container.textContent).not.toMatch(/RunwayTools/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
@@ -47,15 +47,15 @@ describe("public trust pages", () => {
     mocks.getServerSession.mockResolvedValue(null);
     const { container } = render(await TermsPage());
 
-    expect(screen.getByRole("heading", { name: "禁止内容" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "试用限制" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "生成失败" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "退款" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "用户上传素材" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Prohibited content" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Free trial" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Generation failures" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Credits and refunds" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your uploaded materials" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "肖像与未成年人授权" }),
+      screen.getByRole("heading", { name: "Likeness and minor authorization" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "权利通知" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Rights notices" })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/RunwayTools/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
@@ -87,13 +87,13 @@ describe("public trust pages", () => {
       screen.getByText("2026 AI Clothes Video. All rights reserved."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("三张服装图，生成可发布宣传视频"),
+      screen.getByText("Three clothing images. One product video."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "隐私" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
       "href",
       "/privacy",
     );
-    expect(screen.getByRole("link", { name: "条款" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
       "href",
       "/terms",
     );
@@ -101,10 +101,15 @@ describe("public trust pages", () => {
       "href",
       "/faq",
     );
-    expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
       "href",
       "/pricing",
     );
+    expect(screen.getByRole("link", { name: "Acceptable Use" })).toHaveAttribute(
+      "href",
+      "/acceptable-use",
+    );
+    expect(screen.getByText("support@aiclothesvideo.com")).toBeInTheDocument();
   });
 
   it("shows the signed-in public header state without anonymous CTAs", () => {

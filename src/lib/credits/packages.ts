@@ -1,17 +1,17 @@
 export interface CreditPackage {
   code: "starter" | "creator" | "studio";
   name: string;
-  creemProductId: string;
+  creemProductId: string | null;
   amountCents: number;
   currency: "USD";
   credits: number;
 }
 
-export const creditPackages: CreditPackage[] = [
+const creditPackageDefinitions = [
   {
     code: "starter",
     name: "Starter",
-    creemProductId: "starter",
+    envKey: "CREEM_PRODUCT_ID_STARTER",
     amountCents: 999,
     currency: "USD",
     credits: 100,
@@ -19,7 +19,7 @@ export const creditPackages: CreditPackage[] = [
   {
     code: "creator",
     name: "Creator",
-    creemProductId: "creator",
+    envKey: "CREEM_PRODUCT_ID_CREATOR",
     amountCents: 2999,
     currency: "USD",
     credits: 360,
@@ -27,13 +27,26 @@ export const creditPackages: CreditPackage[] = [
   {
     code: "studio",
     name: "Studio",
-    creemProductId: "studio",
+    envKey: "CREEM_PRODUCT_ID_STUDIO",
     amountCents: 7999,
     currency: "USD",
     credits: 1100,
   },
-];
+] as const;
 
-export function getCreditPackage(code: string) {
-  return creditPackages.find((item) => item.code === code) ?? null;
+type EnvSource = Record<string, string | undefined>;
+
+export function getCreditPackages(
+  env: EnvSource = process.env,
+): CreditPackage[] {
+  return creditPackageDefinitions.map(({ envKey, ...item }) => ({
+    ...item,
+    creemProductId: env[envKey]?.trim() || null,
+  }));
+}
+
+export const creditPackages = getCreditPackages();
+
+export function getCreditPackage(code: string, env: EnvSource = process.env) {
+  return getCreditPackages(env).find((item) => item.code === code) ?? null;
 }

@@ -10,21 +10,21 @@ import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
 const sourceImages = [
   {
-    alt: "红色礼服正面原始素材",
-    label: "正面",
-    note: "确认轮廓与主体",
+    alt: "Original front image of a red dress",
+    label: "Front",
+    note: "Confirms the garment shape and subject",
     src: "/demo/red-dress-front.webp",
   },
   {
-    alt: "红色礼服背面原始素材",
-    label: "背面",
-    note: "约束背面展示",
+    alt: "Original back image of a red dress",
+    label: "Back",
+    note: "Supports a back-view shot",
     src: "/demo/red-dress-back.webp",
   },
   {
-    alt: "红色礼服细节原始素材",
-    label: "细节",
-    note: "提供纹理依据",
+    alt: "Original detail image of a red dress",
+    label: "Detail",
+    note: "Supports material-detail shots",
     src: "/demo/red-dress-detail.webp",
   },
 ] as const;
@@ -70,7 +70,7 @@ export default async function Home() {
               AI Clothes Video
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-white/86 sm:text-lg sm:leading-8">
-              上传 3 张服装图，系统按正面、背面与细节的真实素材边界，生成可发布的商品宣传视频。
+              Use exactly three clothing images to create an 8-, 16-, or 24-second product video, constrained by the real front, back, and detail material you provide.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {user ? (
@@ -78,27 +78,27 @@ export default async function Home() {
                   className="group inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--action)] px-5 text-sm font-semibold text-white transition-colors hover:bg-[var(--action-hover)]"
                   href="/workspace"
                 >
-                  进入工作台
+                  Go to workspace
                   <ArrowRight aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" size={16} />
                 </a>
               ) : (
-                <TrialCtaLink sourcePage="landing" />
+                <TrialCtaLink sourcePage="landing">Create one free trial video</TrialCtaLink>
               )}
               <a
                 className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-white/45 px-5 text-sm font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
                 href="/pricing"
               >
-                查看价格
+                View pricing
               </a>
             </div>
             <p className="mt-6 flex max-w-lg items-start gap-2 text-sm leading-6 text-white/72">
               <Check aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--brand-light)]" size={17} />
-              无背面图不生成背面，无细节图不生成细节特写。
+              No back-view image means no back view. No detail image means no invented detail close-up.
             </p>
           </div>
         </div>
         <a
-          aria-label="查看三图输入示例"
+          aria-label="View the three-image input example"
           className="absolute bottom-5 right-5 z-10 inline-flex size-11 items-center justify-center border border-white/35 text-white transition-colors hover:bg-white/10 sm:right-8"
           href="#source-proof"
         >
@@ -109,12 +109,12 @@ export default async function Home() {
       <section className="bg-[var(--surface-raised)]" id="source-proof">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:px-12 lg:py-28">
           <div className="max-w-md self-end">
-            <p className="text-sm font-semibold text-[var(--brand)]">01 / 输入证据</p>
+            <p className="text-sm font-semibold text-[var(--brand)]">01 / Source evidence</p>
             <h2 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
-              正面、背面、细节，不是随便凑三张。
+              Front, back, and detail images each establish a real boundary.
             </h2>
             <p className="mt-5 text-base leading-7 text-[var(--muted)]">
-              每个槽位都有明确用途。素材缺失时，工作台会收紧可用镜头，避免凭空补造服装结构。
+              Each image has a defined purpose. When material is missing, the workspace narrows available shots instead of inventing garment structure.
             </p>
           </div>
 
@@ -147,16 +147,16 @@ export default async function Home() {
       <section className="bg-[var(--ink)] text-white">
         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-[var(--brand-light)]">02 / 生成流程</p>
+            <p className="text-sm font-semibold text-[var(--brand-light)]">02 / Workflow</p>
             <h2 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
-              从素材到成片，只做三次决定。
+              From source material to a product video in three decisions.
             </h2>
           </div>
           <ol className="mt-14 grid border-y border-white/20 md:grid-cols-3 md:divide-x md:divide-white/20">
             {[
-              ["01", "选择三图协议", "商品展示、商品旋转或真人转身，先确定素材该如何被理解。"],
-              ["02", "确认安全镜头", "系统根据素材完整度与风格预设推荐可用镜头。"],
-              ["03", "生成并下载", `输出 ${duration40Enabled ? "8/16/24 秒或 40 秒 Beta" : "8/16/24 秒"}完整视频，任务进度与质检结果可追踪。`],
+              ["01", "Select a source set", "Choose how the uploaded images establish the product evidence."],
+              ["02", "Confirm safe shots", "The system recommends available shots from material completeness and style preset rules."],
+              ["03", "Generate and download", `Create a complete ${duration40Enabled ? "8-, 16-, 24-second, or 40-second Beta" : "8-, 16-, or 24-second"} video with trackable job and quality-check status.`],
             ].map(([number, title, body]) => (
               <li className="py-8 md:px-8 md:first:pl-0 md:last:pr-0" key={number}>
                 <p className="text-xs text-white/48">{number}</p>
@@ -172,7 +172,7 @@ export default async function Home() {
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:px-12 lg:py-28">
           <div className="relative mx-auto aspect-[4/5] w-full max-w-md overflow-hidden bg-black">
             <Image
-              alt="红色礼服生成视频样片画面"
+              alt="Generated product-video frame for a red dress"
               className="object-cover"
               fill
               sizes="(max-width: 1023px) 90vw, 38vw"
@@ -181,25 +181,25 @@ export default async function Home() {
             />
           </div>
           <div className="max-w-xl lg:pl-8">
-            <p className="text-sm font-semibold text-[var(--brand)]">03 / 输出成片</p>
+            <p className="text-sm font-semibold text-[var(--brand)]">03 / Product video</p>
             <h2 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
-              一条能直接进入商品页和社媒测试的宣传视频。
+              A promotional product video for product pages and social tests.
             </h2>
             <p className="mt-5 text-base leading-7 text-[var(--muted)]">
-              演示样片来自本项目真实端到端测试资产。它用于证明三图输入到视频输出的产品路径，不代表所有服装都会得到完全相同的动作与画面。
+              The demo uses real end-to-end test assets from this product workflow. It shows the path from source images to a video, not a guarantee that every garment will receive identical motion or frames.
             </p>
             <dl className="mt-9 divide-y divide-[var(--line-strong)] border-y border-[var(--line-strong)]">
               <div className="flex items-center justify-between gap-5 py-4 text-sm">
-                <dt className="text-[var(--muted)]">公开时长</dt>
-                <dd className="font-semibold">8 / 16 / 24 秒</dd>
+                <dt className="text-[var(--muted)]">Public lengths</dt>
+                <dd className="font-semibold">8 / 16 / 24 seconds</dd>
               </div>
               <div className="flex items-center justify-between gap-5 py-4 text-sm">
-                <dt className="text-[var(--muted)]">内容边界</dt>
-                <dd className="font-semibold">按上传素材约束镜头</dd>
+                <dt className="text-[var(--muted)]">Content boundary</dt>
+                <dd className="font-semibold">Shots follow uploaded material</dd>
               </div>
               <div className="flex items-center justify-between gap-5 py-4 text-sm">
-                <dt className="text-[var(--muted)]">交付状态</dt>
-                <dd className="font-semibold">可预览、可下载、可追踪</dd>
+                <dt className="text-[var(--muted)]">Delivery status</dt>
+                <dd className="font-semibold">Previewable, downloadable, traceable</dd>
               </div>
             </dl>
           </div>
@@ -209,9 +209,9 @@ export default async function Home() {
       <section className="bg-[var(--ink)] text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 py-14 sm:px-8 lg:flex-row lg:items-center lg:px-12">
           <div>
-            <p className="text-sm font-semibold text-white/70">从一个 SKU 开始</p>
+            <p className="text-sm font-semibold text-white/70">Start with one SKU</p>
             <h2 className="mt-3 text-3xl font-semibold leading-tight">
-              把现有商品图变成第一条宣传视频。
+              Turn existing product images into your first promotional video.
             </h2>
           </div>
           {user ? (
@@ -219,12 +219,12 @@ export default async function Home() {
               className="group inline-flex h-11 shrink-0 items-center gap-2 bg-white px-5 text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--brand-soft)]"
               href="/workspace"
             >
-              制作第一条视频
+              Create your first video
               <ArrowRight aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" size={16} />
             </a>
           ) : (
             <TrialCtaLink sourcePage="landing-footer">
-              制作第一条视频
+              Create your first video
             </TrialCtaLink>
           )}
         </div>

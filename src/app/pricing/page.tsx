@@ -11,9 +11,9 @@ import {
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
 
 const packageVideoEstimates = {
-  starter: "约 1 条 8 秒视频",
-  creator: "约 2 条 16 秒视频",
-  studio: "约 5 条 24 秒视频",
+  starter: "About one 8-second video",
+  creator: "About two 16-second videos",
+  studio: "About five 24-second videos",
 } as const;
 
 export default async function PricingPage() {
@@ -38,14 +38,13 @@ export default async function PricingPage() {
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-[var(--accent)]">
-              点数包
+              Credit packs
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-normal">
-              先免费试 1 条，再按视频规格消耗点数
+              Start with one free trial, then use credits for 8, 16, or 24-second product videos.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-              免费试用用于验证素材和效果；付费生成默认高分辨率、无水印、包含音频。
-              点数在确认生成后冻结，质检通过并交付后才正式扣除。
+              Free trials use a low-resolution, watermarked 8-second video with no audio. Paid videos include high resolution, no watermark, and audio. Credits are reserved before generation and only captured after quality checks pass and a video can be delivered.
             </p>
           </div>
           {user ? (
@@ -53,10 +52,10 @@ export default async function PricingPage() {
               className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:bg-[var(--accent-strong)]"
               href="/workspace"
             >
-              进入工作台
+              Go to workspace
             </a>
           ) : (
-            <TrialCtaLink sourcePage="pricing" />
+            <TrialCtaLink sourcePage="pricing">Create one free trial video</TrialCtaLink>
           )}
         </div>
 
@@ -65,35 +64,39 @@ export default async function PricingPage() {
             <div className="rounded-lg border border-[var(--line)] bg-white p-5" key={item.code}>
               <h2 className="text-base font-medium">{item.name}</h2>
               <p className="mt-3 text-3xl font-semibold">
-                ${(item.amountCents / 100).toFixed(2)}
+                {`$${(item.amountCents / 100).toFixed(2)}`}
               </p>
-              <p className="mt-2 text-sm text-[var(--muted)]">{item.credits} 点</p>
+              <p className="mt-2 text-sm text-[var(--muted)]">{item.credits} credits</p>
               <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm font-medium">
                 {packageVideoEstimates[item.code]}
               </p>
               <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
-                适合{item.name === "Starter" ? "先跑少量 SKU 验证效果" : item.name === "Creator" ? "连续生成多条商品短视频" : "小团队集中制作多款商品素材"}。
+                {item.name === "Starter"
+                  ? "For testing a small number of product videos."
+                  : item.name === "Creator"
+                    ? "For producing several product videos."
+                    : "For teams producing videos for multiple products."}
               </p>
             </div>
           ))}
         </div>
         <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-          按当前点数消耗估算；混合生成不同视频规格时，以每次确认生成页面显示的实际点数为准。
+          Estimates are based on current credit costs. When you mix video lengths, the confirmed generation screen shows the actual credits required.
         </p>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
-            <h2 className="text-base font-medium">生成消耗</h2>
+            <h2 className="text-base font-medium">Video credit costs</h2>
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
               {availableDurations.map((duration) => {
                 const spec = getVideoSpec(duration);
                 return (
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4" key={duration}>
                     <p className="font-medium">
-                      {duration === 40 ? "40 秒 Beta" : `${duration} 秒`}
+                      {duration === 40 ? "40-second Beta" : `${duration} seconds`}
                     </p>
                     <p className="mt-2 text-[var(--muted)]">
-                      {spec.creditCost} 点 · {spec.segmentCount} 个片段
+                      {spec.creditCost} credits · {spec.segmentCount} segments
                     </p>
                   </div>
                 );
@@ -101,20 +104,19 @@ export default async function PricingPage() {
             </div>
           </div>
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
-            <h2 className="text-base font-medium">免费试用</h2>
+            <h2 className="text-base font-medium">Free trial</h2>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              新用户可免费生成 1 条试用视频：8 秒、低分辨率、无音频、带水印，
-              仅开放低风险镜头。16/24 秒{duration40Enabled ? "、40 秒 Beta" : ""}和高清无水印需要使用点数。
+              New users can create one free trial video: 8 seconds, low resolution, no audio, and a watermark. It only uses low-risk shots. 16- and 24-second videos{duration40Enabled ? ", plus the 40-second Beta," : ""} and paid high-resolution delivery require credits.
             </p>
           </div>
         </div>
 
         <div className="mt-8 rounded-lg border border-[var(--line)] bg-white p-5">
-          <h2 className="text-base font-medium">失败与退款规则</h2>
+          <h2 className="text-base font-medium">Credit reservation and delivery</h2>
           <div className="mt-4 grid gap-4 text-sm leading-6 text-[var(--muted)] md:grid-cols-3">
-            <p>生成前会先冻结点数，不会一点击就正式扣除。</p>
-            <p>供应商失败、未生成或无法交付时，失败会释放或退回点数。</p>
-            <p>质量检查未通过且无法交付时，会按任务状态处理退款或释放。</p>
+            <p>Credits are reserved before generation. A click does not immediately consume them.</p>
+            <p>If a generation fails, is not created, or cannot be delivered, credits will be released or returned according to its status.</p>
+            <p>Credits are only captured after quality checks pass and delivery is available.</p>
           </div>
         </div>
       </section>
