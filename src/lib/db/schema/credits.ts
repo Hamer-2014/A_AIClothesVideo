@@ -9,6 +9,7 @@ export const creditLedgerTypeValues = [
   "capture",
   "release",
   "refund",
+  "purchase_reversal",
   "admin_adjust",
 ] as const;
 export const creditLedgerTypeEnum = pgEnum(

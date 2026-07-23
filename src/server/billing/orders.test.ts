@@ -6,6 +6,7 @@ import {
   createCheckoutOrder,
   createInMemoryOrderStore,
   handleCreemCheckoutCompleted,
+  handleCreemRefundCreated,
 } from "./orders";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -25,6 +26,22 @@ function completedEvent(overrides: Record<string, unknown> = {}) {
       packageCode: "creator",
     },
     raw: { id: "evt_1" },
+    ...overrides,
+  };
+}
+
+function refundEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "evt_refund_1",
+    type: "refund.created" as const,
+    refundId: "ref_1",
+    externalOrderId: "req_1",
+    productId: "prod_creator",
+    amountCents: 2999,
+    currency: "USD",
+    transactionStatus: "refunded" as const,
+    metadata: { userId, packageCode: "creator" },
+    raw: { id: "evt_refund_1", object: { id: "ref_1" } },
     ...overrides,
   };
 }
@@ -163,5 +180,70 @@ describe("billing orders", () => {
         }),
       }),
     ).rejects.toThrow("Creem checkout product snapshot is missing.");
+  });
+
+  it("reverses a paid order once and rejects a different second refund", async () => {
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
+    });
+    await handleCreemCheckoutCompleted({
+      orderStore,
+      ledgerStore,
+      event: completedEvent({ productId: "prod_creator" }),
+    });
+
+    const first = await handleCreemRefundCreated({
+      orderStore,
+      ledgerStore,
+      event: refundEvent(),
+    });
+    const replay = await handleCreemRefundCreated({
+      orderStore,
+      ledgerStore,
+      event: refundEvent(),
+    });
+
+    expect(first.order.status).toBe("refunded");
+    expect(first.ledgerResult.wallet.availableBalance).toBe(0);
+    expect(replay.ledgerResult.idempotent).toBe(true);
+    expect(
+      ledgerStore.listLedger().filter((entry) => entry.type === "purchase_reversal"),
+    ).toHaveLength(1);
+
+    await expect(
+      handleCreemRefundCreated({
+        orderStore,
+        ledgerStore,
+        event: refundEvent({
+          id: "evt_refund_2",
+          refundId: "ref_2",
+          raw: { id: "evt_refund_2", object: { id: "ref_2" } },
+        }),
+      }),
+    ).rejects.toThrow("Creem order has already been refunded.");
+  });
+
+  it("rejects refunds that do not match a paid local order", async () => {
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "creator",
+      externalOrderId: "req_1",
+      checkoutSnapshot: { creemProductId: "prod_creator" },
+    });
+
+    await expect(
+      handleCreemRefundCreated({ orderStore, ledgerStore, event: refundEvent() }),
+    ).rejects.toThrow("Creem refund requires a paid local order.");
+    expect(ledgerStore.listLedger()).toHaveLength(0);
+    expect(orderStore.listOrders()[0]?.status).toBe("created");
   });
 });

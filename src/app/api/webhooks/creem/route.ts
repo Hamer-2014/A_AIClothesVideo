@@ -15,6 +15,7 @@ import {
 import { createDrizzleOrderStore } from "@/server/billing/drizzle-orders";
 import {
   handleCreemCheckoutCompleted,
+  handleCreemRefundCreated,
   type OrderStore,
 } from "@/server/billing/orders";
 
@@ -48,21 +49,28 @@ export async function handleCreemWebhookRequest(
   }
 
   try {
-    const result = await handleCreemCheckoutCompleted({
-      orderStore: deps.orderStore ?? createDrizzleOrderStore(),
-      ledgerStore: deps.ledgerStore ?? createDrizzleCreditLedgerStore(),
-      event,
-    });
-    await recordFunnelEventSafely({
-      store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
-      eventName: "payment_succeeded",
-      source: "server",
-      userId: result.order.userId,
-      path: new URL(request.url).pathname,
-      metadata: {
-        status: "paid",
-      },
-    });
+    const orderStore = deps.orderStore ?? createDrizzleOrderStore();
+    const ledgerStore = deps.ledgerStore ?? createDrizzleCreditLedgerStore();
+
+    if (event.type === "checkout.completed") {
+      const result = await handleCreemCheckoutCompleted({
+        orderStore,
+        ledgerStore,
+        event,
+      });
+      await recordFunnelEventSafely({
+        store: deps.funnelEventStore ?? createRuntimeFunnelEventStore(),
+        eventName: "payment_succeeded",
+        source: "server",
+        userId: result.order.userId,
+        path: new URL(request.url).pathname,
+        metadata: {
+          status: "paid",
+        },
+      });
+    } else {
+      await handleCreemRefundCreated({ orderStore, ledgerStore, event });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "webhook_failed";
     return NextResponse.json({ error: message }, { status: 400 });

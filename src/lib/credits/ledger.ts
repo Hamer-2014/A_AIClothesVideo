@@ -107,6 +107,19 @@ export function purchaseCredits(input: CreditOperationInput) {
   });
 }
 
+export function reversePurchasedCredits(input: CreditOperationInput) {
+  return applyCreditOperation({
+    input,
+    type: "purchase_reversal",
+    mutate: (wallet) => ({
+      walletChanges: {
+        availableBalance: wallet.availableBalance - input.amount,
+      },
+      amountForLedger: -input.amount,
+    }),
+  });
+}
+
 export function grantTrialCredits(input: CreditOperationInput) {
   return applyCreditOperation({
     input,

@@ -80,6 +80,92 @@ describe("Creem webhook", () => {
     });
   });
 
+  it("parses a successful full refund.created event", () => {
+    const refundPayload = JSON.stringify({
+      id: "evt_refund_1",
+      eventType: "refund.created",
+      object: {
+        id: "ref_1",
+        status: "succeeded",
+        refund_amount: 1199,
+        refund_currency: "USD",
+        transaction: {
+          status: "refunded",
+          amount_paid: 1199,
+          refunded_amount: 1199,
+          currency: "USD",
+        },
+        checkout: {
+          request_id: "req_refund_1",
+          metadata: { userId: "user-1", packageCode: "starter" },
+        },
+        order: {
+          product: "prod_starter",
+          amount: 999,
+          currency: "USD",
+        },
+      },
+    });
+
+    expect(parseCreemWebhookEvent(refundPayload)).toEqual({
+      id: "evt_refund_1",
+      type: "refund.created",
+      refundId: "ref_1",
+      externalOrderId: "req_refund_1",
+      productId: "prod_starter",
+      amountCents: 999,
+      currency: "USD",
+      transactionStatus: "refunded",
+      metadata: { userId: "user-1", packageCode: "starter" },
+      raw: JSON.parse(refundPayload),
+    });
+  });
+
+  it.each([
+    {
+      name: "partial",
+      objectStatus: "succeeded",
+      transactionStatus: "partially_refunded",
+      refundAmount: 500,
+      amountPaid: 1199,
+      refundedAmount: 500,
+    },
+    {
+      name: "not succeeded",
+      objectStatus: "processing",
+      transactionStatus: "refunded",
+      refundAmount: 1199,
+      amountPaid: 1199,
+      refundedAmount: 1199,
+    },
+  ])("rejects $name refund events", (scenario) => {
+    const refundPayload = JSON.stringify({
+      id: "evt_refund_invalid",
+      eventType: "refund.created",
+      object: {
+        id: "ref_invalid",
+        status: scenario.objectStatus,
+        refund_amount: scenario.refundAmount,
+        refund_currency: "USD",
+        transaction: {
+          status: scenario.transactionStatus,
+          amount_paid: scenario.amountPaid,
+          refunded_amount: scenario.refundedAmount,
+          currency: "USD",
+        },
+        checkout: {
+          request_id: "req_refund_invalid",
+          metadata: { userId: "user-1", packageCode: "starter" },
+        },
+        order: { product: "prod_starter", amount: 999, currency: "USD" },
+      },
+    });
+
+    expect(() => parseCreemWebhookEvent(refundPayload)).toThrow(
+      "Creem refund.created event is not a successful full refund.",
+    );
+  });
+
   it("marks unsupported events as ignored", () => {
     const event = parseCreemWebhookEvent(
       JSON.stringify({ id: "evt_2", type: "checkout.created" }),

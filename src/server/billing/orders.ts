@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import type { CreditLedgerResult } from "@/lib/credits/ledger";
-import { purchaseCredits } from "@/lib/credits/ledger";
+import { purchaseCredits, reversePurchasedCredits } from "@/lib/credits/ledger";
 import type { CreditLedgerStore } from "@/lib/credits/types";
 import { getCreditPackage } from "@/lib/credits/packages";
 import type { JsonValue } from "@/lib/db/schema/common";
-import type { CreemCheckoutCompletedEvent } from "@/lib/providers/creem/webhook";
+import type {
+  CreemCheckoutCompletedEvent,
+  CreemRefundCreatedEvent,
+} from "@/lib/providers/creem/webhook";
 
 export type OrderStatus = "created" | "paid" | "failed" | "refunded" | "cancelled";
 
@@ -263,4 +266,90 @@ export async function handleCreemCheckoutCompleted({
     order: paidOrder,
     ledgerResult,
   };
+}
+
+function refundIdFromSnapshot(snapshot: JsonValue | null) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return null;
+  }
+
+  const object = (snapshot as Record<string, unknown>).object;
+  if (!object || typeof object !== "object" || Array.isArray(object)) {
+    return null;
+  }
+
+  const refundId = (object as Record<string, unknown>).id;
+  return typeof refundId === "string" ? refundId : null;
+}
+
+function assertRefundEventMatchesOrder(
+  event: CreemRefundCreatedEvent,
+  order: BillingOrder,
+) {
+  if (metadataString(event.metadata, "userId") !== order.userId) {
+    throw new Error("Creem refund event user does not match the local order.");
+  }
+
+  const checkoutProductId = checkoutSnapshotProductId(order.checkoutSnapshot);
+  if (!checkoutProductId) {
+    throw new Error("Creem checkout product snapshot is missing.");
+  }
+
+  if (
+    metadataString(event.metadata, "packageCode") !== order.productCode ||
+    event.productId !== checkoutProductId ||
+    event.amountCents !== order.amountCents ||
+    event.currency !== order.currency ||
+    event.transactionStatus !== "refunded"
+  ) {
+    throw new Error("Creem refund event does not match the local order.");
+  }
+}
+
+export async function handleCreemRefundCreated({
+  orderStore,
+  ledgerStore,
+  event,
+}: {
+  orderStore: OrderStore;
+  ledgerStore: CreditLedgerStore;
+  event: CreemRefundCreatedEvent;
+}): Promise<{ order: BillingOrder; ledgerResult: CreditLedgerResult }> {
+  const order = await orderStore.findOrderByExternalOrderId(
+    event.externalOrderId,
+  );
+  if (!order) {
+    throw new Error(`Order not found: ${event.externalOrderId}.`);
+  }
+
+  if (order.status === "refunded") {
+    if (refundIdFromSnapshot(order.webhookSnapshot) !== event.refundId) {
+      throw new Error("Creem order has already been refunded.");
+    }
+  } else if (order.status !== "paid") {
+    throw new Error("Creem refund requires a paid local order.");
+  }
+
+  assertRefundEventMatchesOrder(event, order);
+
+  const ledgerResult = await reversePurchasedCredits({
+    store: ledgerStore,
+    userId: order.userId,
+    amount: order.creditsGranted,
+    relatedOrderId: order.id,
+    reason: `Creem refund ${order.productCode}`,
+    idempotencyKey: `purchase-refund:creem:order:${order.externalOrderId}`,
+    metadata: {
+      refundId: event.refundId,
+      externalOrderId: event.externalOrderId,
+      productId: event.productId,
+    },
+  });
+  const refundedOrder = await orderStore.markOrderStatus(
+    order.externalOrderId,
+    "refunded",
+    { eventId: event.id, snapshot: event.raw },
+  );
+
+  return { order: refundedOrder, ledgerResult };
 }

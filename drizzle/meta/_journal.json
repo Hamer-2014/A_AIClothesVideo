@@ -134,6 +134,13 @@
       "when": 1784649600000,
       "tag": "0018_auth_email_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784822400000,
+      "tag": "0019_purchase_reversal_ledger",
+      "breakpoints": true
     }
   ]
 }

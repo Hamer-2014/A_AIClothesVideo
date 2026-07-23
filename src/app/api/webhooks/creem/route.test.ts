@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
+import {
+  captureReservedCredits,
+  reserveCredits,
+} from "@/lib/credits/ledger";
 import { signCreemWebhookPayloadForTest } from "@/lib/providers/creem/webhook";
 import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import {
@@ -182,6 +186,7 @@ describe("POST /api/webhooks/creem", () => {
 
   it("credits an order created at checkout when Creem returns a distinct provider order id after product configuration changes", async () => {
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
     vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator_at_checkout");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
@@ -233,5 +238,93 @@ describe("POST /api/webhooks/creem", () => {
     expect(webhookResponse.status).toBe(200);
     expect(ledgerStore.listLedger()).toHaveLength(1);
     expect(orderStore.listOrders()[0]).toMatchObject({ status: "paid" });
+  });
+
+  it("reverses spent credits once for a replayed successful full refund", async () => {
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
+    const orderStore = createInMemoryOrderStore();
+    const ledgerStore = createInMemoryCreditLedgerStore();
+    await createCheckoutOrder({
+      store: orderStore,
+      userId,
+      packageCode: "starter",
+      externalOrderId: "req_refund",
+      checkoutSnapshot: { creemProductId: "prod_starter" },
+    });
+
+    const paidPayload = JSON.stringify({
+      id: "evt_paid_refund",
+      eventType: "checkout.completed",
+      object: {
+        id: "checkout_refund",
+        request_id: "req_refund",
+        order: { amount: 999, currency: "USD" },
+        product: { id: "prod_starter" },
+        metadata: { userId, packageCode: "starter" },
+      },
+    });
+    await handleCreemWebhookRequest(
+      signedRequest(
+        paidPayload,
+        signCreemWebhookPayloadForTest(paidPayload, "whsec_test"),
+      ),
+      { orderStore, ledgerStore },
+    );
+    await reserveCredits({
+      store: ledgerStore,
+      userId,
+      amount: 100,
+      reason: "generation",
+      idempotencyKey: "reserve:refund-route",
+    });
+    await captureReservedCredits({
+      store: ledgerStore,
+      userId,
+      amount: 100,
+      reason: "delivered generation",
+      idempotencyKey: "capture:refund-route",
+    });
+
+    const refundPayload = JSON.stringify({
+      id: "evt_refund_route",
+      eventType: "refund.created",
+      object: {
+        id: "ref_route",
+        status: "succeeded",
+        refund_amount: 1199,
+        refund_currency: "USD",
+        transaction: {
+          status: "refunded",
+          amount_paid: 1199,
+          refunded_amount: 1199,
+          currency: "USD",
+        },
+        checkout: {
+          request_id: "req_refund",
+          metadata: { userId, packageCode: "starter" },
+        },
+        order: { product: "prod_starter", amount: 999, currency: "USD" },
+      },
+    });
+    const signature = signCreemWebhookPayloadForTest(
+      refundPayload,
+      "whsec_test",
+    );
+
+    const first = await handleCreemWebhookRequest(
+      signedRequest(refundPayload, signature),
+      { orderStore, ledgerStore },
+    );
+    const replay = await handleCreemWebhookRequest(
+      signedRequest(refundPayload, signature),
+      { orderStore, ledgerStore },
+    );
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(200);
+    expect(orderStore.listOrders()[0]?.status).toBe("refunded");
+    expect(
+      ledgerStore.listLedger().filter((entry) => entry.type === "purchase_reversal"),
+    ).toEqual([expect.objectContaining({ amount: -100, balanceAfter: -100 })]);
   });
 });

@@ -22,6 +22,19 @@ export interface CreemCheckoutCompletedEvent {
   raw: JsonValue;
 }
 
+export interface CreemRefundCreatedEvent {
+  id: string;
+  type: "refund.created";
+  refundId: string;
+  externalOrderId: string;
+  productId: string;
+  amountCents: number;
+  currency: string;
+  transactionStatus: "refunded";
+  metadata: Record<string, JsonValue>;
+  raw: JsonValue;
+}
+
 export interface IgnoredCreemWebhookEvent {
   id: string;
   type: string;
@@ -31,6 +44,7 @@ export interface IgnoredCreemWebhookEvent {
 
 export type ParsedCreemWebhookEvent =
   | CreemCheckoutCompletedEvent
+  | CreemRefundCreatedEvent
   | IgnoredCreemWebhookEvent;
 
 function getWebhookSecret() {
@@ -108,11 +122,73 @@ export function parseCreemWebhookEvent(rawBody: string): ParsedCreemWebhookEvent
   const type = stringValue(root.type) ?? stringValue(root.eventType) ?? "unknown";
   const id = stringValue(root.id) ?? "unknown";
 
-  if (type !== "checkout.completed") {
+  if (type !== "checkout.completed" && type !== "refund.created") {
     return { id, type, ignored: true, raw };
   }
 
   const object = asRecord(root.object);
+
+  if (type === "refund.created") {
+    const transaction = asRecord(object.transaction);
+    const checkout = asRecord(object.checkout);
+    const order = asRecord(object.order);
+    const refundId = stringValue(object.id);
+    const externalOrderId = stringValue(checkout.request_id);
+    const productId = stringValue(order.product);
+    const amountCents = numberValue(order.amount);
+    const currency = stringValue(order.currency);
+    const objectStatus = stringValue(object.status);
+    const transactionStatus = stringValue(transaction.status);
+    const refundAmount = numberValue(object.refund_amount);
+    const refundCurrency = stringValue(object.refund_currency);
+    const amountPaid = numberValue(transaction.amount_paid);
+    const refundedAmount = numberValue(transaction.refunded_amount);
+    const transactionCurrency = stringValue(transaction.currency);
+
+    if (
+      !refundId ||
+      !externalOrderId ||
+      !productId ||
+      amountCents === null ||
+      !currency ||
+      !objectStatus ||
+      !transactionStatus ||
+      refundAmount === null ||
+      !refundCurrency ||
+      amountPaid === null ||
+      refundedAmount === null ||
+      !transactionCurrency
+    ) {
+      throw new Error("Creem refund.created event is missing required fields.");
+    }
+
+    if (
+      objectStatus !== "succeeded" ||
+      transactionStatus !== "refunded" ||
+      refundAmount !== amountPaid ||
+      refundAmount !== refundedAmount ||
+      refundCurrency !== transactionCurrency ||
+      refundCurrency !== currency
+    ) {
+      throw new Error(
+        "Creem refund.created event is not a successful full refund.",
+      );
+    }
+
+    return {
+      id,
+      type,
+      refundId,
+      externalOrderId,
+      productId,
+      amountCents,
+      currency,
+      transactionStatus: "refunded",
+      metadata: normalizeMetadata(checkout.metadata),
+      raw,
+    };
+  }
+
   const order = asRecord(object.order);
   const product = asRecord(object.product);
   const customer = asRecord(object.customer);

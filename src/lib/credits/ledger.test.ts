@@ -6,6 +6,7 @@ import {
   captureReservedCredits,
   grantTrialCredits,
   purchaseCredits,
+  reversePurchasedCredits,
   refundCredits,
   releaseReservedCredits,
   reserveCredits,
@@ -35,6 +36,60 @@ describe("credit ledger service", () => {
     expect(first.ledger.id).toBe(second.ledger.id);
     expect(second.wallet.availableBalance).toBe(100);
     expect(store.listLedger()).toHaveLength(1);
+  });
+
+  it("reverses purchased credits once and allows a negative balance", async () => {
+    const store = createInMemoryCreditLedgerStore();
+    await purchaseCredits({
+      store,
+      userId,
+      amount: 100,
+      reason: "Starter package",
+      idempotencyKey: "purchase:event-refund",
+    });
+    await reserveCredits({
+      store,
+      userId,
+      amount: 100,
+      reason: "generation",
+      idempotencyKey: "reserve:event-refund",
+    });
+    await captureReservedCredits({
+      store,
+      userId,
+      amount: 100,
+      reason: "delivered generation",
+      idempotencyKey: "capture:event-refund",
+    });
+
+    const first = await reversePurchasedCredits({
+      store,
+      userId,
+      amount: 100,
+      reason: "Creem refund starter",
+      idempotencyKey: "purchase-refund:creem:order:req_1",
+    });
+    const replay = await reversePurchasedCredits({
+      store,
+      userId,
+      amount: 100,
+      reason: "Creem refund starter replay",
+      idempotencyKey: "purchase-refund:creem:order:req_1",
+    });
+
+    expect(first.wallet.availableBalance).toBe(-100);
+    expect(first.wallet.totalPurchased).toBe(100);
+    expect(replay.wallet.availableBalance).toBe(-100);
+    expect(replay.idempotent).toBe(true);
+    expect(
+      store.listLedger().filter((entry) => entry.type === "purchase_reversal"),
+    ).toEqual([
+      expect.objectContaining({
+        amount: -100,
+        balanceBefore: 0,
+        balanceAfter: -100,
+      }),
+    ]);
   });
 
   it("reserves, captures, and releases credits without changing history", async () => {

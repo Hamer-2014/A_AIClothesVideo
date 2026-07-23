@@ -27,6 +27,7 @@ type AdminCreditLedgerType =
   | "capture"
   | "release"
   | "refund"
+  | "purchase_reversal"
   | "admin_adjust";
 
 export interface AdminJobRecord {
