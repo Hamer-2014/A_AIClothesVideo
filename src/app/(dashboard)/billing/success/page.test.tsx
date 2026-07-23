@@ -1,17 +1,29 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import BillingSuccessPage from "./page";
 
-describe("BillingSuccessPage", () => {
-  it("waits for webhook confirmation before claiming credits", () => {
-    render(<BillingSuccessPage />);
+vi.mock("@/components/billing/payment-status", () => ({
+  PaymentStatus: ({ externalOrderId }: { externalOrderId: string }) => (
+    <p>Polling {externalOrderId}</p>
+  ),
+}));
 
-    expect(
-      screen.getByText("Payment received, credits will appear after webhook confirmation."),
-    ).toBeInTheDocument();
+describe("BillingSuccessPage", () => {
+  afterEach(cleanup);
+
+  it("polls the identified local order instead of claiming redirect success", async () => {
+    render(
+      await BillingSuccessPage({
+        searchParams: Promise.resolve({ order: "req_1" }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: "Payment status" })).toBeInTheDocument();
+    expect(screen.getByText("Polling req_1")).toBeInTheDocument();
+    expect(screen.queryByText("Payment received")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View billing" })).toHaveAttribute(
       "href",
       "/billing",
@@ -20,5 +32,19 @@ describe("BillingSuccessPage", () => {
       "href",
       "/workspace",
     );
+  });
+
+  it("does not guess an order when the redirect has no request ID", async () => {
+    render(
+      await BillingSuccessPage({
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(
+      screen.getByText(
+        "We could not identify this checkout. Check Billing for the latest status.",
+      ),
+    ).toBeInTheDocument();
   });
 });
