@@ -188,6 +188,9 @@ export default async function Home() {
             <p className="mt-5 text-base leading-7 text-[var(--muted)]">
               The demo uses real end-to-end test assets from this product workflow. It shows the path from source images to a video, not a guarantee that every garment will receive identical motion or frames.
             </p>
+            <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
+              AI Clothes Video is an independent product that uses third-party AI models through its own workflow. It is not affiliated with or endorsed by any model provider.
+            </p>
             <dl className="mt-9 divide-y divide-[var(--line-strong)] border-y border-[var(--line-strong)]">
               <div className="flex items-center justify-between gap-5 py-4 text-sm">
                 <dt className="text-[var(--muted)]">Public lengths</dt>

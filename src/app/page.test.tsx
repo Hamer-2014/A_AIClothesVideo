@@ -49,6 +49,18 @@ describe("Home", () => {
     expect(screen.getByAltText("Original detail image of a red dress")).toBeInTheDocument();
   });
 
+  it("discloses that the product independently integrates third-party AI models", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await Home());
+
+    expect(
+      screen.getByText(
+        /independent product that uses third-party AI models through its own workflow/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows anonymous trial actions to visitors", async () => {
     mocks.getServerSession.mockResolvedValue(null);
 
