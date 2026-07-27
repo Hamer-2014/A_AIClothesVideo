@@ -27,14 +27,16 @@ describe("login page", () => {
   it("renders the login shell with the default workspace callback URL", async () => {
     render(await LoginPage({}));
 
-    expect(screen.getByRole("link", { name: "AI Clothes Video 首页" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "AI Clothes Video home" })).toHaveAttribute(
       "href",
       "/",
     );
-    expect(screen.getByText("登录工作台")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Sign in to AI Clothes Video" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("AI Clothes Video")).toBeInTheDocument();
     expect(
-      screen.getByText("使用 Google 或邮箱验证码进入工作台。"),
+      screen.getByText(/Use Google or a one-time email code/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/MVP|密码登录/)).not.toBeInTheDocument();
     expect(mocks.loginForm).toHaveBeenCalledWith(
@@ -42,6 +44,51 @@ describe("login page", () => {
       undefined,
     );
     expect(screen.queryByLabelText(/密码/)).not.toBeInTheDocument();
+  });
+
+  it("shows public product proof and compliance links before sign-in", async () => {
+    render(await LoginPage({}));
+
+    expect(
+      screen.getByText(
+        /Turn three authorized clothing images into a promotional product video/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/independent product that uses third-party AI models/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Generated red dress product video preview",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View product demo" })).toHaveAttribute(
+      "href",
+      "/#source-proof",
+    );
+    expect(screen.getByRole("link", { name: "View pricing" })).toHaveAttribute(
+      "href",
+      "/pricing",
+    );
+    expect(screen.getByRole("link", { name: "Start free trial" })).toHaveAttribute(
+      "href",
+      "/workspace?mode=trial&preset=minimal_studio",
+    );
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    expect(screen.getByRole("link", { name: "Acceptable Use" })).toHaveAttribute(
+      "href",
+      "/acceptable-use",
+    );
+    expect(
+      screen.getByRole("link", { name: "support@aiclothesvideo.com" }),
+    ).toHaveAttribute("href", "mailto:support@aiclothesvideo.com");
   });
 
   it("preserves same-site trial next before passing it to the login form", async () => {

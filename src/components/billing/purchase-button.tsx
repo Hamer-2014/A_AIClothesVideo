@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CreditCard, LoaderCircle } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PackageCode = "starter" | "creator" | "studio";
 
@@ -11,6 +11,7 @@ interface PurchaseButtonProps {
   packageCode: PackageCode;
   packageName: string;
   purchasesEnabled: boolean;
+  selected?: boolean;
   navigate?: (url: string) => void;
 }
 
@@ -19,7 +20,7 @@ function defaultNavigate(url: string) {
 }
 
 function loginHref(packageCode: PackageCode) {
-  const next = `/pricing?package=${packageCode}#credit-packs`;
+  const next = `/pricing?package=${packageCode}`;
   return `/login?next=${encodeURIComponent(next)}`;
 }
 
@@ -34,11 +35,19 @@ export function PurchaseButton({
   packageCode,
   packageName,
   purchasesEnabled,
+  selected = false,
   navigate = defaultNavigate,
 }: PurchaseButtonProps) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const requestLock = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (authenticated && purchasesEnabled && selected) {
+      containerRef.current?.scrollIntoView?.({ block: "center" });
+    }
+  }, [authenticated, purchasesEnabled, selected]);
 
   if (!purchasesEnabled) {
     return (
@@ -106,7 +115,7 @@ export function PurchaseButton({
   }
 
   return (
-    <div className="mt-5">
+    <div className="mt-5" ref={containerRef}>
       <button
         className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--action)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--action-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--action)] disabled:cursor-wait disabled:opacity-70"
         disabled={pending}
@@ -118,7 +127,11 @@ export function PurchaseButton({
         ) : (
           <CreditCard aria-hidden="true" size={16} />
         )}
-        {pending ? "Opening secure checkout..." : `Buy ${packageName}`}
+        {pending
+          ? "Opening secure checkout..."
+          : selected
+            ? "Continue to checkout"
+            : `Buy ${packageName}`}
       </button>
       {message ? (
         <p

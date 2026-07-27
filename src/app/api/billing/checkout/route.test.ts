@@ -11,7 +11,14 @@ import { handleBillingCheckoutRequest } from "./route";
 
 describe("POST /api/billing/checkout", () => {
   beforeEach(() => {
+    vi.stubEnv("APP_ENV", "production");
     vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
+    vi.stubEnv("CREEM_BASE_URL", "https://api.creem.io");
+    vi.stubEnv("CREEM_API_KEY", "creem_live_api_key");
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", "live-webhook-secret");
+    vi.stubEnv("CREEM_PRODUCT_ID_STARTER", "prod_starter");
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator");
+    vi.stubEnv("CREEM_PRODUCT_ID_STUDIO", "prod_studio");
   });
 
   afterEach(() => {
@@ -250,6 +257,7 @@ describe("POST /api/billing/checkout", () => {
   });
 
   it("fails closed without a configured Creem product ID and does not create checkout", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_STARTER", "");
     const createCheckout = vi.fn();
     const response = await handleBillingCheckoutRequest(
       new Request("http://localhost/api/billing/checkout", {
@@ -264,6 +272,57 @@ describe("POST /api/billing/checkout", () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "billing_not_configured" });
+    expect(createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when another required Creem product is missing", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_STUDIO", "");
+    const orderStore = createInMemoryOrderStore();
+    const createCheckout = vi.fn();
+
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "starter" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        orderStore,
+        createCheckout,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "billing_not_configured" });
+    expect(orderStore.listOrders()).toHaveLength(0);
+    expect(createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when credit packages share a Creem product ID", async () => {
+    vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_starter");
+    const orderStore = createInMemoryOrderStore();
+    const createCheckout = vi.fn(async () => ({
+      id: "checkout_duplicate",
+      externalOrderId: "order_duplicate",
+      checkoutUrl: "https://checkout.creem.io/duplicate",
+      raw: { id: "checkout_duplicate" },
+    }));
+
+    const response = await handleBillingCheckoutRequest(
+      new Request("http://localhost/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageCode: "starter" }),
+      }),
+      {
+        getSession: async () => ({ user: { id: "user-1" } }),
+        orderStore,
+        createCheckout,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "billing_not_configured" });
+    expect(orderStore.listOrders()).toHaveLength(0);
     expect(createCheckout).not.toHaveBeenCalled();
   });
 });

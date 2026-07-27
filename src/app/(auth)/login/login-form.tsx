@@ -60,9 +60,9 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         provider: "google",
         callbackURL,
       });
-      if (result.error) setMessage("Google 登录失败，请稍后重试。");
+      if (result.error) setMessage("Google sign-in failed. Please try again.");
     } catch {
-      setMessage("Google 登录失败，请稍后重试。");
+      setMessage("Google sign-in failed. Please try again.");
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -94,9 +94,9 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
             result.error.retryAfterSeconds ?? EMAIL_COOLDOWN_SECONDS,
           );
           startCooldown(retryAfter);
-          setMessage(`发送过于频繁，请在 ${retryAfter} 秒后重试。`);
+          setMessage(`Too many requests. Try again in ${retryAfter} seconds.`);
         } else {
-          setMessage("发送失败，请稍后重试。");
+          setMessage("Could not send the code. Please try again.");
         }
         return;
       }
@@ -105,7 +105,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       onSuccess?.();
       setMessage(successMessage);
     } catch {
-      setMessage("发送失败，请稍后重试。");
+      setMessage("Could not send the code. Please try again.");
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -119,7 +119,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
           email: normalizedEmail,
           type: "sign-in",
         }),
-      "验证码已发送，请检查邮箱。",
+      "We sent a sign-in code to your email.",
       () => {
         setOtp("");
         setOtpEmail(normalizedEmail);
@@ -142,13 +142,13 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       });
       if (result.error) {
         const errorMessages: Record<string, string> = {
-          INVALID_OTP: "验证码错误，请检查后重试。",
-          OTP_EXPIRED: "验证码已过期，请重新发送。",
-          TOO_MANY_ATTEMPTS: "尝试次数过多，请重新发送验证码。",
+          INVALID_OTP: "Invalid code. Check it and try again.",
+          OTP_EXPIRED: "This code has expired. Request a new code.",
+          TOO_MANY_ATTEMPTS: "Too many attempts. Request a new code.",
         };
         setMessage(
           errorMessages[result.error.code ?? ""] ??
-            "验证码验证失败，请稍后重试。",
+            "Could not verify the code. Please try again.",
         );
         return;
       }
@@ -156,7 +156,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       router.replace(callbackURL);
       router.refresh();
     } catch {
-      setMessage("验证码验证失败，请稍后重试。");
+      setMessage("Could not verify the code. Please try again.");
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -178,12 +178,12 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         type="button"
       >
         <ShieldCheck aria-hidden="true" size={17} />
-        {pendingAction === "google" ? "跳转中..." : "使用 Google 登录"}
+        {pendingAction === "google" ? "Redirecting..." : "Sign in with Google"}
       </button>
 
       <div className="flex items-center justify-between gap-4">
         <label className="block text-sm font-medium" htmlFor="email">
-          邮箱
+          Email
         </label>
         {otpEmail ? (
           <button
@@ -192,7 +192,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
             onClick={changeEmail}
             type="button"
           >
-            更换邮箱
+            Change email
           </button>
         ) : null}
       </div>
@@ -211,7 +211,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         <button
           aria-label={
             cooldownSeconds > 0
-              ? `发送邮箱验证码，${cooldownSeconds} 秒后可重发`
+              ? `Send email code, retry in ${cooldownSeconds} seconds`
               : undefined
           }
           className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-60"
@@ -221,17 +221,17 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         >
           <Mail aria-hidden="true" size={16} />
           {pendingAction === "otp"
-            ? "发送中..."
+            ? "Sending..."
             : cooldownSeconds > 0
-              ? `验证码 ${cooldownSeconds}s`
-              : "发送邮箱验证码"}
+              ? `Resend in ${cooldownSeconds}s`
+              : "Send email code"}
         </button>
       </div>
 
       {otpEmail ? (
         <form className="space-y-3" onSubmit={verifyOtp}>
           <label className="block text-sm font-medium" htmlFor="email-otp">
-            邮箱验证码
+            Email code
           </label>
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <input
@@ -246,7 +246,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
                 setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
               }
               pattern="[0-9]{6}"
-              placeholder="6 位验证码"
+              placeholder="6-digit code"
               type="text"
               value={otp}
             />
@@ -256,7 +256,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
               type="submit"
             >
               <KeyRound aria-hidden="true" size={16} />
-              {pendingAction === "otp-verify" ? "验证中..." : "验证并登录"}
+              {pendingAction === "otp-verify" ? "Verifying..." : "Verify and sign in"}
             </button>
           </div>
         </form>

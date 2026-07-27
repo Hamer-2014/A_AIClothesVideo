@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getCreemPurchaseReadiness,
   getCreemEnvironment,
   isCreemPurchasesEnabled,
   isCreemProductionEnvironment,
@@ -32,5 +33,40 @@ describe("Creem environment configuration", () => {
       isCreemPurchasesEnabled({ CREEM_PURCHASES_ENABLED: "false" }),
     ).toBe(false);
     expect(isCreemPurchasesEnabled({})).toBe(false);
+  });
+
+  it("rejects duplicate product IDs across credit packages", () => {
+    const readiness = getCreemPurchaseReadiness({
+      APP_ENV: "test",
+      CREEM_PURCHASES_ENABLED: "true",
+      CREEM_API_KEY: "creem_test_api_key",
+      CREEM_WEBHOOK_SECRET: "whsec_test",
+      CREEM_PRODUCT_ID_STARTER: "prod_duplicate",
+      CREEM_PRODUCT_ID_CREATOR: "prod_duplicate",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missing).toEqual(
+      expect.arrayContaining([
+        "CREEM_PRODUCT_ID_STARTER",
+        "CREEM_PRODUCT_ID_CREATOR",
+      ]),
+    );
+  });
+
+  it("rejects a webhook secret with surrounding whitespace", () => {
+    const readiness = getCreemPurchaseReadiness({
+      APP_ENV: "test",
+      CREEM_PURCHASES_ENABLED: "true",
+      CREEM_API_KEY: "creem_test_api_key",
+      CREEM_WEBHOOK_SECRET: "whsec_test ",
+      CREEM_PRODUCT_ID_STARTER: "prod_starter",
+      CREEM_PRODUCT_ID_CREATOR: "prod_creator",
+      CREEM_PRODUCT_ID_STUDIO: "prod_studio",
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missing).toContain("CREEM_WEBHOOK_SECRET");
   });
 });

@@ -8,7 +8,7 @@ import {
   CreemCheckoutError,
   CreemUnavailableError,
 } from "@/lib/providers/creem/client";
-import { isCreemPurchasesEnabled } from "@/lib/providers/creem/config";
+import { getCreemPurchaseReadiness } from "@/lib/providers/creem/config";
 import {
   createRuntimeFunnelEventStore,
   recordFunnelEventSafely,
@@ -118,11 +118,12 @@ export async function handleBillingCheckoutRequest(
     );
   }
 
-  if (!isCreemPurchasesEnabled()) {
+  const purchaseReadiness = getCreemPurchaseReadiness();
+  if (!purchaseReadiness.enabled) {
     return NextResponse.json({ error: "billing_disabled" }, { status: 503 });
   }
 
-  if (!selectedPackage.creemProductId) {
+  if (!purchaseReadiness.ready || !selectedPackage.creemProductId) {
     return NextResponse.json(
       { error: "billing_not_configured" },
       { status: 503 },

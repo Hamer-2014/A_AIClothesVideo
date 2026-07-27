@@ -1,9 +1,9 @@
 import { SUPPORT_EMAIL } from "@/lib/support-email";
 import {
   CREEM_PRODUCTION_BASE_URL,
+  getCreemPurchaseReadiness,
   getCreemEnvironment,
   isCreemLiveApiKey,
-  isCreemPurchasesEnabled,
 } from "@/lib/providers/creem/config";
 
 export interface RuntimeHealthCheck {
@@ -50,11 +50,9 @@ function buildCheck(env: EnvSource, keys: string[]): RuntimeHealthCheck {
   };
 }
 
-function buildOptionalPaymentCheck(
-  env: EnvSource,
-  environment: string,
-): RuntimeHealthCheck {
-  if (!isCreemPurchasesEnabled(env)) {
+function buildOptionalPaymentCheck(env: EnvSource): RuntimeHealthCheck {
+  const readiness = getCreemPurchaseReadiness(env);
+  if (!readiness.enabled) {
     return {
       configured: false,
       missing: [],
@@ -62,33 +60,10 @@ function buildOptionalPaymentCheck(
     };
   }
 
-  const required = [
-    "CREEM_API_KEY",
-    "CREEM_WEBHOOK_SECRET",
-    "CREEM_PRODUCT_ID_STARTER",
-    "CREEM_PRODUCT_ID_CREATOR",
-    "CREEM_PRODUCT_ID_STUDIO",
-  ];
-  const missing = required.filter((key) => !trimEnv(env, key));
-  for (const key of required.filter((item) => item.startsWith("CREEM_PRODUCT_ID_"))) {
-    const productId = trimEnv(env, key);
-    if (productId && !productId.startsWith("prod_")) {
-      missing.push(key);
-    }
-  }
-
-  if (environment === "production") {
-    if (trimEnv(env, "CREEM_BASE_URL") !== CREEM_PRODUCTION_BASE_URL) {
-      missing.push("CREEM_BASE_URL");
-    }
-    if (!isCreemLiveApiKey(trimEnv(env, "CREEM_API_KEY"))) {
-      missing.push("CREEM_API_KEY");
-    }
-  }
   return {
-    configured: missing.length === 0,
-    missing: [...new Set(missing)],
-    status: missing.length === 0 ? "ready" : "missing",
+    configured: readiness.ready,
+    missing: readiness.missing,
+    status: readiness.ready ? "ready" : "missing",
   };
 }
 
@@ -202,7 +177,7 @@ export function getRuntimeHealth(
     billing: buildCheck(env, []),
     moderation: buildModerationCheck(env, environment),
     legalCompliance: buildLegalComplianceCheck(env, environment),
-    creemPayment: buildOptionalPaymentCheck(env, environment),
+    creemPayment: buildOptionalPaymentCheck(env),
     aiProviders: buildAiProvidersCheck(env),
   };
 

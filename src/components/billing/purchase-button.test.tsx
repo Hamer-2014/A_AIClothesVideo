@@ -11,7 +11,7 @@ describe("PurchaseButton", () => {
     vi.restoreAllMocks();
   });
 
-  it("sends anonymous users through login while preserving the package", () => {
+  it("uses an OAuth-safe login callback while preserving the package", () => {
     render(
       <PurchaseButton
         authenticated={false}
@@ -25,7 +25,7 @@ describe("PurchaseButton", () => {
       screen.getByRole("link", { name: "Sign in to buy Starter" }),
     ).toHaveAttribute(
       "href",
-      `/login?next=${encodeURIComponent("/pricing?package=starter#credit-packs")}`,
+      `/login?next=${encodeURIComponent("/pricing?package=starter")}`,
     );
   });
 
@@ -46,6 +46,32 @@ describe("PurchaseButton", () => {
     ).toBeDisabled();
   });
 
+  it("scrolls the restored selection into view without opening Checkout", () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PurchaseButton
+        authenticated
+        packageCode="starter"
+        packageName="Starter"
+        purchasesEnabled
+        selected
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Continue to checkout" }),
+    ).toBeEnabled();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("submits only packageCode once and redirects to the returned Checkout", async () => {
     let resolveRequest!: (response: Response) => void;
     const fetchMock = vi.fn(
@@ -64,10 +90,11 @@ describe("PurchaseButton", () => {
         packageCode="starter"
         packageName="Starter"
         purchasesEnabled
+        selected
       />,
     );
 
-    const button = screen.getByRole("button", { name: "Buy Starter" });
+    const button = screen.getByRole("button", { name: "Continue to checkout" });
     fireEvent.click(button);
     fireEvent.click(button);
 

@@ -185,9 +185,13 @@ describe("POST /api/webhooks/creem", () => {
   });
 
   it("credits an order created at checkout when Creem returns a distinct provider order id after product configuration changes", async () => {
+    vi.stubEnv("APP_ENV", "test");
+    vi.stubEnv("CREEM_API_KEY", "creem_test_api_key");
     vi.stubEnv("CREEM_WEBHOOK_SECRET", "whsec_test");
     vi.stubEnv("CREEM_PURCHASES_ENABLED", "true");
+    vi.stubEnv("CREEM_PRODUCT_ID_STARTER", "prod_starter");
     vi.stubEnv("CREEM_PRODUCT_ID_CREATOR", "prod_creator_at_checkout");
+    vi.stubEnv("CREEM_PRODUCT_ID_STUDIO", "prod_studio");
     const orderStore = createInMemoryOrderStore();
     const ledgerStore = createInMemoryCreditLedgerStore();
 

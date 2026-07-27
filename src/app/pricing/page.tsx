@@ -4,7 +4,7 @@ import { PublicHeader } from "@/components/public/public-header";
 import { PurchaseButton } from "@/components/billing/purchase-button";
 import { getServerSession } from "@/lib/auth/server";
 import { creditPackages } from "@/lib/credits/packages";
-import { isCreemPurchasesEnabled } from "@/lib/providers/creem/config";
+import { getCreemPurchaseReadiness } from "@/lib/providers/creem/config";
 import {
   getVideoSpec,
   isVideoDurationEnabled,
@@ -18,10 +18,22 @@ const packageVideoEstimates = {
   studio: "About five 24-second videos",
 } as const;
 
-export default async function PricingPage() {
-  const session = await getServerSession();
+interface PricingPageProps {
+  searchParams?: Promise<{ package?: string | string[] }>;
+}
+
+export default async function PricingPage({ searchParams }: PricingPageProps = {}) {
+  const [session, resolvedSearchParams] = await Promise.all([
+    getServerSession(),
+    searchParams ?? Promise.resolve<{ package?: string | string[] }>({}),
+  ]);
   const user = session?.user ?? null;
-  const purchasesEnabled = isCreemPurchasesEnabled();
+  const requestedPackage = resolvedSearchParams.package;
+  const selectedPackageCode =
+    user && typeof requestedPackage === "string"
+      ? creditPackages.find((item) => item.code === requestedPackage)?.code
+      : undefined;
+  const purchasesEnabled = getCreemPurchaseReadiness().ready;
   const duration40Enabled = isVideoDurationEnabled(40, process.env);
   const availableDurations = videoDurations.filter(
     (duration) => duration !== 40 || duration40Enabled,
@@ -63,31 +75,53 @@ export default async function PricingPage() {
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3" id="credit-packs">
-          {creditPackages.map((item) => (
-            <div className="flex flex-col rounded-lg border border-[var(--line)] bg-white p-5" key={item.code}>
-              <h2 className="text-base font-medium">{item.name}</h2>
-              <p className="mt-3 text-3xl font-semibold">
-                {`$${(item.amountCents / 100).toFixed(2)}`}
-              </p>
-              <p className="mt-2 text-sm text-[var(--muted)]">{item.credits} credits</p>
-              <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm font-medium">
-                {packageVideoEstimates[item.code]}
-              </p>
-              <p className="mt-4 flex-1 text-sm leading-6 text-[var(--muted)]">
-                {item.name === "Starter"
-                  ? "For testing a small number of product videos."
-                  : item.name === "Creator"
-                    ? "For producing several product videos."
-                    : "For teams producing videos for multiple products."}
-              </p>
-              <PurchaseButton
-                authenticated={Boolean(user)}
-                packageCode={item.code}
-                packageName={item.name}
-                purchasesEnabled={purchasesEnabled}
-              />
-            </div>
-          ))}
+          {creditPackages.map((item) => {
+            const selected = item.code === selectedPackageCode;
+
+            return (
+              <article
+                aria-label={`${item.name} credit pack`}
+                className={`flex flex-col rounded-lg border p-5 ${
+                  selected
+                    ? "border-[var(--action)] bg-[var(--brand-soft)]"
+                    : "border-[var(--line)] bg-white"
+                }`}
+                key={item.code}
+              >
+                <div className="flex min-h-6 items-start justify-between gap-3">
+                  <h2 className="text-base font-medium">{item.name}</h2>
+                  {selected ? (
+                    <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-[var(--action-hover)]">
+                      Selected
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-3xl font-semibold">
+                  {`$${(item.amountCents / 100).toFixed(2)}`}
+                </p>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {item.credits} credits
+                </p>
+                <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm font-medium">
+                  {packageVideoEstimates[item.code]}
+                </p>
+                <p className="mt-4 flex-1 text-sm leading-6 text-[var(--muted)]">
+                  {item.name === "Starter"
+                    ? "For testing a small number of product videos."
+                    : item.name === "Creator"
+                      ? "For producing several product videos."
+                      : "For teams producing videos for multiple products."}
+                </p>
+                <PurchaseButton
+                  authenticated={Boolean(user)}
+                  packageCode={item.code}
+                  packageName={item.name}
+                  purchasesEnabled={purchasesEnabled}
+                  selected={selected}
+                />
+              </article>
+            );
+          })}
         </div>
         <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
           Estimates are based on current credit costs. When you mix video lengths, the confirmed generation screen shows the actual credits required.
