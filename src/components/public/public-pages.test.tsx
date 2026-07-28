@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FaqPage from "@/app/faq/page";
@@ -12,14 +12,21 @@ import { PublicHeader } from "./public-header";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  trackFunnelEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
   getServerSession: mocks.getServerSession,
 }));
 
+vi.mock("@/lib/analytics/client-funnel", () => ({
+  trackFunnelEvent: mocks.trackFunnelEvent,
+}));
+
 vi.mock("@/components/dashboard/sign-out-button", () => ({
-  SignOutButton: () => <button type="button">Sign out</button>,
+  SignOutButton: ({ label }: { label?: string }) => (
+    <button type="button">{label ?? "Sign out"}</button>
+  ),
 }));
 
 describe("public trust pages", () => {
@@ -73,37 +80,47 @@ describe("public trust pages", () => {
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
-  it("does not link the untranslated FAQ from the public header or footer", () => {
-    const { rerender } = render(<PublicHeader />);
+  it("中文营销导航链接到三图专题、价格与常见问题", () => {
+    const { rerender } = render(<PublicHeader language="zh-CN" />);
 
-    expect(screen.queryByRole("link", { name: "FAQ" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "三图生成" })).toHaveAttribute(
+      "href",
+      "/three-images-to-clothing-video",
+    );
+    expect(screen.getByRole("link", { name: "常见问题" })).toHaveAttribute(
+      "href",
+      "/faq",
+    );
 
-    rerender(<PublicFooter />);
+    rerender(<PublicFooter language="zh-CN" />);
 
     expect(
-      screen.getByText("2026 AI Clothes Video. All rights reserved."),
+      screen.getByText("2026 AI Clothes Video。保留所有权利。"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Three clothing images. One product video."),
+      screen.getByText("三张同款服装图，一条商品视频。"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "隐私政策" })).toHaveAttribute(
       "href",
       "/privacy",
     );
-    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "服务条款" })).toHaveAttribute(
       "href",
       "/terms",
     );
-    expect(screen.queryByRole("link", { name: "FAQ" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "常见问题" })).toHaveAttribute(
+      "href",
+      "/faq",
+    );
+    expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
       "href",
       "/pricing",
     );
-    expect(screen.getByRole("link", { name: "Takedown requests" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "侵权删除" })).toHaveAttribute(
       "href",
       "/takedown",
     );
-    expect(screen.getByRole("link", { name: "Acceptable Use" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "可接受使用政策" })).toHaveAttribute(
       "href",
       "/acceptable-use",
     );
@@ -111,17 +128,35 @@ describe("public trust pages", () => {
   });
 
   it("shows the signed-in public header state without anonymous CTAs", () => {
-    render(<PublicHeader user={{ email: "merchant@example.com" }} />);
+    render(
+      <PublicHeader
+        language="zh-CN"
+        sourcePage="three_images_landing"
+        user={{ email: "merchant@example.com" }}
+      />,
+    );
 
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workspace" })).toHaveAttribute(
+    const workspaceLink = screen.getByRole("link", { name: "进入工作台" });
+    expect(workspaceLink).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(workspaceLink).toHaveClass("min-h-11", "min-w-11");
+    expect(screen.getByRole("button", { name: "退出登录" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "Free trial" }),
+      screen.queryByRole("link", { name: "免费试用" }),
     ).not.toBeInTheDocument();
+
+    fireEvent.click(workspaceLink);
+    expect(mocks.trackFunnelEvent).toHaveBeenCalledWith(
+      "workspace_cta_clicked",
+      {
+        sourcePage: "three_images_landing",
+        ctaPosition: "header",
+        userState: "authenticated",
+      },
+    );
   });
 });

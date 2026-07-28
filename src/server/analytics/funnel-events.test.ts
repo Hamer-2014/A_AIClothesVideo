@@ -99,4 +99,30 @@ describe("funnel events", () => {
     expect(JSON.stringify(store.listEvents())).not.toContain("email_trial_used");
     expect(JSON.stringify(store.listEvents())).not.toContain("hash-value");
   });
+
+  it("records landing source, CTA position, user state, and destination metadata", async () => {
+    const store = createInMemoryFunnelEventStore();
+
+    await recordFunnelEvent({
+      store,
+      eventName: "landing_exit_clicked",
+      source: "client",
+      path: "/three-images-to-clothing-video",
+      metadata: {
+        sourcePage: "three_images_landing",
+        ctaPosition: "final",
+        userState: "anonymous",
+        destination: "/pricing",
+        milestone: "started",
+      },
+    });
+
+    expect(store.listEvents()[0]?.metadata).toEqual({
+      sourcePage: "three_images_landing",
+      ctaPosition: "final",
+      userState: "anonymous",
+      destination: "/pricing",
+      milestone: "started",
+    });
+  });
 });

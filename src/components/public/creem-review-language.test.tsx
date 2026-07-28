@@ -4,7 +4,6 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import AcceptableUsePage from "@/app/acceptable-use/page";
-import Home from "@/app/page";
 import PricingPage from "@/app/pricing/page";
 import PrivacyPage from "@/app/privacy/page";
 import TakedownPage from "@/app/takedown/page";
@@ -32,7 +31,6 @@ describe("Creem review public English surface", () => {
   });
 
   it.each([
-    ["/", Home],
     ["/pricing", PricingPage],
     ["/privacy", PrivacyPage],
     ["/terms", TermsPage],

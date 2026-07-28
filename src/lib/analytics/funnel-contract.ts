@@ -2,7 +2,11 @@ import type { JsonValue } from "@/lib/db/schema/common";
 
 export const funnelEventNames = [
   "landing_viewed",
+  "landing_exit_clicked",
   "trial_cta_clicked",
+  "workspace_cta_clicked",
+  "sample_video_play_started",
+  "sample_video_played_50",
   "pricing_viewed",
   "login_viewed",
   "login_completed",
@@ -38,6 +42,10 @@ export const allowedFunnelMetadataKeys = [
   "billingMode",
   "jobId",
   "sourcePage",
+  "ctaPosition",
+  "userState",
+  "destination",
+  "milestone",
   "status",
   "reasonCategory",
   "mode",

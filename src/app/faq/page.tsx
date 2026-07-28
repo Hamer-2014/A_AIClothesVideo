@@ -6,7 +6,7 @@ const faqs = [
   {
     question: "需要上传什么图片",
     answer:
-      "至少需要一张清晰的服装正面图，推荐补充背面图、侧面图、细节图和场景图。素材越完整，可用镜头越多。",
+      "公开生成流程要求按所选协议上传三张同款有效素材。默认推荐正面主图、背面图和细节图；商品旋转与真人模特转身付费 Beta 分别要求对应的正面、侧面和背面素材。",
   },
   {
     question: "为什么不能生成背面",
@@ -40,9 +40,9 @@ export default async function FaqPage() {
 
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--ink)]">
-      <PublicHeader user={session?.user ?? null} />
+      <PublicHeader language="zh-CN" sourcePage="faq" user={session?.user ?? null} />
       <article className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-3xl font-semibold tracking-normal">FAQ</h1>
+        <h1 className="text-3xl font-semibold tracking-normal">常见问题</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
           先把生成边界讲清楚，再开始试用。别拿一张正面图要求 360 展示，这种愿望很美，产品不会硬装能做到。
         </p>
@@ -59,8 +59,15 @@ export default async function FaqPage() {
             </section>
           ))}
         </div>
+        <p className="mt-8 text-sm leading-6 text-[var(--muted)]">
+          进一步了解素材证据如何限制镜头，请查看
+          <a className="ml-1 font-semibold text-[var(--brand)] hover:text-[var(--action-hover)]" href="/three-images-to-clothing-video">
+            三张图如何决定可用镜头
+          </a>
+          。
+        </p>
       </article>
-      <PublicFooter />
+      <PublicFooter language="zh-CN" />
     </main>
   );
 }
