@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FaqPage from "@/app/faq/page";
@@ -125,6 +125,45 @@ describe("public trust pages", () => {
       "/acceptable-use",
     );
     expect(screen.getByText("support@aiclothesvideo.com")).toBeInTheDocument();
+  });
+
+  it("opens and closes the Chinese mobile navigation", () => {
+    render(<PublicHeader language="zh-CN" />);
+
+    const menuButton = screen.getByRole("button", { name: "打开主导航" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("navigation", { name: "移动端主导航" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(menuButton);
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    const mobileNavigation = screen.getByRole("navigation", { name: "移动端主导航" });
+    const firstMobileLink = within(mobileNavigation).getByRole("link", { name: "三图生成" });
+    expect(firstMobileLink)
+      .toHaveAttribute("href", "/three-images-to-clothing-video");
+    expect(within(mobileNavigation).getByRole("link", { name: "价格" }))
+      .toHaveAttribute("href", "/pricing");
+    expect(within(mobileNavigation).getByRole("link", { name: "常见问题" }))
+      .toHaveAttribute("href", "/faq");
+
+    firstMobileLink.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("navigation", { name: "移动端主导航" }))
+      .not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
+  });
+
+  it("keeps anonymous header CTA funnel tracking", () => {
+    render(<PublicHeader language="zh-CN" sourcePage="homepage" />);
+
+    fireEvent.click(screen.getByRole("link", { name: "免费试用" }));
+    expect(mocks.trackFunnelEvent).toHaveBeenCalledWith("trial_cta_clicked", {
+      sourcePage: "homepage",
+      ctaPosition: "header",
+      userState: "anonymous",
+      presetId: "minimal_studio",
+      mode: "trial",
+    });
   });
 
   it("shows the signed-in public header state without anonymous CTAs", () => {

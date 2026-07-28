@@ -39,7 +39,7 @@ export default async function WorkspacePage({
 
     return (
       <div className="min-h-svh bg-[var(--surface)] text-[var(--ink)]">
-        <PublicHeader user={session?.user ?? null} />
+        <PublicHeader language="zh-CN" user={session?.user ?? null} />
         <main>
           <section className="border-b border-[var(--line)] bg-white">
             <div
@@ -86,7 +86,7 @@ export default async function WorkspacePage({
             </div>
           </section>
         </main>
-        <PublicFooter />
+        <PublicFooter language="zh-CN" />
       </div>
     );
   }

@@ -5,11 +5,8 @@ export const metadata: Metadata = {
   title: "AI Clothes Video",
   description: "上传 3 张服装图，生成可发布的商品宣传视频。",
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/brand/logo.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [{ url: "/brand/logo.png", sizes: "512x512", type: "image/png" }],
+    icon: [{ url: "/icon.svg?v=4", type: "image/svg+xml" }],
+    shortcut: [{ url: "/icon.svg?v=4", type: "image/svg+xml" }],
   },
 };
 

@@ -42,11 +42,15 @@ vi.mock("@/components/dashboard/shell", () => ({
 }));
 
 vi.mock("@/components/public/public-header", () => ({
-  PublicHeader: () => <header data-testid="public-header">public header</header>,
+  PublicHeader: ({ language }: { language?: string }) => (
+    <header data-language={language} data-testid="public-header">public header</header>
+  ),
 }));
 
 vi.mock("@/components/public/public-footer", () => ({
-  PublicFooter: () => <footer data-testid="public-footer">public footer</footer>,
+  PublicFooter: ({ language }: { language?: string }) => (
+    <footer data-language={language} data-testid="public-footer">public footer</footer>
+  ),
 }));
 
 vi.mock("@/components/workspace/workspace-app", () => ({
@@ -90,8 +94,8 @@ describe("WorkspacePage", () => {
 
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(screen.queryByTestId("dashboard-shell")).not.toBeInTheDocument();
-    expect(screen.getByTestId("public-header")).toBeInTheDocument();
-    expect(screen.getByTestId("public-footer")).toBeInTheDocument();
+    expect(screen.getByTestId("public-header")).toHaveAttribute("data-language", "zh-CN");
+    expect(screen.getByTestId("public-footer")).toHaveAttribute("data-language", "zh-CN");
     expect(
       screen.getByRole("heading", {
         name: "服装视频工作台",

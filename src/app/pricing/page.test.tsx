@@ -97,7 +97,9 @@ describe("PricingPage", () => {
       "href",
       "/workspace",
     );
-    expect(screen.getByRole("link", { name: "Workspace" })).toHaveAttribute(
+    const publicHeader = screen.getByRole("button", { name: "Sign out" }).closest("header");
+    expect(publicHeader).not.toBeNull();
+    expect(within(publicHeader!).getByRole("link", { name: "Workspace" })).toHaveAttribute(
       "href",
       "/workspace",
     );

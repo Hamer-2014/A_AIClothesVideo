@@ -4,6 +4,7 @@ import { LogoLockup } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "./cta-link";
+import { MobileNavigation } from "./mobile-navigation";
 
 interface PublicHeaderProps {
   language?: "en" | "zh-CN";
@@ -23,14 +24,18 @@ export function PublicHeader({
   const displayName = user?.name || user?.email || (isChinese ? "当前用户" : "Current user");
 
   return (
-    <header className="relative z-20 border-b border-[var(--line)] bg-[var(--surface-raised)]">
-      <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-8 lg:px-12">
+    <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--surface-raised)]">
+      <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-8 lg:px-12">
         <Link href="/" aria-label={isChinese ? "AI Clothes Video 首页" : "AI Clothes Video home"}>
-          <LogoLockup />
+          <LogoLockup labelClassName="hidden min-[480px]:inline" />
         </Link>
-        <nav aria-label={isChinese ? "主导航" : "Primary navigation"} className="flex items-center gap-2 text-sm sm:gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <nav
+            aria-label={isChinese ? "主导航" : "Primary navigation"}
+            className="hidden items-center gap-6 text-sm lg:flex"
+          >
           {isChinese ? (
-            <div className="hidden items-center gap-5 lg:flex">
+            <>
               <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/three-images-to-clothing-video">
                 三图生成
               </Link>
@@ -40,12 +45,16 @@ export function PublicHeader({
               <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/faq">
                 常见问题
               </Link>
-            </div>
+            </>
           ) : (
-            <Link className="hidden text-[var(--muted)] hover:text-[var(--ink)] sm:inline-flex" href="/pricing">
-              Pricing
-            </Link>
+            <>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/pricing">Pricing</Link>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/privacy">Privacy</Link>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/terms">Terms</Link>
+            </>
           )}
+          </nav>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {user ? (
             <>
               <WorkspaceCtaLink
@@ -63,7 +72,7 @@ export function PublicHeader({
                   "Workspace"
                 )}
               </WorkspaceCtaLink>
-              <span className="hidden max-w-40 truncate text-[var(--muted)] lg:inline">
+              <span className="hidden max-w-40 truncate text-sm text-[var(--muted)] xl:inline">
                 {displayName}
               </span>
               <SignOutButton compact label={isChinese ? "退出登录" : "Sign out"} />
@@ -93,7 +102,9 @@ export function PublicHeader({
               </TrialCtaLink>
             </>
           )}
-        </nav>
+            <MobileNavigation language={language} />
+          </div>
+        </div>
       </div>
     </header>
   );
