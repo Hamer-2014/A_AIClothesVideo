@@ -3,17 +3,20 @@
 import { useEffect, useRef } from "react";
 
 import { trackFunnelEvent } from "@/lib/analytics/client-funnel";
+import type { SiteLocale } from "@/lib/i18n/config";
 
 export function SampleVideo({
   autoPlay = false,
   className,
   controls = false,
+  language = "en",
   sourcePage,
   testId,
 }: {
   autoPlay?: boolean;
   className?: string;
   controls?: boolean;
+  language?: SiteLocale;
   sourcePage: string;
   testId?: string;
 }) {
@@ -66,7 +69,9 @@ export function SampleVideo({
       ref={videoRef}
       src="/demo/red-dress-video.mp4"
     >
-      你的浏览器不支持视频播放。
+      {language === "zh-CN"
+        ? "你的浏览器不支持视频播放。"
+        : "Your browser does not support video playback."}
     </video>
   );
 }

@@ -3,7 +3,9 @@ import { type ReactNode } from "react";
 import { Wallet } from "lucide-react";
 
 import { LogoLockup } from "@/components/brand/logo";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { AppFooter } from "@/components/layout/app-footer";
+import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
 
 import { SignOutButton } from "./sign-out-button";
 
@@ -25,6 +27,7 @@ interface DashboardShellProps {
     reservedBalance: number;
   } | null;
   children: ReactNode;
+  language?: SiteLocale;
 }
 
 export function DashboardShell({
@@ -35,8 +38,14 @@ export function DashboardShell({
   user,
   billing,
   children,
+  language,
 }: DashboardShellProps) {
-  const displayName = user?.name || user?.email || "当前用户";
+  const locale = language ?? "zh-CN";
+  const isEnglish = locale === "en";
+  const workspaceHref = language
+    ? localizeHref("/workspace", locale)
+    : "/workspace";
+  const displayName = user?.name || user?.email || (isEnglish ? "Current user" : "当前用户");
   const shouldShowEmail = Boolean(user?.email && user.name);
 
   return (
@@ -50,7 +59,10 @@ export function DashboardShell({
       >
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <Link href="/workspace" aria-label="AI Clothes Video 工作台">
+            <Link
+              href={workspaceHref}
+              aria-label={isEnglish ? "AI Clothes Video workspace" : "AI Clothes Video 工作台"}
+            >
               <LogoLockup />
             </Link>
             <div className="flex flex-col items-start gap-3 lg:items-end">
@@ -71,13 +83,16 @@ export function DashboardShell({
                     <Wallet aria-hidden="true" size={15} />
                     {billing ? (
                       <span>
-                        {billing.availableBalance} 可用 / {billing.reservedBalance} 冻结
+                        {isEnglish
+                          ? `${billing.availableBalance} available / ${billing.reservedBalance} reserved`
+                          : `${billing.availableBalance} 可用 / ${billing.reservedBalance} 冻结`}
                       </span>
                     ) : (
-                      <span>点数</span>
+                      <span>{isEnglish ? "Credits" : "点数"}</span>
                     )}
                   </Link>
-                  <SignOutButton />
+                  <SignOutButton label={isEnglish ? "Sign out" : "退出登录"} />
+                  {language ? <LanguageSwitcher locale={locale} /> : null}
                 </div>
               ) : null}
               {actions ? <div className="shrink-0">{actions}</div> : null}
@@ -121,7 +136,7 @@ export function DashboardShell({
           {children}
         </section>
       </main>
-      <AppFooter />
+      <AppFooter language={locale} />
     </div>
   );
 }

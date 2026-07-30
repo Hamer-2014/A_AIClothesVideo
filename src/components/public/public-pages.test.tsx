@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import FaqPage from "@/app/faq/page";
 import PrivacyPage from "@/app/privacy/page";
@@ -12,6 +12,7 @@ import { PublicHeader } from "./public-header";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  getRequestLocale: vi.fn(),
   trackFunnelEvent: vi.fn(),
 }));
 
@@ -23,6 +24,15 @@ vi.mock("@/lib/analytics/client-funnel", () => ({
   trackFunnelEvent: mocks.trackFunnelEvent,
 }));
 
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/zh",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/components/dashboard/sign-out-button", () => ({
   SignOutButton: ({ label }: { label?: string }) => (
     <button type="button">{label ?? "Sign out"}</button>
@@ -30,6 +40,10 @@ vi.mock("@/components/dashboard/sign-out-button", () => ({
 }));
 
 describe("public trust pages", () => {
+  beforeEach(() => {
+    mocks.getRequestLocale.mockResolvedValue("en");
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -71,12 +85,12 @@ describe("public trust pages", () => {
     mocks.getServerSession.mockResolvedValue(null);
     const { container } = render(await FaqPage());
 
-    expect(screen.getByText(/需要上传什么图片/)).toBeInTheDocument();
-    expect(screen.getByText(/为什么不能生成背面/)).toBeInTheDocument();
-    expect(screen.getByText(/多久生成/)).toBeInTheDocument();
-    expect(screen.getByText(/试用和付费有什么区别/)).toBeInTheDocument();
-    expect(screen.getByText(/真人或儿童模特需要什么授权/)).toBeInTheDocument();
-    expect(screen.getByText(/如何提交侵权删除请求/)).toBeInTheDocument();
+    expect(screen.getByText(/Which images should I upload/)).toBeInTheDocument();
+    expect(screen.getByText(/Why can't I generate a back view/)).toBeInTheDocument();
+    expect(screen.getByText(/How long does generation take/)).toBeInTheDocument();
+    expect(screen.getByText(/What is the difference between trial and paid generation/)).toBeInTheDocument();
+    expect(screen.getByText(/What authorization is required for models or minors/)).toBeInTheDocument();
+    expect(screen.getByText(/How do I submit a takedown request/)).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
@@ -85,11 +99,11 @@ describe("public trust pages", () => {
 
     expect(screen.getByRole("link", { name: "三图生成" })).toHaveAttribute(
       "href",
-      "/three-images-to-clothing-video",
+      "/zh/three-images-to-clothing-video",
     );
     expect(screen.getByRole("link", { name: "常见问题" })).toHaveAttribute(
       "href",
-      "/faq",
+      "/zh/faq",
     );
 
     rerender(<PublicFooter language="zh-CN" />);
@@ -102,29 +116,44 @@ describe("public trust pages", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "隐私政策" })).toHaveAttribute(
       "href",
-      "/privacy",
+      "/zh/privacy",
     );
     expect(screen.getByRole("link", { name: "服务条款" })).toHaveAttribute(
       "href",
-      "/terms",
+      "/zh/terms",
     );
     expect(screen.getByRole("link", { name: "常见问题" })).toHaveAttribute(
       "href",
-      "/faq",
+      "/zh/faq",
     );
     expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
       "href",
-      "/pricing",
+      "/zh/pricing",
     );
     expect(screen.getByRole("link", { name: "侵权删除" })).toHaveAttribute(
       "href",
-      "/takedown",
+      "/zh/takedown",
     );
     expect(screen.getByRole("link", { name: "可接受使用政策" })).toHaveAttribute(
       "href",
-      "/acceptable-use",
+      "/zh/acceptable-use",
     );
     expect(screen.getByText("support@aiclothesvideo.com")).toBeInTheDocument();
+  });
+
+  it("renders Chinese FAQ and legal content on /zh", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+
+    const { rerender } = render(await FaqPage());
+    expect(screen.getByRole("heading", { name: "常见问题" })).toBeInTheDocument();
+    expect(screen.getByText(/需要上传什么图片/)).toBeInTheDocument();
+
+    rerender(await PrivacyPage());
+    expect(screen.getByRole("heading", { name: "隐私政策" })).toBeInTheDocument();
+
+    rerender(await TermsPage());
+    expect(screen.getByRole("heading", { name: "服务条款" })).toBeInTheDocument();
   });
 
   it("opens and closes the Chinese mobile navigation", () => {
@@ -140,11 +169,11 @@ describe("public trust pages", () => {
     const mobileNavigation = screen.getByRole("navigation", { name: "移动端主导航" });
     const firstMobileLink = within(mobileNavigation).getByRole("link", { name: "三图生成" });
     expect(firstMobileLink)
-      .toHaveAttribute("href", "/three-images-to-clothing-video");
+      .toHaveAttribute("href", "/zh/three-images-to-clothing-video");
     expect(within(mobileNavigation).getByRole("link", { name: "价格" }))
-      .toHaveAttribute("href", "/pricing");
+      .toHaveAttribute("href", "/zh/pricing");
     expect(within(mobileNavigation).getByRole("link", { name: "常见问题" }))
-      .toHaveAttribute("href", "/faq");
+      .toHaveAttribute("href", "/zh/faq");
 
     firstMobileLink.focus();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -157,6 +186,10 @@ describe("public trust pages", () => {
     render(<PublicHeader language="zh-CN" sourcePage="homepage" />);
 
     fireEvent.click(screen.getByRole("link", { name: "免费试用" }));
+    expect(screen.getByRole("link", { name: "免费试用" })).toHaveAttribute(
+      "href",
+      "/zh/workspace?mode=trial&preset=minimal_studio",
+    );
     expect(mocks.trackFunnelEvent).toHaveBeenCalledWith("trial_cta_clicked", {
       sourcePage: "homepage",
       ctaPosition: "header",
@@ -179,7 +212,7 @@ describe("public trust pages", () => {
     const workspaceLink = screen.getByRole("link", { name: "进入工作台" });
     expect(workspaceLink).toHaveAttribute(
       "href",
-      "/workspace",
+      "/zh/workspace",
     );
     expect(workspaceLink).toHaveClass("min-h-11", "min-w-11");
     expect(screen.getByRole("button", { name: "退出登录" })).toBeInTheDocument();

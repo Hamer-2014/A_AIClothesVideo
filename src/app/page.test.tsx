@@ -7,6 +7,7 @@ import Home from "./page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  getRequestLocale: vi.fn(),
   recordFunnelEventSafely: vi.fn(),
 }));
 
@@ -16,6 +17,15 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/server/analytics/funnel-events", () => ({
   recordFunnelEventSafely: mocks.recordFunnelEventSafely,
+}));
+
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/components/dashboard/sign-out-button", () => ({
@@ -28,58 +38,65 @@ describe("Home", () => {
     vi.clearAllMocks();
   });
 
-  it("用中文核心承诺和真实三图证据建立首页首屏", async () => {
+  it("uses English by default and anchors the homepage in real evidence", async () => {
     mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("en");
 
     render(await Home());
 
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "三张服装图，生成一条商品宣传视频",
+        name: "Three clothing images. One product video.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/上传同一件服装的正面、背面与细节图/)).toBeInTheDocument();
-    expect(screen.getByText(/没有背面图，不生成背面/)).toBeInTheDocument();
+    expect(screen.getByText(/front, back, and detail images of the same garment/i)).toBeInTheDocument();
+    expect(screen.getByText(/No back image means no back view/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/细节图是否属于同一件服装仍需由你确认/),
+      screen.getByText(/You still need to confirm that the detail image belongs to the same garment/i),
     ).toBeInTheDocument();
     expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
       "src",
       "/demo/red-dress-video.mp4",
     );
-    expect(screen.getByAltText("红色连衣裙正面主图")).toHaveAttribute(
+    expect(screen.getByAltText("Front product image of a red dress")).toHaveAttribute(
       "src",
       expect.stringContaining("/demo/red-dress-front.webp"),
     );
-    expect(screen.getByAltText("红色连衣裙背面图")).toBeInTheDocument();
-    expect(screen.getByAltText("红色连衣裙细节图")).toBeInTheDocument();
+    expect(screen.getByAltText("Back image of a red dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Detail image of a red dress")).toBeInTheDocument();
   });
 
-  it("明确真实样例不代表所有服装会得到相同结果", async () => {
+  it("keeps the Chinese homepage at /zh without mixing languages", async () => {
     mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
 
     render(await Home());
 
+    expect(screen.getByRole("heading", { level: 1, name: "三张服装图，生成一条商品宣传视频" }))
+      .toBeInTheDocument();
     expect(
       screen.getByText(
         /样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长/,
       ),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "免费生成 1 条试用视频" })[0])
+      .toHaveAttribute("href", "/zh/workspace?mode=trial&preset=minimal_studio");
   });
 
   it("shows anonymous trial actions to visitors", async () => {
     mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("en");
 
     render(await Home());
 
-    expect(screen.getByRole("link", { name: "登录" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
       "/login",
     );
-    expect(screen.getByRole("link", { name: "免费试用" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Free trial" })).toBeInTheDocument();
     expect(
-      screen.getAllByRole("link", { name: "免费生成 1 条试用视频" })[0],
+      screen.getAllByRole("link", { name: "Create a free trial video" })[0],
     ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -96,21 +113,22 @@ describe("Home", () => {
     mocks.getServerSession.mockResolvedValue({
       user: { id: "user-1", email: "merchant@example.com" },
     });
+    mocks.getRequestLocale.mockResolvedValue("en");
 
     render(await Home());
 
     expect(screen.getByText("merchant@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "进入工作台" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Workspace" })[0]).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.getAllByRole("link", { name: "进入工作台" })[1]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "Open workspace" })[0]).toHaveAttribute(
       "href",
       "/workspace",
     );
-    expect(screen.queryByRole("link", { name: "登录" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "免费试用" }),
+      screen.queryByRole("link", { name: "Free trial" }),
     ).not.toBeInTheDocument();
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({

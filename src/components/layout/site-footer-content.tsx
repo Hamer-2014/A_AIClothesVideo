@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { LogoLockup } from "@/components/brand/logo";
+import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
 import { SUPPORT_EMAIL } from "@/lib/support-email";
 
-export function SiteFooterContent({ language = "en" }: { language?: "en" | "zh-CN" }) {
+export function SiteFooterContent({ language = "en" }: { language?: SiteLocale }) {
   const isChinese = language === "zh-CN";
   const linkClassName = "text-sm text-[var(--muted)] hover:text-[var(--ink)]";
 
@@ -30,9 +31,9 @@ export function SiteFooterContent({ language = "en" }: { language?: "en" | "zh-C
         <nav aria-label={isChinese ? "产品" : "Product"}>
           <p className="text-sm font-semibold text-[var(--ink)]">{isChinese ? "产品" : "Product"}</p>
           <div className="mt-4 flex flex-col items-start gap-3">
-            <Link className={linkClassName} href="/">{isChinese ? "首页" : "Home"}</Link>
+            <Link className={linkClassName} href={localizeHref("/", language)}>{isChinese ? "首页" : "Home"}</Link>
             {isChinese ? (
-              <Link className={linkClassName} href="/three-images-to-clothing-video">三图生成视频</Link>
+              <Link className={linkClassName} href={localizeHref("/three-images-to-clothing-video", language)}>三图生成视频</Link>
             ) : null}
           </div>
         </nav>
@@ -40,19 +41,19 @@ export function SiteFooterContent({ language = "en" }: { language?: "en" | "zh-C
         <nav aria-label={isChinese ? "使用" : "Use"}>
           <p className="text-sm font-semibold text-[var(--ink)]">{isChinese ? "使用" : "Use"}</p>
           <div className="mt-4 flex flex-col items-start gap-3">
-            <Link className={linkClassName} href="/pricing">{isChinese ? "价格" : "Pricing"}</Link>
-            {isChinese ? <Link className={linkClassName} href="/faq">常见问题</Link> : null}
-            <Link className={linkClassName} href="/workspace">{isChinese ? "进入工作台" : "Workspace"}</Link>
+            <Link className={linkClassName} href={localizeHref("/pricing", language)}>{isChinese ? "价格" : "Pricing"}</Link>
+            {isChinese ? <Link className={linkClassName} href={localizeHref("/faq", language)}>常见问题</Link> : null}
+            <Link className={linkClassName} href={localizeHref("/workspace", language)}>{isChinese ? "进入工作台" : "Workspace"}</Link>
           </div>
         </nav>
 
         <nav aria-label={isChinese ? "信任与支持" : "Trust and support"}>
           <p className="text-sm font-semibold text-[var(--ink)]">{isChinese ? "信任与支持" : "Trust and support"}</p>
           <div className="mt-4 flex flex-col items-start gap-3">
-            <Link className={linkClassName} href="/privacy">{isChinese ? "隐私政策" : "Privacy"}</Link>
-            <Link className={linkClassName} href="/terms">{isChinese ? "服务条款" : "Terms"}</Link>
-            <Link className={linkClassName} href="/acceptable-use">{isChinese ? "可接受使用政策" : "Acceptable Use"}</Link>
-            <Link className={linkClassName} href="/takedown">{isChinese ? "侵权删除" : "Takedown requests"}</Link>
+            <Link className={linkClassName} href={localizeHref("/privacy", language)}>{isChinese ? "隐私政策" : "Privacy"}</Link>
+            <Link className={linkClassName} href={localizeHref("/terms", language)}>{isChinese ? "服务条款" : "Terms"}</Link>
+            <Link className={linkClassName} href={localizeHref("/acceptable-use", language)}>{isChinese ? "可接受使用政策" : "Acceptable Use"}</Link>
+            <Link className={linkClassName} href={localizeHref("/takedown", language)}>{isChinese ? "侵权删除" : "Takedown requests"}</Link>
             <a className={linkClassName} href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
           </div>
         </nav>

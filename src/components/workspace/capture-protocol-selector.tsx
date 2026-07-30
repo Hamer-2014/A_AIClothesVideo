@@ -6,10 +6,13 @@ import {
   captureProtocols,
   type CaptureProtocolId,
 } from "@/lib/video/capture-protocols";
+import type { SiteLocale } from "@/lib/i18n/config";
+import { localizeCaptureProtocol, workspaceText } from "@/lib/i18n/workspace";
 
 interface CaptureProtocolSelectorProps {
   selectedId: CaptureProtocolId;
   onChange: (protocolId: CaptureProtocolId) => void;
+  language?: SiteLocale;
 }
 
 const protocolIcons = {
@@ -21,6 +24,7 @@ const protocolIcons = {
 export function CaptureProtocolSelector({
   selectedId,
   onChange,
+  language = "zh-CN",
 }: CaptureProtocolSelectorProps) {
   return (
     <section aria-labelledby="capture-protocol-title">
@@ -30,19 +34,20 @@ export function CaptureProtocolSelector({
             className="text-xs font-semibold uppercase text-[var(--muted)]"
             id="capture-protocol-title"
           >
-            生成方式
+            {workspaceText(language, "Generation method", "生成方式")}
           </p>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            不同方式需要不同的三张素材。
+            {workspaceText(language, "Each method requires a specific set of three images.", "不同方式需要不同的三张素材。")}
           </p>
         </div>
       </div>
       <div
-        aria-label="选择三图生成方式"
+        aria-label={workspaceText(language, "Choose a three-image generation method", "选择三图生成方式")}
         className="mt-3 grid grid-cols-3 gap-2"
         role="group"
       >
-        {captureProtocols.map((protocol) => {
+        {captureProtocols.map((sourceProtocol) => {
+          const protocol = localizeCaptureProtocol(sourceProtocol, language);
           const Icon = protocolIcons[protocol.id];
           const active = protocol.id === selectedId;
           return (
@@ -70,7 +75,9 @@ export function CaptureProtocolSelector({
                       active ? "text-white/65" : "text-[var(--muted)]"
                     }`}
                   >
-                    {protocol.availability === "recommended" ? "推荐" : "Beta"}
+                    {protocol.availability === "recommended"
+                      ? workspaceText(language, "Recommended", "推荐")
+                      : workspaceText(language, "Paid Beta", "付费 Beta")}
                   </span>
                 </span>
                 <span

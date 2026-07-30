@@ -10,11 +10,21 @@ vi.mock("@/components/brand/logo", () => ({
 }));
 
 vi.mock("@/components/layout/app-footer", () => ({
-  AppFooter: () => <footer>footer</footer>,
+  AppFooter: ({ language }: { language?: string }) => (
+    <footer data-language={language}>footer</footer>
+  ),
 }));
 
 vi.mock("./sign-out-button", () => ({
-  SignOutButton: () => <button type="button">退出</button>,
+  SignOutButton: ({ label }: { label?: string }) => (
+    <button type="button">{label ?? "退出"}</button>
+  ),
+}));
+
+vi.mock("@/components/i18n/language-switcher", () => ({
+  LanguageSwitcher: ({ locale }: { locale: string }) => (
+    <a data-locale={locale} href="/zh/workspace">language</a>
+  ),
 }));
 
 describe("DashboardShell", () => {
@@ -74,5 +84,34 @@ describe("DashboardShell", () => {
     expect(activeItem.className).toContain("border-[var(--action)]");
     expect(activeItem.className).not.toContain("bg-[var(--ink)]");
     expect(activeItem.className).not.toContain("text-white");
+  });
+
+  it("localizes the authenticated shell in English", () => {
+    render(
+      <DashboardShell
+        billing={{ availableBalance: 100, reservedBalance: 20 }}
+        language="en"
+        nav={[{ href: "/workspace", label: "Workspace", active: true }]}
+        subtitle="Upload materials, review the shot plan, and generate."
+        title="Video workspace"
+        user={{ email: "merchant@example.com" }}
+      >
+        <div>content</div>
+      </DashboardShell>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "AI Clothes Video workspace" }),
+    ).toHaveAttribute("href", "/workspace");
+    expect(screen.getByRole("link", { name: /100 available \/ 20 reserved/ })).toHaveAttribute(
+      "href",
+      "/billing",
+    );
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "language" })).toHaveAttribute(
+      "data-locale",
+      "en",
+    );
+    expect(screen.getByText("footer")).toHaveAttribute("data-language", "en");
   });
 });

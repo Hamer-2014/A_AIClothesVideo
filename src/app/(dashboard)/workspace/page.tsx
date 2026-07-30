@@ -7,6 +7,8 @@ import {
   buildRelativePathWithQuery,
 } from "@/lib/auth/redirects";
 import { getServerSession } from "@/lib/auth/server";
+import { localizeHref } from "@/lib/i18n/config";
+import { getRequestLocale } from "@/lib/i18n/server";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
 import { isVideoDurationEnabled } from "@/lib/video/specs";
 import { buildDashboardNav } from "@/app/app-shell";
@@ -25,21 +27,25 @@ export default async function WorkspacePage({
     preset?: string;
   }>;
 }) {
-  const session = await getServerSession();
-  const resolvedSearchParams = await searchParams;
+  const [session, resolvedSearchParams, locale] = await Promise.all([
+    getServerSession(),
+    searchParams,
+    getRequestLocale(),
+  ]);
+  const isChinese = locale === "zh-CN";
   const initialMode = resolvedSearchParams?.mode === "trial" ? "trial" : "paid";
   const duration40Enabled = isVideoDurationEnabled(40, process.env);
   if (!session?.user?.id) {
-    const loginHref = buildLoginHrefForRedirect(
-      buildRelativePathWithQuery("/workspace", {
+    const loginHref = localizeHref(buildLoginHrefForRedirect(
+      buildRelativePathWithQuery(localizeHref("/workspace", locale), {
         ...resolvedSearchParams,
         resumeDraft: "1",
       }),
-    );
+    ), locale);
 
     return (
       <div className="min-h-svh bg-[var(--surface)] text-[var(--ink)]">
-        <PublicHeader language="zh-CN" user={session?.user ?? null} />
+        <PublicHeader language={locale} user={session?.user ?? null} />
         <main>
           <section className="border-b border-[var(--line)] bg-white">
             <div
@@ -48,13 +54,15 @@ export default async function WorkspacePage({
             >
               <div className="min-w-0">
                 <p className="text-xs font-medium text-[var(--brand)]">
-                  免登录配置
+                  {isChinese ? "免登录配置" : "Configure before signing in"}
                 </p>
                 <h1 className="mt-1 text-lg font-semibold sm:text-xl">
-                  服装视频工作台
+                  {isChinese ? "服装视频工作台" : "Clothing video workspace"}
                 </h1>
                 <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-[var(--muted)] sm:block">
-                  先配置规格并本地预览素材，点击生成时再登录并正式上传。
+                  {isChinese
+                    ? "先配置规格并本地预览素材，点击生成时再登录并正式上传。"
+                    : "Set the output and preview your materials locally. Sign in only when you are ready to upload and generate."}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
@@ -62,13 +70,13 @@ export default async function WorkspacePage({
                   className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--ink)] px-4 text-sm font-medium text-white"
                   href={loginHref}
                 >
-                  登录后继续生成
+                  {isChinese ? "登录后继续生成" : "Sign in to generate"}
                 </a>
                 <a
                   className="hidden h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] bg-white px-4 text-sm font-medium sm:inline-flex"
-                  href="/pricing"
+                  href={localizeHref("/pricing", locale)}
                 >
-                  查看价格
+                  {isChinese ? "查看价格" : "View pricing"}
                 </a>
               </div>
             </div>
@@ -80,13 +88,14 @@ export default async function WorkspacePage({
                 initialMode={initialMode}
                 initialPresetId={resolvedSearchParams?.preset ?? null}
                 isAuthenticated={false}
+                language={locale}
                 loginHref={loginHref}
                 templateCatalog={mvpShotTemplates}
               />
             </div>
           </section>
         </main>
-        <PublicFooter language="zh-CN" />
+        <PublicFooter language={locale} />
       </div>
     );
   }
@@ -97,9 +106,12 @@ export default async function WorkspacePage({
 
   return (
     <DashboardShell
-      title="生成工作台"
-      subtitle="上传素材、分析模板、确认分镜，再进入真实生成链路。"
-      nav={buildDashboardNav("/workspace")}
+      language={locale}
+      title={isChinese ? "生成工作台" : "Video workspace"}
+      subtitle={isChinese
+        ? "上传素材、分析模板、确认分镜，再进入真实生成链路。"
+        : "Upload materials, review the shot plan, and submit a controlled clothing-video generation."}
+      nav={buildDashboardNav(localizeHref("/workspace", locale), locale)}
       user={session.user}
       billing={overview.wallet}
     >
@@ -108,6 +120,7 @@ export default async function WorkspacePage({
         initialMode={initialMode}
         initialPresetId={resolvedSearchParams?.preset ?? null}
         isAuthenticated
+        language={locale}
         templateCatalog={mvpShotTemplates}
       />
     </DashboardShell>

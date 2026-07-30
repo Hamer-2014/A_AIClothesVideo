@@ -750,7 +750,7 @@ describe("WorkspaceApp", () => {
       "data-selectable",
       "true",
     );
-    expect(screen.getByText("Front").nextElementSibling).toHaveTextContent(
+    expect(screen.getByText("正面").nextElementSibling).toHaveTextContent(
       "已选择",
     );
     expect(

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AcceptableUsePage from "@/app/acceptable-use/page";
 import PricingPage from "@/app/pricing/page";
@@ -11,11 +11,21 @@ import TermsPage from "@/app/terms/page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  getRequestLocale: vi.fn(),
   recordFunnelEventSafely: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
   getServerSession: mocks.getServerSession,
+}));
+
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/server/analytics/funnel-events", () => ({
@@ -25,6 +35,10 @@ vi.mock("@/server/analytics/funnel-events", () => ({
 const cjkPattern = /[\u3400-\u9fff]/;
 
 describe("Creem review public English surface", () => {
+  beforeEach(() => {
+    mocks.getRequestLocale.mockResolvedValue("en");
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

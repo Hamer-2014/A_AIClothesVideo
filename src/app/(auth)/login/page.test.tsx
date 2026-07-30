@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "./page";
 
 const mocks = vi.hoisted(() => ({
+  getRequestLocale: vi.fn(),
   loginForm: vi.fn(({ callbackURL }: { callbackURL: string }) => (
     <div data-testid="login-form">{callbackURL}</div>
   )),
@@ -15,6 +16,10 @@ vi.mock("./login-form", () => ({
   LoginForm: mocks.loginForm,
 }));
 
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
 describe("login page", () => {
   afterEach(() => {
     cleanup();
@@ -22,6 +27,7 @@ describe("login page", () => {
 
   beforeEach(() => {
     mocks.loginForm.mockClear();
+    mocks.getRequestLocale.mockResolvedValue("en");
   });
 
   it("renders the login shell with the default workspace callback URL", async () => {
@@ -40,10 +46,24 @@ describe("login page", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/MVP|密码登录/)).not.toBeInTheDocument();
     expect(mocks.loginForm).toHaveBeenCalledWith(
-      { callbackURL: "/workspace" },
+      { callbackURL: "/workspace", language: "en" },
       undefined,
     );
     expect(screen.queryByLabelText(/密码/)).not.toBeInTheDocument();
+  });
+
+  it("renders the Chinese login route with localized links and form", async () => {
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+
+    render(await LoginPage({}));
+
+    expect(screen.getByRole("heading", { name: "登录 AI Clothes Video" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "AI Clothes Video 首页" })).toHaveAttribute("href", "/zh");
+    expect(screen.getByRole("link", { name: "查看价格" })).toHaveAttribute("href", "/zh/pricing");
+    expect(mocks.loginForm).toHaveBeenCalledWith(
+      { callbackURL: "/zh/workspace", language: "zh-CN" },
+      undefined,
+    );
   });
 
   it("shows public product proof and compliance links before sign-in", async () => {
@@ -101,7 +121,7 @@ describe("login page", () => {
     );
 
     expect(mocks.loginForm).toHaveBeenCalledWith(
-      { callbackURL: "/workspace?mode=trial&preset=minimal_studio" },
+      { callbackURL: "/workspace?mode=trial&preset=minimal_studio", language: "en" },
       undefined,
     );
   });
@@ -116,7 +136,7 @@ describe("login page", () => {
     );
 
     expect(mocks.loginForm).toHaveBeenCalledWith(
-      { callbackURL: "/workspace" },
+      { callbackURL: "/workspace", language: "en" },
       undefined,
     );
   });

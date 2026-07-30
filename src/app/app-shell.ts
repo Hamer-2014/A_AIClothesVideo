@@ -43,11 +43,22 @@ export function pickWorkspaceRedirect(session: AuthSession) {
   return session?.user?.id ? "/workspace" : "/login";
 }
 
-export function buildDashboardNav(pathname: string): NavItem[] {
+export function buildDashboardNav(
+  pathname: string,
+  language?: SiteLocale,
+): NavItem[] {
+  const normalizedPathname = stripLocalePrefix(pathname);
+  const labels = language === "en"
+    ? { workspace: "Workspace", jobs: "Jobs", billing: "Billing" }
+    : { workspace: "工作台", jobs: "任务", billing: "账单" };
+  const workspaceHref = language
+    ? localizeHref("/workspace", language)
+    : "/workspace";
+
   return [
-    { href: "/workspace", label: "工作台", active: pathname === "/workspace" },
-    { href: "/jobs", label: "任务", active: pathname.startsWith("/jobs") },
-    { href: "/billing", label: "账单", active: pathname === "/billing" },
+    { href: workspaceHref, label: labels.workspace, active: normalizedPathname === "/workspace" },
+    { href: "/jobs", label: labels.jobs, active: normalizedPathname.startsWith("/jobs") },
+    { href: "/billing", label: labels.billing, active: normalizedPathname === "/billing" },
   ];
 }
 
@@ -120,3 +131,4 @@ export function buildTemplateStatusRows(
     })
     .sort((left, right) => left.templateId.localeCompare(right.templateId));
 }
+import { localizeHref, stripLocalePrefix, type SiteLocale } from "@/lib/i18n/config";

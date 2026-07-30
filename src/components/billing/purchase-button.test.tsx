@@ -29,6 +29,23 @@ describe("PurchaseButton", () => {
     );
   });
 
+  it("localizes the Chinese login callback and purchase label", () => {
+    render(
+      <PurchaseButton
+        authenticated={false}
+        language="zh-CN"
+        packageCode="starter"
+        packageName="Starter"
+        purchasesEnabled
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "登录购买 Starter" })).toHaveAttribute(
+      "href",
+      `/zh/login?next=${encodeURIComponent("/zh/pricing?package=starter")}`,
+    );
+  });
+
   it("disables Checkout while production purchases are off", () => {
     render(
       <PurchaseButton

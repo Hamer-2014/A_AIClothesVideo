@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import WorkspacePage from "./page";
 
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`NEXT_REDIRECT:${href}`);
   }),
   getServerSession: vi.fn(),
+  getRequestLocale: vi.fn(),
   getUserBillingOverview: vi.fn(),
 }));
 
@@ -21,6 +22,10 @@ vi.mock("@/lib/auth/server", () => ({
   getServerSession: mocks.getServerSession,
 }));
 
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
 vi.mock("@/server/billing/user-billing", () => ({
   createDrizzleUserBillingStore: vi.fn(),
   getUserBillingOverview: mocks.getUserBillingOverview,
@@ -29,13 +34,18 @@ vi.mock("@/server/billing/user-billing", () => ({
 vi.mock("@/components/dashboard/shell", () => ({
   DashboardShell: ({
     children,
+    language,
+    nav,
     title,
   }: {
     children: React.ReactNode;
+    language?: string;
+    nav: Array<{ href: string; label: string }>;
     title: string;
   }) => (
-    <div data-testid="dashboard-shell">
+    <div data-language={language} data-testid="dashboard-shell">
       <h1>{title}</h1>
+      <nav>{nav.map((item) => <a href={item.href} key={item.href}>{item.label}</a>)}</nav>
       {children}
     </div>
   ),
@@ -58,16 +68,19 @@ vi.mock("@/components/workspace/workspace-app", () => ({
     initialMode,
     initialPresetId,
     isAuthenticated,
+    language,
     loginHref,
   }: {
     initialMode?: string;
     initialPresetId?: string | null;
     isAuthenticated?: boolean;
+    language?: string;
     loginHref?: string;
   }) => (
     <div
       data-authenticated={String(isAuthenticated)}
       data-login-href={loginHref}
+      data-language={language}
       data-mode={initialMode}
       data-preset={initialPresetId}
       data-testid="workspace-app"
@@ -76,6 +89,10 @@ vi.mock("@/components/workspace/workspace-app", () => ({
 }));
 
 describe("WorkspacePage", () => {
+  beforeEach(() => {
+    mocks.getRequestLocale.mockResolvedValue("en");
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -94,17 +111,17 @@ describe("WorkspacePage", () => {
 
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(screen.queryByTestId("dashboard-shell")).not.toBeInTheDocument();
-    expect(screen.getByTestId("public-header")).toHaveAttribute("data-language", "zh-CN");
-    expect(screen.getByTestId("public-footer")).toHaveAttribute("data-language", "zh-CN");
+    expect(screen.getByTestId("public-header")).toHaveAttribute("data-language", "en");
+    expect(screen.getByTestId("public-footer")).toHaveAttribute("data-language", "en");
     expect(
       screen.getByRole("heading", {
-        name: "服装视频工作台",
+        name: "Clothing video workspace",
       }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("guest-workspace-intro").className).toContain(
       "py-3",
     );
-    expect(screen.getByRole("link", { name: "登录后继续生成" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in to generate" })).toHaveAttribute(
       "href",
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dminimal_studio%26resumeDraft%3D1",
     );
@@ -115,6 +132,33 @@ describe("WorkspacePage", () => {
     expect(screen.getByTestId("workspace-app")).toHaveAttribute(
       "data-login-href",
       "/login?next=%2Fworkspace%3Fmode%3Dtrial%26preset%3Dminimal_studio%26resumeDraft%3D1",
+    );
+    expect(screen.getByTestId("workspace-app")).toHaveAttribute(
+      "data-language",
+      "en",
+    );
+  });
+
+  it("keeps the guest workspace Chinese on the /zh route", async () => {
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await WorkspacePage({
+      searchParams: Promise.resolve({ mode: "trial" }),
+    }));
+
+    expect(screen.getByRole("heading", { name: "服装视频工作台" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "登录后继续生成" })).toHaveAttribute(
+      "href",
+      "/zh/login?next=%2Fzh%2Fworkspace%3Fmode%3Dtrial%26resumeDraft%3D1",
+    );
+    expect(screen.getByRole("link", { name: "查看价格" })).toHaveAttribute(
+      "href",
+      "/zh/pricing",
+    );
+    expect(screen.getByTestId("workspace-app")).toHaveAttribute(
+      "data-language",
+      "zh-CN",
     );
   });
 
@@ -135,6 +179,15 @@ describe("WorkspacePage", () => {
     render(page);
 
     expect(screen.getByTestId("dashboard-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-shell")).toHaveAttribute(
+      "data-language",
+      "en",
+    );
+    expect(screen.getByRole("heading", { name: "Video workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workspace" })).toHaveAttribute(
+      "href",
+      "/workspace",
+    );
     expect(screen.getByTestId("workspace-app")).toHaveAttribute(
       "data-authenticated",
       "true",
