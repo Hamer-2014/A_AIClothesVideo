@@ -44,6 +44,7 @@ export async function retryLocalizedPostQaSegment({
   if (!segment) {
     return { requeued: false, reason: "segment_not_found" };
   }
+  const job = await postQaStore.findJob(jobId);
 
   await postQaStore.createResult({
     videoJobId: jobId,
@@ -52,6 +53,7 @@ export async function retryLocalizedPostQaSegment({
     frameKeys,
     resultJson,
     failureCategory: "localized_segment_retry",
+    isTest: job?.isTest === true,
   });
   await transitionJobStatus({
     store: jobStore,

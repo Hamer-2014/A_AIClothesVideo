@@ -31,6 +31,7 @@ export interface PostQaJobRecord {
   status: string;
   creditCost: number;
   reservedLedgerId: string | null;
+  isTest?: boolean;
 }
 
 export interface PostQaResultRecord {
@@ -67,6 +68,7 @@ export interface PostQaStore {
     frameKeys: string[];
     resultJson?: JsonValue | null;
     failureCategory?: string | null;
+    isTest?: boolean;
   }): Promise<PostQaResultRecord>;
 }
 
@@ -128,6 +130,7 @@ export async function resolvePostQaResult({
     frameKeys,
     resultJson: resultJson ?? null,
     failureCategory: failureCategory ?? null,
+    isTest: job.isTest === true,
   });
 
   const failureMessage = failureCategory ?? "post_qa_failed";
@@ -262,7 +265,7 @@ export function createInMemoryPostQaStore({
         resultJson: input.resultJson ?? null,
         failureCategory: input.failureCategory ?? null,
         providerCallLogId: null,
-        isTest: false,
+        isTest: input.isTest === true,
         lockedBy: null,
         lockedUntil: null,
         attemptCount: 0,
@@ -292,6 +295,7 @@ export function createDrizzlePostQaStore(db: DbClient = getDb()): PostQaStore {
           status: videoJobs.status,
           creditCost: videoJobs.creditCost,
           reservedLedgerId: videoJobs.reservedLedgerId,
+          isTest: videoJobs.isTest,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))
@@ -323,6 +327,7 @@ export function createDrizzlePostQaStore(db: DbClient = getDb()): PostQaStore {
           frameKeys: input.frameKeys,
           resultJson: input.resultJson ?? null,
           failureCategory: input.failureCategory ?? null,
+          isTest: input.isTest === true,
         })
         .returning();
 

@@ -18,7 +18,7 @@ const loginCopy = {
     nav: "Public product links", demo: "View product demo", pricing: "View pricing", trial: "Start free trial",
     disclosure: "AI Clothes Video is an independent product that uses third-party AI models through its own workflow. It is not affiliated with or endorsed by any model provider. User generation text is screened before processing.",
     privacy: "Privacy", terms: "Terms", use: "Acceptable Use",
-    posterAlt: "Generated red dress product video preview", sample: "Real workflow example",
+    posterAlt: "Generated adult burgundy midi dress product video preview", sample: "Real workflow example",
     sampleTitle: "Source images stay the product boundary.",
     sampleBody: "The workspace checks front, back, and detail evidence before recommending supported product shots.",
   },
@@ -29,7 +29,7 @@ const loginCopy = {
     nav: "公开产品链接", demo: "查看产品演示", pricing: "查看价格", trial: "开始免费试用",
     disclosure: "AI Clothes Video 是通过自有工作流调用第三方 AI 模型的独立产品，与任何模型提供商不存在隶属或背书关系。用户生成文本会在处理前接受审核。",
     privacy: "隐私政策", terms: "服务条款", use: "可接受使用政策",
-    posterAlt: "红色连衣裙商品视频生成预览", sample: "真实工作流样例",
+    posterAlt: "成人深酒红中长连衣裙商品视频生成预览", sample: "真实工作流样例",
     sampleTitle: "素材图片始终是产品边界。",
     sampleBody: "工作台先检查正面、背面和细节证据，再推荐有素材支持的商品镜头。",
   },
@@ -82,7 +82,7 @@ export default async function LoginPage({
         </section>
 
         <aside className="relative min-h-[26rem] overflow-hidden bg-black lg:col-start-1 lg:row-start-1 lg:min-h-screen">
-          <Image alt={copy.posterAlt} className="object-cover object-center" fill priority sizes="(max-width: 1023px) 100vw, 58vw" src="/demo/red-dress-poster.webp" />
+          <Image alt={copy.posterAlt} className="object-cover object-center" fill priority sizes="(max-width: 1023px) 100vw, 58vw" src="/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp" />
           <div className="absolute inset-x-0 bottom-0 bg-black/80 px-6 py-7 text-white sm:px-10 lg:px-12 lg:py-10"><p className="text-xs font-semibold text-[var(--brand-light)]">{copy.sample}</p><h2 className="mt-3 max-w-lg text-2xl font-semibold leading-tight sm:text-3xl">{copy.sampleTitle}</h2><p className="mt-3 max-w-xl text-sm leading-6 text-white/75">{copy.sampleBody}</p></div>
         </aside>
       </div>

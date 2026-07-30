@@ -23,8 +23,11 @@ describe("DemoCaseList", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getByText("Published workflow video")).toBeInTheDocument();
     expect(screen.getAllByText("Synthetic source set ready")).toHaveLength(2);
-    expect(screen.getByLabelText("Generated red midi dress product video"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute(
+        "src",
+        "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      );
     expect(screen.getAllByText("Synthetic product input generated with ImageGen. It is not a customer case."))
       .toHaveLength(2);
     expect(screen.getAllByTestId("demo-case-video")).toHaveLength(1);

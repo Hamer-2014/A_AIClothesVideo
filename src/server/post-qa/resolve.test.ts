@@ -49,6 +49,7 @@ async function createStores() {
         status: "post_qa_running",
         creditCost: 130,
         reservedLedgerId: reserveLedger?.id ?? null,
+        isTest: true,
       },
     ],
   });
@@ -86,6 +87,7 @@ describe("resolvePostQaResult", () => {
       videoJobId: jobId,
       status: "passed",
       mode: "standard",
+      isTest: true,
     });
     expect(funnelStore.listEvents()).toEqual([
       expect.objectContaining({

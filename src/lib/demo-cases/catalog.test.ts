@@ -5,13 +5,13 @@ import { demoCases, getDemoCase } from "./catalog";
 describe("demo case catalog", () => {
   it("publishes three distinct garment categories with truthful source types", () => {
     expect(demoCases.map((item) => item.slug)).toEqual([
-      "red-dress",
+      "burgundy-midi-dress",
       "structured-blazer",
       "knit-cardigan",
     ]);
     expect(new Set(demoCases.map((item) => item.category)).size).toBe(3);
     expect(demoCases.map((item) => item.sourceType)).toEqual([
-      "internal-demo",
+      "synthetic-demo",
       "synthetic-demo",
       "synthetic-demo",
     ]);
@@ -33,9 +33,13 @@ describe("demo case catalog", () => {
   });
 
   it("does not invent outputs for source-ready synthetic cases", () => {
-    expect(getDemoCase("red-dress")?.status).toBe("published");
-    expect(getDemoCase("red-dress")?.featuredOutput?.videoSrc)
-      .toBe("/demo/red-dress-video.mp4");
+    expect(getDemoCase("burgundy-midi-dress")?.status).toBe("published");
+    expect(getDemoCase("burgundy-midi-dress")?.featuredOutput).toEqual({
+      videoSrc: "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      posterSrc: "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      presetId: "minimal_studio",
+    });
+    expect(JSON.stringify(demoCases)).not.toContain("/demo/red-dress-");
     expect(getDemoCase("structured-blazer")?.status).toBe("source-ready");
     expect(getDemoCase("structured-blazer")?.featuredOutput).toBeNull();
     expect(getDemoCase("knit-cardigan")?.status).toBe("source-ready");

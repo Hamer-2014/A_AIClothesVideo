@@ -35,7 +35,7 @@ const homeCopy = {
       body: "The front image establishes the overall silhouette, the back image supports back views, and the detail image supports fabric or construction close-ups. Missing material narrows the shot list instead of filling in unseen structure.",
       sampleTitle: "A real result generated from the three images above",
       disclaimer: "This sample shows one real workflow result. It does not mean every garment will receive the same motion, composition, or generation time.",
-      videoLabel: "Generated red dress product video",
+      videoLabel: "Generated adult burgundy midi dress product video",
     },
     control: {
       kicker: "02 / A controlled path to delivery",
@@ -107,7 +107,7 @@ const homeCopy = {
       body: "正面图确定整体轮廓，背面图支持背部展示，细节图支持面料或工艺特写。素材缺失时，系统会收窄镜头，而不是补画不存在的结构。",
       sampleTitle: "由以上三张素材生成的真实样例",
       disclaimer: "样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长。",
-      videoLabel: "由三张红色连衣裙素材生成的商品视频",
+      videoLabel: "由三张成人深酒红中长裙素材生成的商品视频",
     },
     control: {
       kicker: "02 / 从素材到可用镜头",
@@ -185,7 +185,7 @@ export default async function Home() {
   const user = session?.user ?? null;
   const copy = homeCopy[locale];
   const syntheticCases = demoCases.filter(
-    (item) => item.sourceType === "synthetic-demo",
+    (item) => item.status === "source-ready",
   );
 
   await recordFunnelEventSafely({

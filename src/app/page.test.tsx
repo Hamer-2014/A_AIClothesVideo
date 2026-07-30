@@ -85,21 +85,21 @@ describe("Home", () => {
       .toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
     expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
       "src",
-      "/demo/red-dress-video.mp4",
+      "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
     );
-    expect(screen.getByAltText("Front product image of a red dress")).toHaveAttribute(
+    expect(screen.getByAltText("Front product image of an adult burgundy midi dress")).toHaveAttribute(
       "src",
-      expect.stringContaining("/demo/red-dress-front.webp"),
+      expect.stringContaining("/demo/cases/burgundy-midi-dress/front.webp"),
     );
-    expect(screen.getByAltText("Back image of a red dress")).toBeInTheDocument();
-    expect(screen.getByAltText("Detail image of a red dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Back image of an adult burgundy midi dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Detail image of an adult burgundy midi dress")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "View the real three-image sample" }),
     ).toHaveAttribute("href", "#source-proof");
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("poster", "/demo/red-dress-poster.webp");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute("poster", "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp");
   });
 
   it("keeps the Chinese homepage at /zh without mixing languages", async () => {
@@ -129,8 +129,8 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "查看真实三图样例" }))
       .toHaveAttribute("href", "#source-proof");
-    expect(screen.getByLabelText("由三张红色连衣裙素材生成的商品视频"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("由三张成人深酒红中长裙素材生成的商品视频"))
+      .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
     expect(
       screen.getByRole("heading", {
         level: 2,

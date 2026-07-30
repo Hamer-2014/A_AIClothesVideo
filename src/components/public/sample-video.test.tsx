@@ -59,14 +59,22 @@ describe("SampleVideo", () => {
   it("exposes an accessible label for a meaningful result video", () => {
     render(
       <SampleVideo
-        ariaLabel="Generated red dress product video"
+        ariaLabel="Generated adult burgundy midi dress product video"
         controls
         sourcePage="homepage"
       />,
     );
 
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute(
+        "src",
+        "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      );
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute(
+        "poster",
+        "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      );
   });
 
   it("renders accepted case media when custom paths are provided", () => {

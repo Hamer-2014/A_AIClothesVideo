@@ -44,6 +44,13 @@ describe("ExamplesPage", () => {
 
     render(await ExamplesPage());
 
+    expect(screen.getByRole("heading", { level: 2, name: "Adult burgundy midi dress" }))
+      .toBeInTheDocument();
+    expect(screen.getByTestId("demo-case-video")).toHaveAttribute(
+      "src",
+      "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+    );
+
     expect(
       screen.getByRole("heading", {
         level: 1,

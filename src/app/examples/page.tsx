@@ -30,7 +30,7 @@ const examplesCopy = {
     library: {
       kicker: "01 / Source before output",
       title: "See what the model is allowed to use",
-      body: "The red dress includes an existing workflow result. The blazer and cardigan currently show their generated source material only; their Preset videos will appear after the real generation jobs pass review.",
+      body: "The adult burgundy dress includes a real minimal-studio workflow result. The blazer and cardigan currently show their generated source material only; their Preset videos will appear after real generation jobs pass review.",
     },
     final: {
       title: "Prepare one traceable SKU of your own",
@@ -53,7 +53,7 @@ const examplesCopy = {
     library: {
       kicker: "01 / 先看输入，再看输出",
       title: "明确模型实际可以使用哪些素材",
-      body: "红裙包含现有工作流结果；西装和开衫当前只展示已经生成的输入素材，真实 Preset 成片通过生成与复核后再加入。",
+      body: "成人深酒红中长裙包含真实极简棚拍工作流结果；西装和开衫当前只展示已经生成的输入素材，真实 Preset 成片通过生成与复核后再加入。",
     },
     final: {
       title: "准备一套你自己的可追溯 SKU 素材",
@@ -142,11 +142,15 @@ export default async function ExamplesPage() {
             width={591}
           />
           <Image
-            alt=""
+            alt={
+              locale === "zh-CN"
+                ? "成人深酒红中长连衣裙素材预览"
+                : "Adult burgundy midi dress source preview"
+            }
             className="size-full object-cover"
             height={960}
             priority
-            src="/demo/red-dress-front.webp"
+            src="/demo/cases/burgundy-midi-dress/front.webp"
             width={640}
           />
         </div>
