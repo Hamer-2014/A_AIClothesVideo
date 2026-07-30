@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SampleVideo } from "./sample-video";
 
@@ -16,6 +16,11 @@ vi.mock("@/lib/analytics/client-funnel", () => ({
 describe("SampleVideo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("tracks play start and the 50 percent milestone once", () => {
@@ -62,5 +67,19 @@ describe("SampleVideo", () => {
 
     expect(screen.getByLabelText("Generated red dress product video"))
       .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+  });
+
+  it("pauses autoplay media when reduced motion is requested", () => {
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({ matches: true }),
+    );
+
+    render(<SampleVideo autoPlay sourcePage="homepage" testId="hero" />);
+
+    expect(pause).toHaveBeenCalledTimes(1);
   });
 });
