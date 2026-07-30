@@ -6,6 +6,7 @@ import { trackFunnelEvent } from "@/lib/analytics/client-funnel";
 import type { SiteLocale } from "@/lib/i18n/config";
 
 export function SampleVideo({
+  ariaLabel,
   autoPlay = false,
   className,
   controls = false,
@@ -13,6 +14,7 @@ export function SampleVideo({
   sourcePage,
   testId,
 }: {
+  ariaLabel?: string;
   autoPlay?: boolean;
   className?: string;
   controls?: boolean;
@@ -33,6 +35,7 @@ export function SampleVideo({
 
   return (
     <video
+      aria-label={ariaLabel}
       autoPlay={autoPlay}
       className={className}
       controls={controls}

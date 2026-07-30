@@ -32,6 +32,7 @@ const homeCopy = {
       body: "The front image establishes the overall silhouette, the back image supports back views, and the detail image supports fabric or construction close-ups. Missing material narrows the shot list instead of filling in unseen structure.",
       sampleTitle: "A real result generated from the three images above",
       disclaimer: "This sample shows one real workflow result. It does not mean every garment will receive the same motion, composition, or generation time.",
+      videoLabel: "Generated red dress product video",
     },
     control: {
       kicker: "02 / A controlled path to delivery",
@@ -94,6 +95,7 @@ const homeCopy = {
       body: "正面图确定整体轮廓，背面图支持背部展示，细节图支持面料或工艺特写。素材缺失时，系统会收窄镜头，而不是补画不存在的结构。",
       sampleTitle: "由以上三张素材生成的真实样例",
       disclaimer: "样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长。",
+      videoLabel: "由三张红色连衣裙素材生成的商品视频",
     },
     control: {
       kicker: "02 / 从素材到可用镜头",
@@ -212,7 +214,7 @@ export default async function Home() {
           </div>
           <div className="mt-12 grid gap-7 border-t border-[var(--line-strong)] pt-8 lg:grid-cols-[0.65fr_1.35fr]">
             <div><p className="text-sm font-semibold">{copy.evidence.sampleTitle}</p><p className="mt-3 max-w-md text-sm leading-6 text-[var(--muted)]">{copy.evidence.disclaimer}</p></div>
-            <div className="relative aspect-video overflow-hidden bg-black"><SampleVideo className="size-full object-cover" controls language={locale} sourcePage="homepage" /></div>
+            <div className="relative aspect-video overflow-hidden bg-black"><SampleVideo ariaLabel={copy.evidence.videoLabel} className="size-full object-cover" controls language={locale} sourcePage="homepage" /></div>
           </div>
         </div>
       </section>

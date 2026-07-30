@@ -50,4 +50,17 @@ describe("SampleVideo", () => {
 
     expect(analyticsMocks.trackFunnelEvent).not.toHaveBeenCalled();
   });
+
+  it("exposes an accessible label for a meaningful result video", () => {
+    render(
+      <SampleVideo
+        ariaLabel="Generated red dress product video"
+        controls
+        sourcePage="homepage"
+      />,
+    );
+
+    expect(screen.getByLabelText("Generated red dress product video"))
+      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+  });
 });

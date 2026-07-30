@@ -93,6 +93,13 @@ describe("Home", () => {
     );
     expect(screen.getByAltText("Back image of a red dress")).toBeInTheDocument();
     expect(screen.getByAltText("Detail image of a red dress")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "View the real three-image sample" }),
+    ).toHaveAttribute("href", "#source-proof");
+    expect(screen.getByLabelText("Generated red dress product video"))
+      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("Generated red dress product video"))
+      .toHaveAttribute("poster", "/demo/red-dress-poster.webp");
   });
 
   it("keeps the Chinese homepage at /zh without mixing languages", async () => {
@@ -120,6 +127,10 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 3, name: "匹配可用镜头" }))
       .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看真实三图样例" }))
+      .toHaveAttribute("href", "#source-proof");
+    expect(screen.getByLabelText("由三张红色连衣裙素材生成的商品视频"))
+      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
   });
 
   it("shows anonymous trial actions to visitors", async () => {
@@ -136,6 +147,11 @@ describe("Home", () => {
     expect(
       screen.getAllByRole("link", { name: "Create a free trial video" })[0],
     ).toHaveAttribute("href", "/workspace?mode=trial&preset=minimal_studio");
+    expect(
+      screen.getByText(
+        "8 seconds · low resolution · no audio · watermarked · low-risk shots only",
+      ),
+    ).toBeInTheDocument();
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "landing_viewed",
@@ -168,6 +184,14 @@ describe("Home", () => {
     expect(
       screen.queryByRole("link", { name: "Free trial" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "8 seconds · low resolution · no audio · watermarked · low-risk shots only",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "View the real three-image sample" }),
+    ).toHaveAttribute("href", "#source-proof");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "landing_viewed",
