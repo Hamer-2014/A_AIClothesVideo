@@ -141,6 +141,41 @@ describe("public trust pages", () => {
     expect(screen.getByText("support@aiclothesvideo.com")).toBeInTheDocument();
   });
 
+  it("keeps English desktop and mobile navigation on the conversion path", () => {
+    render(<PublicHeader language="en" />);
+
+    const desktopNavigation = screen.getByRole("navigation", {
+      name: "Primary navigation",
+    });
+    expect(
+      within(desktopNavigation).getByRole("link", {
+        name: "Three-image workflow",
+      }),
+    ).toHaveAttribute("href", "/three-images-to-clothing-video");
+    expect(within(desktopNavigation).getByRole("link", { name: "Pricing" }))
+      .toHaveAttribute("href", "/pricing");
+    expect(within(desktopNavigation).getByRole("link", { name: "FAQ" }))
+      .toHaveAttribute("href", "/faq");
+    expect(within(desktopNavigation).queryByRole("link", { name: "Privacy" }))
+      .not.toBeInTheDocument();
+    expect(within(desktopNavigation).queryByRole("link", { name: "Terms" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    const mobileNavigation = screen.getByRole("navigation", {
+      name: "Mobile primary navigation",
+    });
+    expect(
+      within(mobileNavigation).getByRole("link", {
+        name: "Three-image workflow",
+      }),
+    ).toHaveAttribute("href", "/three-images-to-clothing-video");
+    expect(within(mobileNavigation).getByRole("link", { name: "Pricing" }))
+      .toHaveAttribute("href", "/pricing");
+    expect(within(mobileNavigation).getByRole("link", { name: "FAQ" }))
+      .toHaveAttribute("href", "/faq");
+  });
+
   it("renders Chinese FAQ and legal content on /zh", async () => {
     mocks.getServerSession.mockResolvedValue(null);
     mocks.getRequestLocale.mockResolvedValue("zh-CN");

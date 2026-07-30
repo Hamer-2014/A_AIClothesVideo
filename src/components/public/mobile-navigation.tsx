@@ -6,18 +6,7 @@ import { Menu, X } from "lucide-react";
 
 import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
 
-const navigationItems = {
-  "zh-CN": [
-    { href: "/three-images-to-clothing-video", label: "三图生成" },
-    { href: "/pricing", label: "价格" },
-    { href: "/faq", label: "常见问题" },
-  ],
-  en: [
-    { href: "/pricing", label: "Pricing" },
-    { href: "/privacy", label: "Privacy" },
-    { href: "/terms", label: "Terms" },
-  ],
-} as const;
+import { publicNavigationItems } from "./public-navigation";
 
 export function MobileNavigation({ language }: { language: SiteLocale }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +57,7 @@ export function MobileNavigation({ language }: { language: SiteLocale }) {
           className="absolute right-0 top-[calc(100%+0.75rem)] w-72 max-w-[calc(100vw-1.5rem)] border border-[var(--line)] bg-white p-2 shadow-[var(--shadow-md)]"
           id="mobile-primary-navigation"
         >
-          {navigationItems[language].map((item) => (
+          {publicNavigationItems[language].map((item) => (
             <Link
               className="flex min-h-11 items-center border-b border-[var(--line)] px-3 text-sm font-medium text-[var(--ink)] last:border-b-0 hover:bg-[var(--surface-subtle)]"
               href={localizeHref(item.href, language)}

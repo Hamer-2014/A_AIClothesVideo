@@ -7,6 +7,7 @@ import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "./cta-link";
 import { MobileNavigation } from "./mobile-navigation";
+import { publicNavigationItems } from "./public-navigation";
 
 interface PublicHeaderProps {
   language?: SiteLocale;
@@ -36,25 +37,15 @@ export function PublicHeader({
             aria-label={isChinese ? "主导航" : "Primary navigation"}
             className="hidden items-center gap-6 text-sm lg:flex"
           >
-          {isChinese ? (
-            <>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/three-images-to-clothing-video", language)}>
-                三图生成
-              </Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/pricing", language)}>
-                价格
-              </Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/faq", language)}>
-                常见问题
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/pricing", language)}>Pricing</Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/privacy", language)}>Privacy</Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/terms", language)}>Terms</Link>
-            </>
-          )}
+          {publicNavigationItems[language].map((item) => (
+            <Link
+              className="text-[var(--muted)] hover:text-[var(--ink)]"
+              href={localizeHref(item.href, language)}
+              key={item.href}
+            >
+              {item.label}
+            </Link>
+          ))}
           </nav>
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {user ? (
