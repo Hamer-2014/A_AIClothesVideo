@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
+import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
+
 const navigationItems = {
   "zh-CN": [
     { href: "/three-images-to-clothing-video", label: "三图生成" },
@@ -17,7 +19,7 @@ const navigationItems = {
   ],
 } as const;
 
-export function MobileNavigation({ language }: { language: "en" | "zh-CN" }) {
+export function MobileNavigation({ language }: { language: SiteLocale }) {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,7 +71,7 @@ export function MobileNavigation({ language }: { language: "en" | "zh-CN" }) {
           {navigationItems[language].map((item) => (
             <Link
               className="flex min-h-11 items-center border-b border-[var(--line)] px-3 text-sm font-medium text-[var(--ink)] last:border-b-0 hover:bg-[var(--surface-subtle)]"
-              href={item.href}
+              href={localizeHref(item.href, language)}
               key={item.href}
               onClick={() => setIsOpen(false)}
             >

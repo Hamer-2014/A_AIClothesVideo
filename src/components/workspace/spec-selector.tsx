@@ -1,6 +1,8 @@
 "use client";
 
 import { videoDurations, type VideoDuration } from "@/lib/video/specs";
+import type { SiteLocale } from "@/lib/i18n/config";
+import { workspaceText } from "@/lib/i18n/workspace";
 
 interface SpecSelectorProps {
   durationSeconds: VideoDuration;
@@ -8,6 +10,7 @@ interface SpecSelectorProps {
   duration40Enabled?: boolean;
   onDurationChange: (value: VideoDuration) => void;
   onAspectRatioChange: (value: "9:16" | "1:1" | "16:9") => void;
+  language?: SiteLocale;
 }
 
 const aspectRatioOptions = [
@@ -46,18 +49,21 @@ export function SpecSelector({
   aspectRatio,
   onDurationChange,
   onAspectRatioChange,
+  language = "zh-CN",
 }: SpecSelectorProps) {
   const durationOptions = videoDurations
     .filter((duration) => duration !== 40 || duration40Enabled)
     .map((duration) => ({
       value: duration,
-      label: duration === 40 ? "40 秒 Beta" : `${duration} 秒`,
+      label: duration === 40
+        ? workspaceText(language, "40 sec Beta", "40 秒 Beta")
+        : workspaceText(language, `${duration} sec`, `${duration} 秒`),
     }));
 
   return (
     <section className="space-y-5">
       <div>
-        <p className="text-sm font-medium">规格</p>
+        <p className="text-sm font-medium">{workspaceText(language, "Duration", "规格")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {durationOptions.map((option) => (
             <SegmentedButton
@@ -70,7 +76,7 @@ export function SpecSelector({
         </div>
       </div>
       <div>
-        <p className="text-sm font-medium">比例</p>
+        <p className="text-sm font-medium">{workspaceText(language, "Aspect ratio", "比例")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {aspectRatioOptions.map((option) => (
             <SegmentedButton

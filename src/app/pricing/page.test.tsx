@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import PricingPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   getServerSession: vi.fn(),
+  getRequestLocale: vi.fn(),
   recordFunnelEventSafely: vi.fn(),
 }));
 
@@ -29,11 +30,24 @@ vi.mock("@/server/analytics/funnel-events", () => ({
   recordFunnelEventSafely: mocks.recordFunnelEventSafely,
 }));
 
+vi.mock("@/lib/i18n/server", () => ({
+  getRequestLocale: mocks.getRequestLocale,
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/pricing",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/components/dashboard/sign-out-button", () => ({
   SignOutButton: () => <button type="button">Sign out</button>,
 }));
 
 describe("PricingPage", () => {
+  beforeEach(() => {
+    mocks.getRequestLocale.mockResolvedValue("en");
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -139,6 +153,23 @@ describe("PricingPage", () => {
     expect(
       screen.getByRole("link", { name: "Sign in to buy Studio" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders localized Chinese pricing and purchase controls", async () => {
+    stubReadyCreemPurchases();
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+    mocks.getServerSession.mockResolvedValue(null);
+
+    render(await PricingPage());
+
+    expect(screen.getByRole("heading", { level: 1, name: /先免费试用/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "登录购买 Starter" })).toHaveAttribute(
+      "href",
+      `/zh/login?next=${encodeURIComponent("/zh/pricing?package=starter")}`,
+    );
+    expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/zh/pricing" }),
+    );
   });
 
   it("restores the selected package after sign-in", async () => {

@@ -1,26 +1,31 @@
 "use client";
 
 import { stylePresets, type StylePresetId } from "@/lib/presets";
+import type { SiteLocale } from "@/lib/i18n/config";
+import { localizeStylePreset, workspaceText } from "@/lib/i18n/workspace";
 
 interface StylePresetSelectorProps {
   selectedPresetId: StylePresetId;
   onChange: (presetId: StylePresetId) => void;
+  language?: SiteLocale;
 }
 
 export function StylePresetSelector({
   selectedPresetId,
   onChange,
+  language = "zh-CN",
 }: StylePresetSelectorProps) {
   return (
-    <section className="space-y-3" aria-label="风格预设">
+    <section className="space-y-3" aria-label={workspaceText(language, "Style preset", "风格预设")}>
       <div>
-        <p className="text-sm font-medium">风格预设</p>
+        <p className="text-sm font-medium">{workspaceText(language, "Style preset", "风格预设")}</p>
         <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-          选择视频用途，系统会按素材规则自动推荐镜头。
+          {workspaceText(language, "Choose the video use case. Shot recommendations still follow the uploaded-image rules.", "选择视频用途，系统会按素材规则自动推荐镜头。")}
         </p>
       </div>
       <div className="grid gap-2">
-        {stylePresets.map((preset) => {
+        {stylePresets.map((sourcePreset) => {
+          const preset = localizeStylePreset(sourcePreset, language);
           const selected = preset.id === selectedPresetId;
 
           return (

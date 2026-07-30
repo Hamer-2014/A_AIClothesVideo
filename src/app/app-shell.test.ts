@@ -28,6 +28,22 @@ describe("app shell helpers", () => {
     ]);
   });
 
+  it("builds localized English dashboard navigation", () => {
+    expect(buildDashboardNav("/workspace", "en")).toEqual([
+      { href: "/workspace", label: "Workspace", active: true },
+      { href: "/jobs", label: "Jobs", active: false },
+      { href: "/billing", label: "Billing", active: false },
+    ]);
+  });
+
+  it("only prefixes dashboard routes that have a Chinese page", () => {
+    expect(buildDashboardNav("/zh/workspace", "zh-CN")).toEqual([
+      { href: "/zh/workspace", label: "工作台", active: true },
+      { href: "/jobs", label: "任务", active: false },
+      { href: "/billing", label: "账单", active: false },
+    ]);
+  });
+
   it("marks the active admin nav item", () => {
     expect(buildAdminNav("/admin/providers")).toEqual([
       { href: "/admin", label: "总览", active: false },

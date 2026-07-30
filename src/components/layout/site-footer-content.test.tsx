@@ -52,7 +52,11 @@ describe("SiteFooterContent", () => {
     expect(screen.getByRole("navigation", { name: "信任与支持" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "三图生成视频" })).toHaveAttribute(
       "href",
-      "/three-images-to-clothing-video",
+      "/zh/three-images-to-clothing-video",
+    );
+    expect(screen.getByRole("link", { name: "隐私政策" })).toHaveAttribute(
+      "href",
+      "/zh/privacy",
     );
   });
 

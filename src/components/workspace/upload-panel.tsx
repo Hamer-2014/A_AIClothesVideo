@@ -9,6 +9,13 @@ import {
   getCaptureProtocol,
   type CaptureProtocolSlot,
 } from "@/lib/video/capture-protocols";
+import type { SiteLocale } from "@/lib/i18n/config";
+import { localizeHref } from "@/lib/i18n/config";
+import {
+  localizeCaptureProtocol,
+  safeWorkspaceMessage,
+  workspaceText,
+} from "@/lib/i18n/workspace";
 
 export type UploadSlotRole = "front" | "back" | "side" | "detail" | "scene";
 
@@ -30,6 +37,7 @@ interface UploadPanelProps {
   onUploadingChange: (uploading: boolean) => void;
   rightsAccepted: boolean;
   onRightsAcceptedChange: (accepted: boolean) => void;
+  language?: SiteLocale;
 }
 
 interface SelectedSlotFile {
@@ -38,20 +46,20 @@ interface SelectedSlotFile {
   status: "local" | "uploading";
 }
 
-function humanReadableUploadError(error: string) {
+function humanReadableUploadError(error: string, language: SiteLocale) {
   switch (error) {
     case "file_too_large":
-      return "文件过大";
+      return workspaceText(language, "File is too large", "文件过大");
     case "unsupported_file_type":
-      return "文件类型不支持";
+      return workspaceText(language, "Unsupported file type", "文件类型不支持");
     case "unauthorized":
-      return "登录状态失效";
+      return workspaceText(language, "Your session has expired", "登录状态失效");
     case "rights_attestation_required":
-      return "请先确认素材与肖像授权声明";
+      return workspaceText(language, "Confirm the image and likeness rights statement first", "请先确认素材与肖像授权声明");
     case "rights_attestation_version_mismatch":
-      return "授权声明已更新，请重新确认";
+      return workspaceText(language, "The rights statement changed. Please confirm it again", "授权声明已更新，请重新确认");
     default:
-      return "上传失败";
+      return workspaceText(language, "Upload failed", "上传失败");
   }
 }
 
@@ -64,7 +72,22 @@ export function UploadPanel({
   onUploadingChange,
   rightsAccepted,
   onRightsAcceptedChange,
+  language: requestedLanguage,
 }: UploadPanelProps) {
+  const language = requestedLanguage ?? "zh-CN";
+  const localizedSlots =
+    language === "en" && slots.some((slot) => /[\u3400-\u9fff]/u.test(slot.label))
+      ? localizeCaptureProtocol(
+          getCaptureProtocol(
+            slots.some((slot) => slot.role === "detail")
+              ? "product_showcase"
+              : slots[0]?.label.includes("模特")
+                ? "model_turn"
+                : "product_rotation",
+          ),
+          language,
+        ).slots
+      : slots;
   const [slotFiles, setSlotFiles] = useState<
     Partial<Record<UploadSlotRole, SelectedSlotFile>>
   >({});
@@ -196,7 +219,7 @@ export function UploadPanel({
             fileName: file.name,
             intendedRole: role,
             status: "failed",
-            error: humanReadableUploadError(presignBody.error),
+            error: humanReadableUploadError(presignBody.error, language),
             previewUrl,
           });
         }
@@ -236,7 +259,7 @@ export function UploadPanel({
           fileName: file.name,
           intendedRole: role,
           status: "failed",
-          error: "上传失败",
+          error: workspaceText(language, "Upload failed", "上传失败"),
           previewUrl,
         });
       }
@@ -282,23 +305,23 @@ export function UploadPanel({
             type="checkbox"
           />
           <span>
-            我确认拥有或已获得上传素材的版权、商标及商业使用授权；如包含可识别人物，已获得其肖像与商业宣传授权；如人物未满 18 周岁，已获得监护人授权。
+            {workspaceText(language, "I own or have permission to use the uploaded copyright, trademarks, and materials commercially. For identifiable people, I have likeness and promotional consent; for anyone under 18, I have guardian consent.", "我确认拥有或已获得上传素材的版权、商标及商业使用授权；如包含可识别人物，已获得其肖像与商业宣传授权；如人物未满 18 周岁，已获得监护人授权。")}
           </span>
         </label>
         <p className="mt-2 pl-6">
-          查看
-          <Link className="mx-1 underline" href="/terms">
-            服务条款
+          {workspaceText(language, "Review the", "查看")}
+          <Link className="mx-1 underline" href={requestedLanguage ? localizeHref("/terms", language) : "/terms"}>
+            {workspaceText(language, "Terms", "服务条款")}
           </Link>
-          和
-          <Link className="ml-1 underline" href="/privacy">
-            隐私政策
+          {workspaceText(language, "and", "和")}
+          <Link className="ml-1 underline" href={requestedLanguage ? localizeHref("/privacy", language) : "/privacy"}>
+            {workspaceText(language, "Privacy Policy", "隐私政策")}
           </Link>
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3" data-testid="upload-slot-grid">
-        {slots.map((slot, index) => {
+        {localizedSlots.map((slot, index) => {
           const uploaded = uploadedByRole.get(slot.role);
           const failed = failedByRole.get(slot.role);
           const local = localByRole.get(slot.role);
@@ -343,7 +366,7 @@ export function UploadPanel({
                 </div>
                 {fileName ? (
                   <button
-                    aria-label={`删除${slot.label}`}
+                    aria-label={`${workspaceText(language, "Remove", "删除")}${language === "en" ? " " : ""}${slot.label}`}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] transition hover:border-[var(--danger)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]"
                     onClick={() => removeSlot(slot.role)}
                     type="button"
@@ -362,7 +385,7 @@ export function UploadPanel({
               >
                 {hasImage && previewUrl ? (
                   <Image
-                    alt={`${slot.label}预览`}
+                    alt={`${slot.label}${workspaceText(language, " preview", "预览")}`}
                     className="h-full w-full object-cover"
                     height={400}
                     src={previewUrl}
@@ -372,7 +395,7 @@ export function UploadPanel({
                 ) : (
                   <span className="flex flex-col items-center gap-2 px-4">
                     <ImagePlus aria-hidden="true" size={20} />
-                    选择{slot.label}
+                    {workspaceText(language, "Choose", "选择")}{language === "en" ? " " : ""}{slot.label}
                   </span>
                 )}
               </label>
@@ -381,26 +404,26 @@ export function UploadPanel({
                   className="min-w-0 flex-1 truncate text-[var(--muted)]"
                   title={fileName ?? undefined}
                 >
-                  {fileName ?? failed?.error ?? "未选择文件"}
+                  {fileName ?? safeWorkspaceMessage(failed?.error, language, "No file selected", "未选择文件")}
                 </p>
                 <span className="shrink-0 text-[var(--muted)]">
                   {uploading
-                    ? "上传中"
+                    ? workspaceText(language, "Uploading", "上传中")
                     : uploaded
-                      ? "已上传"
+                      ? workspaceText(language, "Uploaded", "已上传")
                       : localPreview
-                        ? "本地预览"
+                        ? workspaceText(language, "Local preview", "本地预览")
                         : failed
-                          ? "失败"
+                          ? workspaceText(language, "Failed", "失败")
                           : ""}
                 </span>
               </div>
               {failed?.error ? (
-                <p className="mt-1 text-xs text-[var(--danger)]">{failed.error}</p>
+                <p className="mt-1 text-xs text-[var(--danger)]">{safeWorkspaceMessage(failed.error, language, "Upload failed", failed.error)}</p>
               ) : null}
               <input
                 accept={accept}
-                aria-label={`选择${slot.label}`}
+                aria-label={`${workspaceText(language, "Choose", "选择")}${language === "en" ? " " : ""}${slot.label}`}
                 className="sr-only"
                 disabled={uploading || (isAuthenticated && !rightsAccepted)}
                 id={`upload-input-${slot.role}`}

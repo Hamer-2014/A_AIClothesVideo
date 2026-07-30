@@ -21,7 +21,7 @@ describe("CaptureProtocolSelector", () => {
       "true",
     );
     expect(screen.getByText("推荐")).toBeInTheDocument();
-    expect(screen.getAllByText("Beta")).toHaveLength(2);
+    expect(screen.getAllByText("付费 Beta")).toHaveLength(2);
   });
 
   it("reports the selected protocol", () => {

@@ -5,6 +5,7 @@ import { KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth/client";
+import type { SiteLocale } from "@/lib/i18n/config";
 
 type AuthAction = "google" | "otp" | "otp-verify";
 
@@ -19,7 +20,41 @@ type EmailRequestResult = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_COOLDOWN_SECONDS = 60;
 
-export function LoginForm({ callbackURL }: { callbackURL: string }) {
+const formCopy = {
+  en: {
+    googleFailed: "Google sign-in failed. Please try again.",
+    tooMany: (seconds: number) => `Too many requests. Try again in ${seconds} seconds.`,
+    sendFailed: "Could not send the code. Please try again.",
+    sent: "We sent a sign-in code to your email.",
+    invalid: "Invalid code. Check it and try again.",
+    expired: "This code has expired. Request a new code.",
+    attempts: "Too many attempts. Request a new code.",
+    verifyFailed: "Could not verify the code. Please try again.",
+    google: "Sign in with Google", redirecting: "Redirecting...", email: "Email",
+    change: "Change email", send: "Send email code", sending: "Sending...",
+    resend: (seconds: number) => `Resend in ${seconds}s`,
+    retryLabel: (seconds: number) => `Send email code, retry in ${seconds} seconds`,
+    code: "Email code", placeholder: "6-digit code", verify: "Verify and sign in", verifying: "Verifying...",
+  },
+  "zh-CN": {
+    googleFailed: "Google 登录失败，请重试。",
+    tooMany: (seconds: number) => `请求过于频繁，请在 ${seconds} 秒后重试。`,
+    sendFailed: "验证码发送失败，请重试。",
+    sent: "登录验证码已发送到你的邮箱。",
+    invalid: "验证码无效，请检查后重试。",
+    expired: "验证码已过期，请重新获取。",
+    attempts: "尝试次数过多，请重新获取验证码。",
+    verifyFailed: "验证码校验失败，请重试。",
+    google: "使用 Google 登录", redirecting: "正在跳转...", email: "邮箱",
+    change: "更换邮箱", send: "发送邮箱验证码", sending: "正在发送...",
+    resend: (seconds: number) => `${seconds} 秒后重新发送`,
+    retryLabel: (seconds: number) => `发送邮箱验证码，${seconds} 秒后可重试`,
+    code: "邮箱验证码", placeholder: "6 位数字验证码", verify: "验证并登录", verifying: "正在验证...",
+  },
+} as const;
+
+export function LoginForm({ callbackURL, language = "en" }: { callbackURL: string; language?: SiteLocale }) {
+  const copy = formCopy[language];
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -60,9 +95,9 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         provider: "google",
         callbackURL,
       });
-      if (result.error) setMessage("Google sign-in failed. Please try again.");
+      if (result.error) setMessage(copy.googleFailed);
     } catch {
-      setMessage("Google sign-in failed. Please try again.");
+      setMessage(copy.googleFailed);
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -94,9 +129,9 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
             result.error.retryAfterSeconds ?? EMAIL_COOLDOWN_SECONDS,
           );
           startCooldown(retryAfter);
-          setMessage(`Too many requests. Try again in ${retryAfter} seconds.`);
+          setMessage(copy.tooMany(retryAfter));
         } else {
-          setMessage("Could not send the code. Please try again.");
+          setMessage(copy.sendFailed);
         }
         return;
       }
@@ -105,7 +140,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       onSuccess?.();
       setMessage(successMessage);
     } catch {
-      setMessage("Could not send the code. Please try again.");
+      setMessage(copy.sendFailed);
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -119,7 +154,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
           email: normalizedEmail,
           type: "sign-in",
         }),
-      "We sent a sign-in code to your email.",
+      copy.sent,
       () => {
         setOtp("");
         setOtpEmail(normalizedEmail);
@@ -142,13 +177,13 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       });
       if (result.error) {
         const errorMessages: Record<string, string> = {
-          INVALID_OTP: "Invalid code. Check it and try again.",
-          OTP_EXPIRED: "This code has expired. Request a new code.",
-          TOO_MANY_ATTEMPTS: "Too many attempts. Request a new code.",
+          INVALID_OTP: copy.invalid,
+          OTP_EXPIRED: copy.expired,
+          TOO_MANY_ATTEMPTS: copy.attempts,
         };
         setMessage(
           errorMessages[result.error.code ?? ""] ??
-            "Could not verify the code. Please try again.",
+            copy.verifyFailed,
         );
         return;
       }
@@ -156,7 +191,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
       router.replace(callbackURL);
       router.refresh();
     } catch {
-      setMessage("Could not verify the code. Please try again.");
+      setMessage(copy.verifyFailed);
     } finally {
       authActionLock.current = false;
       setPendingAction(null);
@@ -178,12 +213,12 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         type="button"
       >
         <ShieldCheck aria-hidden="true" size={17} />
-        {pendingAction === "google" ? "Redirecting..." : "Sign in with Google"}
+        {pendingAction === "google" ? copy.redirecting : copy.google}
       </button>
 
       <div className="flex items-center justify-between gap-4">
         <label className="block text-sm font-medium" htmlFor="email">
-          Email
+          {copy.email}
         </label>
         {otpEmail ? (
           <button
@@ -192,7 +227,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
             onClick={changeEmail}
             type="button"
           >
-            Change email
+            {copy.change}
           </button>
         ) : null}
       </div>
@@ -211,7 +246,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         <button
           aria-label={
             cooldownSeconds > 0
-              ? `Send email code, retry in ${cooldownSeconds} seconds`
+              ? copy.retryLabel(cooldownSeconds)
               : undefined
           }
           className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium tabular-nums disabled:cursor-not-allowed disabled:opacity-60"
@@ -221,17 +256,17 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
         >
           <Mail aria-hidden="true" size={16} />
           {pendingAction === "otp"
-            ? "Sending..."
+            ? copy.sending
             : cooldownSeconds > 0
-              ? `Resend in ${cooldownSeconds}s`
-              : "Send email code"}
+              ? copy.resend(cooldownSeconds)
+              : copy.send}
         </button>
       </div>
 
       {otpEmail ? (
         <form className="space-y-3" onSubmit={verifyOtp}>
           <label className="block text-sm font-medium" htmlFor="email-otp">
-            Email code
+            {copy.code}
           </label>
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <input
@@ -246,7 +281,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
                 setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
               }
               pattern="[0-9]{6}"
-              placeholder="6-digit code"
+              placeholder={copy.placeholder}
               type="text"
               value={otp}
             />
@@ -256,7 +291,7 @@ export function LoginForm({ callbackURL }: { callbackURL: string }) {
               type="submit"
             >
               <KeyRound aria-hidden="true" size={16} />
-              {pendingAction === "otp-verify" ? "Verifying..." : "Verify and sign in"}
+              {pendingAction === "otp-verify" ? copy.verifying : copy.verify}
             </button>
           </div>
         </form>

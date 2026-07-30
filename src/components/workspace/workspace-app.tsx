@@ -33,6 +33,14 @@ import {
   serializeWorkspaceGuestDraft,
 } from "@/lib/workspace/guest-draft";
 import type { TrialStatus } from "@/server/trial/status";
+import type { SiteLocale } from "@/lib/i18n/config";
+import {
+  localizeCaptureProtocol,
+  localizeStylePreset,
+  localizeTemplate,
+  safeWorkspaceMessage,
+  workspaceText,
+} from "@/lib/i18n/workspace";
 
 import { StylePresetSelector } from "./style-preset-selector";
 import { TemplateSlotEditor } from "./template-slot-editor";
@@ -56,6 +64,7 @@ interface WorkspaceAppProps {
   isAuthenticated?: boolean;
   loginHref?: string;
   duration40Enabled?: boolean;
+  language?: SiteLocale;
 }
 
 interface JobDetailResponse {
@@ -148,96 +157,124 @@ interface JobPreflightResponse {
   missingRightsAttestationAssetIds?: string[];
 }
 
-export function reasonLabel(reason: string) {
+export function reasonLabel(reason: string, language: SiteLocale = "zh-CN") {
+  const en = language === "en";
   switch (reason) {
     case "front_asset_required":
-      return "缺少正面图";
+      return en ? "Front image required" : "缺少正面图";
     case "back_asset_required":
-      return "缺少背面图";
+      return en ? "Back image required" : "缺少背面图";
     case "detail_asset_required":
-      return "缺少细节图";
+      return en ? "Detail image required" : "缺少细节图";
     case "fabric_detail_required":
-      return "缺少面料细节图";
+      return en ? "Fabric detail image required" : "缺少面料细节图";
     case "neckline_detail_required":
-      return "缺少领口图";
+      return en ? "Neckline detail image required" : "缺少领口图";
     case "cuff_detail_required":
-      return "缺少袖口图";
+      return en ? "Cuff detail image required" : "缺少袖口图";
     case "print_detail_required":
-      return "缺少印花细节图";
+      return en ? "Print detail image required" : "缺少印花细节图";
     case "trial_requires_low_risk_template":
-      return "试用版仅开放低风险模板";
+      return en ? "The free trial only supports low-risk templates" : "试用版仅开放低风险模板";
     case "flat_lay_or_white_background_required":
-      return "缺少白底/平铺素材";
+      return en ? "Flat-lay or white-background image required" : "缺少白底/平铺素材";
     case "model_front_asset_required":
-      return "缺少模特正面图";
+      return en ? "Model front image required" : "缺少模特正面图";
     case "model_side_asset_required":
-      return "缺少模特侧面图";
+      return en ? "Model side image required" : "缺少模特侧面图";
     case "model_back_asset_required":
-      return "缺少模特背面图";
+      return en ? "Model back image required" : "缺少模特背面图";
     case "product_front_asset_required":
-      return "缺少商品正面图";
+      return en ? "Product front image required" : "缺少商品正面图";
     case "product_side_asset_required":
-      return "缺少商品侧面图";
+      return en ? "Product side image required" : "缺少商品侧面图";
     case "product_back_asset_required":
-      return "缺少商品背面图";
+      return en ? "Product back image required" : "缺少商品背面图";
     case "matching_product_views_required":
-      return "多角度商品图尚未通过一致性校验";
+      return en ? "Matching product views must pass consistency checks" : "多角度商品图尚未通过一致性校验";
     case "product_view_consistency_failed":
-      return "多角度商品图不是同一件服装";
+      return en ? "The product differs across views" : "多角度商品图不是同一件服装";
     case "product_only_template":
-      return "仅支持无真人的商品图";
+      return en ? "This template only supports garment-only product images" : "仅支持无真人的商品图";
     case "matching_model_garment_views_required":
-      return "模特视角中的服装尚未通过一致性校验";
+      return en ? "The garment across model views must pass consistency checks" : "模特视角中的服装尚未通过一致性校验";
     case "model_garment_consistency_failed":
-      return "模特视角中的服装不一致";
+      return en ? "The garment differs across model views" : "模特视角中的服装不一致";
     case "matching_model_views_required":
-      return "多角度图片中的模特尚未通过一致性校验";
+      return en ? "Matching model views must pass consistency checks" : "多角度图片中的模特尚未通过一致性校验";
     case "model_view_consistency_failed":
-      return "多角度图片中的模特不一致";
+      return en ? "The model differs across views" : "多角度图片中的模特不一致";
     default:
-      return reason;
+      return safeWorkspaceMessage(reason, language, "Image requirements were not met", reason);
   }
 }
 
-function safeGenerationMessage(message?: string | null) {
+function safeGenerationMessage(message: string | null | undefined, language: SiteLocale) {
   if (!message) {
-    return "创建任务失败，请检查素材和规格。";
+    return workspaceText(language, "Could not create the job. Check the images and output settings.", "创建任务失败，请检查素材和规格。");
   }
 
   if (message.includes("Asset analysis JSON has invalid asset_role")) {
-    return "素材角色识别异常，请检查上传图片后重试。";
+    return workspaceText(language, "Image-role analysis failed. Check the uploaded images and try again.", "素材角色识别异常，请检查上传图片后重试。");
   }
 
   if (
     /relation ".+" does not exist/i.test(message) ||
     /database|sql|prisma|drizzle|stack trace/i.test(message)
   ) {
-    return "服务暂时异常，请稍后重试。";
+    return workspaceText(language, "The service is temporarily unavailable. Try again later.", "服务暂时异常，请稍后重试。");
   }
 
-  return message;
+  return safeWorkspaceMessage(message, language, "Could not create the job. Check the images and output settings.", message);
 }
 
-function preflightReasonLabel(reason: JobPreflightReason | string) {
+export function jobDetailMessage(
+  job: Pick<JobDetailResponse["job"], "failureReason" | "lastError">,
+  language: SiteLocale,
+) {
+  const fallback = workspaceText(
+    language,
+    "Image analysis is complete. Review the available templates and image requirements.",
+    "素材分析完成，请查看可用模板和素材要求。",
+  );
+  const message = job.failureReason ?? job.lastError;
+
+  if (
+    message &&
+    /relation ".+" does not exist|database|sql|prisma|drizzle|stack trace/i.test(
+      message,
+    )
+  ) {
+    return workspaceText(
+      language,
+      "The service is temporarily unavailable. Try again later.",
+      "服务暂时异常，请稍后重试。",
+    );
+  }
+
+  return safeWorkspaceMessage(message, language, fallback, fallback);
+}
+
+function preflightReasonLabel(reason: JobPreflightReason | string, language: SiteLocale) {
   if (typeof reason !== "string") {
-    return reason.message;
+    return safeWorkspaceMessage(reason.message, language, "An image requirement was not met", reason.message);
   }
 
   if (reason.includes("Asset analysis JSON has invalid asset_role")) {
-    return "素材角色识别异常，请检查上传图片后重试。";
+    return workspaceText(language, "Image-role analysis failed. Check the uploaded images and try again.", "素材角色识别异常，请检查上传图片后重试。");
   }
 
-  return reasonLabel(reason);
+  return reasonLabel(reason, language);
 }
 
-function warningLabel(warning: string) {
+function warningLabel(warning: string, language: SiteLocale) {
   switch (warning) {
     case "high_risk_motion":
-      return "高风险镜头";
+      return workspaceText(language, "High-risk shot", "高风险镜头");
     case "strict_review_required":
-      return "需要严格质检";
+      return workspaceText(language, "Strict review required", "需要严格质检");
     default:
-      return warning;
+      return safeWorkspaceMessage(warning, language, "Additional review required", warning);
   }
 }
 
@@ -274,34 +311,34 @@ function hasRequiredIntent(
   }
 }
 
-function missingIntentReason(requiredAsset: string) {
+function missingIntentReason(requiredAsset: string, language: SiteLocale) {
   switch (requiredAsset) {
     case "front":
-      return "缺少正面图";
+      return workspaceText(language, "Front image required", "缺少正面图");
     case "back":
-      return "缺少背面图";
+      return workspaceText(language, "Back image required", "缺少背面图");
     case "side":
-      return "缺少侧面图";
+      return workspaceText(language, "Side image required", "缺少侧面图");
     case "detail":
-      return "缺少细节图";
+      return workspaceText(language, "Detail image required", "缺少细节图");
     case "scene":
-      return "缺少场景图";
+      return workspaceText(language, "Scene image required", "缺少场景图");
     case "model_front":
-      return "缺少模特正面图";
+      return workspaceText(language, "Model front image required", "缺少模特正面图");
     case "model_side":
-      return "缺少模特侧面图";
+      return workspaceText(language, "Model side image required", "缺少模特侧面图");
     case "model_back":
-      return "缺少模特背面图";
+      return workspaceText(language, "Model back image required", "缺少模特背面图");
     case "flat_lay_or_white_background":
-      return "需分析确认白底/平铺素材";
+      return workspaceText(language, "A flat-lay or white background must be verified", "需分析确认白底/平铺素材");
     case "product_front":
-      return "缺少商品正面图";
+      return workspaceText(language, "Product front image required", "缺少商品正面图");
     case "product_side":
-      return "缺少商品侧面图";
+      return workspaceText(language, "Product side image required", "缺少商品侧面图");
     case "product_back":
-      return "缺少商品背面图";
+      return workspaceText(language, "Product back image required", "缺少商品背面图");
     default:
-      return "素材不足";
+      return workspaceText(language, "Insufficient images", "素材不足");
   }
 }
 
@@ -312,8 +349,9 @@ export function WorkspaceApp({
   isAuthenticated = true,
   loginHref = "/login?next=%2Fworkspace%3FresumeDraft%3D1",
   duration40Enabled = false,
+  language = "zh-CN",
 }: WorkspaceAppProps) {
-  const initialPreset = getStylePreset(initialPresetId);
+  const initialPreset = localizeStylePreset(getStylePreset(initialPresetId), language);
   const [assets, setAssets] = useState<UploadedAssetItem[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<StylePresetId>(
     initialPreset.id,
@@ -402,7 +440,7 @@ export function WorkspaceApp({
       setCaptureProtocolId(draft.captureProtocol);
       setSkuName(draft.skuName);
       setUserPrompt(draft.userPrompt);
-      setMessage("已恢复刚才的配置，请重新选择图片后生成。");
+      setMessage(workspaceText(language, "Your settings were restored. Select the images again before generating.", "已恢复刚才的配置，请重新选择图片后生成。"));
       void trackFunnelEvent("guest_draft_restored", {
         presetId: draft.presetId,
         durationSeconds: draft.durationSeconds,
@@ -419,7 +457,7 @@ export function WorkspaceApp({
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, language]);
 
   const requiredTemplateCount = getVideoSpec(durationSeconds).segmentCount;
   const paidCost = paidCreditCost(durationSeconds);
@@ -433,8 +471,8 @@ export function WorkspaceApp({
   const hasPreviewableAssets = assets.some((asset) =>
     previewableAssetStatuses.has(asset.status),
   );
-  const currentPreset = getStylePreset(selectedPresetId);
-  const currentCaptureProtocol = getCaptureProtocol(captureProtocolId);
+  const currentPreset = localizeStylePreset(getStylePreset(selectedPresetId), language);
+  const currentCaptureProtocol = localizeCaptureProtocol(getCaptureProtocol(captureProtocolId), language);
   const canUseFreeTrial =
     durationSeconds === 8 &&
     captureProtocolId === "product_showcase" &&
@@ -457,9 +495,9 @@ export function WorkspaceApp({
     busyAction !== null || imagesUploading || !hasRequiredAssets;
   const assetGateMessage = hasRequiredAssets
     ? null
-    : `还需上传${missingCaptureSlots
-        .map((slot) => slot.label)
-        .join(missingCaptureSlots.length === 2 ? "和" : "、")}。`;
+    : language === "en"
+      ? `Upload ${missingCaptureSlots.map((slot) => slot.label).join(missingCaptureSlots.length === 2 ? " and " : ", ")} to continue.`
+      : `还需上传${missingCaptureSlots.map((slot) => slot.label).join(missingCaptureSlots.length === 2 ? "和" : "、")}。`;
   const controlStatusMessage = generationStatus ?? assetGateMessage;
   const materialWarnings = useMemo(() => {
     if (!jobDetail) {
@@ -479,12 +517,12 @@ export function WorkspaceApp({
       })
       .map((analysis) =>
         !analysis.quality.isGarment
-          ? "有素材不像服装图，相关模板会被降级。"
+          ? workspaceText(language, "One or more images may not show a garment, so related templates are restricted.", "有素材不像服装图，相关模板会被降级。")
           : !analysis.quality.isClear
-            ? "有素材清晰度不足，生成前建议替换。"
-            : "有素材角色无法确认，生成前会按低置信处理。",
+            ? workspaceText(language, "One or more images are unclear. Replace them before generating.", "有素材清晰度不足，生成前建议替换。")
+            : workspaceText(language, "An image role could not be confirmed and will be treated as low confidence.", "有素材角色无法确认，生成前会按低置信处理。"),
       );
-  }, [jobDetail]);
+  }, [jobDetail, language]);
 
   function requiredTemplateCountForDuration(value: VideoDuration) {
     return getVideoSpec(value).segmentCount;
@@ -502,7 +540,7 @@ export function WorkspaceApp({
   }
 
   function changePreset(presetId: StylePresetId) {
-    const nextPreset = getStylePreset(presetId);
+    const nextPreset = localizeStylePreset(getStylePreset(presetId), language);
     setSelectedPresetId(nextPreset.id);
     setUserPrompt(nextPreset.defaultIntent);
     setAspectRatio(nextPreset.defaultAspectRatio);
@@ -567,7 +605,7 @@ export function WorkspaceApp({
     const detailBody = await detailResponse.json();
 
     if (!detailResponse.ok) {
-      setMessage("读取任务详情失败。");
+      setMessage(workspaceText(language, "Could not load the job details.", "读取任务详情失败。"));
       return null;
     }
 
@@ -590,11 +628,7 @@ export function WorkspaceApp({
       );
       setAdvancedOpen(true);
     }
-    setMessage(
-      typedDetailBody.job.failureReason ??
-        typedDetailBody.job.lastError ??
-        "素材分析完成，正在按推荐方案继续生成。",
-    );
+    setMessage(jobDetailMessage(typedDetailBody.job, language));
 
     return typedDetailBody;
   }
@@ -612,7 +646,7 @@ export function WorkspaceApp({
       const body = (await analyzeResponse.json().catch(() => null)) as
         | { message?: string | null }
         | null;
-      setMessage(body?.message ?? "素材分析失败，请稍后重试。");
+      setMessage(safeWorkspaceMessage(body?.message, language, "Image analysis failed. Try again later.", "素材分析失败，请稍后重试。"));
       return null;
     }
 
@@ -620,23 +654,24 @@ export function WorkspaceApp({
   }
 
   const templateCards = useMemo(() => {
-    const byId = new Map(templateCatalog.map((item) => [item.templateId, item]));
+    const localizedCatalog = templateCatalog.map((item) => localizeTemplate(item, language));
+    const byId = new Map(localizedCatalog.map((item) => [item.templateId, item]));
 
     if (!jobDetail) {
-      const estimated = templateCatalog.map((template) => {
+      const estimated = localizedCatalog.map((template) => {
         const missingReasons = (template.requiredAssets ?? ["front"])
           .filter((requiredAsset) => !hasRequiredIntent(requiredAsset, uploadedRoles))
-          .map(missingIntentReason);
+          .map((requiredAsset) => missingIntentReason(requiredAsset, language));
         const missingDetailReason =
           template.detailTypes?.length && !uploadedRoles.has("detail")
-            ? ["缺少细节图"]
+            ? [workspaceText(language, "Detail image required", "缺少细节图")]
             : [];
         const consistencyReasons = template.consistencyRequirements?.includes(
           "same_model",
         )
-          ? ["需先完成同服装、同模特的任务内一致性校验"]
+          ? [workspaceText(language, "The same garment and model must pass consistency checks", "需先完成同服装、同模特的任务内一致性校验")]
           : template.consistencyRequirements?.includes("same_garment")
-            ? ["需先完成多角度商品一致性校验"]
+            ? [workspaceText(language, "Multiple product views must pass consistency checks", "需先完成多角度商品一致性校验")]
             : [];
 
         return {
@@ -680,7 +715,7 @@ export function WorkspaceApp({
         status: byId.get(item.templateId)?.status,
         selectable: true,
         selected: selectedTemplateIds.includes(item.templateId),
-        warnings: item.riskWarnings.map(warningLabel),
+        warnings: item.riskWarnings.map((warning) => warningLabel(warning, language)),
       })),
       optional: jobDetail.recommendations.optional.map((item) => ({
         templateId: item.templateId,
@@ -690,7 +725,7 @@ export function WorkspaceApp({
         status: byId.get(item.templateId)?.status,
         selectable: true,
         selected: selectedTemplateIds.includes(item.templateId),
-        warnings: item.riskWarnings.map(warningLabel),
+        warnings: item.riskWarnings.map((warning) => warningLabel(warning, language)),
       })),
       unavailable: jobDetail.recommendations.unavailable.map((item) => ({
         templateId: item.templateId,
@@ -700,19 +735,23 @@ export function WorkspaceApp({
         status: byId.get(item.templateId)?.status,
         selectable: false,
         selected: false,
-        reasons: item.reasons.map(reasonLabel),
+        reasons: item.reasons.map((reason) => reasonLabel(reason, language)),
       })),
     };
-  }, [jobDetail, selectedTemplateIds, templateCatalog, uploadedRoles]);
+  }, [jobDetail, language, selectedTemplateIds, templateCatalog, uploadedRoles]);
 
   const templateSlotOptions = useMemo(() => {
     if (!jobDetail) return [];
-    const byId = new Map(templateCatalog.map((item) => [item.templateId, item]));
+    const byId = new Map(
+      templateCatalog
+        .map((item) => localizeTemplate(item, language))
+        .map((item) => [item.templateId, item]),
+    );
     return jobDetail.recommendations.availableTemplateIds.map((templateId) => ({
       templateId,
       label: byId.get(templateId)?.displayName ?? templateId,
     }));
-  }, [jobDetail, templateCatalog]);
+  }, [jobDetail, language, templateCatalog]);
 
   function templateSlotReasons(templateIds: string[]) {
     const highRiskTemplateIds = templateCatalog
@@ -731,15 +770,15 @@ export function WorkspaceApp({
   function templateSlotReasonLabel(reason: string) {
     switch (reason) {
       case "template_count_mismatch":
-        return `需要 ${requiredTemplateCount} 个镜头槽位`;
+        return workspaceText(language, `${requiredTemplateCount} shot slots are required`, `需要 ${requiredTemplateCount} 个镜头槽位`);
       case "too_few_distinct_templates":
-        return "至少需要 3 种不同模板";
+        return workspaceText(language, "Use at least 3 distinct templates", "至少需要 3 种不同模板");
       case "template_repeated_too_often":
-        return "同一模板最多使用 2 次";
+        return workspaceText(language, "Use the same template at most twice", "同一模板最多使用 2 次");
       case "adjacent_duplicate_template":
-        return "相邻镜头不能使用相同模板";
+        return workspaceText(language, "Adjacent shots cannot use the same template", "相邻镜头不能使用相同模板");
       case "too_many_high_risk_templates":
-        return "高风险旋转或转身镜头最多使用 1 次";
+        return workspaceText(language, "Use at most one high-risk rotation or turn shot", "高风险旋转或转身镜头最多使用 1 次");
       default:
         return reason;
     }
@@ -799,7 +838,7 @@ export function WorkspaceApp({
     }
 
     if (imagesUploading) {
-      setMessage("图片上传中，请稍候。");
+      setMessage(workspaceText(language, "Images are still uploading.", "图片上传中，请稍候。"));
       return;
     }
 
@@ -814,7 +853,7 @@ export function WorkspaceApp({
       .map((asset) => asset.assetId);
 
     if (uploadedAssetIds.length !== currentCaptureProtocol.slots.length) {
-      setMessage("请选择当前生成方式要求的 3 张图片。");
+      setMessage(workspaceText(language, "Select all three images required by this generation method.", "请选择当前生成方式要求的 3 张图片。"));
       return;
     }
 
@@ -831,7 +870,7 @@ export function WorkspaceApp({
     };
 
     setBusyAction("preflight");
-    setGenerationStatus("正在检查素材...");
+    setGenerationStatus(workspaceText(language, "Checking images...", "正在检查素材..."));
     setMessage(null);
     setJobDetail(null);
     setStoryboardId(null);
@@ -855,13 +894,13 @@ export function WorkspaceApp({
 
         if (!preflightResponse.ok || !preflightBody) {
           setGenerationStatus(null);
-          setMessage("素材检查暂时失败，请稍后重试。");
+          setMessage(workspaceText(language, "Image checks are temporarily unavailable. Try again later.", "素材检查暂时失败，请稍后重试。"));
           setBusyAction(null);
           return;
         }
       } catch {
         setGenerationStatus(null);
-        setMessage("素材检查暂时失败，请稍后重试。");
+        setMessage(workspaceText(language, "Image checks are temporarily unavailable. Try again later.", "素材检查暂时失败，请稍后重试。"));
         setBusyAction(null);
         return;
       }
@@ -890,9 +929,9 @@ export function WorkspaceApp({
         if (!attestationResponse?.ok) {
           if (attestationResponse?.status === 409) {
             setRightsAccepted(false);
-            setMessage("授权声明已更新，请重新确认。");
+            setMessage(workspaceText(language, "The rights statement changed. Please confirm it again.", "授权声明已更新，请重新确认。"));
           } else {
-            setMessage("素材授权确认失败，请稍后重试。");
+            setMessage(workspaceText(language, "Could not confirm image rights. Try again later.", "素材授权确认失败，请稍后重试。"));
           }
           setGenerationStatus(null);
           setBusyAction(null);
@@ -906,20 +945,20 @@ export function WorkspaceApp({
 
     if (!preflightBody || !preflightBody.canCreateJob) {
       const blockingReasons = (preflightBody.blockingReasons ?? []).map(
-        preflightReasonLabel,
+        (reason) => preflightReasonLabel(reason, language),
       );
       setGenerationStatus(null);
       setMessage(
         blockingReasons.length > 0
-          ? `生成前检查未通过：${blockingReasons.join("；")}`
-          : "生成前检查未通过，请检查素材后重试。",
+          ? workspaceText(language, `Pre-generation checks failed: ${blockingReasons.join("; ")}`, `生成前检查未通过：${blockingReasons.join("；")}`)
+          : workspaceText(language, "Pre-generation checks failed. Review the images and try again.", "生成前检查未通过，请检查素材后重试。"),
       );
       setBusyAction(null);
       return;
     }
 
     setBusyAction("create-job");
-    setGenerationStatus("素材检查通过，正在创建任务...");
+    setGenerationStatus(workspaceText(language, "Image checks passed. Creating the job...", "素材检查通过，正在创建任务..."));
 
     const response = await fetch("/api/jobs", {
       method: "POST",
@@ -930,15 +969,15 @@ export function WorkspaceApp({
 
     if (!response.ok) {
       setGenerationStatus(null);
-      setMessage(safeGenerationMessage(body?.message));
+      setMessage(safeGenerationMessage(body?.message, language));
       setBusyAction(null);
       return;
     }
 
     setJobId(body.jobId);
     setBusyAction("analyze");
-    setGenerationStatus("任务已创建，正在分析素材...");
-    setMessage("任务已创建，正在分析素材...");
+    setGenerationStatus(workspaceText(language, "Job created. Analyzing images...", "任务已创建，正在分析素材..."));
+    setMessage(workspaceText(language, "Job created. Analyzing images...", "任务已创建，正在分析素材..."));
 
     const detail = await runAnalyzeJob(body.jobId, durationSeconds);
     if (!detail) {
@@ -986,9 +1025,11 @@ export function WorkspaceApp({
     const slotReasons = templateSlotReasons(templateIds);
     if (slotReasons.length > 0) {
       setMessage(
-        `镜头组合不符合要求：${slotReasons
-          .map(templateSlotReasonLabel)
-          .join("；")}。`,
+        workspaceText(
+          language,
+          `The shot sequence is invalid: ${slotReasons.map(templateSlotReasonLabel).join("; ")}.`,
+          `镜头组合不符合要求：${slotReasons.map(templateSlotReasonLabel).join("；")}。`,
+        ),
       );
       return null;
     }
@@ -1006,10 +1047,10 @@ export function WorkspaceApp({
     if (!response.ok) {
       setMessage(
         body.error === "prompt_moderation_unavailable"
-          ? "审核服务暂时不可用，请稍后再试。"
+          ? workspaceText(language, "Moderation is temporarily unavailable. Try again later.", "审核服务暂时不可用，请稍后再试。")
           : body.error === "prompt_moderation_blocked"
-            ? "提示词未通过审核。"
-            : "分镜生成失败。",
+            ? workspaceText(language, "The prompt did not pass moderation.", "提示词未通过审核。")
+            : workspaceText(language, "Could not generate the storyboard.", "分镜生成失败。"),
       );
       return null;
     }
@@ -1027,7 +1068,7 @@ export function WorkspaceApp({
 
   async function generateStoryboard() {
     if (!jobId || selectedTemplateIds.length !== requiredTemplateCount) {
-      setMessage(`请选择 ${requiredTemplateCount} 个模板后再生成分镜。`);
+      setMessage(workspaceText(language, `Select ${requiredTemplateCount} templates before generating a storyboard.`, `请选择 ${requiredTemplateCount} 个模板后再生成分镜。`));
       return;
     }
 
@@ -1043,7 +1084,7 @@ export function WorkspaceApp({
 
     setStoryboardId(body.storyboardId);
     setSegments(body.segments);
-    setMessage("分镜草稿已生成，请确认。");
+    setMessage(workspaceText(language, "Storyboard draft generated. Review and confirm it.", "分镜草稿已生成，请确认。"));
     setBusyAction(null);
   }
 
@@ -1066,18 +1107,18 @@ export function WorkspaceApp({
     if (!response.ok) {
       setMessage(
         body.error === "prompt_moderation_unavailable"
-          ? "审核服务暂时不可用，请稍后再试。"
+          ? workspaceText(language, "Moderation is temporarily unavailable. Try again later.", "审核服务暂时不可用，请稍后再试。")
           : body.error === "prompt_moderation_blocked"
-            ? "最终视频提示词未通过审核。"
+            ? workspaceText(language, "The final video prompt did not pass moderation.", "最终视频提示词未通过审核。")
             : body.error === "insufficient_credits"
-              ? "点数不足，请先充值。"
+              ? workspaceText(language, "Not enough credits. Add credits first.", "点数不足，请先充值。")
               : body.error === "generation_route_unavailable"
-                ? body.message ?? "视频生成服务暂时不可用，请稍后重试。"
+                ? safeWorkspaceMessage(body.message, language, "Video generation is temporarily unavailable. Try again later.", "视频生成服务暂时不可用，请稍后重试。")
               : body.error === "generation_submit_failed"
-                ? body.message ?? "提交视频生成失败，请稍后重试。"
+                ? safeWorkspaceMessage(body.message, language, "Could not submit video generation. Try again later.", "提交视频生成失败，请稍后重试。")
                 : body.error === "storyboard_not_confirmable"
-                  ? "这个分镜已经不能重复确认，请打开任务详情查看当前进度。"
-                  : "确认分镜失败。",
+                  ? workspaceText(language, "This storyboard can no longer be confirmed. Open the job to view its current status.", "这个分镜已经不能重复确认，请打开任务详情查看当前进度。")
+                  : workspaceText(language, "Could not confirm the storyboard.", "确认分镜失败。"),
       );
       return null;
     }
@@ -1117,12 +1158,12 @@ export function WorkspaceApp({
     );
     if (templateIds.length !== requiredTemplateCount) {
       setGenerationStatus(null);
-      setMessage(`素材不足，无法自动选择 ${requiredTemplateCount} 个可用模板。`);
+      setMessage(workspaceText(language, `There are not enough valid images to select ${requiredTemplateCount} available templates automatically.`, `素材不足，无法自动选择 ${requiredTemplateCount} 个可用模板。`));
       setBusyAction(null);
       return;
     }
 
-    setGenerationStatus("素材分析完成，正在生成分镜...");
+    setGenerationStatus(workspaceText(language, "Image analysis complete. Generating the storyboard...", "素材分析完成，正在生成分镜..."));
     const storyboard = await requestStoryboard({
       targetJobId: created.jobId,
       templateIds,
@@ -1135,7 +1176,7 @@ export function WorkspaceApp({
     setStoryboardId(storyboard.storyboardId);
     setSegments(storyboard.segments);
 
-    setGenerationStatus("分镜已生成，正在提交生成...");
+    setGenerationStatus(workspaceText(language, "Storyboard generated. Submitting generation...", "分镜已生成，正在提交生成..."));
     const confirmed = await confirmStoryboardById({
       targetJobId: created.jobId,
       targetStoryboardId: storyboard.storyboardId,
@@ -1144,9 +1185,9 @@ export function WorkspaceApp({
       setGenerationStatus(null);
       setAdvancedOpen(false);
       setMessage((current) =>
-        current && current !== "确认分镜失败。"
-          ? `${current} 已保留分镜草稿，如需手动确认，请展开高级设置。`
-          : "自动提交生成失败。已保留分镜草稿，如需手动确认，请展开高级设置。",
+        current && current !== workspaceText(language, "Could not confirm the storyboard.", "确认分镜失败。")
+          ? workspaceText(language, `${current} The storyboard draft was kept. Expand Advanced settings to confirm it manually.`, `${current} 已保留分镜草稿，如需手动确认，请展开高级设置。`)
+          : workspaceText(language, "Automatic submission failed. The storyboard draft was kept; expand Advanced settings to confirm it manually.", "自动提交生成失败。已保留分镜草稿，如需手动确认，请展开高级设置。"),
       );
       setBusyAction(null);
       return;
@@ -1160,14 +1201,14 @@ export function WorkspaceApp({
       <section className="bg-transparent sm:rounded-[var(--radius-lg)] sm:border sm:border-[var(--line)] sm:bg-white sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] pb-3 sm:gap-4 sm:pb-5">
           <div>
-            <h2 className="text-base font-medium">创建商品短视频</h2>
+            <h2 className="text-base font-medium">{workspaceText(language, "Create a product video", "创建商品短视频")}</h2>
             <p className="mt-2 hidden max-w-3xl text-sm leading-6 text-[var(--muted)] sm:block">
-              选择一种三图生成方式，按对应视角上传同一件服装。系统会先检查一致性，再选择安全镜头并提交生成。
+              {workspaceText(language, "Choose a three-image method and upload the required views of the same garment. We check consistency before selecting supported shots and submitting generation.", "选择一种三图生成方式，按对应视角上传同一件服装。系统会先检查一致性，再选择安全镜头并提交生成。")}
             </p>
           </div>
           <div className="space-y-2 text-right">
             <div className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-xs font-medium text-[var(--action-hover)]">
-              {durationSeconds} 秒 · {aspectRatio} · {paidCost} 点
+              {workspaceText(language, `${durationSeconds} sec · ${aspectRatio} · ${paidCost} credits`, `${durationSeconds} 秒 · ${aspectRatio} · ${paidCost} 点`)}
             </div>
             {message ? (
               <p className="max-w-sm rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-left text-xs leading-5 text-[var(--muted)]">
@@ -1191,21 +1232,23 @@ export function WorkspaceApp({
             >
               <div>
                 <p className="text-xs font-semibold uppercase text-[var(--brand)]">
-                  01 / 素材
+                  {workspaceText(language, "01 / Images", "01 / 素材")}
                 </p>
-                <h3 className="mt-2 text-base font-medium">选择生成方式并上传三张图</h3>
+                <h3 className="mt-2 text-base font-medium">{workspaceText(language, "Choose a method and upload three images", "选择生成方式并上传三张图")}</h3>
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  {currentCaptureProtocol.slots.map((slot) => slot.label).join("、")}
+                  {currentCaptureProtocol.slots.map((slot) => slot.label).join(language === "en" ? " · " : "、")}
                 </p>
               </div>
             </div>
             <CaptureProtocolSelector
+              language={language}
               onChange={changeCaptureProtocol}
               selectedId={captureProtocolId}
             />
             <UploadPanel
               assets={assets}
               isAuthenticated={isAuthenticated}
+              language={language}
               onRemoveUploaded={removeUploadedAsset}
               onRightsAcceptedChange={setRightsAccepted}
               onUploaded={addUploadedAsset}
@@ -1225,11 +1268,11 @@ export function WorkspaceApp({
             >
               <div>
                 <p className="text-xs font-semibold uppercase text-[var(--brand)]">
-                  02 / 设置
+                  {workspaceText(language, "02 / Settings", "02 / 设置")}
                 </p>
-                <h3 className="mt-2 text-base font-medium">配置输出</h3>
+                <h3 className="mt-2 text-base font-medium">{workspaceText(language, "Configure output", "配置输出")}</h3>
                 <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                  主按钮会按推荐模板自动完成分析、分镜和提交。
+                  {workspaceText(language, "The primary action analyzes the images, builds a storyboard, and submits generation with supported templates.", "主按钮会按推荐模板自动完成分析、分镜和提交。")}
                 </p>
               </div>
             </div>
@@ -1238,14 +1281,14 @@ export function WorkspaceApp({
                 className="text-xs font-medium text-[var(--muted)]"
                 htmlFor="workspace-sku-name"
               >
-                商品名称或 SKU（可选）
+                {workspaceText(language, "Product name or SKU (optional)", "商品名称或 SKU（可选）")}
               </label>
               <input
                 className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-3 text-sm outline-none transition focus:border-[var(--action)] focus:ring-2 focus:ring-[var(--focus)]"
                 id="workspace-sku-name"
                 maxLength={80}
                 onChange={(event) => setSkuName(event.target.value)}
-                placeholder="例如 Linen Dress / SKU-1024"
+                placeholder={workspaceText(language, "e.g. Linen Dress / SKU-1024", "例如 Linen Dress / SKU-1024")}
                 value={skuName}
               />
             </div>
@@ -1253,28 +1296,30 @@ export function WorkspaceApp({
               aspectRatio={aspectRatio}
               duration40Enabled={duration40Enabled}
               durationSeconds={durationSeconds}
+              language={language}
               onAspectRatioChange={changeAspectRatio}
               onDurationChange={changeDurationSeconds}
             />
             <StylePresetSelector
+              language={language}
               onChange={changePreset}
               selectedPresetId={selectedPresetId}
             />
             <section
-              aria-label="当前风格素材要求"
+              aria-label={workspaceText(language, "Current image requirements", "当前风格素材要求")}
               className="rounded-[var(--radius-md)] border border-[var(--line-strong)] bg-[var(--brand-soft)] px-3 py-2 text-xs leading-5 text-[var(--ink)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">
-                    三图要求 / 生成前检查
+                    {workspaceText(language, "Three-image requirements / Pre-check", "三图要求 / 生成前检查")}
                   </p>
                   <p className="mt-1 text-[var(--muted)]">
                     {currentCaptureProtocol.description}
                   </p>
                   {uploadedRoles.has("scene") ? (
                     <p className="mt-1 text-[var(--muted)]">
-                      场景图只作为背景和氛围参考，不作为服装细节来源。
+                      {workspaceText(language, "The scene image is used only for background and atmosphere, never as a source of garment details.", "场景图只作为背景和氛围参考，不作为服装细节来源。")}
                     </p>
                   ) : null}
                 </div>
@@ -1286,8 +1331,8 @@ export function WorkspaceApp({
                   }`}
                 >
                   {hasRequiredAssets
-                    ? "3 / 3 已就绪"
-                    : `${3 - missingCaptureSlots.length} / 3 已就绪`}
+                    ? workspaceText(language, "3 / 3 ready", "3 / 3 已就绪")
+                    : workspaceText(language, `${3 - missingCaptureSlots.length} / 3 ready`, `${3 - missingCaptureSlots.length} / 3 已就绪`)}
                 </span>
               </div>
             </section>
@@ -1296,7 +1341,7 @@ export function WorkspaceApp({
                 className="text-xs font-medium text-[var(--muted)]"
                 htmlFor="workspace-user-prompt"
               >
-                生成意图
+                {workspaceText(language, "Generation intent", "生成意图")}
               </label>
               <textarea
                 className="mt-2 min-h-32 w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
@@ -1305,15 +1350,15 @@ export function WorkspaceApp({
                 value={userPrompt}
               />
               <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-                可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。
+                {workspaceText(language, "Optionally add selling points, scene, or style preferences. All text passes through Creem Moderation first.", "可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。")}
               </p>
             </div>
             {initialMode === "trial" && trialStatus ? (
-              <TrialStatusPanel status={trialStatus} />
+              <TrialStatusPanel language={language} status={trialStatus} />
             ) : null}
             <div className="rounded-md border border-[var(--line)] bg-white p-3 text-xs leading-5 text-[var(--muted)]">
-              付费生成：高清无水印，{durationSeconds} 秒将冻结 {paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。
-              {durationSeconds === 40 ? " 40 秒 Beta 由 5 个片段组成。" : ""}
+              {workspaceText(language, `Paid generation: high resolution, no watermark. ${paidCost} credits are reserved for ${durationSeconds} seconds and charged after QA; failed generations release the reservation.`, `付费生成：高清无水印，${durationSeconds} 秒将冻结 ${paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。`)}
+              {durationSeconds === 40 ? workspaceText(language, " The 40-second Beta contains five segments.", " 40 秒 Beta 由 5 个片段组成。") : ""}
             </div>
             {controlStatusMessage ? (
               <div
@@ -1334,13 +1379,13 @@ export function WorkspaceApp({
               type="button"
             >
               {imagesUploading
-                ? "图片上传中..."
+                ? workspaceText(language, "Uploading images...", "图片上传中...")
                 : busyAction === "one-click" ||
                     busyAction === "preflight" ||
                     busyAction === "create-job" ||
                     busyAction === "analyze"
-                  ? "正在生成..."
-                  : `付费生成高清无水印 · ${paidCost} 点`}
+                  ? workspaceText(language, "Generating...", "正在生成...")
+                  : workspaceText(language, `Generate high-resolution video · ${paidCost} credits`, `付费生成高清无水印 · ${paidCost} 点`)}
             </button>
             {canUseFreeTrial ? (
               <div className="space-y-2 rounded-md border border-[var(--line)] bg-white p-3">
@@ -1350,15 +1395,15 @@ export function WorkspaceApp({
                   onClick={() => oneClickGenerate(true)}
                   type="button"
                 >
-                  免费试用生成 · 8 秒带水印
+                  {workspaceText(language, "Free trial · 8 sec watermarked", "免费试用生成 · 8 秒带水印")}
                 </button>
                 <p className="text-xs leading-5 text-[var(--muted)]">
-                  免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板
+                  {workspaceText(language, "Free trial: low resolution · no audio · watermarked · low-risk templates only", "免费试用：低分辨率 · 无音频 · 带水印 · 仅低风险模板")}
                 </p>
               </div>
             ) : durationSeconds !== 8 && initialMode === "trial" ? (
               <p className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-                免费试用仅支持 8 秒。16/24/40 秒请使用付费生成。
+                {workspaceText(language, "The free trial supports 8 seconds only. Use paid generation for 16, 24, or 40 seconds.", "免费试用仅支持 8 秒。16/24/40 秒请使用付费生成。")}
               </p>
             ) : null}
           </aside>
@@ -1372,9 +1417,9 @@ export function WorkspaceApp({
       >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-medium">素材分析与模板选择</h2>
+              <h2 className="text-base font-medium">{workspaceText(language, "Image analysis and template selection", "素材分析与模板选择")}</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                系统会根据素材完整度给出推荐、可选和不可用模板。
+                {workspaceText(language, "Templates are marked recommended, optional, or unavailable based on image coverage and consistency checks.", "系统会根据素材完整度给出推荐、可选和不可用模板。")}
               </p>
             </div>
             <button
@@ -1383,7 +1428,9 @@ export function WorkspaceApp({
               onClick={analyzeJob}
               type="button"
             >
-              {busyAction === "analyze" ? "分析中..." : "重新分析素材"}
+              {busyAction === "analyze"
+                ? workspaceText(language, "Analyzing...", "分析中...")
+                : workspaceText(language, "Analyze images again", "重新分析素材")}
             </button>
           </div>
           {jobDetail ? (
@@ -1391,28 +1438,32 @@ export function WorkspaceApp({
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                    Front
+                    {workspaceText(language, "Front", "正面")}
                   </p>
                   <p className="mt-2 text-sm">
-                    {jobDetail.assetCompleteness.hasFront ? "有" : "无"}
+                    {jobDetail.assetCompleteness.hasFront
+                      ? workspaceText(language, "Available", "有")
+                      : workspaceText(language, "Missing", "无")}
                   </p>
                 </div>
                 <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                    Back
+                    {workspaceText(language, "Back", "背面")}
                   </p>
                   <p className="mt-2 text-sm">
-                    {jobDetail.assetCompleteness.hasBack ? "有" : "无"}
+                    {jobDetail.assetCompleteness.hasBack
+                      ? workspaceText(language, "Available", "有")
+                      : workspaceText(language, "Missing", "无")}
                   </p>
                 </div>
                 <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                    Detail
+                    {workspaceText(language, "Detail", "细节")}
                   </p>
                   <p className="mt-2 text-sm">
                     {jobDetail.assetCompleteness.hasDetail
-                      ? jobDetail.assetCompleteness.detailTypes.join(" / ") || "有"
-                      : "无"}
+                      ? jobDetail.assetCompleteness.detailTypes.join(" / ") || workspaceText(language, "Available", "有")
+                      : workspaceText(language, "Missing", "无")}
                   </p>
                 </div>
               </div>
@@ -1424,12 +1475,13 @@ export function WorkspaceApp({
               {durationSeconds === 40 ? (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-medium">40 秒镜头顺序</p>
+                    <p className="text-sm font-medium">{workspaceText(language, "40-second shot sequence", "40 秒镜头顺序")}</p>
                     <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                      5 个片段按顺序生成；至少 3 种模板，不允许相邻重复。
+                      {workspaceText(language, "Five segments are generated in order. Use at least three templates with no adjacent duplicates.", "5 个片段按顺序生成；至少 3 种模板，不允许相邻重复。")}
                     </p>
                   </div>
                   <TemplateSlotEditor
+                    language={language}
                     onChange={setSelectedTemplateIds}
                     options={templateSlotOptions}
                     slots={selectedTemplateIds}
@@ -1438,12 +1490,13 @@ export function WorkspaceApp({
                     <p className="text-xs leading-5 text-amber-800">
                       {templateSlotReasons(selectedTemplateIds)
                         .map(templateSlotReasonLabel)
-                        .join("；")}
+                        .join(language === "en" ? "; " : "；")}
                     </p>
                   ) : null}
                 </div>
               ) : (
                 <TemplatePicker
+                  language={language}
                   onToggle={toggleTemplate}
                   optional={templateCards.optional}
                   recommended={templateCards.recommended}
@@ -1457,54 +1510,55 @@ export function WorkspaceApp({
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                      Front
+                      {workspaceText(language, "Front", "正面")}
                     </p>
                     <p className="mt-2 text-sm">
                       {uploadedRoles.has("front")
                         ? isAuthenticated
-                          ? "已上传"
-                          : "已选择"
-                        : "未上传"}
+                          ? workspaceText(language, "Uploaded", "已上传")
+                          : workspaceText(language, "Selected", "已选择")
+                        : workspaceText(language, "Not uploaded", "未上传")}
                     </p>
                   </div>
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                      Back
+                      {workspaceText(language, "Back", "背面")}
                     </p>
                     <p className="mt-2 text-sm">
                       {uploadedRoles.has("back")
                         ? isAuthenticated
-                          ? "已上传"
-                          : "已选择"
-                        : "未上传"}
+                          ? workspaceText(language, "Uploaded", "已上传")
+                          : workspaceText(language, "Selected", "已选择")
+                        : workspaceText(language, "Not uploaded", "未上传")}
                     </p>
                   </div>
                   <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                      Detail
+                      {workspaceText(language, "Detail", "细节")}
                     </p>
                     <p className="mt-2 text-sm">
                       {uploadedRoles.has("detail")
                         ? isAuthenticated
-                          ? "已上传"
-                          : "已选择"
-                        : "未上传"}
+                          ? workspaceText(language, "Uploaded", "已上传")
+                          : workspaceText(language, "Selected", "已选择")
+                        : workspaceText(language, "Not uploaded", "未上传")}
                     </p>
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-[var(--muted)]">
-                  创建任务后会自动分析素材，失败时可在这里重试。
+                  {workspaceText(language, "Images are analyzed automatically after the job is created. Retry here if analysis fails.", "创建任务后会自动分析素材，失败时可在这里重试。")}
                 </p>
               )}
               {hasPreviewableAssets ? (
                 <p className="text-sm text-[var(--muted)]">
                   {isAuthenticated
-                    ? "基于已上传素材位预估模板，生成前会再次分析校验。"
-                    : "基于已选择素材位预估模板，登录后需要重新选择图片并正式上传。"}
+                    ? workspaceText(language, "Template availability is estimated from uploaded image roles and checked again before generation.", "基于已上传素材位预估模板，生成前会再次分析校验。")
+                    : workspaceText(language, "Template availability is estimated from selected image roles. Sign in to select and upload the images again.", "基于已选择素材位预估模板，登录后需要重新选择图片并正式上传。")}
                 </p>
               ) : null}
               <TemplatePicker
+                language={language}
                 onToggle={toggleTemplate}
                 optional={templateCards.optional}
                 recommended={templateCards.recommended}
@@ -1520,12 +1574,12 @@ export function WorkspaceApp({
             onClick={() => setAdvancedOpen((current) => !current)}
             type="button"
           >
-            高级设置 / 手动预览分镜
+            {workspaceText(language, "Advanced settings / Preview storyboard", "高级设置 / 手动预览分镜")}
           </button>
           {showAdvancedManualControls ? (
             <div className="mt-4 space-y-5">
               <p className="text-sm leading-6 text-[var(--muted)]">
-                默认会自动选择推荐模板并提交生成；只有需要手动预览或改模板时再展开这里。
+                {workspaceText(language, "The default flow selects supported templates and submits automatically. Use this section only to preview or adjust the storyboard manually.", "默认会自动选择推荐模板并提交生成；只有需要手动预览或改模板时再展开这里。")}
               </p>
               <button
                 className="inline-flex h-11 items-center rounded-md border border-[var(--line)] bg-white px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
@@ -1533,7 +1587,9 @@ export function WorkspaceApp({
                 onClick={generateStoryboard}
                 type="button"
               >
-                {busyAction === "storyboard" ? "生成中..." : "生成分镜草稿"}
+                {busyAction === "storyboard"
+                  ? workspaceText(language, "Generating...", "生成中...")
+                  : workspaceText(language, "Generate storyboard draft", "生成分镜草稿")}
               </button>
 
               {storyboardId || segments.length > 0 ? (
@@ -1543,12 +1599,13 @@ export function WorkspaceApp({
                   creditCost={jobDetail?.job.creditCost ?? paidCost}
                   disabled={!storyboardId || busyAction !== null}
                   durationSeconds={durationSeconds}
+                  language={language}
                   moderationPendingMessage={
                     jobDetail?.job.billingMode === "free_trial"
-                      ? "免费试用默认使用低风险模板与 lite 质检。"
+                      ? workspaceText(language, "The free trial uses low-risk templates and lite QA.", "免费试用默认使用低风险模板与 lite 质检。")
                       : jobDetail?.job.billingMode === "paid"
-                        ? "付费任务使用高分辨率有声生成与 standard 质检。"
-                      : "确认后先审核，再冻结点数并进入片段生成。"
+                        ? workspaceText(language, "Paid jobs use high-resolution generation with audio and standard QA.", "付费任务使用高分辨率有声生成与 standard 质检。")
+                      : workspaceText(language, "Confirmation runs moderation, reserves credits, and then starts segment generation.", "确认后先审核，再冻结点数并进入片段生成。")
                   }
                   onConfirm={confirmStoryboard}
                   segments={segments}

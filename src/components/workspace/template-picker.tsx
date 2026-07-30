@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import type { SiteLocale } from "@/lib/i18n/config";
+import { localizeRiskLevel, workspaceText } from "@/lib/i18n/workspace";
 
 export interface TemplateAvailabilityCard {
   templateId: string;
@@ -20,14 +22,17 @@ interface TemplatePickerProps {
   optional: TemplateAvailabilityCard[];
   unavailable: TemplateAvailabilityCard[];
   onToggle: (templateId: string) => void;
+  language?: SiteLocale;
 }
 
 function TemplateCard({
   template,
   onToggle,
+  language,
 }: {
   template: TemplateAvailabilityCard;
   onToggle: (templateId: string) => void;
+  language: SiteLocale;
 }) {
   const selectedClass = template.selected
     ? "border-[var(--accent)] bg-cyan-50/70 ring-2 ring-cyan-100"
@@ -55,20 +60,20 @@ function TemplateCard({
         <span className="flex shrink-0 items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
           {template.status === "beta" ? (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-medium normal-case tracking-normal text-amber-800">
-              付费 Beta
+              {workspaceText(language, "Paid Beta", "付费 Beta")}
             </span>
           ) : null}
-          {template.riskLevel}
+          {localizeRiskLevel(template.riskLevel, language)}
         </span>
       </div>
       {template.warnings?.length ? (
         <p className="mt-3 text-xs text-amber-700">
-          风险提示：{template.warnings.join(" / ")}
+          {workspaceText(language, "Risk notes: ", "风险提示：")}{template.warnings.join(" / ")}
         </p>
       ) : null}
       {template.reasons?.length ? (
         <p className="mt-3 text-xs text-[var(--muted)]">
-          不可用原因：{template.reasons.join(" / ")}
+          {workspaceText(language, "Unavailable: ", "不可用原因：")}{template.reasons.join(" / ")}
         </p>
       ) : null}
     </button>
@@ -81,12 +86,14 @@ function TemplateSection({
   onToggle,
   priority,
   defaultOpen,
+  language,
 }: {
   title: string;
   templates: TemplateAvailabilityCard[];
   onToggle: (templateId: string) => void;
   priority: "primary" | "secondary" | "muted";
   defaultOpen: boolean;
+  language: SiteLocale;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const isPrimary = priority === "primary";
@@ -118,7 +125,9 @@ function TemplateSection({
               className={`transition ${isOpen ? "rotate-180" : ""}`}
               size={14}
             />
-            {isOpen ? "收起" : "展开"}
+            {isOpen
+              ? workspaceText(language, "Collapse", "收起")
+              : workspaceText(language, "Expand", "展开")}
             {title} {templates.length}
           </button>
         )}
@@ -126,11 +135,12 @@ function TemplateSection({
       {isOpen ? (
         <div className={gridClass}>
           {templates.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">当前没有内容。</p>
+            <p className="text-sm text-[var(--muted)]">{workspaceText(language, "Nothing here yet.", "当前没有内容。")}</p>
           ) : (
             templates.map((template) => (
               <TemplateCard
                 key={template.templateId}
+                language={language}
                 onToggle={onToggle}
                 template={template}
               />
@@ -147,29 +157,33 @@ export function TemplatePicker({
   optional,
   unavailable,
   onToggle,
+  language = "zh-CN",
 }: TemplatePickerProps) {
   return (
     <div className="space-y-6">
       <TemplateSection
         defaultOpen
+        language={language}
         onToggle={onToggle}
         priority="primary"
         templates={recommended}
-        title="推荐模板"
+        title={workspaceText(language, "Recommended templates", "推荐模板")}
       />
       <TemplateSection
         defaultOpen={false}
+        language={language}
         onToggle={onToggle}
         priority="secondary"
         templates={optional}
-        title="可选模板"
+        title={workspaceText(language, "Optional templates", "可选模板")}
       />
       <TemplateSection
         defaultOpen={false}
+        language={language}
         onToggle={onToggle}
         priority="muted"
         templates={unavailable}
-        title="不可用模板"
+        title={workspaceText(language, "Unavailable templates", "不可用模板")}
       />
     </div>
   );

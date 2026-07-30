@@ -62,4 +62,11 @@ describe("TakedownForm", () => {
     ).not.toBeChecked();
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
+
+  it("renders Chinese form labels and controls", () => {
+    render(<TakedownForm language="zh-CN" legalContactEmail="" />);
+
+    expect(screen.getByLabelText("姓名")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "提交权利通知" })).toBeInTheDocument();
+  });
 });

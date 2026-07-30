@@ -129,6 +129,26 @@ describe("LoginForm", () => {
     expect(screen.queryByText(/Magic Link/i)).not.toBeInTheDocument();
   });
 
+  it("localizes the complete form and validation feedback in Chinese", async () => {
+    mocks.emailOtpSignIn.mockResolvedValue({
+      data: null,
+      error: { status: 400, code: "INVALID_OTP" },
+    });
+    render(<LoginForm callbackURL="/zh/workspace" language="zh-CN" />);
+
+    expect(screen.getByRole("button", { name: "使用 Google 登录" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("邮箱"), {
+      target: { value: "seller@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送邮箱验证码" }));
+    fireEvent.change(await screen.findByLabelText("邮箱验证码"), {
+      target: { value: "000000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
+
+    expect(await screen.findByText("验证码无效，请检查后重试。")).toBeInTheDocument();
+  });
+
   it("submits only one Google request for rapid repeated clicks", async () => {
     let resolveRequest!: (value: { data: null; error: null }) => void;
     mocks.socialSignIn.mockReturnValue(

@@ -2,12 +2,14 @@ import Link from "next/link";
 
 import { LogoLockup } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "./cta-link";
 import { MobileNavigation } from "./mobile-navigation";
 
 interface PublicHeaderProps {
-  language?: "en" | "zh-CN";
+  language?: SiteLocale;
   sourcePage?: string;
   user?: {
     name?: string | null;
@@ -26,7 +28,7 @@ export function PublicHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--surface-raised)]">
       <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-8 lg:px-12">
-        <Link href="/" aria-label={isChinese ? "AI Clothes Video 首页" : "AI Clothes Video home"}>
+        <Link href={localizeHref("/", language)} aria-label={isChinese ? "AI Clothes Video 首页" : "AI Clothes Video home"}>
           <LogoLockup labelClassName="hidden min-[480px]:inline" />
         </Link>
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -36,21 +38,21 @@ export function PublicHeader({
           >
           {isChinese ? (
             <>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/three-images-to-clothing-video">
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/three-images-to-clothing-video", language)}>
                 三图生成
               </Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/pricing">
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/pricing", language)}>
                 价格
               </Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/faq">
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/faq", language)}>
                 常见问题
               </Link>
             </>
           ) : (
             <>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/pricing">Pricing</Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/privacy">Privacy</Link>
-              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href="/terms">Terms</Link>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/pricing", language)}>Pricing</Link>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/privacy", language)}>Privacy</Link>
+              <Link className="text-[var(--muted)] hover:text-[var(--ink)]" href={localizeHref("/terms", language)}>Terms</Link>
             </>
           )}
           </nav>
@@ -61,6 +63,7 @@ export function PublicHeader({
                 ariaLabel={isChinese ? "进入工作台" : "Workspace"}
                 compact
                 ctaPosition="header"
+                locale={language}
                 sourcePage={sourcePage}
               >
                 {isChinese ? (
@@ -81,7 +84,7 @@ export function PublicHeader({
             <>
               <Link
                 className="whitespace-nowrap text-[var(--muted)] hover:text-[var(--ink)]"
-                href="/login"
+                href={localizeHref("/login", language)}
               >
                 {isChinese ? "登录" : "Sign in"}
               </Link>
@@ -89,6 +92,7 @@ export function PublicHeader({
                 ariaLabel={isChinese ? "免费试用" : undefined}
                 compact
                 ctaPosition="header"
+                locale={language}
                 sourcePage={sourcePage}
               >
                 {isChinese ? (
@@ -102,6 +106,7 @@ export function PublicHeader({
               </TrialCtaLink>
             </>
           )}
+            <LanguageSwitcher locale={language} />
             <MobileNavigation language={language} />
           </div>
         </div>
