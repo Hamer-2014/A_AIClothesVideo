@@ -94,8 +94,11 @@ describe("Home", () => {
     expect(screen.getByAltText("Back image of an adult burgundy midi dress")).toBeInTheDocument();
     expect(screen.getByAltText("Detail image of an adult burgundy midi dress")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "View the real three-image sample" }),
+      screen.getByRole("link", { name: "View the generated three-image source set" }),
     ).toHaveAttribute("href", "#source-proof");
+    expect(
+      screen.getByText(/The three input images were generated with ImageGen/),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
       .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
@@ -112,7 +115,7 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(
       screen.getByText(
-        /样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长/,
+        /三张输入图由 ImageGen 合成，视频由产品真实链路生成/,
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "免费生成 1 条试用视频" })[0])
@@ -127,7 +130,7 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 3, name: "匹配可用镜头" }))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "查看真实三图样例" }))
+    expect(screen.getByRole("link", { name: "查看合成三图样例" }))
       .toHaveAttribute("href", "#source-proof");
     expect(screen.getByLabelText("由三张成人深酒红中长裙素材生成的商品视频"))
       .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
@@ -228,7 +231,7 @@ describe("Home", () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "View the real three-image sample" }),
+      screen.getByRole("link", { name: "View the generated three-image source set" }),
     ).toHaveAttribute("href", "#source-proof");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
