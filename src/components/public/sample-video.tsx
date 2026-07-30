@@ -11,7 +11,9 @@ export function SampleVideo({
   className,
   controls = false,
   language = "en",
+  poster = "/demo/red-dress-poster.webp",
   sourcePage,
+  src = "/demo/red-dress-video.mp4",
   testId,
 }: {
   ariaLabel?: string;
@@ -19,7 +21,9 @@ export function SampleVideo({
   className?: string;
   controls?: boolean;
   language?: SiteLocale;
+  poster?: string;
   sourcePage: string;
+  src?: string;
   testId?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,10 +71,10 @@ export function SampleVideo({
         });
       } : undefined}
       playsInline
-      poster="/demo/red-dress-poster.webp"
+      poster={poster}
       preload="metadata"
       ref={videoRef}
-      src="/demo/red-dress-video.mp4"
+      src={src}
     >
       {language === "zh-CN"
         ? "你的浏览器不支持视频播放。"

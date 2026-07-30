@@ -69,6 +69,29 @@ describe("SampleVideo", () => {
       .toHaveAttribute("src", "/demo/red-dress-video.mp4");
   });
 
+  it("renders accepted case media when custom paths are provided", () => {
+    render(
+      <SampleVideo
+        controls
+        poster="/demo/cases/structured-blazer/minimal-studio-poster.webp"
+        sourcePage="examples"
+        src="/demo/cases/structured-blazer/minimal-studio.mp4"
+        testId="case-video"
+      />,
+    );
+
+    expect(screen.getByTestId("case-video"))
+      .toHaveAttribute(
+        "src",
+        "/demo/cases/structured-blazer/minimal-studio.mp4",
+      );
+    expect(screen.getByTestId("case-video"))
+      .toHaveAttribute(
+        "poster",
+        "/demo/cases/structured-blazer/minimal-studio-poster.webp",
+      );
+  });
+
   it("pauses autoplay media when reduced motion is requested", () => {
     const pause = vi
       .spyOn(HTMLMediaElement.prototype, "pause")

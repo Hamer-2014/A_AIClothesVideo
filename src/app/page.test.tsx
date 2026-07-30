@@ -131,6 +131,44 @@ describe("Home", () => {
       .toHaveAttribute("href", "#source-proof");
     expect(screen.getByLabelText("由三张红色连衣裙素材生成的商品视频"))
       .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "查看已经生成的多 SKU 素材",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("合成演示素材，不是客户案例。"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看全部素材案例" }))
+      .toHaveAttribute("href", "/zh/examples");
+  });
+
+  it("shows generated synthetic SKU material and links to the source library", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("en");
+
+    render(await Home());
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Inspect the generated multi-SKU source sets",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Synthetic demo material, not customer cases."))
+      .toBeInTheDocument();
+    expect(screen.getByAltText("Cobalt structured blazer front source"))
+      .toHaveAttribute(
+        "src",
+        expect.stringContaining("structured-blazer%2Ffront.webp"),
+      );
+    expect(screen.getByAltText("Sage rib-knit cardigan detail source"))
+      .toHaveAttribute(
+        "src",
+        expect.stringContaining("knit-cardigan%2Fdetail.webp"),
+      );
+    expect(screen.getByRole("link", { name: "View all source cases" }))
+      .toHaveAttribute("href", "/examples");
   });
 
   it("shows anonymous trial actions to visitors", async () => {

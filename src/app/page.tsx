@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { ArrowDown, ArrowRight, Check } from "lucide-react";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "@/components/public/cta-link";
@@ -8,6 +9,8 @@ import { SampleVideo } from "@/components/public/sample-video";
 import { ThreeImageStrip } from "@/components/public/three-image-strip";
 import { TrackedMarketingLink } from "@/components/public/tracked-marketing-link";
 import { getServerSession } from "@/lib/auth/server";
+import { demoCases } from "@/lib/demo-cases/catalog";
+import { localizedText } from "@/lib/demo-cases/types";
 import { localizeHref } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
@@ -56,8 +59,17 @@ const homeCopy = {
         ["Social atmosphere", "Light visual atmosphere for TikTok and Reels product testing.", "Strong scenes or model actions require supporting source material."],
       ],
     },
+    showcase: {
+      kicker: "04 / Generated source library",
+      title: "Inspect the generated multi-SKU source sets",
+      body: "Two additional garment sets make the input boundaries visible before their real Preset videos are generated and reviewed.",
+      disclosure: "Synthetic demo material, not customer cases.",
+      status: "Source set ready",
+      link: "View all source cases",
+      roles: { front: "front", back: "back", detail: "detail" },
+    },
     delivery: {
-      kicker: "04 / A complete, publishable video",
+      kicker: "05 / A complete, publishable video",
       title: "Create an 8, 16, or 24-second video for one SKU",
       body: "The system combines one, two, or three 8-second shots, then handles generation, stitching, and QA in the background. You see one task with clear preview, progress, and download states.",
       link: "View trial and credit pricing",
@@ -119,8 +131,17 @@ const homeCopy = {
         ["社媒氛围短片", "为 TikTok / Reels 测款提供轻氛围表达。", "没有场景或模特素材时不生成强场景与模特动作"],
       ],
     },
+    showcase: {
+      kicker: "04 / 已生成素材库",
+      title: "查看已经生成的多 SKU 素材",
+      body: "新增两套服装素材，在真实 Preset 成片生成并通过复核前，先公开模型可使用的输入边界。",
+      disclosure: "合成演示素材，不是客户案例。",
+      status: "素材已就绪",
+      link: "查看全部素材案例",
+      roles: { front: "正面", back: "背面", detail: "细节" },
+    },
     delivery: {
-      kicker: "04 / 可发布的完整视频",
+      kicker: "05 / 可发布的完整视频",
       title: "为一个 SKU 生成 8、16 或 24 秒成片",
       body: "系统根据时长组合 1、2 或 3 个 8 秒镜头，在后台完成生成、拼接和质检。你看到的是一条完整任务，以及清晰的预览、进度和下载状态。",
       link: "查看试用与点数价格",
@@ -163,6 +184,9 @@ export default async function Home() {
   ]);
   const user = session?.user ?? null;
   const copy = homeCopy[locale];
+  const syntheticCases = demoCases.filter(
+    (item) => item.sourceType === "synthetic-demo",
+  );
 
   await recordFunnelEventSafely({
     eventName: "landing_viewed",
@@ -235,6 +259,84 @@ export default async function Home() {
           <p className="section-kicker">{copy.preset.kicker}</p><h2 className="section-title max-w-3xl" id="preset-title">{copy.preset.title}</h2>
           <ul className="mt-12 grid gap-px border-y border-[var(--line-strong)] bg-[var(--line-strong)] md:grid-cols-2 lg:grid-cols-3">{copy.preset.items.map(([name, description, boundary]) => <li className="bg-[var(--background)] px-0 py-7 sm:px-7 md:last:col-span-2 lg:last:col-span-1" key={name}><h3 className="text-xl font-semibold">{name}</h3><p className="mt-4 text-sm leading-6 text-[var(--muted)]">{description}</p><p className="mt-7 border-l-2 border-[var(--brand)] pl-3 text-xs leading-5 text-[var(--muted)]">{boundary}</p></li>)}</ul>
           <p className="mt-6 text-sm leading-6 text-[var(--muted)]">{copy.preset.boundary}</p>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="multi-sku-source-title"
+        className="border-y border-[var(--line-strong)] bg-[var(--surface-raised)]"
+      >
+        <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+          <div className="grid gap-7 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
+            <div>
+              <p className="section-kicker">{copy.showcase.kicker}</p>
+              <h2
+                className="section-title max-w-xl"
+                id="multi-sku-source-title"
+              >
+                {copy.showcase.title}
+              </h2>
+            </div>
+            <div className="max-w-xl lg:justify-self-end">
+              <p className="text-base leading-7 text-[var(--muted)]">
+                {copy.showcase.body}
+              </p>
+              <p className="mt-4 border-l-2 border-[var(--brand)] pl-4 text-sm font-medium leading-6">
+                {copy.showcase.disclosure}
+              </p>
+            </div>
+          </div>
+
+          <ul className="mt-12 grid border-y border-[var(--line-strong)] lg:grid-cols-2 lg:divide-x lg:divide-[var(--line-strong)]">
+            {syntheticCases.map((item) => {
+              const title = localizedText(item.title, locale);
+
+              return (
+                <li
+                  className="border-b border-[var(--line-strong)] py-8 last:border-b-0 lg:border-b-0 lg:px-8 lg:first:pl-0 lg:last:pr-0"
+                  key={item.slug}
+                >
+                  <div className="mb-5 flex items-baseline justify-between gap-4">
+                    <h3 className="text-lg font-semibold">{title}</h3>
+                    <span className="text-xs font-medium text-[var(--muted)]">
+                      {copy.showcase.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {item.sourceAssets.map((asset) => (
+                      <figure key={asset.role}>
+                        <div className="relative aspect-[3/4] overflow-hidden bg-[var(--surface-subtle)]">
+                          <Image
+                            alt={
+                              locale === "zh-CN"
+                                ? `${title}${copy.showcase.roles[asset.role]}素材`
+                                : `${title} ${copy.showcase.roles[asset.role]} source`
+                            }
+                            className="size-full object-cover"
+                            height={520}
+                            src={asset.src}
+                            width={390}
+                          />
+                        </div>
+                        <figcaption className="mt-2 text-xs text-[var(--muted)]">
+                          {copy.showcase.roles[asset.role]}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <TrackedMarketingLink
+            className="mt-8 inline-flex items-center gap-2 text-sm font-semibold hover:text-[var(--brand)]"
+            destination={localizeHref("/examples", locale)}
+            sourcePage="homepage"
+          >
+            {copy.showcase.link}
+            <ArrowRight aria-hidden="true" size={16} />
+          </TrackedMarketingLink>
         </div>
       </section>
 
