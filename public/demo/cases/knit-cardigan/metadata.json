@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "slug": "knit-cardigan",
+  "sourceType": "synthetic-demo",
+  "generatedAt": "2026-07-30",
+  "imageGeneration": {
+    "mode": "imagegen-cli-fallback",
+    "model": "gpt-image-2",
+    "quality": "high",
+    "requestedSize": "2048x1152",
+    "actualSize": "1774x887",
+    "prompt": "Use case: product-mockup\nAsset type: three-view source sheet for a clothing-video demo\nPrimary request: one sage-green rib-knit V-neck button cardigan shown as three photographs of the exact same garment\nScene/backdrop: seamless warm-white ecommerce studio\nSubject: three equal vertical panels separated by wide clean warm-white gutters. Left panel is a full front view. Center panel is a full back view. Right panel is a close detail of the V neckline, matching buttons, rib-knit texture and one cuff edge.\nStyle/medium: photorealistic apparel product photography, invisible mannequin, realistic soft knit fabric\nComposition/framing: landscape contact sheet, three equal vertical panels; full garment centered with generous padding in front and back panels; detail fills the third panel without crossing gutters\nLighting/mood: soft even studio light, accurate muted sage-green color, restrained ecommerce presentation\nConstraints: exact same garment, sage-green color, V neckline, five matching buttons, rib-knit direction, cuffs, hem and proportions in all panels; no person; no hanger; no logo; no text; no watermark; clean straight gutters at exactly one-third and two-thirds of the canvas\nAvoid: added embroidery, extra or missing buttons, pockets, props, dramatic shadow, cropped garment in front or back panels, panel labels",
+    "sourceSheetSha256": "f27cf649054469183e3df6752e589677ed6b044b99a8a4f42ae368fafd01e6cf"
+  },
+  "sourceSetId": "knit-cardigan-v1",
+  "sourceAssets": [
+    {
+      "role": "front",
+      "path": "/demo/cases/knit-cardigan/front.webp",
+      "dimensions": "591x887",
+      "sha256": "86ed0b11236b73cb0432f67e02c382ef5b495134527c1738015ddb6208c56028"
+    },
+    {
+      "role": "back",
+      "path": "/demo/cases/knit-cardigan/back.webp",
+      "dimensions": "591x887",
+      "sha256": "b1a71241f40a79021a8cdfb2a6e59e8b799872af5571ca4a18e645cf8d779f3d"
+    },
+    {
+      "role": "detail",
+      "path": "/demo/cases/knit-cardigan/detail.webp",
+      "dimensions": "591x887",
+      "sha256": "d606332bfcee8042a0a64a4c43af7178675848aa2ea6268d341939c06a3bdf94"
+    }
+  ],
+  "materialLimits": [
+    "No person or scene reference is provided.",
+    "Do not generate a model, strong lifestyle scene, or continuous rotation.",
+    "Back and detail shots may only use the corresponding uploaded evidence."
+  ],
+  "videoOutputs": []
+}

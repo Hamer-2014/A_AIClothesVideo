@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "slug": "structured-blazer",
+  "sourceType": "synthetic-demo",
+  "generatedAt": "2026-07-30",
+  "imageGeneration": {
+    "mode": "imagegen-cli-fallback",
+    "model": "gpt-image-2",
+    "quality": "high",
+    "requestedSize": "2048x1152",
+    "actualSize": "1693x929",
+    "prompt": "Use case: product-mockup\nAsset type: three-view source sheet for a clothing-video demo\nPrimary request: one cobalt-blue structured single-breasted blazer shown as three photographs of the exact same garment\nScene/backdrop: seamless neutral light-gray ecommerce studio\nSubject: three equal vertical panels separated by wide clean light-gray gutters. Left panel is a full front view. Center panel is a full back view. Right panel is a close detail of the lapel, one matching dark button, and wool texture.\nStyle/medium: photorealistic apparel product photography, invisible mannequin, realistic tailored wool fabric\nComposition/framing: landscape contact sheet, three equal vertical panels; full garment centered with generous padding in front and back panels; detail fills the third panel without crossing gutters\nLighting/mood: soft even studio light, accurate cobalt-blue color, restrained ecommerce presentation\nConstraints: exact same garment, cobalt-blue color, single-breasted construction, one visible front button, notch lapels, seams, pocket placement and proportions in all panels; no person; no hanger; no logo; no text; no watermark; clean straight gutters at exactly one-third and two-thirds of the canvas\nAvoid: invented trims, extra buttons, asymmetry, extra pockets, props, dramatic shadow, cropped garment in front or back panels, panel labels",
+    "sourceSheetSha256": "bb4ceed2a6a5c486723d758237a5119a95bc42ec628db1afe82367d1e13edbaf"
+  },
+  "sourceSetId": "structured-blazer-v1",
+  "sourceAssets": [
+    {
+      "role": "front",
+      "path": "/demo/cases/structured-blazer/front.webp",
+      "dimensions": "564x929",
+      "sha256": "7e0eccb875480c517fad53e71929be6c621699c564ece3254b6e2dd8ff652154"
+    },
+    {
+      "role": "back",
+      "path": "/demo/cases/structured-blazer/back.webp",
+      "dimensions": "564x929",
+      "sha256": "fe2271e87cd3534c785d70083033e00cbd104ebd891dfaf08843cc1e04ef9467"
+    },
+    {
+      "role": "detail",
+      "path": "/demo/cases/structured-blazer/detail.webp",
+      "dimensions": "564x929",
+      "sha256": "36c7d78c06c3dd320a08542a2cfd02492c39ccd4d5205d4d19f6ad52a06b8192"
+    }
+  ],
+  "materialLimits": [
+    "No person or scene reference is provided.",
+    "Do not generate a model, strong lifestyle scene, or continuous rotation.",
+    "Back and detail shots may only use the corresponding uploaded evidence."
+  ],
+  "videoOutputs": []
+}
