@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
@@ -53,8 +53,36 @@ describe("Home", () => {
     expect(screen.getByText(/front, back, and detail images of the same garment/i)).toBeInTheDocument();
     expect(screen.getByText(/No back image means no back view/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/You still need to confirm that the detail image belongs to the same garment/i),
+      screen.getByText(/You still verify that the detail image belongs to that garment/i),
     ).toBeInTheDocument();
+    const workflowTitle = screen.getByRole("heading", {
+      level: 2,
+      name: "A controlled workflow from upload to delivery",
+    });
+    const workflowSection = workflowTitle.closest("section");
+    expect(workflowSection).not.toBeNull();
+    expect(within(workflowSection as HTMLElement).getAllByRole("listitem"))
+      .toHaveLength(4);
+    expect(
+      within(workflowSection as HTMLElement).getByRole("heading", {
+        level: 3,
+        name: "Map image evidence",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(workflowSection as HTMLElement).getByRole("heading", {
+        level: 3,
+        name: "Match eligible shots",
+      }),
+    ).toBeInTheDocument();
+    const presetTitle = screen.getByRole("heading", {
+      level: 2,
+      name: "Tell the system where the video will be used",
+    });
+    const presetSection = presetTitle.closest("section");
+    expect(presetSection).not.toBeNull();
+    expect(within(presetSection as HTMLElement).getByRole("list"))
+      .toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
     expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
       "src",
       "/demo/red-dress-video.mp4",
@@ -82,6 +110,16 @@ describe("Home", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "免费生成 1 条试用视频" })[0])
       .toHaveAttribute("href", "/zh/workspace?mode=trial&preset=minimal_studio");
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "从上传到交付，每一步都有明确边界",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "读取素材依据" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "匹配可用镜头" }))
+      .toBeInTheDocument();
   });
 
   it("shows anonymous trial actions to visitors", async () => {

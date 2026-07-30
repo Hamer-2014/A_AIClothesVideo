@@ -34,15 +34,15 @@ const homeCopy = {
       disclaimer: "This sample shows one real workflow result. It does not mean every garment will receive the same motion, composition, or generation time.",
     },
     control: {
-      kicker: "02 / Control comes from constraints",
-      title: "AI does not get free rein over garment details",
-      body: "Checks, shot limits, and post-generation QA address the places most likely to fail. Control describes the workflow, not a guaranteed result.",
+      kicker: "02 / A controlled path to delivery",
+      title: "A controlled workflow from upload to delivery",
+      body: "The system checks the three image roles, narrows the shot list to what the source images support, and reviews generated frames before delivery.",
       link: "See how each image affects shot selection",
       steps: [
-        ["01", "Confirm the same garment", "Confirm that all three images show the same garment. The system checks image roles and usable boundaries. You still need to confirm that the detail image belongs to the same garment."],
-        ["02", "Define material boundaries", "Identify front, back, side, and detail evidence so each available shot has a real source."],
-        ["03", "Select supported shots", "Unsupported shots are removed before style presets influence recommendations."],
-        ["04", "Run post-generation QA", "Frames are checked and task status is recorded before preview and download are made available."],
+        ["01", "Confirm one garment", "Confirm that all three images show the same garment. You still verify that the detail image belongs to that garment."],
+        ["02", "Map image evidence", "Use front, back, side, and detail evidence to define which views have a real source."],
+        ["03", "Match eligible shots", "Remove unsupported shots first, then let the selected style preset rank the remaining options."],
+        ["04", "Review before delivery", "Check generated frames and record task status before preview and download become available."],
       ],
     },
     preset: {
@@ -96,15 +96,15 @@ const homeCopy = {
       disclaimer: "样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长。",
     },
     control: {
-      kicker: "02 / 稳定来自约束",
-      title: "不让 AI 自由发挥服装细节",
-      body: "我们把容易翻车的地方放进生成前后的规则里。稳定指检查、限制和质检，不是结果保证。",
+      kicker: "02 / 从素材到可用镜头",
+      title: "从上传到交付，每一步都有明确边界",
+      body: "系统先检查三张图的素材角色，再把镜头收窄到真实素材支持的范围，并在交付前检查生成画面。",
       link: "了解三张图如何影响镜头选择",
       steps: [
-        ["01", "上传前确认同款", "请确认三张素材来自同一件服装。系统检查素材角色与可用边界；细节图是否属于同一件服装仍需由你确认。"],
-        ["02", "判断素材边界", "识别正面、背面、侧面和细节，明确哪些镜头有真实依据。"],
-        ["03", "选择安全镜头", "先过滤不可用镜头，再按风格预设推荐；缺少依据的镜头保持不可用。"],
-        ["04", "生成后质检", "对成片抽帧检查并记录任务状态，通过后再提供预览与下载。"],
+        ["01", "确认同一件服装", "确认三张素材来自同一件服装；细节图是否属于该服装仍需由你核对。"],
+        ["02", "读取素材依据", "根据正面、背面、侧面与细节证据，明确哪些展示角度有真实来源。"],
+        ["03", "匹配可用镜头", "先移除素材不支持的镜头，再由所选风格预设排序剩余选项。"],
+        ["04", "交付前检查", "检查生成画面并记录任务状态，通过后再提供预览与下载。"],
       ],
     },
     preset: {
@@ -193,9 +193,9 @@ export default async function Home() {
             <p className="text-sm font-semibold text-white/75">{copy.hero.eyebrow}</p>
             <h1 className="mt-4 text-4xl font-semibold leading-[1.08] sm:text-6xl lg:text-7xl" id="landing-title">{copy.hero.title}</h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-white/88 sm:text-lg sm:leading-8">{copy.hero.body}</p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              {primaryCta("hero")}
-              <a className="inline-flex min-h-11 items-center justify-center border border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:border-white hover:bg-white/10" href="#source-proof">{copy.hero.secondary}</a>
+            <div className="mt-8 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="w-full sm:w-auto [&>a]:w-full">{primaryCta("hero")}</div>
+              <a className="inline-flex min-h-11 w-full items-center justify-center border border-white/50 px-5 text-sm font-semibold text-white transition-colors hover:border-white hover:bg-white/10 sm:w-auto" href="#source-proof">{copy.hero.secondary}</a>
             </div>
             {!user ? <p className="mt-4 text-sm leading-6 text-white/72">{copy.hero.trialNote}</p> : null}
             <p className="mt-5 flex max-w-xl items-start gap-2 text-sm leading-6 text-white/82"><Check aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--brand-light)]" size={17} />{copy.hero.boundary}</p>
@@ -217,10 +217,10 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="bg-[var(--ink)] text-white">
+      <section aria-labelledby="controlled-workflow-title" className="bg-[var(--ink)] text-white">
         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
           <p className="section-kicker text-[var(--brand-light)]">{copy.control.kicker}</p>
-          <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:items-end"><h2 className="text-3xl font-semibold leading-tight sm:text-5xl">{copy.control.title}</h2><p className="max-w-lg text-base leading-7 text-white/68 lg:justify-self-end">{copy.control.body}</p></div>
+          <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:items-end"><h2 className="text-3xl font-semibold leading-tight sm:text-5xl" id="controlled-workflow-title">{copy.control.title}</h2><p className="max-w-lg text-base leading-7 text-white/68 lg:justify-self-end">{copy.control.body}</p></div>
           <ol className="mt-14 grid border-y border-white/20 md:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-white/20">
             {copy.control.steps.map(([number, title, body]) => <li className="border-b border-white/20 py-7 last:border-b-0 md:px-6 md:nth-[2n]:border-l lg:border-b-0 lg:first:pl-0 lg:last:pr-0" key={number}><p className="text-xs text-white/45">{number}</p><h3 className="mt-5 text-lg font-semibold">{title}</h3><p className="mt-3 text-sm leading-6 text-white/65">{body}</p></li>)}
           </ol>
@@ -228,10 +228,10 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="bg-[var(--background)]">
+      <section aria-labelledby="preset-title" className="bg-[var(--background)]">
         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
-          <p className="section-kicker">{copy.preset.kicker}</p><h2 className="section-title max-w-3xl">{copy.preset.title}</h2>
-          <div className="mt-12 grid border-y border-[var(--line-strong)] md:grid-cols-3 md:divide-x md:divide-[var(--line-strong)]">{copy.preset.items.map(([name, description, boundary]) => <article className="border-b border-[var(--line)] py-7 last:border-b-0 md:border-b-0 md:px-7 md:first:pl-0 md:last:pr-0" key={name}><h3 className="text-xl font-semibold">{name}</h3><p className="mt-4 text-sm leading-6 text-[var(--muted)]">{description}</p><p className="mt-7 border-l-2 border-[var(--brand)] pl-3 text-xs leading-5 text-[var(--muted)]">{boundary}</p></article>)}</div>
+          <p className="section-kicker">{copy.preset.kicker}</p><h2 className="section-title max-w-3xl" id="preset-title">{copy.preset.title}</h2>
+          <ul className="mt-12 grid gap-px border-y border-[var(--line-strong)] bg-[var(--line-strong)] md:grid-cols-2 lg:grid-cols-3">{copy.preset.items.map(([name, description, boundary]) => <li className="bg-[var(--background)] px-0 py-7 sm:px-7 md:last:col-span-2 lg:last:col-span-1" key={name}><h3 className="text-xl font-semibold">{name}</h3><p className="mt-4 text-sm leading-6 text-[var(--muted)]">{description}</p><p className="mt-7 border-l-2 border-[var(--brand)] pl-3 text-xs leading-5 text-[var(--muted)]">{boundary}</p></li>)}</ul>
           <p className="mt-6 text-sm leading-6 text-[var(--muted)]">{copy.preset.boundary}</p>
         </div>
       </section>
