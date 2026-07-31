@@ -32,6 +32,7 @@ export const virtualTryonJobs = pgTable("virtual_tryon_jobs", {
   creditCost: integer("credit_cost").notNull(),
   reservedLedgerId: uuid("reserved_ledger_id"),
   capturedLedgerId: uuid("captured_ledger_id"),
+  releasedLedgerId: uuid("released_ledger_id"),
   ...lockableJobFields,
   ...timestamps,
   ...softDelete,
