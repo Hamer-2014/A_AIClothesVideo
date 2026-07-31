@@ -583,7 +583,8 @@ describe("confirmStoryboard", () => {
     );
   });
 
-  it("uses an explicit debug resolution override when creating video segments", async () => {
+  it("uses an enabled debug resolution override when creating video segments", async () => {
+    vi.stubEnv("VIDEO_GENERATION_DEBUG_ENABLED", "true");
     vi.stubEnv("VIDEO_GENERATION_DEBUG_RESOLUTION", "360p");
     const stores = createStores();
     await grantTrialCredits({
@@ -614,6 +615,42 @@ describe("confirmStoryboard", () => {
       expect.objectContaining({
         generationProfile: "paid_720p_audio",
         resolution: "360p",
+      }),
+    ]);
+  });
+
+  it("ignores the debug resolution override when its switch is disabled", async () => {
+    vi.stubEnv("VIDEO_GENERATION_DEBUG_ENABLED", "false");
+    vi.stubEnv("VIDEO_GENERATION_DEBUG_RESOLUTION", "360p");
+    const stores = createStores();
+    await grantTrialCredits({
+      store: stores.creditStore,
+      userId,
+      amount: 200,
+      reason: "test setup",
+      idempotencyKey: "grant:disabled-debug-resolution",
+    });
+
+    await confirmStoryboard({
+      ...stores,
+      jobId,
+      userId,
+      storyboardId,
+      moderatePrompt: async () => ({
+        id: "mod-disabled-debug-resolution",
+        decision: "allow",
+        raw: { decision: "allow" },
+      }),
+    });
+
+    expect(stores.storyboardStore.listSegments()).toEqual([
+      expect.objectContaining({
+        generationProfile: "paid_720p_audio",
+        resolution: "720p",
+      }),
+      expect.objectContaining({
+        generationProfile: "paid_720p_audio",
+        resolution: "720p",
       }),
     ]);
   });

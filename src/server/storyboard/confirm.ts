@@ -670,6 +670,12 @@ const debugResolutionValues = new Set(["360p", "540p", "720p", "1080p"]);
 function debugResolutionOverride(
   env: Record<string, string | undefined> = process.env,
 ) {
+  const enabled =
+    env.VIDEO_GENERATION_DEBUG_ENABLED?.trim().toLowerCase() === "true";
+  if (!enabled) {
+    return null;
+  }
+
   const value = env.VIDEO_GENERATION_DEBUG_RESOLUTION?.trim();
   return value && debugResolutionValues.has(value) ? value : null;
 }
