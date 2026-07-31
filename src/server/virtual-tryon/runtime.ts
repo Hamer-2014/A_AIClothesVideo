@@ -4,11 +4,13 @@ import { getDb } from "@/lib/db/client";
 import { appearancePackAssets, appearancePacks, virtualTryonJobs, virtualTryonStateEvents } from "@/lib/db/schema";
 import { createAPIMartImageGeneration, pollAPIMartImageTask } from "@/lib/providers/apimart/image";
 import { createDrizzleProviderCallLogStore, type ProviderCallLogStore } from "@/lib/providers/log-call";
+import { createVisionVirtualTryOnQa } from "@/lib/providers/vision/client";
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
 import { transferRemoteFileToR2 } from "@/lib/storage/transfer";
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import type { AppearanceView, VirtualTryOnMode } from "./config";
 import { runVirtualTryOnQa } from "./qa";
+import { createDrizzleVirtualTryOnQaStore, type VirtualTryOnQaStore } from "./qa-store";
 import { createVirtualTryOnGenerationProvider } from "./generation-provider";
 import { retryDecision } from "./retry";
 
@@ -40,12 +42,16 @@ export function createDefaultVirtualTryOnRuntimeDeps(input: {
   pollClient?: typeof pollAPIMartImageTask;
   providerLogStore?: ProviderCallLogStore;
   transfer?: typeof transferRemoteFileToR2;
+  qaStore?: VirtualTryOnQaStore;
+  visionProvider?: VirtualTryOnQaDeps["visionProvider"];
 }) {
+  const signer = input.signer ?? ((request: { key: string; expiresIn: number }) => createDownloadSignedUrl(request));
+  const providerLogStore = input.providerLogStore ?? createDrizzleProviderCallLogStore();
   const provider = createVirtualTryOnGenerationProvider({
-    signer: input.signer ?? ((request) => createDownloadSignedUrl(request)),
+    signer,
     imageClient: input.imageClient,
     pollClient: input.pollClient,
-    providerLogStore: input.providerLogStore ?? createDrizzleProviderCallLogStore(),
+    providerLogStore,
   });
   return {
     credits: input.credits,
@@ -53,6 +59,12 @@ export function createDefaultVirtualTryOnRuntimeDeps(input: {
     submit: provider.submit,
     poll: provider.poll,
     transfer: input.transfer ?? transferRemoteFileToR2,
+    qaDeps: {
+      signer: (key: string) => signer({ key, expiresIn: 300 }),
+      qaStore: input.qaStore ?? createDrizzleVirtualTryOnQaStore(),
+      providerLogStore,
+      visionProvider: input.visionProvider ?? createVisionVirtualTryOnQa,
+    },
   };
 }
 
