@@ -57,7 +57,7 @@ No design-token changes are planned. `src/app/globals.css` already supplies the 
 - Modify: `src/components/public/mobile-navigation.tsx:1-22`
 - Test: `src/components/public/public-pages.test.tsx:97-183`
 
-- [ ] **Step 1: Write the failing English desktop/mobile navigation test**
+- [x] **Step 1: Write the failing English desktop/mobile navigation test**
 
 Add this test beside the existing Chinese navigation tests in `src/components/public/public-pages.test.tsx`:
 
@@ -98,7 +98,7 @@ it("keeps English desktop and mobile navigation on the conversion path", () => {
 });
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -108,7 +108,7 @@ pnpm exec vitest run src/components/public/public-pages.test.tsx -t "keeps Engli
 
 Expected: FAIL because the English primary navigation still contains `Privacy` and `Terms`, and has no `Three-image workflow` or `FAQ` links.
 
-- [ ] **Step 3: Create the shared navigation definition**
+- [x] **Step 3: Create the shared navigation definition**
 
 Create `src/components/public/public-navigation.ts`:
 
@@ -137,7 +137,7 @@ export const publicNavigationItems = {
 } satisfies Record<SiteLocale, readonly PublicNavigationItem[]>;
 ```
 
-- [ ] **Step 4: Render the shared definition in desktop and mobile navigation**
+- [x] **Step 4: Render the shared definition in desktop and mobile navigation**
 
 In `src/components/public/public-header.tsx`, add:
 
@@ -180,7 +180,7 @@ Use it in the existing map:
 ))}
 ```
 
-- [ ] **Step 5: Run GREEN and the full shared-navigation file**
+- [x] **Step 5: Run GREEN and the full shared-navigation file**
 
 Run:
 
@@ -190,7 +190,7 @@ pnpm exec vitest run src/components/public/public-pages.test.tsx
 
 Expected: all tests in `public-pages.test.tsx` PASS, including the existing Chinese links, Escape-to-close behavior, focus restoration, and CTA tracking.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```powershell
 git add src/components/public/public-navigation.ts src/components/public/public-header.tsx src/components/public/mobile-navigation.tsx src/components/public/public-pages.test.tsx
@@ -203,7 +203,7 @@ git commit -m "fix: align public navigation with conversion flow"
 - Modify: `src/app/page.tsx:36-47,98-109,217-228`
 - Test: `src/app/page.test.tsx:1-85`
 
-- [ ] **Step 1: Write failing bilingual workflow tests**
+- [x] **Step 1: Write failing bilingual workflow tests**
 
 Change the Testing Library import in `src/app/page.test.tsx` to:
 
@@ -264,7 +264,7 @@ expect(within(presetSection as HTMLElement).getByRole("list"))
   .toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -274,7 +274,7 @@ pnpm exec vitest run src/app/page.test.tsx -t "uses English by default|keeps the
 
 Expected: FAIL because the current section headings are `AI does not get free rein over garment details` and `不让 AI 自由发挥服装细节`.
 
-- [ ] **Step 3: Replace only the controlled-workflow copy**
+- [x] **Step 3: Replace only the controlled-workflow copy**
 
 Replace `homeCopy.en.control` in `src/app/page.tsx` with:
 
@@ -381,7 +381,7 @@ Give the Preset section and its list explicit semantics, and delay the three-col
 </section>
 ```
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run:
 
@@ -391,7 +391,7 @@ pnpm exec vitest run src/app/page.test.tsx
 
 Expected: 4 homepage tests PASS in both locales and both authentication states.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```powershell
 git add src/app/page.tsx src/app/page.test.tsx
@@ -406,7 +406,7 @@ git commit -m "feat: clarify homepage generation workflow"
 - Modify: `src/app/page.tsx:18-35,80-97,189-216`
 - Modify: `src/app/page.test.tsx:41-142`
 
-- [ ] **Step 1: Write the failing accessible-result-video test**
+- [x] **Step 1: Write the failing accessible-result-video test**
 
 Add to `src/components/public/sample-video.test.tsx`:
 
@@ -425,7 +425,7 @@ it("exposes an accessible label for a meaningful result video", () => {
 });
 ```
 
-- [ ] **Step 2: Extend the homepage evidence assertions**
+- [x] **Step 2: Extend the homepage evidence assertions**
 
 Add these assertions to the English homepage test in `src/app/page.test.tsx`:
 
@@ -471,7 +471,7 @@ expect(
 ).toHaveAttribute("href", "#source-proof");
 ```
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 Run:
 
@@ -481,7 +481,7 @@ pnpm exec vitest run src/components/public/sample-video.test.tsx src/app/page.te
 
 Expected: FAIL because `SampleVideo` does not yet accept or render an accessible label. Existing source-image, CTA, trial-note, and authentication assertions should already pass and act as regression coverage.
 
-- [ ] **Step 4: Add the optional accessible label**
+- [x] **Step 4: Add the optional accessible label**
 
 Update the `SampleVideo` signature in `src/components/public/sample-video.tsx`:
 
@@ -513,7 +513,7 @@ Add the label to the existing `<video>` element:
   autoPlay={autoPlay}
 ```
 
-- [ ] **Step 5: Name the result video in both locales**
+- [x] **Step 5: Name the result video in both locales**
 
 Add to `homeCopy.en.evidence`:
 
@@ -539,7 +539,7 @@ Pass the label only to the controlled result video in `#source-proof`:
 />
 ```
 
-- [ ] **Step 6: Run GREEN**
+- [x] **Step 6: Run GREEN**
 
 Run:
 
@@ -549,7 +549,7 @@ pnpm exec vitest run src/components/public/sample-video.test.tsx src/app/page.te
 
 Expected: all tests in both files PASS; video engagement tracking remains unchanged because only controlled playback receives handlers.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```powershell
 git add src/components/public/sample-video.tsx src/components/public/sample-video.test.tsx src/app/page.tsx src/app/page.test.tsx
@@ -565,7 +565,7 @@ git commit -m "test: protect homepage evidence and CTA contract"
 - Verify: `src/components/public/public-header.tsx`
 - Verify: `src/components/public/mobile-navigation.tsx`
 
-- [ ] **Step 1: Add reduced-motion regression coverage**
+- [x] **Step 1: Add reduced-motion regression coverage**
 
 Update the Vitest import in `src/components/public/sample-video.test.tsx`:
 
@@ -600,7 +600,7 @@ it("pauses autoplay media when reduced motion is requested", () => {
 });
 ```
 
-- [ ] **Step 2: Run the reduced-motion regression test**
+- [x] **Step 2: Run the reduced-motion regression test**
 
 Run:
 
@@ -610,7 +610,7 @@ pnpm exec vitest run src/components/public/sample-video.test.tsx -t "pauses auto
 
 Expected: PASS against the existing `matchMedia("(prefers-reduced-motion: reduce)")` effect. A failure means Task 3 altered existing motion behavior and must be corrected before browser QA.
 
-- [ ] **Step 3: Run focused code gates**
+- [x] **Step 3: Run focused code gates**
 
 Run:
 
@@ -622,7 +622,7 @@ pnpm run typecheck
 
 Expected: all focused tests PASS, ESLint exits 0, and TypeScript exits 0.
 
-- [ ] **Step 4: Start the development server**
+- [x] **Step 4: Start the development server**
 
 Run on an available port:
 
@@ -632,7 +632,7 @@ pnpm exec next dev --webpack --port 3000
 
 Expected: Next.js reports the local URL and serves `/` and `/zh` without a runtime error. If port 3000 is occupied, use `pnpm exec next dev --webpack --port 3001` and keep that URL for all checks below.
 
-- [ ] **Step 5: Verify both locales at three viewport classes**
+- [x] **Step 5: Verify both locales at three viewport classes**
 
 Use the in-app browser to inspect `/` and `/zh` at:
 
@@ -651,7 +651,7 @@ At every viewport verify:
 - With reduced motion enabled, Hero entrance animation is effectively removed and autoplay video pauses.
 - There are no console errors, failed local media requests, or inaccessible unlabeled result videos.
 
-- [ ] **Step 6: Run the frontend design audit**
+- [x] **Step 6: Run the frontend design audit**
 
 Run:
 
@@ -661,7 +661,7 @@ python "$env:USERPROFILE/.codex/skills/frontend-design/scripts/audit_frontend_pr
 
 Expected: no `FAIL`. Manually review warnings against `docs/COMPETITOR_LANDING_DECISIONS.md`; the homepage must retain one primary task, no card farm, and no unsupported claims.
 
-- [ ] **Step 7: Commit Task 4 test coverage**
+- [x] **Step 7: Commit Task 4 test coverage**
 
 ```powershell
 git add src/components/public/sample-video.test.tsx
@@ -673,7 +673,7 @@ git commit -m "test: cover reduced-motion sample playback"
 **Files:**
 - Verify only; no planned source changes.
 
-- [ ] **Step 1: Inspect the final change set**
+- [x] **Step 1: Inspect the final change set**
 
 Run:
 
@@ -686,7 +686,7 @@ git diff HEAD~4..HEAD -- src/components/public src/app/page.tsx src/app/page.tes
 
 Expected: only the files listed in the File Map changed; `git diff --check` produces no output; no placeholder copy, invented data, unrelated refactor, or generated-file churn appears.
 
-- [ ] **Step 2: Run the full suite once**
+- [x] **Step 2: Run the full suite once**
 
 Run:
 
@@ -698,7 +698,7 @@ pnpm run typecheck
 
 Expected: the full Vitest suite passes, ESLint exits 0, and TypeScript exits 0. Report actual test file and test counts from this run; do not reuse the earlier 67/67 i18n count or the separate 68/68 workspace count.
 
-- [ ] **Step 3: Record acceptance evidence**
+- [x] **Step 3: Record acceptance evidence**
 
 The implementation handoff must include:
 
@@ -707,6 +707,27 @@ The implementation handoff must include:
 - ESLint, typecheck, `git diff --check`, and frontend-audit results.
 - Desktop/mobile screenshot locations or browser capture references for `/` and `/zh`.
 - Any remaining manual-review warning, without presenting it as a passing automated assertion.
+
+## Execution Record
+
+Closed on 2026-07-30 against `main` at `4956e49`.
+
+| Task | Commit | Evidence |
+|---|---|---|
+| Plan | `4ca9cc5` | Competitor-informed scope, TDD steps, and acceptance matrix recorded. |
+| Public navigation | `3e59d1b` | Shared desktop/mobile conversion navigation implemented and covered by focused tests. |
+| Homepage workflow | `66113a8` | Bilingual controlled workflow, responsive preset grid, and mobile CTA layout implemented. |
+| SKU evidence contract | `b43e23e` | Source-image paths, accessible result-video labels, secondary CTA, and trial-note behavior locked by tests. |
+| Reduced motion | `4956e49` | Autoplay media pauses when reduced motion is requested. |
+
+Final verification evidence:
+
+- Focused homepage/public suite passed before the stage gate.
+- Full Vitest suite: 210/210 files and 1046/1046 tests passed in 274.14 seconds.
+- ESLint, TypeScript, frontend audit, and `git diff --check origin/main..HEAD` passed.
+- `/` and `/zh` were inspected at 390 x 844, 768 x 1024, and 1440 x 900 with no blocking layout, media, language, keyboard, or console issue.
+- The implementation was merged and pushed; `main` and `origin/main` both pointed to `4956e49` at closure.
+- Browser inspection was completed in the prior session, but no durable screenshot files were committed. Persistent captures will be added by the independent multi-SKU/Preset-preview goal and must not be inferred from this record.
 
 ## Acceptance Matrix
 

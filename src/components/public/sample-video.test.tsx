@@ -59,14 +59,45 @@ describe("SampleVideo", () => {
   it("exposes an accessible label for a meaningful result video", () => {
     render(
       <SampleVideo
-        ariaLabel="Generated red dress product video"
+        ariaLabel="Generated adult burgundy midi dress product video"
         controls
         sourcePage="homepage"
       />,
     );
 
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute(
+        "src",
+        "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      );
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute(
+        "poster",
+        "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      );
+  });
+
+  it("renders accepted case media when custom paths are provided", () => {
+    render(
+      <SampleVideo
+        controls
+        poster="/demo/cases/structured-blazer/minimal-studio-poster.webp"
+        sourcePage="examples"
+        src="/demo/cases/structured-blazer/minimal-studio.mp4"
+        testId="case-video"
+      />,
+    );
+
+    expect(screen.getByTestId("case-video"))
+      .toHaveAttribute(
+        "src",
+        "/demo/cases/structured-blazer/minimal-studio.mp4",
+      );
+    expect(screen.getByTestId("case-video"))
+      .toHaveAttribute(
+        "poster",
+        "/demo/cases/structured-blazer/minimal-studio-poster.webp",
+      );
   });
 
   it("pauses autoplay media when reduced motion is requested", () => {

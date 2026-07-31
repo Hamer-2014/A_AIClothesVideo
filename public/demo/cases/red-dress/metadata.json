@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "slug": "red-dress",
+  "sourceType": "internal-demo",
+  "generatedAt": "unknown",
+  "imageGeneration": {
+    "mode": "unknown",
+    "model": "unknown",
+    "quality": "unknown",
+    "requestedSize": "unknown",
+    "actualSize": "unknown",
+    "prompt": "unknown",
+    "sourceSheetSha256": "unknown"
+  },
+  "sourceSetId": "red-dress-existing-v1",
+  "sourceAssets": [
+    {
+      "role": "front",
+      "path": "/demo/red-dress-front.webp",
+      "dimensions": "unknown",
+      "sha256": "8375f676750887c774bcd4d16d45f7100eec946bbfaa99ae46f6cf77ef17b1ea"
+    },
+    {
+      "role": "back",
+      "path": "/demo/red-dress-back.webp",
+      "dimensions": "unknown",
+      "sha256": "723281132c356a082f8787f21ed0736917f81492ab8c7e36b55850db4364295a"
+    },
+    {
+      "role": "detail",
+      "path": "/demo/red-dress-detail.webp",
+      "dimensions": "unknown",
+      "sha256": "77c3b6272e31b54a61e071bc3e577cf481a0360d6f9b177a1260f04ba85f2db6"
+    }
+  ],
+  "materialLimits": [
+    "Existing internal demo provenance is incomplete.",
+    "Do not infer an undocumented provider, model, prompt, preset, or customer relationship."
+  ],
+  "videoOutputs": [
+    {
+      "path": "/demo/red-dress-video.mp4",
+      "posterPath": "/demo/red-dress-poster.webp",
+      "presetId": "unknown",
+      "provider": "unknown",
+      "model": "unknown",
+      "templateIds": [],
+      "generatedAt": "unknown"
+    }
+  ]
+}

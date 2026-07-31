@@ -5,42 +5,42 @@ import type { SiteLocale } from "@/lib/i18n/config";
 const threeImageSources = {
   en: [
     {
-      alt: "Front product image of a red dress",
+      alt: "Front product image of an adult burgundy midi dress",
       label: "Front image",
       note: "Defines the garment and its overall silhouette",
-      src: "/demo/red-dress-front.webp",
+      src: "/demo/cases/burgundy-midi-dress/front.webp",
     },
     {
-      alt: "Back image of a red dress",
+      alt: "Back image of an adult burgundy midi dress",
       label: "Back image",
       note: "Supports views of the actual back construction",
-      src: "/demo/red-dress-back.webp",
+      src: "/demo/cases/burgundy-midi-dress/back.webp",
     },
     {
-      alt: "Detail image of a red dress",
+      alt: "Detail image of an adult burgundy midi dress",
       label: "Detail image",
       note: "Supports close-ups of visible fabric or construction",
-      src: "/demo/red-dress-detail.webp",
+      src: "/demo/cases/burgundy-midi-dress/detail.webp",
     },
   ],
   "zh-CN": [
     {
-      alt: "红色连衣裙正面主图",
+      alt: "成人深酒红中长连衣裙正面主图",
       label: "正面主图",
       note: "确认服装主体与整体轮廓",
-      src: "/demo/red-dress-front.webp",
+      src: "/demo/cases/burgundy-midi-dress/front.webp",
     },
     {
-      alt: "红色连衣裙背面图",
+      alt: "成人深酒红中长连衣裙背面图",
       label: "背面图",
       note: "支持真实背部结构展示",
-      src: "/demo/red-dress-back.webp",
+      src: "/demo/cases/burgundy-midi-dress/back.webp",
     },
     {
-      alt: "红色连衣裙细节图",
+      alt: "成人深酒红中长连衣裙细节图",
       label: "细节图",
       note: "支持可见面料或工艺特写",
-      src: "/demo/red-dress-detail.webp",
+      src: "/demo/cases/burgundy-midi-dress/detail.webp",
     },
   ],
 } as const;

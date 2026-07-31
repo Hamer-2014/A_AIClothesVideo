@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "slug": "burgundy-midi-dress",
+  "sourceType": "synthetic-demo",
+  "generatedAt": "2026-07-30",
+  "imageGeneration": {
+    "mode": "imagegen-cli-fallback",
+    "model": "gpt-image-2",
+    "quality": "high",
+    "requestedSize": "1536x1024",
+    "actualSize": "1536x1024",
+    "prompt": "Create a photorealistic ecommerce three-view source sheet for one adult women's deep burgundy midi dress. Show the exact same garment in three equal vertical panels: left is a full front view, center is a full back view, right is a close detail showing the neckline, waist construction, and fabric texture. Use an invisible adult mannequin with no head and no face on a seamless neutral warm-gray studio backdrop. The garment is a refined adult-sized long-sleeve midi dress with a clean modest V neckline, shaped waist seam, smooth A-line skirt, and matte crepe fabric. Keep neckline, sleeve shape, waist, seams, hem, fabric, color, and proportions identical across all views. Soft even catalog lighting, accurate deep wine-red color, generous padding, no person, no child, no child mannequin, no doll, no logo, no text, no watermark. Avoid childish silhouettes, tutus, children's formalwear ruffles, fantasy costumes, extra buttons, invented trims, asymmetry, props, and dramatic shadows.",
+    "sourceSheetSha256": "aa580ea029b903c5edc0768f6ec0e0cfb827f06635d9465a688e6ca8c77fcc2d"
+  },
+  "sourceSetId": "burgundy-midi-dress-v1",
+  "sourceAssets": [
+    {
+      "role": "front",
+      "path": "/demo/cases/burgundy-midi-dress/front.webp",
+      "dimensions": "526x1024",
+      "sha256": "9c04524ed333bd4a3a7e01b4a6bc28b50669483c403a9450444a1fced700e6fe"
+    },
+    {
+      "role": "back",
+      "path": "/demo/cases/burgundy-midi-dress/back.webp",
+      "dimensions": "473x1024",
+      "sha256": "5ed23b86a562d300f83ab8d11a05b72e9a2612dbf76a9cd3515bfe65a572d35b"
+    },
+    {
+      "role": "detail",
+      "path": "/demo/cases/burgundy-midi-dress/detail.webp",
+      "dimensions": "532x1024",
+      "sha256": "d68a8022c5b4a6a221a0b89c0c1751514440294b0ab86e7e2f4b9b32552f3cf2"
+    }
+  ],
+  "materialLimits": [
+    "No person or scene reference is provided.",
+    "Do not generate a person, child, model action, back turn, or continuous rotation.",
+    "Preserve the visible V neckline, long sleeves, waist seam, A-line hem, matte crepe texture, and deep burgundy color."
+  ],
+  "videoOutputs": [
+    {
+      "path": "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      "posterPath": "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      "posterSha256": "df62d00f746138154964f83ce7b8e66cadb12cd203c2e33c9c9d622ead4ff225",
+      "videoSha256": "9e791bb39d2bc451ae8cab6acab065a549edac37c5fc3c89e928cd377a28c001",
+      "jobId": "bdec0abb-a7b1-4d5b-9d0c-1783c345487f",
+      "stitchJobId": "aa519799-a189-4e62-aaf6-4db14cb2cf71",
+      "isTest": true,
+      "presetId": "minimal_studio",
+      "templateIds": [
+        "front_push_in"
+      ],
+      "segmentPrompt": "A slow front-facing push-in shot of a deep burgundy midi dress with a V neckline, long sleeves, shaped waist seam, A-line hem, and matte crepe texture. The dress is displayed in a clean minimal studio setting with a neutral background, stable camera, and no people. The wine-red color is consistent and no additional details are added.",
+      "provider": "apimart",
+      "model": "pixverse-v6",
+      "generationProfile": "paid_720p_audio",
+      "providerReportedResolution": "360p",
+      "inspectedResolution": "336x640",
+      "durationSeconds": 8.073,
+      "aspectRatio": "9:16",
+      "frameRate": 24,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "watermarkEnabled": false,
+      "fastStart": true,
+      "promptModeration": "passed",
+      "postQa": {
+        "mode": "standard",
+        "status": "passed",
+        "frameCount": 5,
+        "isTest": true
+      },
+      "stitchWorkerRevision": "stitch-worker-00068-7qh"
+    }
+  ]
+}

@@ -421,6 +421,7 @@ export function createDrizzleVideoJobCreationStore(
         return [];
       }
 
+      const qualifiedAssetId = sql`${assets.id}`;
       const rows = await db
         .select({
           id: assets.id,
@@ -432,7 +433,7 @@ export function createDrizzleVideoJobCreationStore(
             from "asset_rights_attestations" ara
             inner join "rights_attestations" ra
               on ra."id" = ara."rights_attestation_id"
-            where ara."asset_id" = ${assets.id}
+            where ara."asset_id" = ${qualifiedAssetId}
               and ra."version" = 'image_rights_v1'
           )`,
           rightsAttestationId: sql<string | null>`(
@@ -440,7 +441,7 @@ export function createDrizzleVideoJobCreationStore(
             from "asset_rights_attestations" ara
             inner join "rights_attestations" ra
               on ra."id" = ara."rights_attestation_id"
-            where ara."asset_id" = ${assets.id}
+            where ara."asset_id" = ${qualifiedAssetId}
               and ra."version" = 'image_rights_v1'
             order by ara."created_at" desc
             limit 1

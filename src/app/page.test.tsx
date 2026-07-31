@@ -85,21 +85,24 @@ describe("Home", () => {
       .toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
     expect(screen.getByTestId("landing-hero-video")).toHaveAttribute(
       "src",
-      "/demo/red-dress-video.mp4",
+      "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
     );
-    expect(screen.getByAltText("Front product image of a red dress")).toHaveAttribute(
+    expect(screen.getByAltText("Front product image of an adult burgundy midi dress")).toHaveAttribute(
       "src",
-      expect.stringContaining("/demo/red-dress-front.webp"),
+      expect.stringContaining("/demo/cases/burgundy-midi-dress/front.webp"),
     );
-    expect(screen.getByAltText("Back image of a red dress")).toBeInTheDocument();
-    expect(screen.getByAltText("Detail image of a red dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Back image of an adult burgundy midi dress")).toBeInTheDocument();
+    expect(screen.getByAltText("Detail image of an adult burgundy midi dress")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "View the real three-image sample" }),
+      screen.getByRole("link", { name: "View the generated three-image source set" }),
     ).toHaveAttribute("href", "#source-proof");
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
-    expect(screen.getByLabelText("Generated red dress product video"))
-      .toHaveAttribute("poster", "/demo/red-dress-poster.webp");
+    expect(
+      screen.getByText(/The three input images were generated with ImageGen/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
+    expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
+      .toHaveAttribute("poster", "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp");
   });
 
   it("keeps the Chinese homepage at /zh without mixing languages", async () => {
@@ -112,7 +115,7 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(
       screen.getByText(
-        /样例展示真实工作流结果，不代表所有服装都会得到完全相同的动作、画面或生成时长/,
+        /三张输入图由 ImageGen 合成，视频由产品真实链路生成/,
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "免费生成 1 条试用视频" })[0])
@@ -127,10 +130,48 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 3, name: "匹配可用镜头" }))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "查看真实三图样例" }))
+    expect(screen.getByRole("link", { name: "查看合成三图样例" }))
       .toHaveAttribute("href", "#source-proof");
-    expect(screen.getByLabelText("由三张红色连衣裙素材生成的商品视频"))
-      .toHaveAttribute("src", "/demo/red-dress-video.mp4");
+    expect(screen.getByLabelText("由三张成人深酒红中长裙素材生成的商品视频"))
+      .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "查看已经生成的多 SKU 素材",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("合成演示素材，不是客户案例。"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看全部素材案例" }))
+      .toHaveAttribute("href", "/zh/examples");
+  });
+
+  it("shows generated synthetic SKU material and links to the source library", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("en");
+
+    render(await Home());
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Inspect the generated multi-SKU source sets",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Synthetic demo material, not customer cases."))
+      .toBeInTheDocument();
+    expect(screen.getByAltText("Cobalt structured blazer front source"))
+      .toHaveAttribute(
+        "src",
+        expect.stringContaining("structured-blazer%2Ffront.webp"),
+      );
+    expect(screen.getByAltText("Sage rib-knit cardigan detail source"))
+      .toHaveAttribute(
+        "src",
+        expect.stringContaining("knit-cardigan%2Fdetail.webp"),
+      );
+    expect(screen.getByRole("link", { name: "View all source cases" }))
+      .toHaveAttribute("href", "/examples");
   });
 
   it("shows anonymous trial actions to visitors", async () => {
@@ -190,7 +231,7 @@ describe("Home", () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "View the real three-image sample" }),
+      screen.getByRole("link", { name: "View the generated three-image source set" }),
     ).toHaveAttribute("href", "#source-proof");
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({

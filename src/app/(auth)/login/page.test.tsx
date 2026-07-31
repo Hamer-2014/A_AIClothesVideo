@@ -79,7 +79,7 @@ describe("login page", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("img", {
-        name: "Generated red dress product video preview",
+        name: "Generated adult burgundy midi dress product video preview",
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View product demo" })).toHaveAttribute(
