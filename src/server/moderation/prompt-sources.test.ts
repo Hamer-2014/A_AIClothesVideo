@@ -12,6 +12,7 @@ describe("prompt moderation sources", () => {
       "user_input",
       "storyboard_prompt",
       "final_video_prompt",
+      "virtual_tryon_generation",
     ]);
   });
 

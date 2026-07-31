@@ -4,6 +4,7 @@ export const promptModerationSources = [
   "user_input",
   "storyboard_prompt",
   "final_video_prompt",
+  "virtual_tryon_generation",
 ] as const;
 
 export type PromptModerationSource = (typeof promptModerationSources)[number];
