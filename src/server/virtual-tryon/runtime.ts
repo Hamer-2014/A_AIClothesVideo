@@ -11,7 +11,7 @@ import { retryDecision } from "./retry";
 export type RuntimeAsset = { view: AppearanceView; providerTaskId: string | null; providerStatus: "pending" | "queued" | "running" | "succeeded" | "failed"; attemptCount: number; r2Key: string | null; lastErrorCode?: string | null; nextRetryAt?: Date | null; outputUrl?: string | null };
 export type RuntimeJob = { id: string; packId: string; userId: string; mode: VirtualTryOnMode; status: string; creditCost: number; lockedUntil: Date | null; assets: RuntimeAsset[] };
 type RuntimeStatus = "generating" | "ready" | "recovering_release" | "failed_released" | "failed_refunded";
-export interface RuntimeStore { acquire(workerId: string, now: Date): Promise<RuntimeJob | null>; saveAsset(jobId: string, asset: RuntimeAsset): Promise<void>; setStatus(jobId: string, status: RuntimeStatus, error?: string): Promise<void>; releaseLease(jobId: string, workerId: string): Promise<void>; }
+export interface RuntimeStore { acquire(workerId: string, now: Date): Promise<RuntimeJob | null>; saveAsset(jobId: string, asset: RuntimeAsset): Promise<void>; setStatus(jobId: string, status: RuntimeStatus, error?: string): Promise<void>; releaseLease(jobId: string, workerId: string): Promise<void>; scheduleRetry(jobId: string, retryAt: Date): Promise<void>; }
 
 export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStore {
   return {
@@ -27,6 +27,7 @@ export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStor
     async saveAsset(jobId, asset) { const [pack] = await db.select({ id: appearancePacks.id }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, jobId)).limit(1); if (!pack) throw new Error("virtual_tryon_pack_missing"); await db.update(appearancePackAssets).set({ providerTaskId: asset.providerTaskId, providerStatus: asset.providerStatus, attemptCount: asset.attemptCount, r2Key: asset.r2Key, lastErrorCode: asset.lastErrorCode ?? null, nextRetryAt: asset.nextRetryAt ?? null, updatedAt: new Date() }).where(and(eq(appearancePackAssets.appearancePackId, pack.id), eq(appearancePackAssets.view, asset.view))); },
     async setStatus(jobId, status, error) { await db.update(virtualTryonJobs).set({ status, lastError: error ?? null, lockedBy: null, lockedUntil: null, updatedAt: new Date() }).where(eq(virtualTryonJobs.id, jobId)); },
     async releaseLease(jobId, workerId) { await db.update(virtualTryonJobs).set({ lockedBy: null, lockedUntil: null, updatedAt: new Date() }).where(and(eq(virtualTryonJobs.id, jobId), eq(virtualTryonJobs.lockedBy, workerId))); },
+    async scheduleRetry(jobId, retryAt) { await db.update(virtualTryonJobs).set({ nextRetryAt: retryAt, lockedBy: null, lockedUntil: null, updatedAt: new Date() }).where(eq(virtualTryonJobs.id, jobId)); },
   };
 }
 
@@ -48,7 +49,7 @@ export async function runVirtualTryOnTick(input: { workerId: string; store: Runt
   } catch (error) {
     const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : error instanceof Error ? error.message : "worker_failed";
     const decision = retryDecision({ code, attemptCount: asset?.attemptCount ?? 0, now: input.now ?? new Date() });
-    if (asset && decision.retry) { asset.attemptCount += 1; asset.lastErrorCode = decision.errorCode ?? code; asset.nextRetryAt = decision.nextRetryAt; asset.providerStatus = asset.providerTaskId ? "running" : "pending"; await input.store.saveAsset(job.id, asset); return { processed: 1, action: "retry" as const }; }
+    if (asset && decision.retry) { asset.attemptCount += 1; asset.lastErrorCode = decision.errorCode ?? code; asset.nextRetryAt = decision.nextRetryAt; asset.providerStatus = asset.providerTaskId ? "running" : "pending"; await input.store.saveAsset(job.id, asset); await input.store.scheduleRetry(job.id, decision.nextRetryAt); return { processed: 1, action: "retry" as const }; }
     await input.store.setStatus(job.id, "recovering_release", code); return { processed: 1, action: "failed" as const };
   } finally { await input.store.releaseLease(job.id, input.workerId); }
 }
