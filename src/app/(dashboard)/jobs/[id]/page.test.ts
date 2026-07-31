@@ -39,4 +39,18 @@ describe("job detail page server imports", () => {
     expect(source).toContain("ai-clothes-video-${detail.job.id.slice(0, 8)}.mp4");
     expect(source).not.toContain("runwaytools-${detail.job.id.slice(0, 8)}.mp4");
   });
+
+  it("re-signs and presents the original source images when reopening a job", () => {
+    const source = readFileSync(
+      "src/app/(dashboard)/jobs/[id]/page.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("getJobSourceAssets");
+    expect(source).toContain("sourceAssets");
+    expect(source).toContain("原始素材");
+    expect(source).toContain("asset.previewUrl");
+    expect(source).toContain("打开原图");
+    expect(source).toContain("素材暂不可预览");
+  });
 });

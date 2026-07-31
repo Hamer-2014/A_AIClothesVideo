@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
+import { ExternalLink, ImageOff } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/shell";
 import { AnalyzeRetryButton } from "@/components/jobs/analyze-retry-button";
@@ -8,6 +10,7 @@ import { buildDashboardNav } from "@/app/app-shell";
 import { getServerSession } from "@/lib/auth/server";
 import { userFacingJobMessage } from "@/lib/jobs/user-facing-message";
 import { createPublicJobVideoUrl } from "@/server/files/job-download";
+import { getJobSourceAssets } from "@/server/files/job-source-assets";
 import {
   createDrizzleVideoJobReadStore,
   getVideoJobDetail,
@@ -23,6 +26,16 @@ import {
 } from "@/server/billing/user-billing";
 
 export const dynamic = "force-dynamic";
+
+const sourceAssetRoleLabels: Record<string, string> = {
+  front: "正面",
+  back: "背面",
+  side: "侧面",
+  detail: "细节",
+  scene: "场景",
+  logo: "Logo",
+  unknown: "素材",
+};
 
 function storyboardSegments(storyboardJson: unknown) {
   if (
@@ -56,7 +69,7 @@ export default async function JobDetailPage({
   }
 
   const { id } = await params;
-  const [detail, progress, overview] = await Promise.all([
+  const [detail, progress, overview, sourceAssets] = await Promise.all([
     getVideoJobDetail({
       store: createDrizzleVideoJobReadStore(),
       jobId: id,
@@ -70,6 +83,10 @@ export default async function JobDetailPage({
     }),
     getUserBillingOverview({
       store: createDrizzleUserBillingStore(),
+      userId,
+    }),
+    getJobSourceAssets({
+      jobId: id,
       userId,
     }),
   ]);
@@ -145,6 +162,76 @@ export default async function JobDetailPage({
           recommendations={detail.recommendations}
           templateCatalog={mvpShotTemplates}
         />
+
+        <section className="rounded-lg border border-[var(--line)] bg-white p-5">
+          <div>
+            <h2 className="text-base font-medium">原始素材</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              页面每次打开都会为当前账号重新生成临时访问地址，不会公开原始 R2 文件。
+            </p>
+          </div>
+          {sourceAssets.length > 0 ? (
+            <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {sourceAssets.map((asset) => (
+                <li
+                  className="min-w-0 overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]"
+                  key={asset.assetId}
+                >
+                  {asset.previewUrl ? (
+                    <a
+                      aria-label={`打开${sourceAssetRoleLabels[asset.role] ?? "素材"}原图`}
+                      className="block aspect-[4/5] overflow-hidden bg-[var(--surface-subtle)]"
+                      href={asset.previewUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <Image
+                        alt={`${sourceAssetRoleLabels[asset.role] ?? "素材"}：${asset.fileName}`}
+                        className="size-full object-contain"
+                        height={640}
+                        src={asset.previewUrl}
+                        unoptimized
+                        width={512}
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex aspect-[4/5] flex-col items-center justify-center gap-2 bg-[var(--surface-subtle)] px-4 text-center text-xs text-[var(--muted)]">
+                      <ImageOff aria-hidden="true" size={20} />
+                      素材暂不可预览
+                    </div>
+                  )}
+                  <div className="flex min-w-0 items-center justify-between gap-3 px-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {sourceAssetRoleLabels[asset.role] ?? "素材"}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-[var(--muted)]">
+                        {asset.fileName}
+                      </p>
+                    </div>
+                    {asset.previewUrl ? (
+                      <a
+                        className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--action)] hover:underline"
+                        href={asset.previewUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <ExternalLink aria-hidden="true" size={14} />
+                        打开原图
+                      </a>
+                    ) : (
+                      <span className="shrink-0 text-xs text-[var(--muted)]">
+                        暂不可用
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-[var(--muted)]">当前任务没有可用素材。</p>
+          )}
+        </section>
 
         <section className="rounded-lg border border-[var(--line)] bg-white p-5">
           <h2 className="text-base font-medium">任务信息</h2>

@@ -21,6 +21,36 @@ describe("GET /api/jobs/[id]", () => {
       { params: { id: "job-1" } },
       {
         getSession: async () => ({ user: { id: "user-1" } }),
+        sourceAssetStore: {
+          listOwnedJobAssets: async ({ jobId, userId }) => {
+            expect(jobId).toBe("job-1");
+            expect(userId).toBe("user-1");
+            return [
+              {
+                assetId: "asset-1",
+                role: "front",
+                sortOrder: 0,
+                originalKey: "users/user-1/assets/asset-1/original.webp",
+                fileName: "front.webp",
+                mimeType: "image/webp",
+              },
+              {
+                assetId: "asset-2",
+                role: "back",
+                sortOrder: 1,
+                originalKey: "users/user-1/assets/asset-2/original.webp",
+                fileName: "back.webp",
+                mimeType: "image/webp",
+              },
+            ];
+          },
+        },
+        createDownloadSignedUrl: async ({ key }) => {
+          if (key.includes("asset-2")) {
+            throw new Error("temporary signing failure");
+          }
+          return `https://signed-r2.example/${key}?expires=900`;
+        },
         getJob: async () => ({
           job: {
             id: "job-1",
@@ -38,7 +68,10 @@ describe("GET /api/jobs/[id]", () => {
             generationProfile: "trial_540p_watermarked",
             watermarkEnabled: true,
           },
-          assets: [{ assetId: "asset-1", role: "front", sortOrder: 0 }],
+          assets: [
+            { assetId: "asset-1", role: "front", sortOrder: 0 },
+            { assetId: "asset-2", role: "back", sortOrder: 1 },
+          ],
           analyses: [],
           consistencyAnalyses: [],
           acceptable: true,
@@ -88,7 +121,7 @@ describe("GET /api/jobs/[id]", () => {
         id: "job-1",
         status: "asset_analysis_passed",
       },
-      assetCount: 1,
+      assetCount: 2,
       recommendations: {
         availableTemplateIds: ["front_push_in"],
       },
@@ -98,6 +131,25 @@ describe("GET /api/jobs/[id]", () => {
         selectedTemplateIds: ["front_push_in"],
       },
     });
+    expect(body.assets).toEqual([
+      {
+        assetId: "asset-1",
+        role: "front",
+        sortOrder: 0,
+        fileName: "front.webp",
+        mimeType: "image/webp",
+        previewUrl:
+          "https://signed-r2.example/users/user-1/assets/asset-1/original.webp?expires=900",
+      },
+      {
+        assetId: "asset-2",
+        role: "back",
+        sortOrder: 1,
+        fileName: "back.webp",
+        mimeType: "image/webp",
+        previewUrl: null,
+      },
+    ]);
   });
 
   it("returns 404 when the job is not found for the user", async () => {

@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/server";
 import { mvpShotTemplates } from "@/lib/templates/catalog";
 import {
+  getJobSourceAssets,
+  type JobSourceAssetStore,
+} from "@/server/files/job-source-assets";
+import {
   createDrizzleVideoJobReadStore,
   getVideoJobDetail,
   type VideoJobReadStore,
@@ -23,6 +27,8 @@ interface GetJobRouteDeps {
     userId: string;
   }) => Promise<JobDetailResult>;
   store?: VideoJobReadStore;
+  sourceAssetStore?: JobSourceAssetStore;
+  createDownloadSignedUrl?: (input: { key: string }) => Promise<string>;
 }
 
 async function defaultGetJob({
@@ -67,6 +73,13 @@ export async function handleGetJobRequest(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
+  const sourceAssets = await getJobSourceAssets({
+    jobId: context.params.id,
+    userId,
+    store: deps.sourceAssetStore,
+    createDownloadSignedUrl: deps.createDownloadSignedUrl,
+  });
+
   return NextResponse.json({
     job: {
       id: detail.job.id,
@@ -81,8 +94,8 @@ export async function handleGetJobRequest(
       generationProfile: detail.job.generationProfile,
       watermarkEnabled: detail.job.watermarkEnabled,
     },
-    assetCount: detail.assets.length,
-    assets: detail.assets,
+    assetCount: sourceAssets.length,
+    assets: sourceAssets,
     analyses: detail.analyses,
     acceptable: detail.acceptable,
     assetCompleteness: detail.assetCompleteness,
