@@ -3,6 +3,7 @@ CREATE TYPE "virtual_tryon_job_status" AS ENUM ('draft', 'queued', 'generating',
 CREATE TYPE "appearance_pack_status" AS ENUM ('draft', 'generating', 'qa_queued', 'ready', 'locked', 'failed');
 CREATE TYPE "appearance_view" AS ENUM ('front', 'side', 'back');
 ALTER TYPE "provider_purpose" ADD VALUE IF NOT EXISTS 'virtual_tryon_image';
+ALTER TYPE "provider_purpose" ADD VALUE IF NOT EXISTS 'virtual_tryon_qa';
 ALTER TABLE "provider_call_logs" ADD COLUMN IF NOT EXISTS "virtual_tryon_job_id" uuid;
 
 CREATE TABLE "virtual_tryon_jobs" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "user_id" text NOT NULL, "mode" "virtual_tryon_mode" NOT NULL, "status" "virtual_tryon_job_status" NOT NULL DEFAULT 'draft', "sku_name" text, "create_idempotency_key" text NOT NULL, "source_snapshot" jsonb NOT NULL, "model_snapshot" jsonb NOT NULL, "rights_snapshot" jsonb NOT NULL, "credit_cost" integer NOT NULL, "reserved_ledger_id" uuid, "captured_ledger_id" uuid, "released_ledger_id" uuid, "locked_by" text, "locked_until" timestamptz, "attempt_count" integer NOT NULL DEFAULT 0, "last_error" text, "next_retry_at" timestamptz, "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now(), "deleted_at" timestamptz);
@@ -12,5 +13,6 @@ CREATE UNIQUE INDEX "appearance_packs_job_version_unique" ON "appearance_packs" 
 CREATE TABLE "appearance_pack_assets" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "appearance_pack_id" uuid NOT NULL, "view" "appearance_view" NOT NULL, "provider_task_id" text, "provider_status" text NOT NULL DEFAULT 'pending', "attempt_count" integer NOT NULL DEFAULT 0, "r2_key" text, "origin" text NOT NULL DEFAULT 'generated_apimart_gpt_image_2', "provenance" jsonb NOT NULL, "last_error_code" text, "next_retry_at" timestamptz, "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX "appearance_pack_assets_pack_view_unique" ON "appearance_pack_assets" ("appearance_pack_id", "view");
 CREATE TABLE "garment_fidelity_results" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "appearance_pack_id" uuid NOT NULL, "scope" text NOT NULL, "view" "appearance_view", "verdict" text NOT NULL, "result_json" jsonb NOT NULL, "provider_call_log_id" uuid, "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now());
-CREATE UNIQUE INDEX "garment_fidelity_results_pack_scope_view_unique" ON "garment_fidelity_results" ("appearance_pack_id", "scope", "view");
+CREATE UNIQUE INDEX "garment_fidelity_results_view_unique" ON "garment_fidelity_results" ("appearance_pack_id", "scope", "view") WHERE "view" IS NOT NULL;
+CREATE UNIQUE INDEX "garment_fidelity_results_cross_unique" ON "garment_fidelity_results" ("appearance_pack_id", "scope") WHERE "view" IS NULL;
 CREATE TABLE "virtual_tryon_state_events" ("id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "virtual_tryon_job_id" uuid NOT NULL, "from_status" text, "to_status" text NOT NULL, "reason" text NOT NULL, "actor_type" text NOT NULL DEFAULT 'system', "event_snapshot" jsonb, "created_at" timestamptz NOT NULL DEFAULT now());

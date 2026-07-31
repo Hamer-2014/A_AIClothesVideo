@@ -54,6 +54,21 @@ export interface VisionConsistencyResult {
   raw: JsonValue;
 }
 
+export interface VisionVirtualTryOnQaInput {
+  kind: "view" | "cross";
+  imageUrls: string[];
+  targetView?: string;
+  requiredViews?: string[];
+  requirements: string[];
+}
+
+export interface VisionVirtualTryOnQaResult {
+  provider: string;
+  model: string;
+  qaJson: JsonValue;
+  raw: JsonValue;
+}
+
 interface VisionClientDeps {
   fetch?: typeof fetch;
 }
@@ -471,4 +486,24 @@ export async function createVisionPostQaCheck(
     qaJson,
     raw: raw as JsonValue,
   };
+}
+
+export async function createVisionVirtualTryOnQa(
+  input: VisionVirtualTryOnQaInput,
+  deps: VisionClientDeps = {},
+): Promise<VisionVirtualTryOnQaResult> {
+  const config = getVisionConfig("strict");
+  const fetchImpl = deps.fetch ?? fetch;
+  const responsesApi = isResponsesApi(config.baseUrl);
+  const url = responsesApi ? config.baseUrl : `${config.baseUrl}/chat/completions`;
+  const target = input.kind === "view" ? `target view ${input.targetView ?? "unknown"}` : `required views ${(input.requiredViews ?? []).join(", ")}`;
+  const instruction = `Perform strict virtual try-on ${input.kind} QA for ${target}. Return JSON only. A view result must contain verdict, targetView, garment {silhouette,color,pattern,visibleDetails}, person {anatomy,identityConsistency}, inventedDetails, evidence. A cross result must contain verdict, requiredViews, coverage, garmentConsistency, personConsistency, evidence. Use unknown whenever evidence is insufficient. Requirements: ${input.requirements.join("; ")}.`;
+  const body = responsesApi
+    ? { model: config.model, input: responsesInput(input.imageUrls, instruction), text: { format: { type: "json_object" } } }
+    : { model: config.model, stream: false, response_format: { type: "json_object" }, messages: chatMessages(input.imageUrls, instruction) };
+  const response = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const raw = asRecord(await response.json());
+  if (!response.ok) throw new Error(`Vision provider failed with status ${response.status}.`);
+  const qaJson = responsesApi ? parseResponsesOutput(raw) : parseJsonContent(asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content);
+  return { provider: config.provider, model: config.model, qaJson, raw: raw as JsonValue };
 }

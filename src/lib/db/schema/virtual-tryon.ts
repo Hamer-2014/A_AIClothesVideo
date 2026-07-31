@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   integer,
   pgEnum,
@@ -73,7 +74,7 @@ export const garmentFidelityResults = pgTable("garment_fidelity_results", {
   resultJson: jsonSnapshot("result_json").notNull(),
   providerCallLogId: uuid("provider_call_log_id"),
   ...timestamps,
-}, (table) => [uniqueIndex("garment_fidelity_results_pack_scope_view_unique").on(table.appearancePackId, table.scope, table.view)]);
+}, (table) => [uniqueIndex("garment_fidelity_results_view_unique").on(table.appearancePackId, table.scope, table.view).where(sql`${table.view} is not null`), uniqueIndex("garment_fidelity_results_cross_unique").on(table.appearancePackId, table.scope).where(sql`${table.view} is null`)]);
 
 export const virtualTryonStateEvents = pgTable("virtual_tryon_state_events", {
   ...id,

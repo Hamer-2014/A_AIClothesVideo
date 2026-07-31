@@ -22,6 +22,8 @@ export const providerPurposeValues = [
   "video_generation",
   "post_qa",
   "experimental_video",
+  "virtual_tryon_image",
+  "virtual_tryon_qa",
 ] as const;
 export const providerPurposeEnum = pgEnum(
   "provider_purpose",
@@ -86,6 +88,7 @@ export const providerCallLogs = pgTable("provider_call_logs", {
   purpose: providerPurposeEnum("purpose").notNull(),
   userId: text("user_id"),
   videoJobId: uuid("video_job_id"),
+  virtualTryonJobId: uuid("virtual_tryon_job_id"),
   segmentId: uuid("segment_id"),
   requestSnapshot: jsonSnapshot("request_snapshot").notNull(),
   responseSummary: jsonSnapshot("response_summary"),

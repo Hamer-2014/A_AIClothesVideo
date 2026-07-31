@@ -23,6 +23,7 @@ export interface ProviderCallLogRecord {
   purpose: ProviderPurpose;
   userId: string | null;
   videoJobId: string | null;
+  virtualTryonJobId: string | null;
   segmentId: string | null;
   requestSnapshot: JsonValue;
   responseSummary: JsonValue | null;
@@ -46,6 +47,7 @@ export interface NewProviderCallLog {
   purpose: ProviderPurpose;
   userId?: string | null;
   videoJobId?: string | null;
+  virtualTryonJobId?: string | null;
   segmentId?: string | null;
   requestSnapshot: JsonValue;
   responseSummary?: JsonValue | null;
@@ -73,6 +75,7 @@ function normalizeProviderCallLog(input: NewProviderCallLog) {
     purpose: input.purpose,
     userId: input.userId ?? null,
     videoJobId: input.videoJobId ?? null,
+    virtualTryonJobId: input.virtualTryonJobId ?? null,
     segmentId: input.segmentId ?? null,
     requestSnapshot: input.requestSnapshot,
     responseSummary: input.responseSummary ?? null,
