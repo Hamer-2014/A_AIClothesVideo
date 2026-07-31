@@ -38,6 +38,7 @@ interface UploadPanelProps {
   rightsAccepted: boolean;
   onRightsAcceptedChange: (accepted: boolean) => void;
   language?: SiteLocale;
+  disabled?: boolean;
 }
 
 interface SelectedSlotFile {
@@ -73,6 +74,7 @@ export function UploadPanel({
   rightsAccepted,
   onRightsAcceptedChange,
   language: requestedLanguage,
+  disabled = false,
 }: UploadPanelProps) {
   const language = requestedLanguage ?? "zh-CN";
   const localizedSlots =
@@ -150,6 +152,9 @@ export function UploadPanel({
     role: UploadSlotRole,
     event: ChangeEvent<HTMLInputElement>,
   ) {
+    if (disabled) {
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -271,6 +276,9 @@ export function UploadPanel({
   }
 
   function removeSlot(role: UploadSlotRole) {
+    if (disabled) {
+      return;
+    }
     nextUploadToken(role);
     setRoleUploading(role, false);
     setSlotFiles((current) => {
@@ -300,6 +308,7 @@ export function UploadPanel({
           <input
             checked={rightsAccepted}
             className="mt-1 h-4 w-4 shrink-0 accent-[var(--action)]"
+            disabled={disabled}
             id="upload-rights-attestation"
             onChange={(event) => onRightsAcceptedChange(event.target.checked)}
             type="checkbox"
@@ -367,7 +376,8 @@ export function UploadPanel({
                 {fileName ? (
                   <button
                     aria-label={`${workspaceText(language, "Remove", "删除")}${language === "en" ? " " : ""}${slot.label}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] transition hover:border-[var(--danger)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] transition hover:border-[var(--danger)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--line-strong)]"
+                    disabled={disabled}
                     onClick={() => removeSlot(slot.role)}
                     type="button"
                   >
@@ -425,7 +435,7 @@ export function UploadPanel({
                 accept={accept}
                 aria-label={`${workspaceText(language, "Choose", "选择")}${language === "en" ? " " : ""}${slot.label}`}
                 className="sr-only"
-                disabled={uploading || (isAuthenticated && !rightsAccepted)}
+                disabled={disabled || uploading || (isAuthenticated && !rightsAccepted)}
                 id={`upload-input-${slot.role}`}
                 onChange={(event) => handleSlotFileChange(slot.role, event)}
                 type="file"

@@ -23,6 +23,7 @@ describe("app shell helpers", () => {
   it("marks the active user dashboard nav item", () => {
     expect(buildDashboardNav("/jobs")).toEqual([
       { href: "/workspace", label: "工作台", active: false },
+      { href: "/virtual-try-on", label: "虚拟试穿", active: false },
       { href: "/jobs", label: "任务", active: true },
       { href: "/billing", label: "账单", active: false },
     ]);
@@ -31,6 +32,7 @@ describe("app shell helpers", () => {
   it("builds localized English dashboard navigation", () => {
     expect(buildDashboardNav("/workspace", "en")).toEqual([
       { href: "/workspace", label: "Workspace", active: true },
+      { href: "/virtual-try-on", label: "Virtual try-on", active: false },
       { href: "/jobs", label: "Jobs", active: false },
       { href: "/billing", label: "Billing", active: false },
     ]);
@@ -39,6 +41,7 @@ describe("app shell helpers", () => {
   it("only prefixes dashboard routes that have a Chinese page", () => {
     expect(buildDashboardNav("/zh/workspace", "zh-CN")).toEqual([
       { href: "/zh/workspace", label: "工作台", active: true },
+      { href: "/zh/virtual-try-on", label: "虚拟试穿", active: false },
       { href: "/jobs", label: "任务", active: false },
       { href: "/billing", label: "账单", active: false },
     ]);

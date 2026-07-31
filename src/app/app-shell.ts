@@ -49,14 +49,18 @@ export function buildDashboardNav(
 ): NavItem[] {
   const normalizedPathname = stripLocalePrefix(pathname);
   const labels = language === "en"
-    ? { workspace: "Workspace", jobs: "Jobs", billing: "Billing" }
-    : { workspace: "工作台", jobs: "任务", billing: "账单" };
+    ? { workspace: "Workspace", virtualTryOn: "Virtual try-on", jobs: "Jobs", billing: "Billing" }
+    : { workspace: "工作台", virtualTryOn: "虚拟试穿", jobs: "任务", billing: "账单" };
   const workspaceHref = language
     ? localizeHref("/workspace", language)
     : "/workspace";
+  const virtualTryOnHref = language
+    ? localizeHref("/virtual-try-on", language)
+    : "/virtual-try-on";
 
   return [
     { href: workspaceHref, label: labels.workspace, active: normalizedPathname === "/workspace" },
+    { href: virtualTryOnHref, label: labels.virtualTryOn, active: normalizedPathname === "/virtual-try-on" || normalizedPathname.startsWith("/virtual-try-on/") },
     { href: "/jobs", label: labels.jobs, active: normalizedPathname.startsWith("/jobs") },
     { href: "/billing", label: labels.billing, active: normalizedPathname === "/billing" },
   ];

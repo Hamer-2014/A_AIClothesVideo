@@ -263,4 +263,31 @@ describe("UploadPanel", () => {
     expect(onRemoveUploaded).toHaveBeenCalledWith("asset-front");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:front-preview");
   });
+
+  it("disables file selection and removal when the parent locks the upload workflow", () => {
+    const asset: UploadedAssetItem = {
+      assetId: "asset-front",
+      fileName: "front.jpg",
+      intendedRole: "front",
+      status: "uploaded",
+      previewUrl: "blob:front-preview",
+    };
+
+    render(
+      <UploadPanel
+        assets={[asset]}
+        disabled
+        onUploaded={vi.fn()}
+        onUploadingChange={vi.fn()}
+        onRemoveUploaded={vi.fn()}
+        rightsAccepted
+        onRightsAcceptedChange={vi.fn()}
+        slots={getCaptureProtocol("product_showcase").slots}
+      />,
+    );
+
+    expect(screen.getByLabelText("选择正面主图")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "删除正面主图" })).toBeDisabled();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+  });
 });
