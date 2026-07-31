@@ -4,6 +4,7 @@ import {
   createInMemoryVirtualTryOnOwnerStore,
   createDrizzleVirtualTryOnOwnerStore,
   createVirtualTryOnDownload,
+  createVirtualTryOnPreview,
   getVirtualTryOnDetail,
   lockVirtualTryOnPack,
 } from "./owner";
@@ -78,6 +79,12 @@ describe("virtual try-on owner delivery", () => {
     expect(signer).toHaveBeenCalledWith({ key: "virtual-try-on/job/packs/pack/front.png", filename: "appearance-pack-front.png", expiresIn: 300 });
     await lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "pack" }, ownerStore);
     await expect(createVirtualTryOnDownload({ userId: "owner", jobId: "job", assetId: "asset" }, ownerStore, signer)).resolves.toBe("https://download.example/signed");
+  });
+
+  it("signs a preview only after the same owner delivery check without attachment naming", async () => {
+    const signer = vi.fn(async () => "https://preview.example/signed");
+    await expect(createVirtualTryOnPreview({ userId: "owner", jobId: "job", assetId: "asset" }, store(), signer)).resolves.toBe("https://preview.example/signed");
+    expect(signer).toHaveBeenCalledWith({ key: "virtual-try-on/job/packs/pack/front.png", expiresIn: 300 });
   });
 
   it("locks only the matching ready pack and makes repeated locks idempotent", async () => {

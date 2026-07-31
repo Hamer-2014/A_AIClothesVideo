@@ -174,3 +174,9 @@ export async function createVirtualTryOnDownload(input: { userId: string; jobId:
   if (!asset) throw new Error("appearance_pack_asset_not_found");
   return signer({ key: asset.r2Key, filename: "appearance-pack-" + asset.view + ".png", expiresIn: 300 });
 }
+
+export async function createVirtualTryOnPreview(input: { userId: string; jobId: string; assetId: string }, store: VirtualTryOnOwnerStore, signer = createDownloadSignedUrl) {
+  const asset = await store.findDownloadableAsset(input.userId, input.jobId, input.assetId);
+  if (!asset) throw new Error("appearance_pack_asset_not_found");
+  return signer({ key: asset.r2Key, expiresIn: 300 });
+}

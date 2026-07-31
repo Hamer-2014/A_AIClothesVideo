@@ -105,3 +105,85 @@ DashboardShell
     optional SKU
     status/error + one primary CTA
 ```
+
+---
+
+# 虚拟试穿详情页 / PackDetail UI Guideline
+
+## 使用场景
+
+- **Persona / scenario / primary task：** 已提交试穿任务的服装卖家查看当前 appearance pack 的真实交付状态，并且只在严格核验完成后锁定或下载结果。
+- **用户流程：** 提交 -> 等待生成 -> 严格核验 -> 可下载 -> 锁定定妆图；视频生成仅作为未来能力，不在本页面执行。
+- 主舞台是任务状态与已交付的定妆图，而不是任务数据、计费细节或视频功能入口。
+
+## 任务模型
+
+| 层级 | 任务 | 信息角色 | 首屏 |
+| --- | --- | --- | --- |
+| Primary | 判断当前 pack 是否已可交付，并锁定或下载已核验图像 | action-critical / decision-supporting | 是 |
+| Secondary | 刷新等待中任务的安全状态 | status-feedback | 是，图标按钮 |
+| Low-frequency | 查看未来视频桥接能力 | reference | 否，仅 ready/locked 时作为禁用次级按钮 |
+| Rare | 处理未预留、释放或退款中的失败交付 | exception-handling | 否，仅失败状态 |
+
+## 状态模型
+
+| 状态 | 进入条件 | Must-show | Hidden | 唯一 CTA | Exit |
+| --- | --- | --- | --- | --- | --- |
+| `queued` | 已完成建单，等待生成 worker | 稳定四步进度、排队文案、刷新 | 图像、锁定、下载、视频 | 无 | worker 进入 generating |
+| `generating` | 正在生成任意 required view | 进度第二步 active、安全状态 | 图像、锁定、下载、视频 | 无 | QA 或恢复状态 |
+| `qa_queued` | 全部图像待严格 QA | 进度第三步 active、安全状态 | 图像、锁定、下载、视频 | 无 | capturing 或 recovering_release |
+| `capturing` | QA 已通过，正在确认可交付 | 进度第四步 active、安全状态 | 图像、锁定、下载、视频 | 无 | ready 或 recovering_refund |
+| `ready` | pack 与 job 均 ready | 真实结果网格、下载入口、锁定主 CTA | 错误恢复、重生成、内部 QA/供应商资料 | 锁定定妆图 | lock 成功或安全冲突提示 |
+| `locked` | 用户锁定同一 ready pack 成功 | 真实结果网格、下载入口、不可覆盖状态 | 锁定 CTA、重生成、内部资料 | 无 | 不可在本页离开 locked |
+| `failed_unreserved` | 点数未预留，未提交生成 | 安全失败文案、返回创建页 | 图像、下载、锁定、视频、内部错误 | 创建新的定妆图 | 新建任务 |
+| `recovering_release` / `failed_released` | 交付前不可交付，正在或已释放预留点数 | 安全交付/点数处理文案、返回创建页 | 图像、下载、锁定、视频、供应商详情 | 创建新的定妆图 | 新建任务 |
+| `recovering_refund` / `failed_refunded` | capture 后交付未完成，正在或已退款 | 安全退款文案、返回创建页 | 图像、下载、锁定、视频、账本细节 | 创建新的定妆图 | 新建任务 |
+
+## Information Architecture / 信息架构表
+
+| 信息项 | 频率 | 首屏必须 | 阶段 | 显示条件 | 建议容器 | 可收合 | 角色 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 当前状态与四步进度 | 高 | 是 | all | 始终 | 顶部紧凑 status surface | 否 | status-feedback |
+| 刷新状态 | 中 | 是 | all | 始终 | 状态区 icon button | 否 | status-feedback |
+| 已交付结果图 | 高 | 是 | ready/locked | pack 可交付 | 主舞台 result grid | 否 | decision-supporting |
+| 锁定定妆图 | 中 | 是 | ready | job/pack 同时 ready | 结果区 action band | 否 | action-critical |
+| 单图下载 | 中 | 是 | ready/locked | 对应 asset 是当前 pack deliverable | 结果图 item | 否 | action-critical |
+| 视频桥接 | 低 | 否 | ready/locked | `videoGeneration=not_enabled` | action band disabled control | 否 | reference |
+| 失败恢复 | 低 | 否 | failed/recovering | 终态或账本恢复状态 | inline exception surface | 否 | exception-handling |
+| R2 key、签名 URL、provider task、QA 原始响应、账本记录 | 低 | 否 | never | 永不面对普通用户显示 | 后台审计 | 是 | audit/history |
+
+## 内容审计
+
+| 分类 | 内容 |
+| --- | --- |
+| `must-see-now` | 当前安全状态、固定四步进度；ready/locked 时为真实结果视图与当前可用操作 |
+| `next-step-only` | ready 时锁定 CTA，locked 时仅下载，未来视频能力 |
+| `error-only` | 未预留、释放、退款、刷新和锁定失败的安全提示 |
+| `on-demand-reference` | 下载图像本身、视频桥接的即将推出提示 |
+| `keep-off-first-viewport` | R2 key、签名 URL、provider/status raw、lastError、QA 证据、账本与供应商错误 |
+
+## Deferred Blocks
+
+| block | hidden_now_because | reveal_trigger | container |
+| --- | --- | --- | --- |
+| 结果网格与下载 | 任务尚未形成可交付 appearance pack，不能展示装饰占位图 | job 和 pack 都为 ready/locked | 主舞台 result grid |
+| 锁定操作 | 不可交付的 pack 不能被用户确认，也不能覆盖状态 | job 与 pack 同时 ready | result action band |
+| 视频桥接 | 本 Goal 不执行视频生成，不应造成可点击的假成功入口 | bridge 返回且 `videoGeneration=not_enabled` | result action band 的 disabled control |
+| 失败恢复说明 | 正常交付时会干扰读取结果 | failed 或 recovering 状态 | inline exception surface |
+| 内部任务与存储信息 | 对用户没有可操作价值且可能泄露数据 | 永不显示 | 后台审计 |
+
+## Layout / Anatomy / States
+
+- 首屏最多三个视觉群组：紧凑状态与进度、结果主舞台或等待状态、ready 时单个 action band；不添加概览卡栈或常驻侧栏。
+- `VirtualTryOnPackDetail` anatomy：状态标题与刷新图标、稳定四步进度、条件化主舞台、结果图 item、action band。每个图 item 可独立成轻量边框容器，页面 section 不嵌套卡片。
+- 结果图 mobile 单列，tablet 自适应，desktop `lg:grid-cols-3`；每张图固定 `4/5` aspect ratio，避免轮询或图片加载引起布局跳动。
+- 下载预览使用同一 owner-gated endpoint 的精确 `?preview=1`，它只返回短时 302 签名且不传 `filename`；默认下载 URL 仍使用 attachment。详情对象和 DOM 文案不得包含 R2 key、签名 URL、provider task 或原始响应。
+- Refresh、下载与锁定均有 default/hover/focus/disabled/loading 状态；刷新图标使用 `aria-label` 与 `title`，锁定期间禁用冲突操作。所有色彩、圆角、阴影和 motion 复用现有 `globals.css` tokens，不新增色板或渐变。
+- 非终态每 5 秒轮询脱敏详情 API；cleanup 终止 `AbortController` 并清理 interval，页面隐藏时跳过请求。终态不轮询；任何失败只显示中英文安全文案。
+
+## Interaction / Content / Asset
+
+- `ready` 只有一个主 CTA“锁定定妆图 / Lock appearance pack”；锁定成功本地进入 `locked`，后续没有覆盖或重新生成入口。
+- `locked` 可下载当前 pack 的每个 view；视频按钮只有 bridge 已返回时才显示，并始终 disabled、文案明确“即将推出”。
+- `failed*` 和 `recovering*` 不渲染图像或视频能力，仅提供返回创建页的恢复路径。
+- 每个结果图的预览与下载都只使用 asset id 构造受保护 API path；不把临时 URL 写入状态、日志或 HTML。所有状态和错误经 `workspaceText` 输出中英文。

@@ -1,22 +1,27 @@
 import { NextResponse } from "next/server";
 
 import { getServerSession } from "@/lib/auth/server";
-import { createDrizzleVirtualTryOnOwnerStore, createVirtualTryOnDownload, type VirtualTryOnOwnerStore } from "@/server/virtual-tryon/owner";
+import { createDrizzleVirtualTryOnOwnerStore, createVirtualTryOnDownload, createVirtualTryOnPreview, type VirtualTryOnOwnerStore } from "@/server/virtual-tryon/owner";
 
 type Session = { user?: { id?: string } } | null;
 interface DownloadVirtualTryOnRouteDeps {
   getSession?: () => Promise<Session>;
   createDownload?: (input: { userId: string; jobId: string; assetId: string }) => Promise<string>;
+  createPreview?: (input: { userId: string; jobId: string; assetId: string }) => Promise<string>;
   store?: VirtualTryOnOwnerStore;
 }
 
-export async function handleVirtualTryOnDownloadRequest(_request: Request, context: { params: { id: string; assetId: string } }, deps: DownloadVirtualTryOnRouteDeps = {}) {
+export async function handleVirtualTryOnDownloadRequest(request: Request, context: { params: { id: string; assetId: string } }, deps: DownloadVirtualTryOnRouteDeps = {}) {
   const session = await (deps.getSession ?? getServerSession)();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const createDownload = deps.createDownload ?? ((input: { userId: string; jobId: string; assetId: string }) => createVirtualTryOnDownload(input, deps.store ?? createDrizzleVirtualTryOnOwnerStore()));
+  const store = deps.store ?? createDrizzleVirtualTryOnOwnerStore();
+  const preview = new URL(request.url).searchParams.get("preview") === "1";
+  const createSignature = preview
+    ? deps.createPreview ?? ((input: { userId: string; jobId: string; assetId: string }) => createVirtualTryOnPreview(input, store))
+    : deps.createDownload ?? ((input: { userId: string; jobId: string; assetId: string }) => createVirtualTryOnDownload(input, store));
   try {
-    const url = await createDownload({ userId, jobId: context.params.id, assetId: context.params.assetId });
+    const url = await createSignature({ userId, jobId: context.params.id, assetId: context.params.assetId });
     return NextResponse.redirect(url, { status: 302 });
   } catch (error) {
     if (error instanceof Error && error.message === "appearance_pack_asset_not_found") return NextResponse.json({ error: "not_found" }, { status: 404 });
