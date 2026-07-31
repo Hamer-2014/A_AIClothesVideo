@@ -49,21 +49,22 @@ type CreateVirtualTryOnRequest = {
 
 `orderedUrls` 不超过 16，顺序是当前 view 的临时模特 reference，然后 `front`、在 `three_view` 下依次 `back`、`detail`。`GET /v1/tasks/{task_id}` 只轮询该 view。provider 任务和输出 URL 可在进程内暂存；输出 URL 一到达立即 `transferRemoteObjectToR2`，写 key `virtual-tryon/{jobId}/packs/{packId}/{view}.png`。系统不保存远程 URL。
 
-失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed；网络超时、429、5xx、明确 queued/running poll 为可重试；4xx（非 429）、provider failed、无 output URL 为不可重试。每 view 记录 `attemptCount`、`providerTaskId`、`providerStatus`、`r2Key`、`lastErrorCode`、`nextRetryAt`；默认最多 2 次提交尝试，指数退避 30s/120s。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response。
+失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed；网络超时、429、5xx、明确 queued/running poll 为可重试；4xx（非 429）、provider failed、无 output URL 为不可重试。每 view 记录 `attemptCount`、`providerTaskId`、`providerStatus`、`r2Key`、`lastErrorCode`、`nextRetryAt`；最多 2 次 submit：第一次失败等待 30 秒，第二次 submit 失败直接转 `recovering_release`，不设置不可达的 120 秒第三次尝试。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response。
 
 ## 5. 数据、状态机与幂等
 
-新增 `virtual_tryon_jobs`（owner、mode、status、source/model/rights snapshot、pack id、creditCost、reserve/capture ledger id、lock fields）、`appearance_packs`（job、version、requiredViews、status、lockedAt）、`appearance_pack_assets`（pack、view、providerTaskId/status、attemptCount、r2Key、origin/provenance） 、`garment_fidelity_results`、`virtual_tryon_state_events`。唯一键：`appearance_packs(job_id, version)`、`appearance_pack_assets(pack_id, view)`、`garment_fidelity_results(pack_id, scope, view)`、`virtual_tryon_jobs(user_id, create_idempotency_key)`。
+新增 `virtual_tryon_jobs`（owner、mode、status、按 front/back/detail 角色保存 source key 的 snapshot、model/rights snapshot、creditCost、reserve/capture ledger id、`deliveryPersistAttemptCount`、lock fields）、`appearance_packs`（job、version、requiredViews、status、lockedAt）、`appearance_pack_assets`（pack、view、providerTaskId/status、attemptCount、r2Key、origin/provenance） 、`garment_fidelity_results`、`virtual_tryon_state_events`。唯一键：`appearance_packs(job_id, version)`、`appearance_pack_assets(pack_id, view)`、`garment_fidelity_results(pack_id, scope, view)`、`virtual_tryon_jobs(user_id, create_idempotency_key)`。
 
 | from | worker action | to | 每 tick 的原子边界 |
 | --- | --- | --- | --- |
 | `draft` | 检查配置/asset/rights，moderate，再 reserve | `queued` | create 只到这里，不调用 APIMart |
 | `queued` | 提交首个未提交 required view | `generating` | 只写一个 view task id |
 | `generating` | poll 一个最早未完成 view；成功时转存 R2 | `queued` 或 `qa_queued` | 只处理一个 view；前序完成后才提交后序 |
-| `qa_queued` | 单视角与跨视角 QA，随后 capture reserved credits | `ready` | QA 全 pass 且 capture 成功才 ready |
+| `qa_queued` | 单视角与跨视角 QA | `capturing` 或 `recovering_release` | QA 全 pass 才可进入 capture；fail 时 pack 保持 `qa_queued`，由 release 成功统一标记 failed |
+| `capturing` | 幂等 capture 后持久化 job/pack ready | `ready` 或 `recovering_refund` | ready 事务临时失败保留 capturing+nextRetryAt 并再次用同 capture key 调用；连续三次持久化失败进入 recovering_refund，绝不 release |
+| `recovering_release` | 幂等 release reserve | `failed_released` | release 成功后将 pack 标为 failed；失败保留本状态和 nextRetryAt |
+| `recovering_refund` | 幂等 refund captured credit | `failed_refunded` | 仅在 capture 已确认成功且交付持久化被明确判定不可恢复时进入 |
 | `ready` | 用户 lock | `locked` | locked pack 永不覆盖 |
-| `queued/generating/qa_queued` | 不可恢复或重试耗尽 | `failed_released` | 所有 ready 前失败 release reserve |
-| `ready/locked` | 平台内部交付故障 | `failed_refunded` | 已 capture 时 refund |
 
 内部 `POST /api/internal/virtual-try-on/tick` 复用 `CRON_JOB_SECRET` 的 Bearer/x-cron-secret 检查，body `{ limit?: number }`，成功返回 `{ processed, submitted, polled, ready, failed }`。专用 lock store 使用同一 compare-and-set 策略，锁 60 秒；同一 tick 只能推进一个 job 的一个状态或一个 view，重复 tick 读取已有 `providerTaskId`，绝不重复提交。`
 
