@@ -71,6 +71,11 @@ export function buildAdminNav(pathname: string): NavItem[] {
     { href: "/admin", label: "总览", active: pathname === "/admin" },
     { href: "/admin/jobs", label: "任务", active: pathname.startsWith("/admin/jobs") },
     {
+      href: "/admin/virtual-try-on",
+      label: "虚拟试穿",
+      active: pathname.startsWith("/admin/virtual-try-on"),
+    },
+    {
       href: "/admin/providers",
       label: "供应商",
       active: pathname.startsWith("/admin/providers"),

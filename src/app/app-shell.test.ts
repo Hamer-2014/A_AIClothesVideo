@@ -51,6 +51,7 @@ describe("app shell helpers", () => {
     expect(buildAdminNav("/admin/providers")).toEqual([
       { href: "/admin", label: "总览", active: false },
       { href: "/admin/jobs", label: "任务", active: false },
+      { href: "/admin/virtual-try-on", label: "虚拟试穿", active: false },
       { href: "/admin/providers", label: "供应商", active: true },
       { href: "/admin/billing", label: "点数", active: false },
       { href: "/admin/funnel", label: "漏斗", active: false },
@@ -72,6 +73,14 @@ describe("app shell helpers", () => {
     expect(buildAdminNav("/admin/rights-removal")).toContainEqual({
       href: "/admin/rights-removal",
       label: "侵权处理",
+      active: true,
+    });
+  });
+
+  it("marks the virtual try-on admin entry active for its list and detail routes", () => {
+    expect(buildAdminNav("/admin/virtual-try-on/job-1")).toContainEqual({
+      href: "/admin/virtual-try-on",
+      label: "虚拟试穿",
       active: true,
     });
   });

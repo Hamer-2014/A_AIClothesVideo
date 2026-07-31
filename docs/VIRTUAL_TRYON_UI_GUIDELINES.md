@@ -187,3 +187,51 @@ DashboardShell
 - `locked` 可下载当前 pack 的每个 view；视频按钮只有 bridge 已返回时才显示，并始终 disabled、文案明确“即将推出”。
 - `failed*` 和 `recovering*` 不渲染图像或视频能力，仅提供返回创建页的恢复路径。
 - 每个结果图的预览与下载都只使用 asset id 构造受保护 API path；不把临时 URL 写入状态、日志或 HTML。所有状态和错误经 `workspaceText` 输出中英文。
+
+---
+
+# 管理端虚拟试穿可观测性
+
+## Persona / Scenario / Primary Task
+
+- **Persona / scenario / primary task：** 运营或工程管理员在异常排查时扫描有界任务列表，并读取单个虚拟试穿任务的脱敏交付、QA、账本和状态事件。
+- 列表的唯一主任务是定位要调查的 job；详情的唯一主任务是按视角、QA/账本、状态事件追踪交付链路。
+
+## 任务与状态模型
+
+| 层级 | 任务 | 信息角色 | 首屏 |
+| --- | --- | --- | --- |
+| Primary | 扫描 job、owner、模式、状态、当前 pack 版本与 required views | decision-supporting | 列表页是 |
+| Secondary | 查看每视角的 provider 状态、attempt、稳定错误码和 R2 后缀 | status-feedback | 详情页是 |
+| Low-frequency | 对照 provider 调用的 model/purpose/status/cost/task id | audit/history | 详情页 QA/账本区内 |
+| Rare | 根据 failed/recovering 状态追踪账本 ID 与事件 | exception-handling | 只在对应记录存在时 |
+
+| 页面状态 | 进入条件 | Must-show | Hidden | Exit |
+| --- | --- | --- | --- | --- |
+| `list_empty` | 有管理员会话，但当前页无任务 | 空列表文案 | 分页、详情链接 | 新任务进入查询范围 |
+| `list_ready` | 当前页有任务 | 有界表格、下一页入口（如有） | 素材 key、调用 raw | 进入单任务详情 |
+| `detail_ready` | 找到目标 job 与当前 pack | 视角、QA/账本、状态事件三段 | requestSnapshot、response raw、URL、完整 R2 key、errorMessage | 返回列表 |
+| `detail_missing` | job 不存在或已删除 | 返回列表 | 不存在原因与数据库细节 | 列表 |
+
+## 信息架构与披露规则
+
+| 信息项 | 使用频率 | 首屏必须 | 显示条件 | 容器 | 角色 |
+| --- | --- | --- | --- | --- | --- |
+| job/owner/mode/status/pack views | 高 | 是 | list_ready | 可横向滚动的单表格 | decision-supporting |
+| view provider 状态与 R2 后缀 | 中 | 是 | detail_ready | 视角全宽 section | status-feedback |
+| fidelity 规范化结果、四类 ledger ID、provider 安全摘要 | 中 | 是 | detail_ready | QA 与账本全宽 section | audit/history |
+| state events 与规范化 snapshot | 中 | 是 | detail_ready | 状态事件全宽 section | audit/history |
+| requestSnapshot、raw response、完整 key、签名 URL、API key、errorMessage 原文 | 无 | 否 | 永不 | 不进入前台页面或 API | keep-off-first-viewport |
+
+| block | hidden_now_because | reveal_trigger | container |
+| --- | --- | --- | --- |
+| 下一页 | 当前页未填满，不增加无效导航 | list 返回 nextCursor | 列表表格底部 |
+| Provider 调用摘要 | 列表扫描不需要逐调用细节 | 管理员进入详情 | QA 与账本 section |
+| 账本关联 | 正常任务的列表无需干扰扫描 | 管理员进入详情 | QA 与账本 section |
+| 原始 URL、key、签名和错误正文 | 管理端也不应获得可复制的凭据或不受控对象访问 | 永不 | 不渲染 |
+
+## Layout / Content
+
+- 复用 `AdminShell`、`buildAdminNav` 和现有 `globals.css` tokens；状态使用紧凑 badge，不新造色板、渐变或嵌套卡片。
+- 列表只使用一个可横向滚动的表格；详情保持三个全宽 section，避免把每条 view、QA 或事件做成独立卡片。
+- 页面只渲染 admin service 的 allowlist DTO。服务层递归移除 `http(s)`、API key、签名、完整 R2 key、requestSnapshot、response raw 和 errorMessage；R2 仅允许显示最后两段后缀。
