@@ -6,7 +6,7 @@ import type { CreditLedgerStore } from "@/lib/credits/types";
 import { createInMemoryVirtualTryOnStore, type SourceAsset } from "./store";
 import { createVirtualTryOn } from "./create";
 
-const env = { APIMART_API_KEY: "key", R2_ACCOUNT_ID: "id", R2_ACCESS_KEY_ID: "access", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "bucket", VIRTUAL_TRYON_MODEL_FRONT_KEY: "models/front.png", VIRTUAL_TRYON_MODEL_SIDE_KEY: "models/side.png", VIRTUAL_TRYON_MODEL_BACK_KEY: "models/back.png", VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST: "2", VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST: "5" };
+const env = { APIMART_API_KEY: "key", CLOUDFLARE_R2_ACCOUNT_ID: "id", CLOUDFLARE_R2_ACCESS_KEY_ID: "access", CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret", CLOUDFLARE_R2_BUCKET: "bucket", VIRTUAL_TRYON_MODEL_FRONT_KEY: "models/front.png", VIRTUAL_TRYON_MODEL_SIDE_KEY: "models/side.png", VIRTUAL_TRYON_MODEL_BACK_KEY: "models/back.png", VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST: "2", VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST: "5" };
 const source = (id: string, detectedRole: SourceAsset["detectedRole"] = "front", overrides: Partial<SourceAsset & { rightsAttestationRedactedAt: Date | null }> = {}): SourceAsset & { userId: string; rightsAttestationRedactedAt?: Date | null } => ({ id, userId: "user", originalKey: "assets/" + id + ".png", detectedRole, rightsAttestationId: "attestation-" + id, rightsAttestationVersion: "image_rights_v1", rightsAttestationAcceptedAt: new Date("2026-08-01T00:00:00.000Z"), ...overrides });
 
 describe("create virtual try-on", () => {

@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
-import { appearancePackAssets, appearancePacks, virtualTryonJobs, virtualTryonStateEvents } from "@/lib/db/schema";
+import { appearancePackAssets, appearancePacks, assetRightsAttestations, assets, rightsAttestations, virtualTryonJobs, virtualTryonStateEvents } from "@/lib/db/schema";
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
 
 import type { AppearanceView, VirtualTryOnMode } from "./config";
@@ -60,7 +60,7 @@ function detailFrom(input: {
   return { job: input.job, pack: input.pack, views: input.views, bridge };
 }
 
-type InMemoryJob = OwnedJob & { userId: string; deletedAt?: Date | null };
+type InMemoryJob = OwnedJob & { userId: string; deletedAt?: Date | null; sourceAuthorized?: boolean };
 type InMemoryPack = OwnedPack & { jobId: string };
 type InMemoryAsset = OwnedView & { packId: string; r2Key: string | null; origin: string; providerTaskId?: string | null };
 
@@ -74,7 +74,7 @@ export function createInMemoryVirtualTryOnOwnerStore(initial: {
   const assets = initial.assets ?? [];
   const events: Array<{ virtualTryonJobId: string; fromStatus: string; toStatus: string; reason: string }> = [];
 
-  const ownedJob = (userId: string, jobId: string) => jobs.find((job) => job.id === jobId && job.userId === userId && job.deletedAt == null) ?? null;
+  const ownedJob = (userId: string, jobId: string) => jobs.find((job) => job.id === jobId && job.userId === userId && job.deletedAt == null && job.sourceAuthorized !== false) ?? null;
   const currentPack = (jobId: string) => packs.filter((pack) => pack.jobId === jobId).sort((left, right) => right.version - left.version)[0] ?? null;
   const viewsFor = (packId: string) => assets.filter((asset) => asset.packId === packId).map(({ id, view, status }) => ({ id, view, status }));
   const detail = (job: InMemoryJob, pack: InMemoryPack) => detailFrom({ job: { id: job.id, mode: job.mode, status: job.status }, pack: { id: pack.id, version: pack.version, status: pack.status, lockedAt: pack.lockedAt }, views: viewsFor(pack.id), provenance: assets.find((asset) => asset.packId === pack.id)?.origin ?? "generated_apimart_gpt_image_2" });
@@ -87,7 +87,7 @@ export function createInMemoryVirtualTryOnOwnerStore(initial: {
     },
     async lockReadyPack(userId, jobId, packId) {
       const job = ownedJob(userId, jobId);
-      const pack = job ? packs.find((item) => item.id === packId && item.jobId === job.id) ?? null : null;
+      const pack = job && currentPack(job.id)?.id === packId ? currentPack(job.id) : null;
       if (!job || !pack) return null;
       if (job.status === "locked" && pack.status === "locked") return detail(job, pack);
       if (job.status !== "ready" || pack.status !== "ready") return null;
@@ -110,11 +110,45 @@ export function createInMemoryVirtualTryOnOwnerStore(initial: {
 
 class LockCasLostError extends Error {}
 
+type SourceRight = { assetId: string; attestationId: string };
+type DbReader = ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+function sourceRightsFromSnapshots(sourceSnapshot: unknown, rightsSnapshot: unknown): SourceRight[] | null {
+  if (!sourceSnapshot || !rightsSnapshot || typeof sourceSnapshot !== "object" || typeof rightsSnapshot !== "object" || Array.isArray(sourceSnapshot) || Array.isArray(rightsSnapshot)) return null;
+  const sources = (sourceSnapshot as { sources?: unknown }).sources;
+  const rights = (rightsSnapshot as { sources?: unknown }).sources;
+  if (!sources || !rights || typeof sources !== "object" || typeof rights !== "object" || Array.isArray(sources) || Array.isArray(rights)) return null;
+  const result: SourceRight[] = [];
+  for (const role of ["front", "back", "detail"]) {
+    const source = (sources as Record<string, unknown>)[role];
+    if (source === undefined) continue;
+    const right = (rights as Record<string, unknown>)[role];
+    if (!source || !right || typeof source !== "object" || typeof right !== "object") return null;
+    const assetId = (source as { assetId?: unknown }).assetId;
+    const attestationId = (right as { attestationId?: unknown }).attestationId;
+    if (typeof assetId !== "string" || typeof attestationId !== "string") return null;
+    result.push({ assetId, attestationId });
+  }
+  return result.length ? result : null;
+}
+
+async function sourceDeliveryAuthorized(client: DbReader, userId: string, sourceSnapshot: unknown, rightsSnapshot: unknown) {
+  const required = sourceRightsFromSnapshots(sourceSnapshot, rightsSnapshot);
+  if (!required) return false;
+  const rows = await client.select({ assetId: assets.id, attestationId: rightsAttestations.id })
+    .from(assets)
+    .innerJoin(assetRightsAttestations, eq(assetRightsAttestations.assetId, assets.id))
+    .innerJoin(rightsAttestations, eq(rightsAttestations.id, assetRightsAttestations.rightsAttestationId))
+    .where(and(eq(assets.userId, userId), isNull(assets.deletedAt), eq(rightsAttestations.userId, userId), isNull(rightsAttestations.redactedAt), inArray(assets.id, required.map((item) => item.assetId))));
+  return required.every((item) => rows.some((row) => row.assetId === item.assetId && row.attestationId === item.attestationId));
+}
+
 export function createDrizzleVirtualTryOnOwnerStore(db = getDb()): VirtualTryOnOwnerStore {
   const ownedJobWhere = (userId: string, jobId: string) => and(eq(virtualTryonJobs.id, jobId), eq(virtualTryonJobs.userId, userId), isNull(virtualTryonJobs.deletedAt));
   const readDetail = async (client: typeof db, userId: string, jobId: string) => {
-    const [job] = await client.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
+    const [job] = await client.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
     if (!job) return null;
+    if (!await sourceDeliveryAuthorized(client, userId, job.sourceSnapshot, job.rightsSnapshot)) return null;
     const [pack] = await client.select({ id: appearancePacks.id, version: appearancePacks.version, status: appearancePacks.status, lockedAt: appearancePacks.lockedAt }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, job.id)).orderBy(desc(appearancePacks.version)).limit(1);
     if (!pack) return null;
     const assets = await client.select({ id: appearancePackAssets.id, view: appearancePackAssets.view, status: appearancePackAssets.providerStatus, origin: appearancePackAssets.origin }).from(appearancePackAssets).where(eq(appearancePackAssets.appearancePackId, pack.id));
@@ -128,8 +162,11 @@ export function createDrizzleVirtualTryOnOwnerStore(db = getDb()): VirtualTryOnO
     async lockReadyPack(userId, jobId, packId) {
       try {
         return await db.transaction(async (tx) => {
-          const [job] = await tx.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
+          const [job] = await tx.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
           if (!job) return null;
+          if (!await sourceDeliveryAuthorized(tx, userId, job.sourceSnapshot, job.rightsSnapshot)) return null;
+          const [latestPack] = await tx.select({ id: appearancePacks.id }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, job.id)).orderBy(desc(appearancePacks.version)).limit(1);
+          if (!latestPack || latestPack.id !== packId) return null;
           const [pack] = await tx.select({ id: appearancePacks.id, version: appearancePacks.version, status: appearancePacks.status, lockedAt: appearancePacks.lockedAt }).from(appearancePacks).where(and(eq(appearancePacks.id, packId), eq(appearancePacks.virtualTryonJobId, job.id))).limit(1);
           if (!pack) return null;
           const assets = await tx.select({ id: appearancePackAssets.id, view: appearancePackAssets.view, status: appearancePackAssets.providerStatus, origin: appearancePackAssets.origin }).from(appearancePackAssets).where(eq(appearancePackAssets.appearancePackId, pack.id));
@@ -149,8 +186,9 @@ export function createDrizzleVirtualTryOnOwnerStore(db = getDb()): VirtualTryOnO
       }
     },
     async findDownloadableAsset(userId, jobId, assetId) {
-      const [job] = await db.select({ id: virtualTryonJobs.id, status: virtualTryonJobs.status }).from(virtualTryonJobs).where(and(ownedJobWhere(userId, jobId), inArray(virtualTryonJobs.status, ["ready", "locked"]))).limit(1);
+      const [job] = await db.select({ id: virtualTryonJobs.id, status: virtualTryonJobs.status, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(and(ownedJobWhere(userId, jobId), inArray(virtualTryonJobs.status, ["ready", "locked"]))).limit(1);
       if (!job) return null;
+      if (!await sourceDeliveryAuthorized(db, userId, job.sourceSnapshot, job.rightsSnapshot)) return null;
       const [pack] = await db.select({ id: appearancePacks.id }).from(appearancePacks).where(and(eq(appearancePacks.virtualTryonJobId, job.id), inArray(appearancePacks.status, ["ready", "locked"]))).orderBy(desc(appearancePacks.version)).limit(1);
       if (!pack) return null;
       const [asset] = await db.select({ id: appearancePackAssets.id, view: appearancePackAssets.view, r2Key: appearancePackAssets.r2Key }).from(appearancePackAssets).where(and(eq(appearancePackAssets.id, assetId), eq(appearancePackAssets.appearancePackId, pack.id), isNotNull(appearancePackAssets.r2Key))).limit(1);

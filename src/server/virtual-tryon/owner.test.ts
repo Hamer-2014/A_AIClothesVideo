@@ -47,6 +47,28 @@ describe("virtual try-on owner delivery", () => {
     await expect(getVirtualTryOnDetail({ userId: "owner", jobId: "missing" }, ownerStore)).resolves.toBeNull();
   });
 
+  it("immediately blocks detail, lock and download when source delivery authorization is revoked", async () => {
+    const ownerStore = createInMemoryVirtualTryOnOwnerStore({
+      jobs: [{ id: "job", userId: "owner", mode: "front_only", status: "ready", sourceAuthorized: false }],
+      packs: [{ id: "pack", jobId: "job", version: 1, status: "ready", lockedAt: null }],
+      assets: [{ id: "asset", packId: "pack", view: "front", status: "succeeded", r2Key: "key", origin: "generated_apimart_gpt_image_2" }],
+    });
+    await expect(getVirtualTryOnDetail({ userId: "owner", jobId: "job" }, ownerStore)).resolves.toBeNull();
+    await expect(lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "pack" }, ownerStore)).rejects.toThrow("appearance_pack_not_lockable");
+    await expect(createVirtualTryOnDownload({ userId: "owner", jobId: "job", assetId: "asset" }, ownerStore)).rejects.toThrow("appearance_pack_asset_not_found");
+  });
+
+  it("uses only the latest pack version for lock and download", async () => {
+    const ownerStore = createInMemoryVirtualTryOnOwnerStore({
+      jobs: [{ id: "job", userId: "owner", mode: "front_only", status: "ready" }],
+      packs: [{ id: "v1", jobId: "job", version: 1, status: "ready", lockedAt: null }, { id: "v2", jobId: "job", version: 2, status: "ready", lockedAt: null }],
+      assets: [{ id: "v1-asset", packId: "v1", view: "front", status: "succeeded", r2Key: "v1-key", origin: "generated" }, { id: "v2-asset", packId: "v2", view: "front", status: "succeeded", r2Key: "v2-key", origin: "generated" }],
+    });
+    await expect(lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "v1" }, ownerStore)).rejects.toThrow("appearance_pack_not_lockable");
+    await expect(createVirtualTryOnDownload({ userId: "owner", jobId: "job", assetId: "v1-asset" }, ownerStore)).rejects.toThrow("appearance_pack_asset_not_found");
+    await expect(lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "v2" }, ownerStore)).resolves.toMatchObject({ pack: { id: "v2", status: "locked" } });
+  });
+
   it("gates the video bridge until both job and pack are deliverable", async () => {
     const ownerStore = createInMemoryVirtualTryOnOwnerStore({
       jobs: [{ id: "job", userId: "owner", mode: "front_only", status: "generating" }],
@@ -104,17 +126,20 @@ describe("virtual try-on owner delivery", () => {
     const updates: Array<Record<string, unknown>> = [];
     const events: unknown[] = [];
     const rows = [
-      [{ id: "job", mode: "front_only", status: "ready" }],
+      [{ id: "job", mode: "front_only", status: "ready", sourceSnapshot: { sources: { front: { assetId: "source-asset" } } }, rightsSnapshot: { sources: { front: { attestationId: "attestation" } } } }],
+      [{ assetId: "source-asset", attestationId: "attestation" }],
+      [{ id: "pack" }],
       [{ id: "pack", version: 1, status: "ready", lockedAt: null }],
       [{ id: "asset", view: "front", status: "succeeded", origin: "generated_apimart_gpt_image_2" }],
     ];
     const result = (value: unknown[]) => {
-      const promise = Promise.resolve(value) as Promise<unknown[]> & { limit: () => Promise<unknown[]> };
+      const promise = Promise.resolve(value) as Promise<unknown[]> & { limit: () => Promise<unknown[]>; orderBy: () => Promise<unknown[]> };
       promise.limit = async () => value;
+      promise.orderBy = () => promise;
       return promise;
     };
     const tx = {
-      select: () => ({ from: () => ({ where: () => result(rows.shift() ?? []) }) }),
+      select: () => ({ from: () => ({ innerJoin: () => ({ innerJoin: () => ({ where: () => result(rows.shift() ?? []) }) }), where: () => result(rows.shift() ?? []) }) }),
       update: () => ({ set: (values: Record<string, unknown>) => { updates.push(values); return { where: () => ({ returning: async () => [{ id: "locked" }] }) }; } }),
       insert: () => ({ values: async (value: unknown) => { events.push(value); } }),
     };

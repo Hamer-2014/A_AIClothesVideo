@@ -5,7 +5,7 @@ import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import { createBillingMaintenanceCreditOperations, createDrizzleBillingMaintenanceStore, runBillingMaintenanceTick } from "@/server/virtual-tryon/maintenance";
 import { createDefaultVirtualTryOnRuntimeDeps, runVirtualTryOnTick } from "@/server/virtual-tryon/runtime";
 
-const defaultLimit = 10;
+const defaultLimit = 1;
 
 type TickActionResult = { processed: number; action?: string };
 type TickRunner = (input: { workerId: string; now: Date }) => Promise<TickActionResult>;

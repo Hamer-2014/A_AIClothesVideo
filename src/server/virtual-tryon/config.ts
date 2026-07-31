@@ -24,11 +24,22 @@ function positiveInteger(value: string | undefined) {
 }
 
 export function getVirtualTryOnConfig(env: Record<string, string | undefined> = process.env) {
-  const required = ["APIMART_API_KEY", "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "VIRTUAL_TRYON_MODEL_FRONT_KEY", "VIRTUAL_TRYON_MODEL_SIDE_KEY", "VIRTUAL_TRYON_MODEL_BACK_KEY"];
+  const required = ["APIMART_API_KEY", "CLOUDFLARE_R2_ACCOUNT_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY", "CLOUDFLARE_R2_BUCKET", "VIRTUAL_TRYON_MODEL_FRONT_KEY", "VIRTUAL_TRYON_MODEL_SIDE_KEY", "VIRTUAL_TRYON_MODEL_BACK_KEY"];
   if (required.some((name) => !env[name]?.trim())) throw new Error("virtual_tryon_config_unavailable");
   return {
     frontOnlyCreditCost: positiveInteger(env.VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST),
     threeViewCreditCost: positiveInteger(env.VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST),
     modelKeys: { front: env.VIRTUAL_TRYON_MODEL_FRONT_KEY!, side: env.VIRTUAL_TRYON_MODEL_SIDE_KEY!, back: env.VIRTUAL_TRYON_MODEL_BACK_KEY! },
   };
+}
+
+export type VirtualTryOnPublicConfig = { available: boolean; frontOnlyCreditCost: number | null; threeViewCreditCost: number | null };
+
+export function getVirtualTryOnPublicConfig(env: Record<string, string | undefined> = process.env): VirtualTryOnPublicConfig {
+  try {
+    const config = getVirtualTryOnConfig(env);
+    return { available: true, frontOnlyCreditCost: config.frontOnlyCreditCost, threeViewCreditCost: config.threeViewCreditCost };
+  } catch {
+    return { available: false, frontOnlyCreditCost: null, threeViewCreditCost: null };
+  }
 }

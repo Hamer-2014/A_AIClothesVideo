@@ -18,7 +18,7 @@ export type VirtualTryOnGenerationProviderDeps = {
 };
 
 function promptFor(view: AppearanceView) {
-  return "Create a single static " + view + " view of the configured AI model wearing the supplied garment. Preserve the garment silhouette, color, pattern, construction and visible details. Do not invent garment details that are not present in the references. Keep the same model identity, anatomy and proportions across views.";
+  return "Create a single static " + view + " view of the configured AI model wearing the supplied garment. The ordered references are model, prior generated views when present, then garment front, garment back and garment detail. Use prior generated views only to preserve the same person and garment across views. Preserve the garment silhouette, color, pattern, construction and visible details. Do not invent garment details that are not present in the garment references.";
 }
 
 function promptHash(prompt: string) {
@@ -35,6 +35,14 @@ function sourceKeysFor(job: RuntimeJob) {
     keys.push(job.sourceKeys.detail);
   }
   return keys;
+}
+
+function priorGeneratedKeysFor(job: RuntimeJob, view: AppearanceView) {
+  if (job.mode !== "three_view" || view === "front") return [];
+  const priorViews = view === "side" ? ["front"] as const : ["front", "side"] as const;
+  const keys = priorViews.map((priorView) => job.assets.find((asset) => asset.view === priorView)?.r2Key);
+  if (keys.some((key) => !key)) throw new Error("virtual_tryon_prior_view_missing");
+  return keys as string[];
 }
 
 async function writeLog(input: {
@@ -75,8 +83,9 @@ export function createVirtualTryOnGenerationProvider(deps: VirtualTryOnGeneratio
       const modelKey = job.modelKeys[view];
       if (!modelKey) throw new Error("virtual_tryon_model_key_missing");
       const sourceKeys = sourceKeysFor(job);
+      const priorKeys = priorGeneratedKeysFor(job, view);
       const prompt = promptFor(view);
-      const imageUrls = await Promise.all([modelKey, ...sourceKeys].map((key) => deps.signer({ key, expiresIn: 300 })));
+      const imageUrls = await Promise.all([modelKey, ...priorKeys, ...sourceKeys].map((key) => deps.signer({ key, expiresIn: 300 })));
       try {
         const result = await imageClient({ prompt, imageUrls });
         await writeLog({ deps, job, view, imageCount: imageUrls.length, prompt, status: "succeeded", taskId: result.providerTaskId, providerStatus: "submitted" });

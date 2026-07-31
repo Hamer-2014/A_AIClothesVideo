@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isStrictCrossViewQaPass, isStrictViewQaPass, parseStrictViewQa, type StrictViewQa } from "./qa-schema";
+import { isStrictCrossViewQaPass, isStrictViewQaPass, parseStrictCrossViewQa, parseStrictViewQa, type StrictViewQa } from "./qa-schema";
 
 describe("virtual try-on strict QA", () => {
   it("fails closed for unknown results", () => {
@@ -9,5 +9,13 @@ describe("virtual try-on strict QA", () => {
   });
   it("rejects missing nested fields", () => {
     expect(() => parseStrictViewQa({ verdict: "pass", targetView: "front", garment: {}, person: {}, inventedDetails: false, evidence: [] })).toThrow("qa_schema_error");
+  });
+  it("fails closed when a valid view result is bound to the wrong target", () => {
+    const qa = parseStrictViewQa({ verdict: "pass", targetView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] });
+    expect(isStrictViewQaPass(qa, "side")).toBe(false);
+  });
+  it("fails closed when a cross result has an out-of-order or incomplete view set", () => {
+    const qa = parseStrictCrossViewQa({ verdict: "pass", requiredViews: ["front", "back", "side"], coverage: "complete", garmentConsistency: "match", personConsistency: "match", evidence: [] });
+    expect(isStrictCrossViewQaPass(qa, ["front", "side", "back"])).toBe(false);
   });
 });

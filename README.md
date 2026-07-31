@@ -103,3 +103,6 @@ worker 默认监听 `http://localhost:8080`，本地还需要 ffmpeg 和 worker/
 - `docs/DEVELOPMENT_SPEC.md`
 - `docs/STYLE_PRESET_DESIGN.md`
 - `docs/deployment/cloud-run-stitch.md`
+# 虚拟试穿运维入口
+
+静态 AI 模特试穿部署、cron、R2 输出限制与 staging smoke 见 [docs/deployment/virtual-try-on.md](docs/deployment/virtual-try-on.md)。该模块不运行视频动作、Flow Music 或 Cloud Run 拼接。

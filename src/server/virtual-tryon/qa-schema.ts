@@ -34,10 +34,10 @@ export function parseStrictCrossViewQa(value: unknown): StrictCrossViewQa {
   return { verdict: oneOf(root.verdict, ["pass", "fail", "unknown"]), requiredViews, coverage: oneOf(root.coverage, ["complete", "incomplete", "unknown"]), garmentConsistency: oneOf(root.garmentConsistency, ["match", "mismatch", "unknown"]), personConsistency: oneOf(root.personConsistency, ["match", "mismatch", "unknown"]), evidence: strings(root.evidence) };
 }
 
-export function isStrictViewQaPass(value: StrictViewQa) {
-  return value.verdict === "pass" && value.garment?.silhouette === "match" && value.garment.color === "match" && value.garment.pattern === "match" && value.garment.visibleDetails === "match" && value.person?.anatomy === "natural" && value.person.identityConsistency === "match" && value.inventedDetails === false;
+export function isStrictViewQaPass(value: StrictViewQa, expectedView?: AppearanceView) {
+  return value.verdict === "pass" && (!expectedView || value.targetView === expectedView) && value.garment?.silhouette === "match" && value.garment.color === "match" && value.garment.pattern === "match" && value.garment.visibleDetails === "match" && value.person?.anatomy === "natural" && value.person.identityConsistency === "match" && value.inventedDetails === false;
 }
 
-export function isStrictCrossViewQaPass(value: StrictCrossViewQa) {
-  return value.verdict === "pass" && value.coverage === "complete" && value.garmentConsistency === "match" && value.personConsistency === "match";
+export function isStrictCrossViewQaPass(value: StrictCrossViewQa, expectedViews: AppearanceView[] = ["front", "side", "back"]) {
+  return value.verdict === "pass" && value.coverage === "complete" && value.garmentConsistency === "match" && value.personConsistency === "match" && value.requiredViews.length === expectedViews.length && value.requiredViews.every((view, index) => view === expectedViews[index]);
 }

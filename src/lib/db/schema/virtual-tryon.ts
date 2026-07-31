@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  index,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -39,7 +40,7 @@ export const virtualTryonJobs = pgTable("virtual_tryon_jobs", {
   ...lockableJobFields,
   ...timestamps,
   ...softDelete,
-}, (table) => [uniqueIndex("virtual_tryon_jobs_owner_idempotency_unique").on(table.userId, table.createIdempotencyKey)]);
+}, (table) => [uniqueIndex("virtual_tryon_jobs_owner_idempotency_unique").on(table.userId, table.createIdempotencyKey), index("virtual_tryon_jobs_runnable_idx").on(table.status, table.deletedAt, table.nextRetryAt, table.lockedUntil, table.createdAt)]);
 
 export const appearancePacks = pgTable("appearance_packs", {
   ...id,
@@ -59,6 +60,9 @@ export const appearancePackAssets = pgTable("appearance_pack_assets", {
   providerTaskId: text("provider_task_id"),
   providerStatus: text("provider_status").notNull().default("pending"),
   attemptCount: integer("attempt_count").notNull().default(0),
+  submitAttemptCount: integer("submit_attempt_count").notNull().default(0),
+  pollFailureCount: integer("poll_failure_count").notNull().default(0),
+  deliveryFailureCount: integer("delivery_failure_count").notNull().default(0),
   r2Key: text("r2_key"),
   origin: text("origin").notNull().default("generated_apimart_gpt_image_2"),
   provenance: jsonSnapshot("provenance").notNull(),

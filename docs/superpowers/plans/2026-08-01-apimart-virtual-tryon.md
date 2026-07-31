@@ -283,6 +283,8 @@ return { id: job.id, ownerId: job.userId, mode: job.mode, status: job.status, pa
 
 ### Task 11: Smoke, product docs and final verification
 
+> 2026-08-01 implementation update: Task 1-10 are implemented on the feature branch. Task 11 now includes the staging-only `scripts/virtual-try-on-smoke.mjs`, deployment checklist, APIMart official envelope regression tests, host/MIME/size constrained R2 transfer, source-rights delivery gate, phase-aware retry, and final full-suite verification. Real smoke remains explicitly skipped unless staging cost acknowledgement and all required credentials are present.
+
 Files: Create scripts/virtual-tryon-smoke.mjs and scripts/virtual-tryon-smoke.test.ts. Modify docs/VIRTUAL_TRYON_SPEC.md, docs/PRD.md, docs/TECHNICAL_ARCHITECTURE.md, docs/IMPLEMENTATION_PLAN.md, docs/DEVELOPMENT_SPEC.md and docs/STYLE_PRESET_DESIGN.md.
 
 - [ ] Step 1: Write the failing test.

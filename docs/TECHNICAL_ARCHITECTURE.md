@@ -981,3 +981,6 @@ MVP 至少需要后台可见指标：
 - Creem webhook 事件类型与测试流程。
 - Creem Moderation 生产 key、sandbox/production 验证流程、flag/deny 测试用例。
 - 管理员后台首批需要的筛选字段。
+# 虚拟试穿运行边界
+
+`/api/internal/virtual-try-on/tick` 是 Vercel/Next.js 内部端点，使用 CRON_JOB_SECRET，默认一次处理一个原子动作；不与 Cloud Run stitch worker 混用。GPT Image 2 输出必须经过试穿专用 host/MIME/25 MiB 限制转存后写入私有 R2，不能让 provider URL 进入持久化或日志。

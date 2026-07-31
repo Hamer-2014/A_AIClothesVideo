@@ -7,14 +7,14 @@ import { createDrizzleProviderCallLogStore, type ProviderCallLogStore } from "@/
 import { createVisionVirtualTryOnQa } from "@/lib/providers/vision/client";
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
 import { transferRemoteFileToR2 } from "@/lib/storage/transfer";
-import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import type { AppearanceView, VirtualTryOnMode } from "./config";
 import { runVirtualTryOnQa } from "./qa";
 import { createDrizzleVirtualTryOnQaStore, type VirtualTryOnQaStore } from "./qa-store";
 import { createVirtualTryOnGenerationProvider } from "./generation-provider";
-import { retryDecision } from "./retry";
+import { transferVirtualTryOnImageToR2 } from "./transfer";
 
-export type RuntimeAsset = { view: AppearanceView; providerTaskId: string | null; providerStatus: "pending" | "queued" | "running" | "succeeded" | "failed"; attemptCount: number; r2Key: string | null; lastErrorCode?: string | null; nextRetryAt?: Date | null; outputUrl?: string | null };
+export type RuntimeAsset = { view: AppearanceView; providerTaskId: string | null; providerStatus: "pending" | "queued" | "running" | "succeeded" | "failed"; attemptCount: number; submitAttemptCount?: number; pollFailureCount?: number; deliveryFailureCount?: number; r2Key: string | null; lastErrorCode?: string | null; nextRetryAt?: Date | null; outputUrl?: string | null };
 export type RuntimeStatus = "queued" | "generating" | "qa_queued" | "capturing" | "ready" | "recovering_release" | "recovering_refund" | "failed_released" | "failed_refunded";
 export type RuntimeJob = { id: string; packId: string; userId: string; mode: VirtualTryOnMode; status: RuntimeStatus; creditCost: number; lockedUntil: Date | null; sourceKeys: Partial<Record<"front" | "back" | "detail", string>>; modelKeys: Record<AppearanceView, string>; assets: RuntimeAsset[]; deliveryPersistAttemptCount?: number };
 export type QaRunner = (job: RuntimeJob) => Promise<{ allPassed: boolean }>;
@@ -58,7 +58,7 @@ export function createDefaultVirtualTryOnRuntimeDeps(input: {
     store: input.store ?? createDrizzleVirtualTryOnRuntimeStore(),
     submit: provider.submit,
     poll: provider.poll,
-    transfer: input.transfer ?? transferRemoteFileToR2,
+    transfer: input.transfer ?? transferVirtualTryOnImageToR2,
     qaDeps: {
       signer: (key: string) => signer({ key, expiresIn: 300 }),
       qaStore: input.qaStore ?? createDrizzleVirtualTryOnQaStore(),
@@ -98,7 +98,7 @@ export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStor
       if (!candidate) return null;
       const [locked] = await db.update(virtualTryonJobs).set({ lockedBy: workerId, lockedUntil: new Date(now.getTime() + 60_000), attemptCount: candidate.attemptCount + 1 }).where(and(eq(virtualTryonJobs.id, candidate.id), eq(virtualTryonJobs.status, candidate.status), or(isNull(virtualTryonJobs.lockedUntil), lte(virtualTryonJobs.lockedUntil, now)))).returning();
       if (!locked) return null;
-      const [pack] = await db.select().from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, locked.id)).limit(1);
+      const [pack] = await db.select().from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, locked.id)).orderBy(desc(appearancePacks.version)).limit(1);
       if (!pack) throw new Error("virtual_tryon_pack_missing");
       const rows = await db.select().from(appearancePackAssets).where(eq(appearancePackAssets.appearancePackId, pack.id));
       const modelKeys = parseRuntimeModelKeys(locked.modelSnapshot);
@@ -109,13 +109,13 @@ export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStor
         });
         return null;
       }
-      return { id: locked.id, packId: pack.id, userId: locked.userId, mode: locked.mode, status: locked.status as RuntimeStatus, creditCost: locked.creditCost, lockedUntil: locked.lockedUntil, sourceKeys: sourceKeysFromSnapshot(locked.sourceSnapshot), modelKeys, deliveryPersistAttemptCount: locked.deliveryPersistAttemptCount, assets: rows.map((item) => ({ view: item.view, providerTaskId: item.providerTaskId, providerStatus: item.providerStatus as RuntimeAsset["providerStatus"], attemptCount: item.attemptCount, r2Key: item.r2Key, lastErrorCode: item.lastErrorCode, nextRetryAt: item.nextRetryAt })) };
+      return { id: locked.id, packId: pack.id, userId: locked.userId, mode: locked.mode, status: locked.status as RuntimeStatus, creditCost: locked.creditCost, lockedUntil: locked.lockedUntil, sourceKeys: sourceKeysFromSnapshot(locked.sourceSnapshot), modelKeys, deliveryPersistAttemptCount: locked.deliveryPersistAttemptCount, assets: rows.map((item) => ({ view: item.view, providerTaskId: item.providerTaskId, providerStatus: item.providerStatus as RuntimeAsset["providerStatus"], attemptCount: item.attemptCount, submitAttemptCount: item.submitAttemptCount, pollFailureCount: item.pollFailureCount, deliveryFailureCount: item.deliveryFailureCount, r2Key: item.r2Key, lastErrorCode: item.lastErrorCode, nextRetryAt: item.nextRetryAt })) };
     },
     async saveAsset(jobId, workerId, asset) {
       if (!await held(jobId, workerId, ["queued", "generating"])) return false;
-      const [pack] = await db.select({ id: appearancePacks.id }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, jobId)).limit(1);
+      const [pack] = await db.select({ id: appearancePacks.id }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, jobId)).orderBy(desc(appearancePacks.version)).limit(1);
       if (!pack) throw new Error("virtual_tryon_pack_missing");
-      const [saved] = await db.update(appearancePackAssets).set({ providerTaskId: asset.providerTaskId, providerStatus: asset.providerStatus, attemptCount: asset.attemptCount, r2Key: asset.r2Key, lastErrorCode: asset.lastErrorCode ?? null, nextRetryAt: asset.nextRetryAt ?? null, updatedAt: new Date() }).where(and(eq(appearancePackAssets.appearancePackId, pack.id), eq(appearancePackAssets.view, asset.view))).returning({ id: appearancePackAssets.id });
+      const [saved] = await db.update(appearancePackAssets).set({ providerTaskId: asset.providerTaskId, providerStatus: asset.providerStatus, attemptCount: asset.attemptCount, submitAttemptCount: asset.submitAttemptCount ?? 0, pollFailureCount: asset.pollFailureCount ?? 0, deliveryFailureCount: asset.deliveryFailureCount ?? 0, r2Key: asset.r2Key, lastErrorCode: asset.lastErrorCode ?? null, nextRetryAt: asset.nextRetryAt ?? null, updatedAt: new Date() }).where(and(eq(appearancePackAssets.appearancePackId, pack.id), eq(appearancePackAssets.view, asset.view))).returning({ id: appearancePackAssets.id });
       return Boolean(saved);
     },
     async transitionToGenerating(jobId, workerId, expectedStatus) {
@@ -211,39 +211,66 @@ export async function runVirtualTryOnTick(input: { workerId: string; store: Runt
   const asset = order.map((view) => job.assets.find((item) => item.view === view)).find((item) => item && !item.r2Key);
   try {
     if (asset) {
+      let phase: "submit" | "poll" | "transfer" = "submit";
       try {
         if (!asset.providerTaskId) {
+          phase = "submit";
           asset.providerTaskId = await input.submit(job, asset.view);
           asset.providerStatus = "queued";
           asset.attemptCount += 1;
+          asset.submitAttemptCount = (asset.submitAttemptCount ?? asset.attemptCount - 1) + 1;
           if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
           const transitioned = await input.store.transitionToGenerating(job.id, input.workerId, job.status === "queued" ? "queued" : "generating");
           return { processed: 1, action: transitioned ? "submit" as const : "lost_lease" as const };
         }
+        phase = "poll";
         const polled = await input.poll(job, asset.view, asset.providerTaskId);
         asset.providerStatus = polled.status;
         asset.outputUrl = polled.outputUrl;
+        asset.pollFailureCount = 0;
         if (polled.status === "failed") throw new Error("provider_failed");
         if (polled.status !== "succeeded" || !polled.outputUrl) {
           if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
           return { processed: 1, action: "poll" as const };
         }
         const key = "virtual-tryon/" + job.id + "/packs/" + job.packId + "/" + asset.view + ".png";
-        await (input.transfer ?? transferRemoteFileToR2)({ url: polled.outputUrl, key });
+        phase = "transfer";
+        await (input.transfer ?? transferVirtualTryOnImageToR2)({ url: polled.outputUrl, key });
         asset.r2Key = key;
         asset.outputUrl = null;
         if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
         return { processed: 1, action: "transfer" as const };
       } catch (error) {
         const code = errorCode(error);
-        const decision = retryDecision({ code, status: errorStatus(error), attemptCount: asset.attemptCount, now });
-        if (decision.retry) {
-          asset.attemptCount += 1;
-          asset.lastErrorCode = decision.errorCode ?? code;
-          asset.nextRetryAt = decision.nextRetryAt;
-          asset.providerStatus = asset.providerTaskId ? "running" : "pending";
+        const status = errorStatus(error) ?? Number(code.match(/^http_(\d{3})$/)?.[1]);
+        const retryable = code === "timeout" || code === "network_error" || status === 429 || (Number.isInteger(status) && status >= 500);
+        if (phase === "submit") {
+          const attempts = (asset.submitAttemptCount ?? asset.attemptCount) + 1;
+          asset.submitAttemptCount = attempts;
+          asset.attemptCount = attempts;
+          asset.lastErrorCode = code;
+          asset.nextRetryAt = status === 429 && attempts < 2 ? new Date(now.getTime() + 30_000) : null;
+          asset.providerStatus = "pending";
+          if (status === 429 && attempts < 2) {
+            if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
+            await input.store.scheduleRetry(job.id, input.workerId, new Date(now.getTime() + 30_000));
+            return { processed: 1, action: "retry" as const };
+          }
+        } else if (retryable && phase === "poll" && (asset.pollFailureCount ?? 0) < 10) {
+          asset.pollFailureCount = (asset.pollFailureCount ?? 0) + 1;
+          asset.lastErrorCode = code;
+          asset.nextRetryAt = new Date(now.getTime() + 30_000);
+          asset.providerStatus = "running";
           if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
-          await input.store.scheduleRetry(job.id, input.workerId, decision.nextRetryAt);
+          await input.store.scheduleRetry(job.id, input.workerId, asset.nextRetryAt);
+          return { processed: 1, action: "retry" as const };
+        } else if (retryable && phase === "transfer" && (asset.deliveryFailureCount ?? 0) < 3) {
+          asset.deliveryFailureCount = (asset.deliveryFailureCount ?? 0) + 1;
+          asset.lastErrorCode = code;
+          asset.nextRetryAt = new Date(now.getTime() + 30_000);
+          asset.providerStatus = "succeeded";
+          if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
+          await input.store.scheduleRetry(job.id, input.workerId, asset.nextRetryAt);
           return { processed: 1, action: "retry" as const };
         }
         await input.store.transitionToRecoveringRelease(job.id, input.workerId, job.status === "queued" ? "queued" : "generating", code);

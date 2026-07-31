@@ -167,10 +167,10 @@ export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDet
               const previewUrl = `/api/virtual-try-on/${detail.job.id}/assets/${view.id}/download?preview=1`;
               const downloadUrl = `/api/virtual-try-on/${detail.job.id}/assets/${view.id}/download`;
               return <article className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-raised)]" key={view.id}>
-                <div className="aspect-[4/5] bg-[var(--surface-subtle)]">
+                <div className="aspect-[2/3] bg-[var(--surface-subtle)]">
                   {/* Keep the preview on the owner-gated route; a remote optimizer would change its access boundary. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt={`${label} ${workspaceText(language, "appearance view", "定妆视图")}`} className="size-full object-cover" src={previewUrl} />
+                  <img alt={`${label} ${workspaceText(language, "appearance view", "定妆视图")}`} className="size-full object-contain" src={previewUrl} />
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-3"><p className="text-sm font-semibold">{label}</p><a aria-label={workspaceText(language, `Download ${label} view`, `下载${label}定妆图`)} className="inline-flex size-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]" href={downloadUrl} title={workspaceText(language, `Download ${label} view`, `下载${label}定妆图`)}><Download aria-hidden="true" size={16} /></a></div>
               </article>;

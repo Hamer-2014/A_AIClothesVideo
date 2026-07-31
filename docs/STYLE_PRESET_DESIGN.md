@@ -130,6 +130,8 @@ Preset: 极简棚拍
 
 `model_quarter_turn` 与 `model_half_turn` 同样是付费 Beta、Advanced-only 模板，`autoSelectAllowed=false`。它们只接受同一真人模特穿着同一件服装的对应多视角素材，且 `model_views` 的服装一致性和任务内可见模特一致性必须同时通过；单张正面真人图只能使用 `model_front_pose`。两个转身模板不进入任何 Preset 自动槽位。
 
+虚拟试穿的 `front_only` / `three_view` appearance pack 不属于 Style Preset，也不应被 Preset、视频模板或用户意图自动触发。它是独立收费静态入口，现阶段没有视频动作或场景生成能力。
+
 只有商品图时，Preset 不得隐式生成真人或虚拟模特。虚拟穿衣已作为独立静态上游入口，不受 Preset 触发；它使用平台模特生成带 `generated_apimart_gpt_image_2` provenance 的 `front_only` 或 `three_view` appearance pack，而非用户上传真人。视频桥接尚未启用，未来复用模特动作模板前仍须通过任务内一致性校验。
 
 如果用户选择 `social_lifestyle`，但没有场景图，也不能生成强场景，例如真实街拍、咖啡馆、海边、店铺空间等。最多只能使用通用弱背景和低风险氛围表达。

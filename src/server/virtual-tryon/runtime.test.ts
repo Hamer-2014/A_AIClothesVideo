@@ -183,12 +183,31 @@ describe("virtual try-on runtime tick", () => {
     expect(first.action).toBe("submit"); expect(second.action).toBe("poll"); expect(job.assets[0]?.providerTaskId).toBe("task");
   });
 
-  it("persists a retry delay after the first retryable submit failure", async () => {
+  it("does not retry an ambiguous submit timeout", async () => {
     const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, r2Key: null }] };
     const saved: RuntimeJob["assets"][number][] = []; let released = 0; let jobRetryAt: Date | null = null;
     const store: RuntimeStore = { acquire: async () => job, saveAsset: async (_id, _workerId, asset) => { saved.push(asset); return true; }, transitionToGenerating: async () => true, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry", transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => true, releaseLease: async () => { released++; return true; }, scheduleRetry: async (_id, _workerId, retryAt) => { jobRetryAt = retryAt; return true; } };
     const credits = createInMemoryCreditLedgerStore(); await grantTrialCredits({ store: credits, userId: "user", amount: 2, reason: "test", idempotencyKey: "grant" });
     const result = await runVirtualTryOnTick({ workerId: "worker", store, credits, submit: async () => { const error = new Error("timeout"); (error as Error & { code: string }).code = "timeout"; throw error; }, poll: async () => ({ status: "running", outputUrl: null }), qa: async () => ({ allPassed: false }), now: new Date(0) });
-    expect(result.action).toBe("retry"); expect(saved[0]?.attemptCount).toBe(1); expect(saved[0]?.nextRetryAt).toEqual(new Date(30_000)); expect(jobRetryAt).toEqual(new Date(30_000)); expect(released).toBe(1);
+    expect(result.action).toBe("recovering_release"); expect(jobRetryAt).toBeNull(); expect(released).toBe(1);
+  });
+
+  it("keeps a persisted task and submit count when a poll times out", async () => {
+    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "generating", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: "task", providerStatus: "running", attemptCount: 1, submitAttemptCount: 1, pollFailureCount: 0, r2Key: null }] };
+    let saved: RuntimeJob["assets"][number] | undefined;
+    const store = { acquire: async () => job, saveAsset: async (_id: string, _worker: string, asset: RuntimeJob["assets"][number]) => { saved = { ...asset }; return true; }, transitionToGenerating: async () => true, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry" as const, transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => true, releaseLease: async () => true, scheduleRetry: async () => true } as unknown as RuntimeStore;
+    const error = Object.assign(new Error("timeout"), { code: "timeout" });
+    const result = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw new Error("must_not_submit"); }, poll: async () => { throw error; }, now: new Date(0) });
+    expect(result.action).toBe("retry"); expect(saved).toMatchObject({ providerTaskId: "task", submitAttemptCount: 1, pollFailureCount: 1, nextRetryAt: new Date(30_000) });
+  });
+
+  it("retries a 429 submit once and then releases without a third submit", async () => {
+    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, submitAttemptCount: 0, r2Key: null }] };
+    let releases = 0;
+    const store = { acquire: async () => job, saveAsset: async (_id: string, _worker: string, asset: RuntimeJob["assets"][number]) => { job.assets[0] = { ...asset }; return true; }, transitionToGenerating: async () => true, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry" as const, transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => { releases++; return true; }, releaseLease: async () => true, scheduleRetry: async () => true } as unknown as RuntimeStore;
+    const error = Object.assign(new Error("rate"), { code: "http_429", status: 429 });
+    const first = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw error; }, poll: async () => ({ status: "running" as const, outputUrl: null }), now: new Date(0) });
+    const second = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw error; }, poll: async () => ({ status: "running" as const, outputUrl: null }), now: new Date(30_000) });
+    expect(first.action).toBe("retry"); expect(second.action).toBe("recovering_release"); expect(job.assets[0]?.submitAttemptCount).toBe(2); expect(releases).toBe(1);
   });
 });

@@ -52,6 +52,15 @@ vi.mock("@/components/workspace/upload-panel", () => ({
 }));
 
 describe("VirtualTryOnCreateForm", () => {
+  it("shows the selected public credit cost and disables all controls when unavailable", () => {
+    const view = render(<VirtualTryOnCreateForm language="en" publicConfig={{ available: true, frontOnlyCreditCost: 10, threeViewCreditCost: 30 }} />);
+    expect(screen.getByRole("button", { name: /Create appearance pack.*10 credits/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Front, side, and back/i }));
+    expect(screen.getByRole("button", { name: /Create appearance pack.*30 credits/i })).toBeDisabled();
+    view.unmount();
+    render(<VirtualTryOnCreateForm language="en" publicConfig={{ available: false, frontOnlyCreditCost: null, threeViewCreditCost: null }} />);
+    expect(screen.getByText("The virtual try-on service is temporarily unavailable. Try again shortly.")).toBeInTheDocument();
+  });
   beforeEach(() => {
     mocks.randomUUID.mockReset();
     mocks.randomUUID.mockReturnValueOnce("request-1").mockReturnValueOnce("request-2").mockReturnValue("request-3");

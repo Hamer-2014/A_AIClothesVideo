@@ -47,9 +47,9 @@ type CreateVirtualTryOnRequest = {
 { model: "gpt-image-2", n: 1, prompt, image_urls: orderedUrls }
 ```
 
-`orderedUrls` 不超过 16，顺序是当前 view 的临时模特 reference，然后 `front`、在 `three_view` 下依次 `back`、`detail`。`GET /v1/tasks/{task_id}` 只轮询该 view。provider 任务和输出 URL 可在进程内暂存；输出 URL 一到达立即 `transferRemoteObjectToR2`，写 key `virtual-tryon/{jobId}/packs/{packId}/{view}.png`。系统不保存远程 URL。
+`orderedUrls` 不超过 16，且必须按一致性链固定：front = modelFront, garmentFront, garmentBack?, garmentDetail?；side = modelSide, generatedFront, garmentFront, garmentBack, garmentDetail；back = modelBack, generatedFront, generatedSide, garmentFront, garmentBack, garmentDetail。前序 generated view 必须已经转存 R2，缺失即 fail closed。生产 appearance pack 固定 `size="2:3"`、`resolution="2k"`，不先做 1k 再做 2k 双生成，避免双重成本和人物漂移；smoke 也不改变该协议。`GET /v1/tasks/{task_id}` 只轮询该 view，官方 completed 输出读取 `data.result.images[0].url[0]`。provider 任务和输出 URL 仅在进程内暂存；输出 URL 一到达立即受限转存到 `virtual-tryon/{jobId}/packs/{packId}/{view}.png`，系统不保存远程 URL。
 
-失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed；网络超时、429、5xx、明确 queued/running poll 为可重试；4xx（非 429）、provider failed、无 output URL 为不可重试。每 view 记录 `attemptCount`、`providerTaskId`、`providerStatus`、`r2Key`、`lastErrorCode`、`nextRetryAt`；最多 2 次 submit：第一次失败等待 30 秒，第二次 submit 失败直接转 `recovering_release`，不设置不可达的 120 秒第三次尝试。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response。
+失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed。submit、poll 使用 25 秒 AbortSignal timeout。`submitAttemptCount` 只记录真实 submit，最多 2 次；网络 timeout/network error 不自动重提（APIMart 未声明 idempotency key，受理状态未知），429 只可在 30 秒后重提一次，5xx 也保守进入 release。已有 `providerTaskId` 时 poll 绝不清 task 或重新 submit；`pollFailureCount` 最多 10 次、每次 30 秒。transfer 保留 task 并用独立 delivery failure count 有界重试；SSRF/host/MIME/size 校验失败直接 release。受限转存只允许 HTTPS、默认 `upload.apimart.ai`（可用 `APIMART_IMAGE_OUTPUT_HOST_ALLOWLIST` 覆盖），拒绝 localhost/IP/私网/link-local/metadata、redirect、非 PNG/JPEG/WebP 和超过 25 MiB 的响应。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response；QA log 写入失败同样 fail closed。
 
 ## 5. 数据、状态机与幂等
 
@@ -102,6 +102,6 @@ type StrictCrossViewQa = { verdict: "pass" | "fail" | "unknown"; requiredViews: 
 
 ## 8. 保留、指标、桥接与 smoke
 
-source asset、rights snapshot、pack/provenance、QA、state event 和脱敏 provider log 按既有 retention/rights-removal 工作流保留；源资产删/撤权后 pack soft-delete、禁下载，并调度 R2 删除。指标为创建/配置/审核/扣款失败率，视角提交/轮询/R2/QA 成功率，ready/lock/download 转化，重试次数、成本、退款人工工单率。
+source asset、rights snapshot、pack/provenance、QA、state event 和脱敏 provider log 按既有 retention/rights-removal 工作流保留；源资产删/撤权或 attestation redacted 后立即禁 detail/lock/preview/download（统一不可用，不泄露原因）。当前没有可靠 R2 异步物理清理队列，不宣称已调度删除。指标为创建/配置/审核/扣款失败率，视角提交/轮询/R2/QA 成功率，ready/lock/download 转化，重试次数、成本、退款人工工单率。
 
 桥接仅在 ready/locked 返回 `{ kind:"virtual_tryon_appearance_pack", appearancePackId, version, mode, assetIds, provenance:"generated_apimart_gpt_image_2", videoGeneration:"not_enabled" }`。真实 smoke 脚本为 `scripts/virtual-tryon-smoke.mjs`：先检查 `APIMART_API_KEY`、三项 `VIRTUAL_TRYON_MODEL_*_KEY`、`R2_*`、`DATABASE_URL`；任一缺失输出 `SKIP: virtual try-on staging smoke requires ...` 并 exit 0；齐备时只在 staging 创建 `front_only` isTest job，循环调用内部 tick 至 terminal，验证 R2 key 与 Strict pass，随后软删除。命令：`pnpm exec dotenv -e .env.staging -- node scripts/virtual-tryon-smoke.mjs`；未提供真实变量时不得声称执行过。

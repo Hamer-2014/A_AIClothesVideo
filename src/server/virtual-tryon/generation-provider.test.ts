@@ -28,20 +28,24 @@ function job(mode: RuntimeJob["mode"] = "three_view"): RuntimeJob {
 }
 
 describe("virtual try-on APIMart generation provider", () => {
-  it("signs the target model then garment references in a stable three-view order", async () => {
+  it("forms the side reference chain from the transferred front result", async () => {
     const signer = vi.fn(async ({ key }: { key: string; expiresIn: number }) => "https://signed.example/" + key + "?signature=secret");
-    const imageClient = vi.fn(async () => ({ provider: "apimart" as const, model: "gpt-image-2", providerTaskId: "task-1", raw: { output: "ignored" } }));
+    const imageClient = vi.fn(async () => ({ provider: "apimart" as const, model: "gpt-image-2", providerTaskId: "task-1" }));
+    const input = job();
+    input.assets = [{ view: "front", providerTaskId: "task-front", providerStatus: "succeeded", attemptCount: 1, r2Key: "virtual-try-on/job-1/packs/pack-1/front.png" }];
     const provider = createVirtualTryOnGenerationProvider({ signer, imageClient, pollClient: vi.fn(), providerLogStore: createInMemoryProviderCallLogStore() });
 
-    await expect(provider.submit(job(), "side")).resolves.toBe("task-1");
+    await expect(provider.submit(input, "side")).resolves.toBe("task-1");
     expect(signer.mock.calls.map(([input]) => input)).toEqual([
       { key: "platform/models/look/side.png", expiresIn: 300 },
+      { key: "virtual-try-on/job-1/packs/pack-1/front.png", expiresIn: 300 },
       { key: "users/user-1/assets/front/original.png", expiresIn: 300 },
       { key: "users/user-1/assets/back/original.png", expiresIn: 300 },
       { key: "users/user-1/assets/detail/original.png", expiresIn: 300 },
     ]);
     expect(imageClient).toHaveBeenCalledWith(expect.objectContaining({ imageUrls: [
       "https://signed.example/platform/models/look/side.png?signature=secret",
+      "https://signed.example/virtual-try-on/job-1/packs/pack-1/front.png?signature=secret",
       "https://signed.example/users/user-1/assets/front/original.png?signature=secret",
       "https://signed.example/users/user-1/assets/back/original.png?signature=secret",
       "https://signed.example/users/user-1/assets/detail/original.png?signature=secret",
@@ -50,7 +54,7 @@ describe("virtual try-on APIMart generation provider", () => {
 
   it("uses only the front model and available front garment references for front_only", async () => {
     const signer = vi.fn(async ({ key }: { key: string }) => "signed:" + key);
-    const imageClient = vi.fn(async () => ({ provider: "apimart" as const, model: "gpt-image-2", providerTaskId: "task-1", raw: {} }));
+    const imageClient = vi.fn(async () => ({ provider: "apimart" as const, model: "gpt-image-2", providerTaskId: "task-1" }));
     const input = job("front_only");
     delete input.sourceKeys.back;
     const provider = createVirtualTryOnGenerationProvider({ signer, imageClient, pollClient: vi.fn(), providerLogStore: createInMemoryProviderCallLogStore() });
@@ -61,6 +65,15 @@ describe("virtual try-on APIMart generation provider", () => {
       "users/user-1/assets/front/original.png",
       "users/user-1/assets/detail/original.png",
     ]);
+  });
+
+  it("fails closed when a side or back view lacks its transferred predecessor", async () => {
+    const signer = vi.fn();
+    const imageClient = vi.fn();
+    const provider = createVirtualTryOnGenerationProvider({ signer, imageClient, pollClient: vi.fn(), providerLogStore: createInMemoryProviderCallLogStore() });
+    await expect(provider.submit(job(), "side")).rejects.toThrow("virtual_tryon_prior_view_missing");
+    expect(signer).not.toHaveBeenCalled();
+    await expect(provider.submit({ ...job(), assets: [{ view: "front", providerTaskId: "task", providerStatus: "succeeded", attemptCount: 1, r2Key: "front" }] }, "back")).rejects.toThrow("virtual_tryon_prior_view_missing");
   });
 
   it("fails closed before signing when a required model key is absent", async () => {
@@ -79,8 +92,8 @@ describe("virtual try-on APIMart generation provider", () => {
     const logs = createInMemoryProviderCallLogStore();
     const provider = createVirtualTryOnGenerationProvider({
       signer: async ({ key }) => "https://signed.example/" + key + "?token=secret",
-      imageClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", raw: { image_url: "https://raw.example/output.png" } }),
-      pollClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", status: "succeeded", outputUrl: "https://provider.example/output.png?token=secret", raw: { result: "raw" } }),
+      imageClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1" }),
+      pollClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", status: "succeeded", outputUrl: "https://provider.example/output.png?token=secret" }),
       providerLogStore: logs,
     });
 
@@ -117,7 +130,7 @@ describe("virtual try-on APIMart generation provider", () => {
   it("persists the APIMart task despite a transient audit write failure", async () => {
     const provider = createVirtualTryOnGenerationProvider({
       signer: async ({ key }) => "signed:" + key,
-      imageClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", raw: {} }),
+      imageClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1" }),
       pollClient: vi.fn(),
       providerLogStore: { createCallLog: async () => { throw new Error("database_unavailable"); } },
     });

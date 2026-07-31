@@ -1,0 +1,54 @@
+import { PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+
+import { createR2Client, getR2Config } from "@/lib/storage/r2-client";
+
+type UploadClient = Pick<S3Client, "send">;
+const maxBytes = 25 * 1024 * 1024;
+const imageTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function allowlist(env: Record<string, string | undefined>) {
+  const configured = env.APIMART_IMAGE_OUTPUT_HOST_ALLOWLIST?.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  return new Set(configured?.length ? configured : ["upload.apimart.ai"]);
+}
+function isBlockedHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.includes(":")) return true;
+  const parts = host.split(".");
+  if (parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part))) return false;
+  const octets = parts.map(Number);
+  return octets.some((part) => part > 255) || octets[0] === 0 || octets[0] === 10 || octets[0] === 127 || (octets[0] === 169 && octets[1] === 254) || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || (octets[0] === 192 && octets[1] === 168);
+}
+function safeUrl(value: string, env: Record<string, string | undefined>) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || isBlockedHost(parsed.hostname) || !allowlist(env).has(parsed.hostname.toLowerCase())) throw new Error("rejected");
+    return parsed;
+  } catch { throw new Error("virtual_tryon_output_url_rejected"); }
+}
+async function readLimited(response: Response) {
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let received = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      received += next.value.byteLength;
+      if (received > maxBytes) throw new Error("virtual_tryon_output_too_large");
+      chunks.push(next.value);
+    }
+  } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+}
+
+export async function transferVirtualTryOnImageToR2(input: { url: string; key: string; bucket?: string; client?: UploadClient; fetch?: typeof fetch; env?: Record<string, string | undefined> }) {
+  const url = safeUrl(input.url, input.env ?? process.env);
+  const response = await (input.fetch ?? fetch)(url, { redirect: "error" });
+  if (!response.ok) throw new Error("virtual_tryon_output_download_failed");
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  if (!imageTypes.has(contentType)) throw new Error("virtual_tryon_output_content_type_rejected");
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) throw new Error("virtual_tryon_output_too_large");
+  const body = await readLimited(response);
+  await (input.client ?? createR2Client()).send(new PutObjectCommand({ Bucket: input.bucket ?? getR2Config().bucket, Key: input.key, Body: body, ContentType: contentType }));
+  return { key: input.key, contentType };
+}

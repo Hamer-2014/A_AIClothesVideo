@@ -1,12 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { APIMartImageProviderError, createAPIMartImageGeneration } from "./image";
+import { APIMartImageProviderError, createAPIMartImageGeneration, pollAPIMartImageTask } from "./image";
 
 describe("APIMart image provider", () => {
-  it("sends GPT Image 2 with n=1 and ordered image URLs", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { task_id: "task-1" } }), { status: 200 }));
-    await createAPIMartImageGeneration({ prompt: "front", imageUrls: ["model", "front", "back", "detail"] }, { fetch: fetchSpy, apiKey: "key" });
-    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ model: "gpt-image-2", n: 1, prompt: "front", image_urls: ["model", "front", "back", "detail"] });
+  it("parses the official submit envelope and sends the fixed 2k full-body protocol", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 200, data: [{ status: "submitted", task_id: "task-1" }] }), { status: 200 }));
+    const result = await createAPIMartImageGeneration({ prompt: "front", imageUrls: ["model", "front", "back", "detail"] }, { fetch: fetchSpy, apiKey: "key" });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ model: "gpt-image-2", n: 1, size: "2:3", resolution: "2k", prompt: "front", image_urls: ["model", "front", "back", "detail"] });
+    expect(result).toEqual({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1" });
+  });
+
+  it.each([
+    { code: 200, data: { task_id: "task-1" } },
+    { code: 200, data: [{ status: "submitted" }] },
+  ])("fails closed when the official submit shape is malformed", async (body) => {
+    await expect(createAPIMartImageGeneration({ prompt: "front", imageUrls: ["model"] }, { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toThrow("APIMart response is missing task id.");
+  });
+
+  it.each([
+    { data: { status: "completed", result: { images: {} } } },
+    { data: { status: "completed", result: { images: [{ url: "https://upload.apimart.ai/image.png" }] } } },
+    { data: { status: "completed", result: { images: [{ url: ["http://upload.apimart.ai/image.png"] }] } } },
+    { data: { status: "completed", result: { images: [] } } },
+  ])("fails closed for malformed or unsafe completed output", async (body) => {
+    await expect(pollAPIMartImageTask("task-1", { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toThrow("APIMart response is missing a safe completed output URL.");
+  });
+
+  it("returns only a sanitized poll DTO for the official completed shape", async () => {
+    await expect(pollAPIMartImageTask("task-1", { fetch: async () => new Response(JSON.stringify({ data: { status: "completed", result: { images: [{ url: ["https://upload.apimart.ai/generated.png"] }] } } }), { status: 200 }), apiKey: "key" })).resolves.toEqual({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", status: "succeeded", outputUrl: "https://upload.apimart.ai/generated.png" });
   });
 
   it("exposes a sanitized HTTP status and code for runtime retry classification", async () => {

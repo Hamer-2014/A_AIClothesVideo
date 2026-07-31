@@ -8,6 +8,7 @@ import { getServerSession } from "@/lib/auth/server";
 import { localizeHref } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { createDrizzleUserBillingStore, getUserBillingOverview } from "@/server/billing/user-billing";
+import { getVirtualTryOnPublicConfig } from "@/server/virtual-tryon/config";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function VirtualTryOnPage() {
       title={isEnglish ? "Virtual try-on" : "虚拟试穿"}
       user={session.user}
     >
-      <VirtualTryOnCreateForm language={locale} />
+      <VirtualTryOnCreateForm language={locale} publicConfig={getVirtualTryOnPublicConfig()} />
     </DashboardShell>
   );
 }
