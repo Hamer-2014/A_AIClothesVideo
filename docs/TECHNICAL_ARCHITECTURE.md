@@ -806,7 +806,7 @@ video_segments 全部成功 -> Cloud Run 拼接 -> 抽帧 -> 视觉质检 -> cap
 
 `model_quarter_turn` 与 `model_half_turn` 同样在确认时强制 Strict，但只接受已通过 `model_views` 同服装、同模特任务内一致性校验的 `human_model` 素材，并按 front -> side -> back 确定性排序。Prompt 必须固定同一可见人物和服装，限制 15-45° 或 180° 终点，禁止换脸、体型/发型漂移、人体异常和继续到 360°。Post-QA 追加同一人物连续性、人体自然度、服装多视角一致性与转身角度检查。
 
-只有商品图时，模板层不得自动造人。未来虚拟穿衣必须作为独立上游模块产出明确的 `human_model` 素材，其输出完成任务内一致性校验后才能进入上述模特模板链路。
+只有商品图时，视频模板层不得自动造人。虚拟穿衣作为独立静态上游模块：平台模特仅以私有 R2 key 临时签名引用，APIMart GPT Image 2 输出立即转存 R2，形成带 `generated_apimart_gpt_image_2` provenance 的不可变 appearance pack。create 只 reserve，受保护 worker tick 每次推进一个 view；Strict QA 全部通过才 capture/ready。视频桥接当前仅为契约，不得触发视频，未来仍须任务内一致性校验。
 
 ### 13.3 执行
 

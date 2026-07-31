@@ -633,3 +633,7 @@
    - 前台工作台、任务历史、管理员后台、上线验证。
 
 每个里程碑完成后都应跑一次端到端手工验收，不要等全部写完才发现状态机或账本设计有问题。
+
+## 19. 独立静态虚拟试穿模块
+
+APIMart GPT Image 2 虚拟试穿是独立于视频工作台的静态上游模块。它提供 `front_only` 与要求 front/back/detail 的 `three_view`，以 worker tick 的 front -> side -> back 恢复式流程生成；所有必要图片 R2 转存和 Strict QA 通过后才 capture 点数并 ready。任何 ready 前失败 release，平台交付故障在 capture 后 refund。它不包含视频、动作、场景、Flow Music 或 Cloud Run 混音，bridge 在本阶段明确为未启用。

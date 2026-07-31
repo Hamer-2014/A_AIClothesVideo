@@ -8,3 +8,4 @@ export * from "./jobs";
 export * from "./providers";
 export * from "./templates";
 export * from "./users";
+export * from "./virtual-tryon";
