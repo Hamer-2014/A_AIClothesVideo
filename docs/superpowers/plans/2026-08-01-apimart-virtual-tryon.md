@@ -4,7 +4,7 @@
 
 **Goal:** Build paid APIMart GPT Image 2 static appearance packs with front_only/three_view modes, recoverable worker ticks, strict QA, locking and safe download.
 
-**Architecture:** Create moderates, validates and reserves only. A locked internal tick submits, polls or transfers one view per invocation. R2/model URLs are transient; all required R2 assets and QA must pass before capture and ready.
+**Architecture:** Create validates and moderates, then writes a draft Saga job before reserve. Reserve success CASes draft to queued; stale drafts replay the same ledger idempotency key without provider calls. A locked internal tick submits, polls or transfers one view per invocation. R2/model URLs are transient; all required R2 assets and QA must pass before capture and ready.
 
 **Tech Stack:** Next.js 16, TypeScript, Drizzle/Postgres, Vitest, Cloudflare R2, APIMart, Creem moderation and credits.
 
@@ -306,4 +306,3 @@ if (missing.length) {
 - [ ] Step 4: Run pnpm vitest run scripts/virtual-tryon-smoke.test.ts src/lib/providers/apimart/image.test.ts src/server/virtual-tryon/worker.test.ts src/server/virtual-tryon/service.test.ts && node scripts/virtual-tryon-smoke.mjs. Expected: tests PASS; without staging credentials output explicit SKIP.
 - [ ] Step 5: Run pnpm run lint && pnpm run typecheck && pnpm test && pnpm run build && git diff --check. Expected: all exit 0.
 - [ ] Step 6: Commit: git add docs scripts; git commit -m "docs: specify virtual try-on appearance packs".
-

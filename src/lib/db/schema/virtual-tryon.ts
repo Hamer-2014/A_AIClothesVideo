@@ -12,7 +12,7 @@ import { id, jsonSnapshot, lockableJobFields, softDelete, timestamps } from "./c
 
 export const virtualTryonModeValues = ["front_only", "three_view"] as const;
 export const virtualTryonModeEnum = pgEnum("virtual_tryon_mode", virtualTryonModeValues);
-export const virtualTryonJobStatusValues = ["draft", "queued", "generating", "qa_queued", "ready", "locked", "failed_released", "failed_refunded"] as const;
+export const virtualTryonJobStatusValues = ["draft", "queued", "generating", "qa_queued", "ready", "locked", "failed_unreserved", "recovering_release", "failed_released", "failed_refunded"] as const;
 export const virtualTryonJobStatusEnum = pgEnum("virtual_tryon_job_status", virtualTryonJobStatusValues);
 export const appearancePackStatusValues = ["draft", "generating", "qa_queued", "ready", "locked", "failed"] as const;
 export const appearancePackStatusEnum = pgEnum("appearance_pack_status", appearancePackStatusValues);

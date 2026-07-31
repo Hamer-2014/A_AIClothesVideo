@@ -37,7 +37,7 @@ type CreateVirtualTryOnRequest = {
 
 这是收费链路，复用 `reserveCredits`、`captureReservedCredits`、`releaseReservedCredits` 与 idempotency key（`src/lib/credits/ledger.ts`）。价格为正整数 env：`VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST` 与 `VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST`；缺失、零或非法值导致配置不可用，不降级免费。
 
-创建前根据固定服务 prompt 调用 `checkPrompt`（`src/server/moderation/check-prompt.ts`），`source` 新增 `virtual_tryon_generation`；Creem decision `flag`、`deny`、`error` 全部阻断，且在 reserve 前发生。审核 allow 后，在同一 create transaction 中插入 job/pack/state event 并 reserve：`idempotencyKey="virtual-tryon:{jobId}:reserve"`。只有 APIMart、R2 转存和 Strict QA 全部完成、pack 已 ready 后才 capture：`"virtual-tryon:{jobId}:capture"`。任何 ready 前终态失败（供应商、R2、schema、QA 或重试耗尽）以 `"virtual-tryon:{jobId}:release"` release；供应商失败成本由产品毛利承担。capture 后如果锁定或下载的内部故障使用户不能交付，则以 `"virtual-tryon:{jobId}:refund"` refund。重复 create/tick 由 ledger 幂等键和 job/view 唯一索引防双扣。
+创建前根据固定服务 prompt 调用 `checkPrompt`（`src/server/moderation/check-prompt.ts`），`source` 新增 `virtual_tryon_generation`；Creem decision `flag`、`deny`、`error` 全部阻断。审核 allow 后先创建不可被生成 worker 获取的 `draft` job/pack/assets，再调用 `reserveCredits`（`idempotencyKey="virtual-tryon:{jobId}:reserve"`），成功后 CAS `draft -> queued` 并写 reserved ledger/state event。reserve 明确失败则 CAS 为 `failed_unreserved`，不写 release。进程在 reserve 后 queue 前中断时，同 key 重放及 stale-draft reconciliation 重放同一 reserve key 并完成 queue，且 reconciliation 不调用 provider。只有 APIMart、R2 转存和 Strict QA 全部完成、pack 已 ready 后才 capture：`"virtual-tryon:{jobId}:capture"`。任何 ready 前终态失败（供应商、R2、schema、QA 或重试耗尽）以 `"virtual-tryon:{jobId}:release"` release；供应商失败成本由产品毛利承担。capture 后如果锁定或下载的内部故障使用户不能交付，则以 `"virtual-tryon:{jobId}:refund"` refund。重复 create/tick 由 ledger 幂等键和 job/view 唯一索引防双扣。
 
 ## 4. Provider、R2 与重试
 
