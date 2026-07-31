@@ -2,15 +2,19 @@ import { captureReservedCredits } from "@/lib/credits/ledger";
 import type { CreditLedgerStore } from "@/lib/credits/types";
 import { getDb } from "@/lib/db/client";
 import { appearancePackAssets, appearancePacks, virtualTryonJobs, virtualTryonStateEvents } from "@/lib/db/schema";
+import { createAPIMartImageGeneration, pollAPIMartImageTask } from "@/lib/providers/apimart/image";
+import { createDrizzleProviderCallLogStore, type ProviderCallLogStore } from "@/lib/providers/log-call";
+import { createDownloadSignedUrl } from "@/lib/storage/presign";
 import { transferRemoteFileToR2 } from "@/lib/storage/transfer";
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import type { AppearanceView, VirtualTryOnMode } from "./config";
 import { runVirtualTryOnQa } from "./qa";
+import { createVirtualTryOnGenerationProvider } from "./generation-provider";
 import { retryDecision } from "./retry";
 
 export type RuntimeAsset = { view: AppearanceView; providerTaskId: string | null; providerStatus: "pending" | "queued" | "running" | "succeeded" | "failed"; attemptCount: number; r2Key: string | null; lastErrorCode?: string | null; nextRetryAt?: Date | null; outputUrl?: string | null };
 export type RuntimeStatus = "queued" | "generating" | "qa_queued" | "capturing" | "ready" | "recovering_release" | "recovering_refund" | "failed_released" | "failed_refunded";
-export type RuntimeJob = { id: string; packId: string; userId: string; mode: VirtualTryOnMode; status: RuntimeStatus; creditCost: number; lockedUntil: Date | null; sourceKeys: Partial<Record<"front" | "back" | "detail", string>>; assets: RuntimeAsset[]; deliveryPersistAttemptCount?: number };
+export type RuntimeJob = { id: string; packId: string; userId: string; mode: VirtualTryOnMode; status: RuntimeStatus; creditCost: number; lockedUntil: Date | null; sourceKeys: Partial<Record<"front" | "back" | "detail", string>>; modelKeys: Record<AppearanceView, string>; assets: RuntimeAsset[]; deliveryPersistAttemptCount?: number };
 export type QaRunner = (job: RuntimeJob) => Promise<{ allPassed: boolean }>;
 type VirtualTryOnQaDeps = Parameters<typeof runVirtualTryOnQa>[1];
 
@@ -28,6 +32,30 @@ export interface RuntimeStore {
   releaseLease(jobId: string, workerId: string): Promise<boolean>;
 }
 
+export function createDefaultVirtualTryOnRuntimeDeps(input: {
+  credits: CreditLedgerStore;
+  store?: RuntimeStore;
+  signer?: (input: { key: string; expiresIn: number }) => Promise<string>;
+  imageClient?: typeof createAPIMartImageGeneration;
+  pollClient?: typeof pollAPIMartImageTask;
+  providerLogStore?: ProviderCallLogStore;
+  transfer?: typeof transferRemoteFileToR2;
+}) {
+  const provider = createVirtualTryOnGenerationProvider({
+    signer: input.signer ?? ((request) => createDownloadSignedUrl(request)),
+    imageClient: input.imageClient,
+    pollClient: input.pollClient,
+    providerLogStore: input.providerLogStore ?? createDrizzleProviderCallLogStore(),
+  });
+  return {
+    credits: input.credits,
+    store: input.store ?? createDrizzleVirtualTryOnRuntimeStore(),
+    submit: provider.submit,
+    poll: provider.poll,
+    transfer: input.transfer ?? transferRemoteFileToR2,
+  };
+}
+
 function sourceKeysFromSnapshot(snapshot: unknown): RuntimeJob["sourceKeys"] {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return {};
   const sources = (snapshot as { sources?: unknown }).sources;
@@ -36,6 +64,14 @@ function sourceKeysFromSnapshot(snapshot: unknown): RuntimeJob["sourceKeys"] {
     const item = (sources as Record<string, unknown>)[role];
     return item && typeof item === "object" && typeof (item as { key?: unknown }).key === "string" ? [[role, (item as { key: string }).key]] : [];
   }));
+}
+
+export function parseRuntimeModelKeys(snapshot: unknown): RuntimeJob["modelKeys"] | null {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return null;
+  const values = snapshot as Record<string, unknown>;
+  const keys = ["front", "side", "back"] as const;
+  if (!keys.every((view) => typeof values[view] === "string" && values[view].trim().length > 0)) return null;
+  return { front: values.front as string, side: values.side as string, back: values.back as string };
 }
 
 export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStore {
@@ -53,7 +89,15 @@ export function createDrizzleVirtualTryOnRuntimeStore(db = getDb()): RuntimeStor
       const [pack] = await db.select().from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, locked.id)).limit(1);
       if (!pack) throw new Error("virtual_tryon_pack_missing");
       const rows = await db.select().from(appearancePackAssets).where(eq(appearancePackAssets.appearancePackId, pack.id));
-      return { id: locked.id, packId: pack.id, userId: locked.userId, mode: locked.mode, status: locked.status as RuntimeStatus, creditCost: locked.creditCost, lockedUntil: locked.lockedUntil, sourceKeys: sourceKeysFromSnapshot(locked.sourceSnapshot), deliveryPersistAttemptCount: locked.deliveryPersistAttemptCount, assets: rows.map((item) => ({ view: item.view, providerTaskId: item.providerTaskId, providerStatus: item.providerStatus as RuntimeAsset["providerStatus"], attemptCount: item.attemptCount, r2Key: item.r2Key, lastErrorCode: item.lastErrorCode, nextRetryAt: item.nextRetryAt })) };
+      const modelKeys = parseRuntimeModelKeys(locked.modelSnapshot);
+      if (!modelKeys) {
+        await db.transaction(async (tx) => {
+          const [failed] = await tx.update(virtualTryonJobs).set({ status: "recovering_release", lastError: "virtual_tryon_model_keys_invalid", lockedBy: null, lockedUntil: null, updatedAt: new Date() }).where(and(eq(virtualTryonJobs.id, locked.id), eq(virtualTryonJobs.lockedBy, workerId), inArray(virtualTryonJobs.status, runnable))).returning({ id: virtualTryonJobs.id });
+          if (failed) await tx.insert(virtualTryonStateEvents).values({ virtualTryonJobId: locked.id, fromStatus: locked.status, toStatus: "recovering_release", reason: "virtual_tryon_model_keys_invalid" });
+        });
+        return null;
+      }
+      return { id: locked.id, packId: pack.id, userId: locked.userId, mode: locked.mode, status: locked.status as RuntimeStatus, creditCost: locked.creditCost, lockedUntil: locked.lockedUntil, sourceKeys: sourceKeysFromSnapshot(locked.sourceSnapshot), modelKeys, deliveryPersistAttemptCount: locked.deliveryPersistAttemptCount, assets: rows.map((item) => ({ view: item.view, providerTaskId: item.providerTaskId, providerStatus: item.providerStatus as RuntimeAsset["providerStatus"], attemptCount: item.attemptCount, r2Key: item.r2Key, lastErrorCode: item.lastErrorCode, nextRetryAt: item.nextRetryAt })) };
     },
     async saveAsset(jobId, workerId, asset) {
       if (!await held(jobId, workerId, ["queued", "generating"])) return false;
@@ -134,6 +178,10 @@ function errorCode(error: unknown) {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : error instanceof Error ? error.message : "worker_failed";
 }
 
+function errorStatus(error: unknown) {
+  return error instanceof Error && "status" in error && typeof error.status === "number" ? error.status : undefined;
+}
+
 async function runQa(job: RuntimeJob, qa: QaRunner | undefined, qaDeps: VirtualTryOnQaDeps | undefined) {
   const front = job.sourceKeys.front;
   if (!front || (job.mode === "three_view" && (!job.sourceKeys.back || !job.sourceKeys.detail))) return { allPassed: false };
@@ -143,7 +191,7 @@ async function runQa(job: RuntimeJob, qa: QaRunner | undefined, qaDeps: VirtualT
   return runVirtualTryOnQa({ jobId: job.id, userId: job.userId, packId: job.packId, mode: job.mode, sourceKeys: { front, back: job.sourceKeys.back, detail: job.sourceKeys.detail }, generatedKeys }, qaDeps);
 }
 
-export async function runVirtualTryOnTick(input: { workerId: string; store: RuntimeStore; credits: CreditLedgerStore; submit: (view: AppearanceView) => Promise<string>; poll: (taskId: string) => Promise<{ status: RuntimeAsset["providerStatus"]; outputUrl: string | null }>; qa?: QaRunner; qaDeps?: VirtualTryOnQaDeps; transfer?: typeof transferRemoteFileToR2; now?: Date }) {
+export async function runVirtualTryOnTick(input: { workerId: string; store: RuntimeStore; credits: CreditLedgerStore; submit: (job: RuntimeJob, view: AppearanceView) => Promise<string>; poll: (job: RuntimeJob, view: AppearanceView, taskId: string) => Promise<{ status: RuntimeAsset["providerStatus"]; outputUrl: string | null }>; qa?: QaRunner; qaDeps?: VirtualTryOnQaDeps; transfer?: typeof transferRemoteFileToR2; now?: Date }) {
   const now = input.now ?? new Date();
   const job = await input.store.acquire(input.workerId, now);
   if (!job) return { processed: 0, action: "idle" as const };
@@ -153,14 +201,14 @@ export async function runVirtualTryOnTick(input: { workerId: string; store: Runt
     if (asset) {
       try {
         if (!asset.providerTaskId) {
-          asset.providerTaskId = await input.submit(asset.view);
+          asset.providerTaskId = await input.submit(job, asset.view);
           asset.providerStatus = "queued";
           asset.attemptCount += 1;
           if (!await input.store.saveAsset(job.id, input.workerId, asset)) return { processed: 1, action: "lost_lease" as const };
           const transitioned = await input.store.transitionToGenerating(job.id, input.workerId, job.status === "queued" ? "queued" : "generating");
           return { processed: 1, action: transitioned ? "submit" as const : "lost_lease" as const };
         }
-        const polled = await input.poll(asset.providerTaskId);
+        const polled = await input.poll(job, asset.view, asset.providerTaskId);
         asset.providerStatus = polled.status;
         asset.outputUrl = polled.outputUrl;
         if (polled.status === "failed") throw new Error("provider_failed");
@@ -176,7 +224,7 @@ export async function runVirtualTryOnTick(input: { workerId: string; store: Runt
         return { processed: 1, action: "transfer" as const };
       } catch (error) {
         const code = errorCode(error);
-        const decision = retryDecision({ code, attemptCount: asset.attemptCount, now });
+        const decision = retryDecision({ code, status: errorStatus(error), attemptCount: asset.attemptCount, now });
         if (decision.retry) {
           asset.attemptCount += 1;
           asset.lastErrorCode = decision.errorCode ?? code;

@@ -16,6 +16,7 @@ describe("virtual try-on runtime tick", () => {
       creditCost: 2,
       lockedUntil: null,
       sourceKeys: { front: "source/front.png" },
+      modelKeys: { front: "models/front.png", side: "models/side.png", back: "models/back.png" },
       assets: [{ view: "front", providerTaskId: "task", providerStatus: "succeeded", attemptCount: 1, r2Key: "virtual-try-on/job/packs/pack/front.png" }],
     };
     const events: string[] = [];
@@ -174,7 +175,7 @@ describe("virtual try-on runtime tick", () => {
   });
 
   it("persists a front task and does not submit it again", async () => {
-    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, r2Key: null }] };
+    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, r2Key: null }] };
     const store: RuntimeStore = { acquire: async () => job, saveAsset: async (_id, _workerId, asset) => { job.assets[0] = asset; return true; }, transitionToGenerating: async (_id, _workerId, status) => { job.status = status === "queued" ? "generating" : status; return true; }, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry", transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => true, releaseLease: async () => true, scheduleRetry: async () => true };
     const credits = createInMemoryCreditLedgerStore(); await grantTrialCredits({ store: credits, userId: "user", amount: 2, reason: "test", idempotencyKey: "grant" });
     const first = await runVirtualTryOnTick({ workerId: "worker", store, credits, submit: async () => "task", poll: async () => ({ status: "running", outputUrl: null }), qa: async () => ({ allPassed: false }) });
@@ -183,7 +184,7 @@ describe("virtual try-on runtime tick", () => {
   });
 
   it("persists a retry delay after the first retryable submit failure", async () => {
-    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, r2Key: null }] };
+    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "queued", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: null, providerStatus: "pending", attemptCount: 0, r2Key: null }] };
     const saved: RuntimeJob["assets"][number][] = []; let released = 0; let jobRetryAt: Date | null = null;
     const store: RuntimeStore = { acquire: async () => job, saveAsset: async (_id, _workerId, asset) => { saved.push(asset); return true; }, transitionToGenerating: async () => true, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry", transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => true, releaseLease: async () => { released++; return true; }, scheduleRetry: async (_id, _workerId, retryAt) => { jobRetryAt = retryAt; return true; } };
     const credits = createInMemoryCreditLedgerStore(); await grantTrialCredits({ store: credits, userId: "user", amount: 2, reason: "test", idempotencyKey: "grant" });

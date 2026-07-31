@@ -4,6 +4,19 @@ export class APIMartImageProviderUnavailableError extends Error {
   constructor() { super("APIMart image provider is not configured."); this.name = "APIMartImageProviderUnavailableError"; }
 }
 
+export class APIMartImageProviderError extends Error {
+  readonly code: string;
+  readonly status?: number;
+
+  constructor(input: { operation: "generation" | "poll"; status?: number; code?: string }) {
+    const status = input.status;
+    super("APIMart image " + input.operation + " failed" + (status === undefined ? "." : " with status " + status + "."));
+    this.name = "APIMartImageProviderError";
+    this.status = status;
+    this.code = input.code ?? (status === undefined ? "network_error" : "http_" + status);
+  }
+}
+
 type Deps = { fetch?: typeof fetch; env?: Record<string, string | undefined>; apiKey?: string };
 type RecordValue = Record<string, unknown>;
 
@@ -33,15 +46,29 @@ function outputUrl(raw: RecordValue) {
 
 export async function createAPIMartImageGeneration(input: { prompt: string; imageUrls: string[] }, deps: Deps = {}) {
   if (input.imageUrls.length < 1 || input.imageUrls.length > 16) throw new Error("APIMart image generation accepts 1 to 16 image URLs.");
-  const current = config(deps); const response = await (deps.fetch ?? fetch)(current.baseUrl + "/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer " + current.apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-image-2", n: 1, prompt: input.prompt, image_urls: input.imageUrls }) });
+  const current = config(deps);
+  let response: Response;
+  try {
+    response = await (deps.fetch ?? fetch)(current.baseUrl + "/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer " + current.apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-image-2", n: 1, prompt: input.prompt, image_urls: input.imageUrls }) });
+  } catch (error) {
+    const code = error instanceof Error && error.name === "AbortError" ? "timeout" : "network_error";
+    throw new APIMartImageProviderError({ operation: "generation", code });
+  }
   const raw = record(await response.json().catch(() => ({})));
-  if (!response.ok) throw new Error("APIMart image generation failed with status " + response.status + ".");
+  if (!response.ok) throw new APIMartImageProviderError({ operation: "generation", status: response.status });
   return { provider: "apimart" as const, model: "gpt-image-2", providerTaskId: taskId(raw), raw: raw as JsonValue };
 }
 
 export async function pollAPIMartImageTask(providerTaskId: string, deps: Deps = {}) {
-  const current = config(deps); const response = await (deps.fetch ?? fetch)(current.baseUrl + "/v1/tasks/" + encodeURIComponent(providerTaskId), { headers: { Authorization: "Bearer " + current.apiKey } });
+  const current = config(deps);
+  let response: Response;
+  try {
+    response = await (deps.fetch ?? fetch)(current.baseUrl + "/v1/tasks/" + encodeURIComponent(providerTaskId), { headers: { Authorization: "Bearer " + current.apiKey } });
+  } catch (error) {
+    const code = error instanceof Error && error.name === "AbortError" ? "timeout" : "network_error";
+    throw new APIMartImageProviderError({ operation: "poll", code });
+  }
   const raw = record(await response.json().catch(() => ({}))); const data = record(raw.data);
-  if (!response.ok) throw new Error("APIMart task polling failed with status " + response.status + ".");
+  if (!response.ok) throw new APIMartImageProviderError({ operation: "poll", status: response.status });
   return { provider: "apimart" as const, model: "gpt-image-2", providerTaskId, status: status(raw.status ?? data.status), outputUrl: outputUrl(raw), raw: raw as JsonValue };
 }

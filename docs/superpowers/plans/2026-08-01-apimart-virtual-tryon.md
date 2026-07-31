@@ -145,27 +145,27 @@ await reserveCredits({ store: creditStore, userId, amount: creditCost, reason: "
 - [ ] Step 4: Run pnpm vitest run src/server/virtual-tryon/store.test.ts src/server/virtual-tryon/create.test.ts. Expected: PASS.
 - [ ] Step 5: Commit: git add src/server/virtual-tryon/store.ts src/server/virtual-tryon/store.test.ts src/server/virtual-tryon/create.ts src/server/virtual-tryon/create.test.ts; git commit -m "feat: create reserved virtual try-on jobs".
 
-### Task 6: Tick state machine and locks
+### Task 6: Runtime tick state machine and locks
 
-Files: Create src/server/virtual-tryon/locks.ts, locks.test.ts, worker.ts and worker.test.ts.
+Files: Create `src/server/virtual-tryon/runtime.ts`, `src/server/virtual-tryon/runtime.test.ts`, `src/server/virtual-tryon/retry.ts` and `src/server/virtual-tryon/retry.test.ts`.
 
 - [ ] Step 1: Write the failing test.
 
 ~~~ts
 test("submits front once then polls in a later tick", async () => {
-  await runVirtualTryOnWorkerTick(deps);
-  await runVirtualTryOnWorkerTick(deps);
-  expect(deps.provider.create).toHaveBeenCalledTimes(1);
-  expect(deps.provider.poll).toHaveBeenCalledWith("front-task");
+  await runVirtualTryOnTick({ ...deps, submit, poll });
+  await runVirtualTryOnTick({ ...deps, submit, poll });
+  expect(submit).toHaveBeenCalledTimes(1);
+  expect(poll).toHaveBeenCalledWith(expect.any(Object), "front", "front-task");
 });
-test("submits side only after front transfer", async () => {
-  await runVirtualTryOnWorkerTick(frontStoredDeps);
-  expect(frontStoredDeps.provider.create.mock.calls[0][0].view).toBe("side");
+test("never resubmits a persisted APIMart task", async () => {
+  await runVirtualTryOnTick({ ...deps, submit, poll });
+  expect(submit).toHaveBeenCalledTimes(1);
 });
 ~~~
 
-- [ ] Step 2: Run pnpm vitest run src/server/virtual-tryon/locks.test.ts src/server/virtual-tryon/worker.test.ts. Expected: FAIL, files missing.
-- [ ] Step 3: Use 60-second CAS lock and process one state or one view only; record task/status/attempt/next retry/R2 key. 429, 5xx and timeout retry at 30s/120s; terminal errors release before ready; never resubmit a persisted task.
+- [ ] Step 2: Run `pnpm exec vitest run src/server/virtual-tryon/runtime.test.ts src/server/virtual-tryon/retry.test.ts`. Expected: FAIL because `runVirtualTryOnTick` and retry classification do not exist.
+- [ ] Step 3: Use the existing `runtime.ts` 60-second CAS lock and process one state or one view only; record task/status/attempt/next retry/R2 key. A first 429, 5xx or timeout submit failure retries after 30 seconds; a second submit failure transitions to `recovering_release` with no third/120-second attempt. Terminal errors release before ready; never resubmit a persisted task.
 
 ~~~ts
 const view = nextRequiredView(pack);
@@ -174,12 +174,12 @@ if (view.providerStatus !== "succeeded") return pollView({ job, pack, view });
 return transferView({ job, pack, view });
 ~~~
 
-- [ ] Step 4: Run pnpm vitest run src/server/virtual-tryon/locks.test.ts src/server/virtual-tryon/worker.test.ts. Expected: PASS for order, duplicate tick, retry and front_only.
-- [ ] Step 5: Commit: git add src/server/virtual-tryon/locks.ts src/server/virtual-tryon/locks.test.ts src/server/virtual-tryon/worker.ts src/server/virtual-tryon/worker.test.ts; git commit -m "feat: add virtual try-on worker state machine".
+- [ ] Step 4: Run `pnpm exec vitest run src/server/virtual-tryon/runtime.test.ts src/server/virtual-tryon/retry.test.ts`. Expected: PASS for order, duplicate tick, retry and `front_only`.
+- [ ] Step 5: Commit: `git add src/server/virtual-tryon/runtime.ts src/server/virtual-tryon/runtime.test.ts src/server/virtual-tryon/retry.ts src/server/virtual-tryon/retry.test.ts && git commit -m "feat: add virtual try-on runtime state machine"`.
 
 ### Task 7: Private R2 presign, transfer and provider audit
 
-Files: Create src/server/virtual-tryon/transfer.ts, transfer.test.ts, provider-log.ts and provider-log.test.ts.
+Files: Create `src/server/virtual-tryon/generation-provider.ts`, `src/server/virtual-tryon/generation-provider.test.ts`, `src/server/virtual-tryon/provider-log.ts` and `src/server/virtual-tryon/provider-log.test.ts`. Modify `src/lib/providers/apimart/image.ts` and `src/server/virtual-tryon/runtime.ts`.
 
 - [ ] Step 1: Write the failing test.
 
@@ -201,7 +201,7 @@ await transferRemoteObjectToR2({ sourceUrl: outputUrl, destinationKey: r2Key });
 ~~~
 
 - [ ] Step 4: Run pnpm vitest run src/server/virtual-tryon/transfer.test.ts src/server/virtual-tryon/provider-log.test.ts. Expected: PASS.
-- [ ] Step 5: Commit: git add src/server/virtual-tryon/transfer.ts src/server/virtual-tryon/transfer.test.ts src/server/virtual-tryon/provider-log.ts src/server/virtual-tryon/provider-log.test.ts; git commit -m "feat: securely transfer virtual try-on images".
+- [ ] Step 5: Commit: `git add src/server/virtual-tryon/generation-provider.ts src/server/virtual-tryon/generation-provider.test.ts src/server/virtual-tryon/provider-log.ts src/server/virtual-tryon/provider-log.test.ts src/lib/providers/apimart/image.ts src/server/virtual-tryon/runtime.ts && git commit -m "feat: connect APIMart virtual try-on runtime"`.
 
 ### Task 8: Ready capture, owner read, lock and download
 
@@ -303,6 +303,6 @@ if (missing.length) {
 }
 ~~~
 
-- [ ] Step 4: Run pnpm vitest run scripts/virtual-tryon-smoke.test.ts src/lib/providers/apimart/image.test.ts src/server/virtual-tryon/worker.test.ts src/server/virtual-tryon/service.test.ts && node scripts/virtual-tryon-smoke.mjs. Expected: tests PASS; without staging credentials output explicit SKIP.
+- [ ] Step 4: Run `pnpm exec vitest run scripts/virtual-tryon-smoke.test.ts src/lib/providers/apimart/image.test.ts src/server/virtual-tryon/runtime.test.ts src/server/virtual-tryon/service.test.ts && node scripts/virtual-tryon-smoke.mjs`. Expected: tests PASS; without staging credentials output explicit SKIP.
 - [ ] Step 5: Run pnpm run lint && pnpm run typecheck && pnpm test && pnpm run build && git diff --check. Expected: all exit 0.
 - [ ] Step 6: Commit: git add docs scripts; git commit -m "docs: specify virtual try-on appearance packs".
