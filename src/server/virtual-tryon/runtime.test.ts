@@ -3,6 +3,7 @@ import { grantTrialCredits, reserveCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
 import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
 import { createInMemoryVirtualTryOnQaStore } from "./qa-store";
+import { VirtualTryOnTransferError } from "./transfer";
 import { runVirtualTryOnTick, type RuntimeJob, type RuntimeStore } from "./runtime";
 
 describe("virtual try-on runtime tick", () => {
@@ -209,5 +210,16 @@ describe("virtual try-on runtime tick", () => {
     const first = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw error; }, poll: async () => ({ status: "running" as const, outputUrl: null }), now: new Date(0) });
     const second = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw error; }, poll: async () => ({ status: "running" as const, outputUrl: null }), now: new Date(30_000) });
     expect(first.action).toBe("retry"); expect(second.action).toBe("recovering_release"); expect(job.assets[0]?.submitAttemptCount).toBe(2); expect(releases).toBe(1);
+  });
+
+  it("keeps the provider task and schedules delivery retry for a structured transfer network error", async () => {
+    const job: RuntimeJob = { id: "job", packId: "pack", userId: "user", mode: "front_only", status: "generating", creditCost: 2, lockedUntil: null, sourceKeys: { front: "source" }, modelKeys: { front: "models/front", side: "models/side", back: "models/back" }, assets: [{ view: "front", providerTaskId: "task", providerStatus: "succeeded", attemptCount: 1, submitAttemptCount: 1, deliveryFailureCount: 0, r2Key: null }] };
+    let saved: RuntimeJob["assets"][number] | undefined;
+    let retryAt: Date | undefined;
+    const store = { acquire: async () => job, saveAsset: async (_id: string, _worker: string, asset: RuntimeJob["assets"][number]) => { saved = { ...asset }; return true; }, transitionToGenerating: async () => true, transitionAssetsReadyToQaQueued: async () => true, resolveQa: async () => true, finalizeCapturedPack: async () => true, scheduleCapturePersistenceRetry: async () => "retry" as const, transitionCaptureToRefund: async () => true, transitionToRecoveringRelease: async () => true, releaseLease: async () => true, scheduleRetry: async (_id: string, _worker: string, next: Date) => { retryAt = next; return true; } } as unknown as RuntimeStore;
+    const result = await runVirtualTryOnTick({ workerId: "worker", store, credits: createInMemoryCreditLedgerStore(), submit: async () => { throw new Error("must_not_submit"); }, poll: async () => ({ status: "succeeded", outputUrl: "https://upload.apimart.ai/output.png" }), transfer: async () => { throw new VirtualTryOnTransferError("network_error"); }, now: new Date(0) });
+    expect(result.action).toBe("retry");
+    expect(saved).toMatchObject({ providerTaskId: "task", submitAttemptCount: 1, deliveryFailureCount: 1, lastErrorCode: "network_error", nextRetryAt: new Date(30_000) });
+    expect(retryAt).toEqual(new Date(30_000));
   });
 });

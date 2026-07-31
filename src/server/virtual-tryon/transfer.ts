@@ -3,6 +3,11 @@ import { PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { createR2Client, getR2Config } from "@/lib/storage/r2-client";
 
 type UploadClient = Pick<S3Client, "send">;
+export class VirtualTryOnTransferError extends Error {
+  readonly code: string;
+  readonly status?: number;
+  constructor(code: string, status?: number) { super(code); this.name = "VirtualTryOnTransferError"; this.code = code; this.status = status; }
+}
 const maxBytes = 25 * 1024 * 1024;
 const imageTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -23,32 +28,52 @@ function safeUrl(value: string, env: Record<string, string | undefined>) {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" || isBlockedHost(parsed.hostname) || !allowlist(env).has(parsed.hostname.toLowerCase())) throw new Error("rejected");
     return parsed;
-  } catch { throw new Error("virtual_tryon_output_url_rejected"); }
+  } catch { throw new VirtualTryOnTransferError("virtual_tryon_output_url_rejected"); }
 }
-async function readLimited(response: Response) {
+async function readLimited(response: Response, signal: AbortSignal) {
   if (!response.body) return Buffer.alloc(0);
   const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let received = 0;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(new VirtualTryOnTransferError("timeout")), { once: true });
+  });
   try {
     while (true) {
-      const next = await reader.read();
+      const next = await Promise.race([reader.read(), aborted]);
       if (next.done) break;
       received += next.value.byteLength;
-      if (received > maxBytes) throw new Error("virtual_tryon_output_too_large");
+      if (received > maxBytes) throw new VirtualTryOnTransferError("virtual_tryon_output_too_large");
       chunks.push(next.value);
     }
+  } catch (error) {
+    if (error instanceof VirtualTryOnTransferError) throw error;
+    if (signal.aborted) throw new VirtualTryOnTransferError("timeout");
+    throw new VirtualTryOnTransferError("network_error");
   } finally { reader.releaseLock(); }
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 }
 
-export async function transferVirtualTryOnImageToR2(input: { url: string; key: string; bucket?: string; client?: UploadClient; fetch?: typeof fetch; env?: Record<string, string | undefined> }) {
+export async function transferVirtualTryOnImageToR2(input: { url: string; key: string; bucket?: string; client?: UploadClient; fetch?: typeof fetch; env?: Record<string, string | undefined>; timeoutMs?: number }) {
   const url = safeUrl(input.url, input.env ?? process.env);
-  const response = await (input.fetch ?? fetch)(url, { redirect: "error" });
-  if (!response.ok) throw new Error("virtual_tryon_output_download_failed");
-  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  if (!imageTypes.has(contentType)) throw new Error("virtual_tryon_output_content_type_rejected");
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new Error("virtual_tryon_output_too_large");
-  const body = await readLimited(response);
-  await (input.client ?? createR2Client()).send(new PutObjectCommand({ Bucket: input.bucket ?? getR2Config().bucket, Key: input.key, Body: body, ContentType: contentType }));
-  return { key: input.key, contentType };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.min(input.timeoutMs ?? 25_000, 25_000));
+  let response: Response;
+  try {
+    response = await (input.fetch ?? fetch)(url, { redirect: "error", signal: controller.signal });
+    if (!response.ok) {
+      if (response.status >= 300 && response.status < 400) throw new VirtualTryOnTransferError("virtual_tryon_output_redirect_rejected", response.status);
+      throw new VirtualTryOnTransferError("http_" + response.status, response.status);
+    }
+    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+    if (!imageTypes.has(contentType)) throw new VirtualTryOnTransferError("virtual_tryon_output_content_type_rejected");
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > maxBytes) throw new VirtualTryOnTransferError("virtual_tryon_output_too_large");
+    const body = await readLimited(response, controller.signal);
+    clearTimeout(timeout);
+    await (input.client ?? createR2Client()).send(new PutObjectCommand({ Bucket: input.bucket ?? getR2Config().bucket, Key: input.key, Body: body, ContentType: contentType }));
+    return { key: input.key, contentType };
+  } catch (error) {
+    if (error instanceof VirtualTryOnTransferError) throw error;
+    if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) throw new VirtualTryOnTransferError("timeout");
+    throw new VirtualTryOnTransferError("network_error");
+  } finally { clearTimeout(timeout); }
 }

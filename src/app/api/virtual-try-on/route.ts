@@ -29,7 +29,7 @@ function nonEmptyString(value: unknown, maxLength: number) {
 }
 
 function parseInput(body: unknown): Omit<CreateInput, "userId" | "key"> | null {
-  if (!isRecord(body) || Object.keys(body).some((key) => !["mode", "skuName", "sourceAssetIds"].includes(key))) return null;
+  if (!isRecord(body) || Object.keys(body).some((key) => !["mode", "skuName", "sourceAssetIds", "isTest"].includes(key))) return null;
   const mode = body.mode === "front_only" || body.mode === "three_view" ? body.mode : null;
   const sources = isRecord(body.sourceAssetIds) ? body.sourceAssetIds : null;
   if (!mode || !sources || Object.keys(sources).some((key) => !["front", "back", "detail"].includes(key))) return null;
@@ -40,7 +40,8 @@ function parseInput(body: unknown): Omit<CreateInput, "userId" | "key"> | null {
   if (mode === "three_view" && (!back || !detail)) return null;
   if (body.skuName !== undefined && (typeof body.skuName !== "string" || body.skuName.trim().length > 80)) return null;
   const skuName = typeof body.skuName === "string" ? body.skuName.trim() || undefined : undefined;
-  return { mode: mode as VirtualTryOnMode, skuName, sourceAssetIds: { front, ...(back ? { back } : {}), ...(detail ? { detail } : {}) } };
+  if (body.isTest !== undefined && typeof body.isTest !== "boolean") return null;
+  return { mode: mode as VirtualTryOnMode, skuName, ...(body.isTest === true ? { isTest: true } : {}), sourceAssetIds: { front, ...(back ? { back } : {}), ...(detail ? { detail } : {}) } };
 }
 
 function creationErrorStatus(error: unknown) {

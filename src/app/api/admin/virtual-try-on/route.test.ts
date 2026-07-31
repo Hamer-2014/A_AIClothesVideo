@@ -15,7 +15,7 @@ describe("GET /api/admin/virtual-try-on", () => {
       getAdminSession: async () => ({ userId: "admin", email: "admin@example.com", role: "admin" }),
       list: async (input) => {
         expect(input).toEqual({ limit: 2, cursor: "1|job" });
-        return { items: [{ id: "job", userId: "owner", mode: "front_only", status: "queued", pack: { version: 1, requiredViews: ["front"] }, createdAt: new Date("2026-08-01T00:00:00.000Z") }], nextCursor: null };
+        return { items: [{ id: "job", userId: "owner", mode: "front_only", status: "queued", isTest: false, pack: { version: 1, requiredViews: ["front"] }, createdAt: new Date("2026-08-01T00:00:00.000Z") }], nextCursor: null };
       },
     });
     const body = await response.json();

@@ -39,9 +39,9 @@ async function request(fetchImpl: typeof fetch, url: string, init: RequestInit, 
 
 function parseSubmit(raw: unknown) {
   const root = record(raw);
-  if (!Array.isArray(root.data)) throw new Error("APIMart response is missing task id.");
+  if (!Array.isArray(root.data)) throw new APIMartImageProviderError({ operation: "generation", code: "response_schema_error" });
   const first = record(root.data[0]);
-  if (first.status !== "submitted" || typeof first.task_id !== "string" || first.task_id.trim().length === 0) throw new Error("APIMart response is missing task id.");
+  if (first.status !== "submitted" || typeof first.task_id !== "string" || first.task_id.trim().length === 0) throw new APIMartImageProviderError({ operation: "generation", code: "response_schema_error" });
   return first.task_id;
 }
 function parseStatus(value: unknown): ProviderStatus {
@@ -49,18 +49,18 @@ function parseStatus(value: unknown): ProviderStatus {
   if (value === "processing") return "running";
   if (value === "completed") return "succeeded";
   if (value === "failed") return "failed";
-  throw new Error("APIMart response has an invalid task status.");
+  throw new APIMartImageProviderError({ operation: "poll", code: "response_schema_error" });
 }
 function parseCompletedOutput(raw: RecordValue) {
   const result = record(record(raw.data).result);
-  if (!Array.isArray(result.images)) throw new Error("APIMart response is missing a safe completed output URL.");
+  if (!Array.isArray(result.images)) throw new APIMartImageProviderError({ operation: "poll", code: "response_schema_error" });
   const first = record(result.images[0]);
-  if (!Array.isArray(first.url) || typeof first.url[0] !== "string") throw new Error("APIMart response is missing a safe completed output URL.");
+  if (!Array.isArray(first.url) || typeof first.url[0] !== "string") throw new APIMartImageProviderError({ operation: "poll", code: "response_schema_error" });
   try {
     const parsed = new URL(first.url[0]);
     if (parsed.protocol !== "https:") throw new Error("unsafe");
     return parsed.toString();
-  } catch { throw new Error("APIMart response is missing a safe completed output URL."); }
+  } catch { throw new APIMartImageProviderError({ operation: "poll", code: "response_schema_error" }); }
 }
 
 export async function createAPIMartImageGeneration(input: { prompt: string; imageUrls: string[] }, deps: Deps = {}) {

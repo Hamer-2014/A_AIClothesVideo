@@ -14,6 +14,7 @@ function makeJob(id: string, createdAt = now) {
     userId: "owner-1",
     mode: "three_view" as const,
     status: "ready",
+    isTest: true,
     skuName: "Dress 100",
     creditCost: 8,
     reservedLedgerId: "reserve-ledger",
@@ -45,6 +46,7 @@ describe("admin virtual try-on observability", () => {
 
     expect(first.items.map((item) => item.id)).toEqual(["job-new", "job-middle"]);
     expect(first.items[0]?.pack).toEqual({ version: 2, requiredViews: ["front", "side", "back"] });
+    expect(first.items[0]?.isTest).toBe(true);
     expect(first.nextCursor).toBeTruthy();
     expect(second.items.map((item) => item.id)).toEqual(["job-old"]);
   });
@@ -67,6 +69,7 @@ describe("admin virtual try-on observability", () => {
     expect(detail?.providerLogs[0]).toEqual({ id: "log-1", provider: "apimart", model: "gpt-image-2", purpose: "virtual_tryon_image", status: "succeeded", costEstimate: "0.02", providerTaskId: "task-1", errorCode: "timeout" });
     expect(detail?.ledger).toEqual({ reservedLedgerId: "reserve-ledger", capturedLedgerId: "capture-ledger", releasedLedgerId: null, refundedLedgerId: null });
     expect(detail?.job.skuName).toBeNull();
+    expect(detail?.job.isTest).toBe(true);
     const serialized = JSON.stringify(detail);
     expect(serialized).not.toMatch(/https?:\/\/|api[_-]?key|virtual-try-on\/job-1|raw/iu);
     expect(serialized).toContain("pack-1/front.png");

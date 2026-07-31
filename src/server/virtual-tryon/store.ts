@@ -7,14 +7,14 @@ import type { JsonValue } from "@/lib/db/schema/common";
 import type { AppearanceView, VirtualTryOnMode } from "./config";
 
 export type SourceAsset = { id: string; originalKey: string; detectedRole: "front" | "back" | "detail" | "side" | "scene" | "logo" | "unknown" | null; rightsAttestationId: string; rightsAttestationVersion: string; rightsAttestationAcceptedAt: Date };
-export type TryOnJob = { id: string; userId: string; mode: VirtualTryOnMode; status: string; creditCost: number; createIdempotencyKey: string; sourceSnapshot: JsonValue; rightsSnapshot: JsonValue; reservedLedgerId?: string | null; lastError?: string | null; nextRetryAt?: Date | null };
+export type TryOnJob = { id: string; userId: string; mode: VirtualTryOnMode; status: string; isTest: boolean; creditCost: number; createIdempotencyKey: string; sourceSnapshot: JsonValue; rightsSnapshot: JsonValue; reservedLedgerId?: string | null; lastError?: string | null; nextRetryAt?: Date | null };
 export type TryOnPack = { id: string; virtualTryonJobId: string; status: string; requiredViews: AppearanceView[] };
 export type VirtualTryOnStateEvent = { virtualTryonJobId: string; fromStatus: string | null; toStatus: string; reason: string; eventSnapshot: JsonValue | null };
 
 export interface VirtualTryOnStore {
   findOwnedSources(input: { userId: string; assetIds: string[] }): Promise<SourceAsset[]>;
   findByIdempotency(input: { userId: string; key: string }): Promise<{ job: TryOnJob; pack: TryOnPack } | null>;
-  createJobAndPack(input: { userId: string; mode: VirtualTryOnMode; skuName?: string; key: string; creditCost: number; requiredViews: AppearanceView[]; sourceSnapshot: JsonValue; modelSnapshot: JsonValue; rightsSnapshot: JsonValue }): Promise<{ job: TryOnJob; pack: TryOnPack }>;
+  createJobAndPack(input: { userId: string; mode: VirtualTryOnMode; skuName?: string; isTest?: boolean; key: string; creditCost: number; requiredViews: AppearanceView[]; sourceSnapshot: JsonValue; modelSnapshot: JsonValue; rightsSnapshot: JsonValue }): Promise<{ job: TryOnJob; pack: TryOnPack }>;
   queueDraft(input: { jobId: string; reservedLedgerId: string }): Promise<boolean>;
   failDraft(input: { jobId: string; error: string }): Promise<boolean>;
   scheduleDraftRetry(input: { jobId: string; error: string; nextRetryAt: Date }): Promise<boolean>;
@@ -45,7 +45,7 @@ export function createInMemoryVirtualTryOnStore(initial: { sources?: Array<Sourc
         if (!pack) throw new Error("virtual_tryon_idempotency_conflict");
         return packResult(existing, pack);
       }
-      const job: TryOnJob = { id: crypto.randomUUID(), userId: input.userId, mode: input.mode, status: "draft", creditCost: input.creditCost, createIdempotencyKey: input.key, sourceSnapshot: input.sourceSnapshot, rightsSnapshot: input.rightsSnapshot, reservedLedgerId: null, lastError: null, nextRetryAt: null };
+      const job: TryOnJob = { id: crypto.randomUUID(), userId: input.userId, mode: input.mode, status: "draft", isTest: input.isTest ?? false, creditCost: input.creditCost, createIdempotencyKey: input.key, sourceSnapshot: input.sourceSnapshot, rightsSnapshot: input.rightsSnapshot, reservedLedgerId: null, lastError: null, nextRetryAt: null };
       const pack: TryOnPack = { id: crypto.randomUUID(), virtualTryonJobId: job.id, status: "draft", requiredViews: input.requiredViews };
       jobs.push(job);
       packs.push(pack);
@@ -95,7 +95,7 @@ export function createDrizzleVirtualTryOnStore(db = getDb()): VirtualTryOnStore 
     },
     async createJobAndPack(input) {
       return db.transaction(async (tx) => {
-        const [inserted] = await tx.insert(virtualTryonJobs).values({ userId: input.userId, mode: input.mode, status: "draft", skuName: input.skuName ?? null, createIdempotencyKey: input.key, creditCost: input.creditCost, sourceSnapshot: input.sourceSnapshot, modelSnapshot: input.modelSnapshot, rightsSnapshot: input.rightsSnapshot }).onConflictDoNothing({ target: [virtualTryonJobs.userId, virtualTryonJobs.createIdempotencyKey] }).returning();
+        const [inserted] = await tx.insert(virtualTryonJobs).values({ userId: input.userId, mode: input.mode, status: "draft", skuName: input.skuName ?? null, isTest: input.isTest ?? false, createIdempotencyKey: input.key, creditCost: input.creditCost, sourceSnapshot: input.sourceSnapshot, modelSnapshot: input.modelSnapshot, rightsSnapshot: input.rightsSnapshot }).onConflictDoNothing({ target: [virtualTryonJobs.userId, virtualTryonJobs.createIdempotencyKey] }).returning();
         const job = inserted ?? (await tx.select().from(virtualTryonJobs).where(and(eq(virtualTryonJobs.userId, input.userId), eq(virtualTryonJobs.createIdempotencyKey, input.key), isNull(virtualTryonJobs.deletedAt))).limit(1))[0];
         if (!job) throw new Error("virtual_tryon_idempotency_conflict");
         if (!inserted) {

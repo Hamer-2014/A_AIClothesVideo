@@ -23,6 +23,7 @@ type AdminVirtualTryOnJob = {
   userId: string;
   mode: Mode;
   status: string;
+  isTest: boolean;
   skuName: string | null;
   creditCost: number;
   reservedLedgerId: string | null;
@@ -95,12 +96,13 @@ export type AdminVirtualTryOnListItem = {
   userId: string;
   mode: Mode;
   status: string;
+  isTest: boolean;
   pack: { version: number; requiredViews: RequiredView[] } | null;
   createdAt: Date;
 };
 
 export type AdminVirtualTryOnDetail = {
-  job: Pick<AdminVirtualTryOnJob, "id" | "userId" | "mode" | "status" | "skuName" | "creditCost" | "createdAt" | "updatedAt">;
+  job: Pick<AdminVirtualTryOnJob, "id" | "userId" | "mode" | "status" | "isTest" | "skuName" | "creditCost" | "createdAt" | "updatedAt">;
   pack: { id: string; version: number; status: string; requiredViews: RequiredView[]; qaSummary: unknown; lockedAt: Date | null };
   views: Array<Omit<AdminVirtualTryOnAsset, "packId" | "r2Key"> & { r2KeySuffix: string | null; provenance: unknown }>;
   fidelity: Array<Omit<AdminVirtualTryOnFidelity, "packId"> & { resultJson: unknown }>;
@@ -182,6 +184,7 @@ export async function listAdminVirtualTryOns({ store, limit, cursor }: { store: 
       userId: safeText(job.userId) ?? "redacted",
       mode: job.mode,
       status: stableCode(job.status) ?? "unknown",
+      isTest: job.isTest,
       pack: job.pack ? { version: job.pack.version, requiredViews: requiredViews(job.pack.requiredViews) } : null,
       createdAt: job.createdAt,
     })),
@@ -198,6 +201,7 @@ export async function getAdminVirtualTryOnDetail({ store, jobId }: { store: Admi
       userId: safeText(record.job.userId) ?? "redacted",
       mode: record.job.mode,
       status: stableCode(record.job.status) ?? "unknown",
+      isTest: record.job.isTest,
       skuName: safeText(record.job.skuName),
       creditCost: record.job.creditCost,
       createdAt: record.job.createdAt,
@@ -310,6 +314,7 @@ export function createDrizzleAdminVirtualTryOnStore(db: DbClient = getDb()): Adm
         userId: virtualTryonJobs.userId,
         mode: virtualTryonJobs.mode,
         status: virtualTryonJobs.status,
+        isTest: virtualTryonJobs.isTest,
         skuName: virtualTryonJobs.skuName,
         creditCost: virtualTryonJobs.creditCost,
         reservedLedgerId: virtualTryonJobs.reservedLedgerId,
@@ -340,6 +345,7 @@ export function createDrizzleAdminVirtualTryOnStore(db: DbClient = getDb()): Adm
         userId: virtualTryonJobs.userId,
         mode: virtualTryonJobs.mode,
         status: virtualTryonJobs.status,
+        isTest: virtualTryonJobs.isTest,
         skuName: virtualTryonJobs.skuName,
         creditCost: virtualTryonJobs.creditCost,
         reservedLedgerId: virtualTryonJobs.reservedLedgerId,

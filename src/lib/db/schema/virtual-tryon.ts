@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { id, jsonSnapshot, lockableJobFields, softDelete, timestamps } from "./common";
+import { id, isTest, jsonSnapshot, lockableJobFields, softDelete, timestamps } from "./common";
 
 export const virtualTryonModeValues = ["front_only", "three_view"] as const;
 export const virtualTryonModeEnum = pgEnum("virtual_tryon_mode", virtualTryonModeValues);
@@ -27,6 +27,7 @@ export const virtualTryonJobs = pgTable("virtual_tryon_jobs", {
   mode: virtualTryonModeEnum("mode").notNull(),
   status: virtualTryonJobStatusEnum("status").notNull().default("draft"),
   skuName: text("sku_name"),
+  ...isTest,
   createIdempotencyKey: text("create_idempotency_key").notNull(),
   sourceSnapshot: jsonSnapshot("source_snapshot").notNull(),
   modelSnapshot: jsonSnapshot("model_snapshot").notNull(),

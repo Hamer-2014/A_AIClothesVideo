@@ -13,8 +13,8 @@ describe("APIMart image provider", () => {
   it.each([
     { code: 200, data: { task_id: "task-1" } },
     { code: 200, data: [{ status: "submitted" }] },
-  ])("fails closed when the official submit shape is malformed", async (body) => {
-    await expect(createAPIMartImageGeneration({ prompt: "front", imageUrls: ["model"] }, { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toThrow("APIMart response is missing task id.");
+  ])("fails closed with a stable schema code when the official submit shape is malformed", async (body) => {
+    await expect(createAPIMartImageGeneration({ prompt: "front", imageUrls: ["model"] }, { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toMatchObject({ name: "APIMartImageProviderError", code: "response_schema_error" });
   });
 
   it.each([
@@ -22,8 +22,8 @@ describe("APIMart image provider", () => {
     { data: { status: "completed", result: { images: [{ url: "https://upload.apimart.ai/image.png" }] } } },
     { data: { status: "completed", result: { images: [{ url: ["http://upload.apimart.ai/image.png"] }] } } },
     { data: { status: "completed", result: { images: [] } } },
-  ])("fails closed for malformed or unsafe completed output", async (body) => {
-    await expect(pollAPIMartImageTask("task-1", { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toThrow("APIMart response is missing a safe completed output URL.");
+  ])("fails closed with a stable schema code for malformed or unsafe completed output", async (body) => {
+    await expect(pollAPIMartImageTask("task-1", { fetch: async () => new Response(JSON.stringify(body), { status: 200 }), apiKey: "key" })).rejects.toMatchObject({ name: "APIMartImageProviderError", code: "response_schema_error" });
   });
 
   it("returns only a sanitized poll DTO for the official completed shape", async () => {

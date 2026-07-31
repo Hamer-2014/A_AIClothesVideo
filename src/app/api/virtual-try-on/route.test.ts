@@ -29,6 +29,13 @@ describe("POST /api/virtual-try-on", () => {
     expect(invalid.status).toBe(400);
   });
 
+  it("forwards an explicit smoke isTest marker without marking ordinary owner requests", async () => {
+    const seen: unknown[] = [];
+    await handleCreateVirtualTryOnRequest(new Request("http://localhost/api/virtual-try-on", { method: "POST", body: JSON.stringify({ ...body, isTest: true }), headers: { "Idempotency-Key": "smoke" } }), { getSession: session, createVirtualTryOn: async (input) => { seen.push(input); return created; } });
+    await handleCreateVirtualTryOnRequest(new Request("http://localhost/api/virtual-try-on", { method: "POST", body: JSON.stringify(body), headers: { "Idempotency-Key": "ordinary" } }), { getSession: session, createVirtualTryOn: async (input) => { seen.push(input); return created; } });
+    expect(seen).toEqual([expect.objectContaining({ isTest: true }), expect.not.objectContaining({ isTest: true })]);
+  });
+
   it.each([
     ["virtual_tryon_asset_rights_required", 400],
     ["Insufficient available credits.", 402],

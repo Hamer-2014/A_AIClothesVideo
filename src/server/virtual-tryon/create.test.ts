@@ -6,10 +6,19 @@ import type { CreditLedgerStore } from "@/lib/credits/types";
 import { createInMemoryVirtualTryOnStore, type SourceAsset } from "./store";
 import { createVirtualTryOn } from "./create";
 
-const env = { APIMART_API_KEY: "key", CLOUDFLARE_R2_ACCOUNT_ID: "id", CLOUDFLARE_R2_ACCESS_KEY_ID: "access", CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret", CLOUDFLARE_R2_BUCKET: "bucket", VIRTUAL_TRYON_MODEL_FRONT_KEY: "models/front.png", VIRTUAL_TRYON_MODEL_SIDE_KEY: "models/side.png", VIRTUAL_TRYON_MODEL_BACK_KEY: "models/back.png", VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST: "2", VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST: "5" };
+const env = { APIMART_API_KEY: "key", CLOUDFLARE_R2_ACCOUNT_ID: "id", CLOUDFLARE_R2_ACCESS_KEY_ID: "access", CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret", CLOUDFLARE_R2_BUCKET: "bucket", VIRTUAL_TRYON_MODEL_FRONT_KEY: "models/front.png", VIRTUAL_TRYON_MODEL_SIDE_KEY: "models/side.png", VIRTUAL_TRYON_MODEL_BACK_KEY: "models/back.png", VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST: "2", VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST: "5", VISION_PROVIDER: "openai", VISION_API_KEY: "vision", VISION_MODEL_STRICT: "strict", PROMPT_MODERATION_MODE: "off", APP_ENV: "development", NODE_ENV: "test" };
 const source = (id: string, detectedRole: SourceAsset["detectedRole"] = "front", overrides: Partial<SourceAsset & { rightsAttestationRedactedAt: Date | null }> = {}): SourceAsset & { userId: string; rightsAttestationRedactedAt?: Date | null } => ({ id, userId: "user", originalKey: "assets/" + id + ".png", detectedRole, rightsAttestationId: "attestation-" + id, rightsAttestationVersion: "image_rights_v1", rightsAttestationAcceptedAt: new Date("2026-08-01T00:00:00.000Z"), ...overrides });
 
 describe("create virtual try-on", () => {
+  it("persists an explicit smoke test marker and defaults ordinary jobs to false", async () => {
+    const store = createInMemoryVirtualTryOnStore({ sources: [source("front")] });
+    const credits = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({ store: credits, userId: "user", amount: 10, reason: "test", idempotencyKey: "grant-is-test" });
+    const common = { store, creditStore: credits, env, moderate: async () => ({ allowed: true, decision: "allow" as const, moderationId: null, errorCode: null }) };
+    await createVirtualTryOn({ userId: "user", key: "normal", mode: "front_only", sourceAssetIds: { front: "front" } }, common);
+    await createVirtualTryOn({ userId: "user", key: "smoke", mode: "front_only", sourceAssetIds: { front: "front" }, isTest: true }, common);
+    expect(store.listJobs().map((job) => job.isTest)).toEqual([false, true]);
+  });
   it("moderates before reserving a queued front-only job", async () => {
     const credits = createInMemoryCreditLedgerStore();
     await grantTrialCredits({ store: credits, userId: "user", amount: 10, reason: "test", idempotencyKey: "grant" });

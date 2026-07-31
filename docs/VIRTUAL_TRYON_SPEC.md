@@ -1,7 +1,7 @@
 # AI 模特虚拟试穿 SPEC
 
-版本：v1 静态定妆包  
-日期：2026-08-01  
+版本：v1 静态定妆包
+日期：2026-08-01
 关联：[PRD](PRD.md)、[技术架构](TECHNICAL_ARCHITECTURE.md)、[开发 SPEC](DEVELOPMENT_SPEC.md)
 
 ## 1. 产品范围
@@ -31,7 +31,7 @@ type CreateVirtualTryOnRequest = {
 
 客户端先复用 `POST /api/assets/attest-rights`，请求 `assetIds` 和 `{ accepted: true, version: "image_rights_v1" }`。创建服务复用 `parseRightsAttestation` / `attestAssets`（`src/server/compliance/rights-attestation.ts`）和 `assets`/`asset_rights_attestations`：每个 source asset 必须为当前 user owner、`status="uploaded"` 或 `"ready"`、未删除、拥有当前 `image_rights_v1` 链接，且 role 分别为 `front/back/detail`。job 写不可变 `rightsSnapshot`（asset id、original key、attestation id/version、acceptedAt），而生成 asset 是 `derived`，从不调用用户权利声明或伪装成上传真人。
 
-平台模特参考是私有 R2 key：`VIRTUAL_TRYON_MODEL_FRONT_KEY`、`VIRTUAL_TRYON_MODEL_SIDE_KEY`、`VIRTUAL_TRYON_MODEL_BACK_KEY`。worker 用 `createDownloadSignedUrl({ key, expiresIn: 300 })` 临时 presign；key 可保存于 job 的 model snapshot，signed URL 永远不得进入数据库、`provider_call_logs`、事件、错误消息或日志。任一 key、`APIMART_API_KEY`、现有 R2 配置、Creem moderation 配置缺失时 fail closed；前台文案为“试穿服务暂不可用，请稍后再试”，不 mock 成功。
+平台模特参考是私有 R2 key：`VIRTUAL_TRYON_MODEL_FRONT_KEY`、`VIRTUAL_TRYON_MODEL_SIDE_KEY`、`VIRTUAL_TRYON_MODEL_BACK_KEY`。worker 用 `createDownloadSignedUrl({ key, expiresIn: 300 })` 临时 presign；key 可保存于 job 的 model snapshot，signed URL 永远不得进入数据库、`provider_call_logs`、事件、错误消息或日志。任一 key、`APIMART_API_KEY`、`CLOUDFLARE_R2_*`、严格视觉 QA（`VISION_PROVIDER`、`VISION_API_KEY`、`VISION_MODEL_STRICT`，非 OpenAI 还需要 `VISION_BASE_URL`）或 Creem moderation 配置缺失时 fail closed；前台文案为“试穿服务暂不可用，请稍后再试”，不 mock 成功。`PROMPT_MODERATION_MODE=off`/`dev_bypass` 仅本地 development/test 的 `canUseDevBypass` 条件下可用，staging/production 一律 fail closed。
 
 ## 3. 计费与审核
 
@@ -49,7 +49,7 @@ type CreateVirtualTryOnRequest = {
 
 `orderedUrls` 不超过 16，且必须按一致性链固定：front = modelFront, garmentFront, garmentBack?, garmentDetail?；side = modelSide, generatedFront, garmentFront, garmentBack, garmentDetail；back = modelBack, generatedFront, generatedSide, garmentFront, garmentBack, garmentDetail。前序 generated view 必须已经转存 R2，缺失即 fail closed。生产 appearance pack 固定 `size="2:3"`、`resolution="2k"`，不先做 1k 再做 2k 双生成，避免双重成本和人物漂移；smoke 也不改变该协议。`GET /v1/tasks/{task_id}` 只轮询该 view，官方 completed 输出读取 `data.result.images[0].url[0]`。provider 任务和输出 URL 仅在进程内暂存；输出 URL 一到达立即受限转存到 `virtual-tryon/{jobId}/packs/{packId}/{view}.png`，系统不保存远程 URL。
 
-失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed。submit、poll 使用 25 秒 AbortSignal timeout。`submitAttemptCount` 只记录真实 submit，最多 2 次；网络 timeout/network error 不自动重提（APIMart 未声明 idempotency key，受理状态未知），429 只可在 30 秒后重提一次，5xx 也保守进入 release。已有 `providerTaskId` 时 poll 绝不清 task 或重新 submit；`pollFailureCount` 最多 10 次、每次 30 秒。transfer 保留 task 并用独立 delivery failure count 有界重试；SSRF/host/MIME/size 校验失败直接 release。受限转存只允许 HTTPS、默认 `upload.apimart.ai`（可用 `APIMART_IMAGE_OUTPUT_HOST_ALLOWLIST` 覆盖），拒绝 localhost/IP/私网/link-local/metadata、redirect、非 PNG/JPEG/WebP 和超过 25 MiB 的响应。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response；QA log 写入失败同样 fail closed。
+失败分类：配置/rights/moderation/response-schema/QA `unknown` 为不可重试且 fail closed。submit、poll 使用 25 秒 AbortSignal timeout。`submitAttemptCount` 只记录真实 submit，最多 2 次；网络 timeout/network error 不自动重提（APIMart 未声明 idempotency key，受理状态未知），429 只可在 30 秒后重提一次，5xx 也保守进入 release。已有 `providerTaskId` 时 poll 绝不清 task 或重新 submit；`pollFailureCount` 最多 10 次、每次 30 秒。transfer 保留 task 并用独立 `deliveryFailureCount` 有界重试；仅 `http_429`、`http_5xx`、`timeout`、`network_error` 可重试，SSRF/host/redirect/MIME/size 校验失败直接 release。受限转存只允许 HTTPS、默认 `upload.apimart.ai`（可用 `APIMART_IMAGE_OUTPUT_HOST_ALLOWLIST` 覆盖），拒绝 localhost/IP/私网/link-local/metadata、redirect、非 PNG/JPEG/WebP 和超过 25 MiB 的响应。provider call log 的 request snapshot 仅含 `imageCount`、`view`、prompt hash；response summary 仅含 task/status/cost，不含输入 signed URL、raw output URL 或 raw response；QA log 写入失败同样 fail closed。
 
 ## 5. 数据、状态机与幂等
 
@@ -84,7 +84,7 @@ type StrictViewQa = {
 type StrictCrossViewQa = { verdict: "pass" | "fail" | "unknown"; requiredViews: ("front" | "side" | "back")[]; coverage: "complete" | "incomplete" | "unknown"; garmentConsistency: "match" | "mismatch" | "unknown"; personConsistency: "match" | "mismatch" | "unknown"; evidence: string[] };
 ```
 
-单视图 pass 要求每个 garment field `match`、anatomy `natural`、identity `match`、`inventedDetails=false`；跨视图 pass 要求 complete/match/match。任何 schema failure、provider failure、`unknown`、`fail` 均 fail closed。确切文件：`src/server/virtual-tryon/qa-schema.ts`、`qa.ts`、`qa-schema.test.ts`、`qa.test.ts`、`service.ts`、`service.test.ts`。
+单视图 QA 的签名图片顺序固定为 `model[currentView]`、`garmentFront`、`garmentBack?`、`garmentDetail?`、`generated[currentView]`：视觉模型只能以第 1 张平台模特参考比较 `identityConsistency`，以服装参考比较 garment 字段；无可用证据必须为 `unknown`。单视图 pass 要求每个 garment field `match`、anatomy `natural`、identity `match`、`inventedDetails=false`；跨视图 pass 要求 complete/match/match。任何 schema failure、provider failure、`unknown`、`fail` 均 fail closed。确切文件：`src/server/virtual-tryon/qa-schema.ts`、`qa.ts`、`qa-schema.test.ts`、`qa.test.ts`、`service.ts`、`service.test.ts`。
 
 ## 7. API、UI、后台与文案
 
@@ -104,4 +104,4 @@ type StrictCrossViewQa = { verdict: "pass" | "fail" | "unknown"; requiredViews: 
 
 source asset、rights snapshot、pack/provenance、QA、state event 和脱敏 provider log 按既有 retention/rights-removal 工作流保留；源资产删/撤权或 attestation redacted 后立即禁 detail/lock/preview/download（统一不可用，不泄露原因）。当前没有可靠 R2 异步物理清理队列，不宣称已调度删除。指标为创建/配置/审核/扣款失败率，视角提交/轮询/R2/QA 成功率，ready/lock/download 转化，重试次数、成本、退款人工工单率。
 
-桥接仅在 ready/locked 返回 `{ kind:"virtual_tryon_appearance_pack", appearancePackId, version, mode, assetIds, provenance:"generated_apimart_gpt_image_2", videoGeneration:"not_enabled" }`。真实 smoke 脚本为 `scripts/virtual-tryon-smoke.mjs`：先检查 `APIMART_API_KEY`、三项 `VIRTUAL_TRYON_MODEL_*_KEY`、`R2_*`、`DATABASE_URL`；任一缺失输出 `SKIP: virtual try-on staging smoke requires ...` 并 exit 0；齐备时只在 staging 创建 `front_only` isTest job，循环调用内部 tick 至 terminal，验证 R2 key 与 Strict pass，随后软删除。命令：`pnpm exec dotenv -e .env.staging -- node scripts/virtual-tryon-smoke.mjs`；未提供真实变量时不得声称执行过。
+桥接仅在 ready/locked 返回 `{ kind:"virtual_tryon_appearance_pack", appearancePackId, version, mode, assetIds, provenance:"generated_apimart_gpt_image_2", videoGeneration:"not_enabled" }`。真实 smoke 脚本为 `scripts/virtual-tryon-smoke.mjs`：先检查 `APIMART_API_KEY`、三项 `VIRTUAL_TRYON_MODEL_*_KEY`、`CLOUDFLARE_R2_*`、`DATABASE_URL`；任一缺失输出 `SKIP: virtual try-on staging smoke requires ...` 并 exit 0；齐备时只在 staging 创建 `front_only` 且 `is_test=true` 的 job，循环调用内部 tick 至 terminal，验证 R2 对象、Strict 单视图 pass、无 front-only cross QA 与关联 job 的 reserve/capture `credit_ledger` 行，随后仅软删除脚本创建的 job。已有 `VIRTUAL_TRYON_SMOKE_JOB_ID` 绝不删除，并报告其 `is_test` 状态。命令：`pnpm exec dotenv -e .env.staging -- node scripts/virtual-tryon-smoke.mjs`；未提供真实变量时不得声称执行过。

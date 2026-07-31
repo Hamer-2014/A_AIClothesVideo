@@ -200,7 +200,7 @@ async function runQa(job: RuntimeJob, qa: QaRunner | undefined, qaDeps: VirtualT
   if (qa) return qa(job);
   if (!qaDeps) return { allPassed: false };
   const generatedKeys = Object.fromEntries(job.assets.flatMap((asset) => asset.r2Key ? [[asset.view, asset.r2Key]] : []));
-  return runVirtualTryOnQa({ jobId: job.id, userId: job.userId, packId: job.packId, mode: job.mode, sourceKeys: { front, back: job.sourceKeys.back, detail: job.sourceKeys.detail }, generatedKeys }, qaDeps);
+  return runVirtualTryOnQa({ jobId: job.id, userId: job.userId, packId: job.packId, mode: job.mode, sourceKeys: { front, back: job.sourceKeys.back, detail: job.sourceKeys.detail }, modelKeys: job.modelKeys, generatedKeys }, qaDeps);
 }
 
 export async function runVirtualTryOnTick(input: { workerId: string; store: RuntimeStore; credits: CreditLedgerStore; submit: (job: RuntimeJob, view: AppearanceView) => Promise<string>; poll: (job: RuntimeJob, view: AppearanceView, taskId: string) => Promise<{ status: RuntimeAsset["providerStatus"]; outputUrl: string | null }>; qa?: QaRunner; qaDeps?: VirtualTryOnQaDeps; transfer?: typeof transferRemoteFileToR2; now?: Date }) {

@@ -13,8 +13,8 @@ function selectedSources(input: SourceInput): Array<[SourceRole, string]> {
   return (["front", "back", "detail"] as const).flatMap((role) => input[role] ? [[role, input[role]!]] : []);
 }
 
-function samePayload(job: TryOnJob, input: { mode: VirtualTryOnMode; sourceAssetIds: SourceInput }) {
-  if (job.mode !== input.mode || !job.sourceSnapshot || typeof job.sourceSnapshot !== "object" || Array.isArray(job.sourceSnapshot)) return false;
+function samePayload(job: TryOnJob, input: { mode: VirtualTryOnMode; sourceAssetIds: SourceInput; isTest?: boolean }) {
+  if (job.mode !== input.mode || job.isTest !== (input.isTest ?? false) || !job.sourceSnapshot || typeof job.sourceSnapshot !== "object" || Array.isArray(job.sourceSnapshot)) return false;
   const sources = (job.sourceSnapshot as { sources?: unknown }).sources;
   if (!sources || typeof sources !== "object" || Array.isArray(sources)) return false;
   const requested = selectedSources(input.sourceAssetIds);
@@ -62,7 +62,7 @@ async function reserveDraft(input: { result: { job: TryOnJob; pack: TryOnPack };
   }
 }
 
-export async function createVirtualTryOn(input: { userId: string; key: string; mode: VirtualTryOnMode; skuName?: string; sourceAssetIds: SourceInput }, deps: { store: VirtualTryOnStore; creditStore: CreditLedgerStore; env?: Record<string, string | undefined>; moderate?: typeof checkPrompt }) {
+export async function createVirtualTryOn(input: { userId: string; key: string; mode: VirtualTryOnMode; skuName?: string; isTest?: boolean; sourceAssetIds: SourceInput }, deps: { store: VirtualTryOnStore; creditStore: CreditLedgerStore; env?: Record<string, string | undefined>; moderate?: typeof checkPrompt }) {
   const selected = selectedSources(input.sourceAssetIds);
   const sourceIds = selected.map(([, assetId]) => assetId);
   if (new Set(sourceIds).size !== sourceIds.length) throw new Error("virtual_tryon_duplicate_source_asset");
@@ -85,7 +85,7 @@ export async function createVirtualTryOn(input: { userId: string; key: string; m
   const moderation = await moderate({ userId: input.userId, source: "virtual_tryon_generation", prompt: "Generate a static AI model garment appearance pack." });
   if (!moderation.allowed) throw new Error("virtual_tryon_moderation_blocked");
   const creditCost = input.mode === "front_only" ? config.frontOnlyCreditCost : config.threeViewCreditCost;
-  const result = await deps.store.createJobAndPack({ userId: input.userId, mode: input.mode, skuName: input.skuName, key: input.key, creditCost, requiredViews, sourceSnapshot, modelSnapshot: config.modelKeys as JsonValue, rightsSnapshot });
+  const result = await deps.store.createJobAndPack({ userId: input.userId, mode: input.mode, skuName: input.skuName, isTest: input.isTest, key: input.key, creditCost, requiredViews, sourceSnapshot, modelSnapshot: config.modelKeys as JsonValue, rightsSnapshot });
   if (!samePayload(result.job, input)) throw new Error("virtual_tryon_idempotency_conflict");
   if (result.job.status === "failed_unreserved") throw new Error("virtual_tryon_failed_unreserved");
   if (result.job.status !== "draft") return result;

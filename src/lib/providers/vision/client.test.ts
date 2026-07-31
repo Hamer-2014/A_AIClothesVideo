@@ -17,6 +17,8 @@ describe("vision provider client", () => {
     expect(result.qaJson).toEqual({ verdict: "unknown" });
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.messages[0].content).toContain("strict virtual try-on view QA");
+    expect(body.messages[0].content).toContain("platform model reference");
+    expect(body.messages[0].content).toContain("identityConsistency only between the generated image and the first platform model reference");
   });
   afterEach(() => {
     vi.unstubAllEnvs();
