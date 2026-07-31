@@ -49,18 +49,22 @@ async function writeLog(input: {
   errorCode?: string | null;
 }) {
   const sanitized = sanitizeVirtualTryOnProviderLog({ view: input.view, imageCount: input.imageCount, promptHash: promptHash(input.prompt), taskId: input.taskId, status: input.providerStatus, errorCode: input.errorCode });
-  await input.deps.providerLogStore.createCallLog({
-    provider: "apimart",
-    model: "gpt-image-2",
-    purpose: "virtual_tryon_image",
-    userId: input.job.userId,
-    virtualTryonJobId: input.job.id,
-    providerTaskId: input.taskId ?? null,
-    requestSnapshot: sanitized.requestSnapshot,
-    responseSummary: sanitized.responseSummary,
-    status: input.status,
-    errorCode: sanitized.errorCode,
-  });
+  try {
+    await input.deps.providerLogStore.createCallLog({
+      provider: "apimart",
+      model: "gpt-image-2",
+      purpose: "virtual_tryon_image",
+      userId: input.job.userId,
+      virtualTryonJobId: input.job.id,
+      providerTaskId: input.taskId ?? null,
+      requestSnapshot: sanitized.requestSnapshot,
+      responseSummary: sanitized.responseSummary,
+      status: input.status,
+      errorCode: sanitized.errorCode,
+    });
+  } catch {
+    // A failed audit write must not discard a provider task ID and trigger resubmission.
+  }
 }
 
 export function createVirtualTryOnGenerationProvider(deps: VirtualTryOnGenerationProviderDeps) {

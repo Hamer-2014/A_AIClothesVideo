@@ -113,4 +113,15 @@ describe("virtual try-on APIMart generation provider", () => {
     expect(encoded).not.toMatch(/https:\/\/|secret|apiKey|raw/i);
     expect(logs.listCallLogs()[0]).toMatchObject({ status: "failed", errorCode: "provider_error" });
   });
+
+  it("persists the APIMart task despite a transient audit write failure", async () => {
+    const provider = createVirtualTryOnGenerationProvider({
+      signer: async ({ key }) => "signed:" + key,
+      imageClient: async () => ({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1", raw: {} }),
+      pollClient: vi.fn(),
+      providerLogStore: { createCallLog: async () => { throw new Error("database_unavailable"); } },
+    });
+
+    await expect(provider.submit(job("front_only"), "front")).resolves.toBe("task-1");
+  });
 });
