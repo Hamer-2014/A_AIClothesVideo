@@ -59,6 +59,8 @@ describe("public trust pages", () => {
     expect(screen.getByRole("heading", { name: "Retention" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Deletion" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Notices and complaints" })).toBeInTheDocument();
+    expect(container).toHaveTextContent(/public custom domain/);
+    expect(container).toHaveTextContent(/anyone who obtains a source-image URL/i);
     expect(container).toHaveTextContent(/three years/);
     expect(container.textContent).not.toMatch(/RunwayTools/);
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);

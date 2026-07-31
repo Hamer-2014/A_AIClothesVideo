@@ -103,6 +103,15 @@ describe("createJobDownloadUrl", () => {
     ).toBe("https://cdn.example.com/videos/jobs/job-1/stitched/final.mp4");
   });
 
+  it("requires the public custom domain for preview URLs", () => {
+    expect(() =>
+      createPublicJobVideoUrl({
+        key: "jobs/job-1/stitched/final.mp4",
+        publicBaseUrl: "",
+      }),
+    ).toThrow("CLOUDFLARE_R2_PUBLIC_BASE_URL is required");
+  });
+
   it("rejects downloads for non-deliverable jobs", async () => {
     await expect(
       createJobDownloadUrl({

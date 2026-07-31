@@ -18,7 +18,7 @@ import {
   type VideoGenerationResult,
   type VideoTaskResult,
 } from "@/lib/providers/video-generation/router";
-import { createDownloadSignedUrl } from "@/lib/storage/presign";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 import { buildSegmentVideoKey } from "@/lib/storage/keys";
 import { transferRemoteFileToR2 } from "@/lib/storage/transfer";
 import {
@@ -206,7 +206,7 @@ export async function submitQueuedSegment({
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   jobId,
   segmentId,
-  createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
+  createSignedUrl = async ({ key }) => createR2PublicUrl({ key }),
   createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
   maxSubmitAttempts = getMaxSubmitAttempts(),
 }: {
@@ -418,7 +418,7 @@ export async function kickQueuedSegmentsForJob({
   segmentStore,
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   jobId,
-  createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
+  createSignedUrl = async ({ key }) => createR2PublicUrl({ key }),
   createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
   maxSubmitAttempts = getMaxSubmitAttempts(),
 }: {
@@ -522,7 +522,7 @@ export async function pollSubmittedSegment({
   jobId,
   segmentId,
   pollTask,
-  createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
+  createSignedUrl = async ({ key }) => createR2PublicUrl({ key }),
   createVideoGeneration: createVideoGenerationFn = createVideoGeneration,
   providerCallLogStore = createDrizzleProviderCallLogStore(),
   maxSubmitAttempts = getMaxSubmitAttempts(),

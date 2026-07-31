@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
 
@@ -9,6 +9,10 @@ import {
 } from "./job-source-assets";
 
 describe("job source assets", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("requires both the job and each linked asset to belong to the user", async () => {
     const queries: string[] = [];
     const db = drizzle.mock({
@@ -34,7 +38,48 @@ describe("job source assets", () => {
     expect(queries[0]).toContain('"assets"."user_id" =');
   });
 
-  it("keeps the task readable when one asset cannot be signed", async () => {
+  it("uses the required public custom domain when reopening source assets", async () => {
+    vi.stubEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://media.example.com/assets");
+    const result = await getJobSourceAssets({
+      jobId: "job-1",
+      userId: "user-1",
+      store: {
+        listOwnedJobAssets: async () => [
+          {
+            assetId: "asset-front",
+            role: "front",
+            sortOrder: 0,
+            originalKey: "users/user-1/assets/asset-front/original.webp",
+            fileName: "front.webp",
+            mimeType: "image/webp",
+          },
+          {
+            assetId: "asset-back",
+            role: "back",
+            sortOrder: 1,
+            originalKey: "users/user-1/assets/asset-back/original.webp",
+            fileName: "back.webp",
+            mimeType: "image/webp",
+          },
+        ],
+      },
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        assetId: "asset-front",
+        previewUrl:
+          "https://media.example.com/assets/users/user-1/assets/asset-front/original.webp",
+      }),
+      expect.objectContaining({
+        assetId: "asset-back",
+        previewUrl:
+          "https://media.example.com/assets/users/user-1/assets/asset-back/original.webp",
+      }),
+    ]);
+  });
+
+  it("keeps the task readable when one public asset URL cannot be created", async () => {
     const result = await getJobSourceAssets({
       jobId: "job-1",
       userId: "user-1",
@@ -60,9 +105,9 @@ describe("job source assets", () => {
       },
       createDownloadSignedUrl: async ({ key }) => {
         if (key.includes("asset-back")) {
-          throw new Error("temporary signing failure");
+          throw new Error("invalid public object key");
         }
-        return `https://signed-r2.example/${key}`;
+        return `https://media.example.com/${key}`;
       },
     });
 
@@ -70,7 +115,7 @@ describe("job source assets", () => {
       expect.objectContaining({
         assetId: "asset-front",
         previewUrl:
-          "https://signed-r2.example/users/user-1/assets/asset-front/original.webp",
+          "https://media.example.com/users/user-1/assets/asset-front/original.webp",
       }),
       expect.objectContaining({
         assetId: "asset-back",

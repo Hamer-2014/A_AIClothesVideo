@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { JsonValue } from "@/lib/db/schema/common";
 import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
@@ -17,7 +17,12 @@ const jobId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 
 describe("video job asset analysis", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("runs ordered task-local consistency for human-model views", async () => {
+    vi.stubEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://media.example.com");
     const jobStore = createInMemoryJobStore([
       {
         id: jobId,
@@ -53,9 +58,8 @@ describe("video job asset analysis", () => {
       mode: "standard",
       templates: mvpShotTemplates,
       isTrial: false,
-      createDownloadSignedUrl: async ({ key }) =>
-        `https://signed.example/${key}`,
       visionProvider: async ({ imageUrls }) => {
+        expect(imageUrls[0]).toMatch(/^https:\/\/media\.example\.com\//);
         const role = imageUrls[0]?.split("/").at(-1)?.replace(".jpg", "") ??
           "front";
         return {

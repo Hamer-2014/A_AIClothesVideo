@@ -20,7 +20,7 @@
 | API | 用途 | 当前状态 | 关键约束 |
 | --- | --- | --- | --- |
 | `POST /api/uploads/presign` | 创建 R2 私有直传 URL 和素材记录 | 已实现 | 只保存 R2 key，不保存公开 URL |
-| `GET /api/files/signed-url` | 为用户自己的文件生成下载 signed URL | 已实现 | 用户只能访问自己的文件 |
+| `GET /api/files/signed-url` | 返回用户自己源图片的 R2 公共自定义域 URL（保留兼容路由名） | 已实现 | 返回前校验所有权；URL 可转发且不自动过期 |
 | `POST /api/jobs` | 创建视频任务并绑定素材 | 已实现 | 新任务进入 `asset_analysis_queued` |
 | `GET /api/jobs/[id]` | 读取任务详情、素材分析、模板推荐、最新分镜 | 已实现 | 不暴露 provider key 和 secret |
 | `POST /api/jobs/[id]/analyze` | 手动触发素材分析 | 已实现 | 使用真实视觉 provider，不伪造成功 |

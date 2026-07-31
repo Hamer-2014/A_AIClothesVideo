@@ -1,4 +1,4 @@
-import { createDownloadSignedUrl as createR2DownloadSignedUrl } from "@/lib/storage/presign";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 import { getDb } from "@/lib/db/client";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { assets, videoJobAssets } from "@/lib/db/schema";
@@ -159,8 +159,7 @@ export async function analyzeVideoJobAssets({
   mode,
   templates,
   isTrial,
-  createDownloadSignedUrl = ({ key }) =>
-    createR2DownloadSignedUrl({ key, expiresIn: 900 }),
+  createDownloadSignedUrl = async ({ key }) => createR2PublicUrl({ key }),
   visionProvider,
   consistencyProvider,
   manageJobStatus = true,
@@ -209,7 +208,7 @@ export async function analyzeVideoJobAssets({
       .filter((role): role is AssetRole => Boolean(role) && role !== "unknown");
 
     for (const asset of jobAssets) {
-      const signedUrl = await createDownloadSignedUrl({ key: asset.originalKey });
+      const imageUrl = await createDownloadSignedUrl({ key: asset.originalKey });
       const result = await analyzeAssetWithVisionProvider({
         analysisStore,
         providerCallLogStore,
@@ -217,7 +216,7 @@ export async function analyzeVideoJobAssets({
         userId,
         videoJobId: jobId,
         mode,
-        imageUrls: [signedUrl],
+        imageUrls: [imageUrl],
         templates,
         isTrial,
         visionProvider,
@@ -230,7 +229,7 @@ export async function analyzeVideoJobAssets({
         assetId: asset.assetId,
         role: result.analysis.assetRole,
         subjectKind: result.analysis.subjectKind,
-        imageUrl: signedUrl,
+        imageUrl,
       });
     }
 

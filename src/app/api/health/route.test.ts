@@ -16,6 +16,7 @@ describe("GET /api/health", () => {
     vi.stubEnv("CLOUDFLARE_R2_ACCESS_KEY_ID", "key");
     vi.stubEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "secret");
     vi.stubEnv("CLOUDFLARE_R2_BUCKET", "bucket");
+    vi.stubEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://media.example.com");
     vi.stubEnv("INTERNAL_WORKER_SECRET", "internal-secret");
     vi.stubEnv("CRON_JOB_SECRET", "cron-secret");
     vi.stubEnv("ABUSE_HASH_SECRET", "abuse-hash-secret");
@@ -75,6 +76,7 @@ describe("GET /api/health", () => {
     vi.stubEnv("CLOUDFLARE_R2_ACCESS_KEY_ID", "");
     vi.stubEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "");
     vi.stubEnv("CLOUDFLARE_R2_BUCKET", "");
+    vi.stubEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "");
     vi.stubEnv("INTERNAL_WORKER_SECRET", "");
     vi.stubEnv("CRON_JOB_SECRET", "");
     vi.stubEnv("CLOUD_RUN_STITCH_URL", "");

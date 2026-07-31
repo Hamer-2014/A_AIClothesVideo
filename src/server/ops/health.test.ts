@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { getRuntimeHealth } from "./health";
 
 describe("getRuntimeHealth", () => {
+  it("marks storage unready when the public R2 base URL is not a plain HTTPS URL", () => {
+    const result = getRuntimeHealth({
+      CLOUDFLARE_R2_ACCOUNT_ID: "account",
+      CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
+      CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "http://media.example.com",
+    });
+
+    expect(result.checks.storage).toEqual({
+      configured: false,
+      missing: ["CLOUDFLARE_R2_PUBLIC_BASE_URL"],
+      status: "missing",
+    });
+  });
+
   it("aggregates missing env vars by subsystem", () => {
     const result = getRuntimeHealth({
       NODE_ENV: "production",
@@ -13,6 +29,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_ACCESS_KEY_ID: "",
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: "",
       CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "",
       CLOUD_RUN_STITCH_URL: "",
@@ -41,6 +58,7 @@ describe("getRuntimeHealth", () => {
       missing: [
         "CLOUDFLARE_R2_ACCESS_KEY_ID",
         "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+        "CLOUDFLARE_R2_PUBLIC_BASE_URL",
       ],
       status: "missing",
     });
@@ -69,6 +87,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
       CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "https://media.example.com",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
@@ -114,6 +133,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
       CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "https://media.example.com",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       CLOUD_RUN_STITCH_URL: "https://stitch-worker.a.run.app",
@@ -145,6 +165,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
       CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "https://media.example.com",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",
@@ -325,6 +346,7 @@ describe("getRuntimeHealth", () => {
       CLOUDFLARE_R2_ACCESS_KEY_ID: "key",
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: "secret",
       CLOUDFLARE_R2_BUCKET: "bucket",
+      CLOUDFLARE_R2_PUBLIC_BASE_URL: "https://media.example.com",
       INTERNAL_WORKER_SECRET: "internal-secret",
       CRON_JOB_SECRET: "cron-secret",
       ABUSE_HASH_SECRET: "abuse-hash-secret",

@@ -5,6 +5,7 @@ import {
   getCreemEnvironment,
   isCreemLiveApiKey,
 } from "@/lib/providers/creem/config";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 
 export interface RuntimeHealthCheck {
   configured: boolean;
@@ -47,6 +48,34 @@ function buildCheck(env: EnvSource, keys: string[]): RuntimeHealthCheck {
     configured: missing.length === 0,
     missing,
     status: missing.length === 0 ? "ready" : "missing",
+  };
+}
+
+function buildStorageCheck(env: EnvSource): RuntimeHealthCheck {
+  const publicBaseUrlKey = "CLOUDFLARE_R2_PUBLIC_BASE_URL";
+  const check = buildCheck(env, [
+    "CLOUDFLARE_R2_ACCOUNT_ID",
+    "CLOUDFLARE_R2_ACCESS_KEY_ID",
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    "CLOUDFLARE_R2_BUCKET",
+    publicBaseUrlKey,
+  ]);
+
+  if (!check.missing.includes(publicBaseUrlKey)) {
+    try {
+      createR2PublicUrl({
+        key: "health-check",
+        publicBaseUrl: trimEnv(env, publicBaseUrlKey),
+      });
+    } catch {
+      check.missing.push(publicBaseUrlKey);
+    }
+  }
+
+  return {
+    configured: check.missing.length === 0,
+    missing: check.missing,
+    status: check.missing.length === 0 ? "ready" : "missing",
   };
 }
 
@@ -159,12 +188,7 @@ export function getRuntimeHealth(
   const checks = {
     database: buildCheck(env, ["DATABASE_URL"]),
     auth: buildCheck(env, ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"]),
-    storage: buildCheck(env, [
-      "CLOUDFLARE_R2_ACCOUNT_ID",
-      "CLOUDFLARE_R2_ACCESS_KEY_ID",
-      "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
-      "CLOUDFLARE_R2_BUCKET",
-    ]),
+    storage: buildStorageCheck(env),
     internalSecurity: buildCheck(env, [
       "INTERNAL_WORKER_SECRET",
       "CRON_JOB_SECRET",

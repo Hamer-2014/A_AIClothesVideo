@@ -2,7 +2,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { assets, videoJobAssets, videoJobs } from "@/lib/db/schema";
-import { createDownloadSignedUrl as createR2DownloadSignedUrl } from "@/lib/storage/presign";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 
 export interface JobSourceAssetRecord {
   assetId: string;
@@ -57,8 +57,7 @@ export async function getJobSourceAssets({
   jobId,
   userId,
   store = createDrizzleJobSourceAssetStore(),
-  createDownloadSignedUrl = ({ key }) =>
-    createR2DownloadSignedUrl({ key, expiresIn: 900 }),
+  createDownloadSignedUrl = async ({ key }) => createR2PublicUrl({ key }),
 }: {
   jobId: string;
   userId: string;

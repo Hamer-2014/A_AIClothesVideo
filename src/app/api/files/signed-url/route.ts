@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 import { assets } from "@/lib/db/schema";
-import { createDownloadSignedUrl as createR2DownloadSignedUrl } from "@/lib/storage/presign";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 
 type FileSession = {
   user?: {
@@ -70,15 +70,14 @@ export async function handleFileSignedUrlRequest(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const expiresIn = 900;
   const createDownloadSignedUrl =
     deps.createDownloadSignedUrl ??
-    ((input) => createR2DownloadSignedUrl({ key: input.key, expiresIn }));
+    (async (input) => createR2PublicUrl({ key: input.key }));
   const url = await createDownloadSignedUrl({ key: asset.originalKey });
 
   return NextResponse.json({
     url,
-    expiresIn,
+    expiresIn: null,
   });
 }
 

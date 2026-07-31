@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
+import { createR2PublicUrl } from "@/lib/storage/public-url";
 import { getDb } from "@/lib/db/client";
 import { videoJobs } from "@/lib/db/schema";
 
@@ -109,9 +110,9 @@ export function createPublicJobVideoUrl({
   key: string | null;
   publicBaseUrl?: string;
 }) {
-  if (!key || !publicBaseUrl) {
+  if (!key) {
     return null;
   }
 
-  return `${publicBaseUrl.replace(/\/+$/, "")}/${key.replace(/^\/+/, "")}`;
+  return createR2PublicUrl({ key, publicBaseUrl });
 }

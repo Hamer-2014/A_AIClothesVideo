@@ -384,6 +384,31 @@ describe("video segment services", () => {
     });
   });
 
+  it("submits public custom-domain image URLs by default", async () => {
+    vi.stubEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://media.example.com");
+    const stores = createStores();
+    let submittedImageUrls: string[] = [];
+
+    await submitQueuedSegment({
+      ...stores,
+      jobId,
+      segmentId,
+      createVideoGeneration: async (input) => {
+        submittedImageUrls = input.imageUrls;
+        return {
+          provider: "evolink",
+          model: "veo3.1-fast-beta",
+          providerTaskId: "task-public-url",
+          raw: {},
+        };
+      },
+    });
+
+    expect(submittedImageUrls).toEqual([
+      "https://media.example.com/users/user-1/assets/asset-front/original.jpg",
+    ]);
+  });
+
   it("does not submit the same queued segment twice when concurrent workers race", async () => {
     const stores = createStores();
     let providerCalls = 0;

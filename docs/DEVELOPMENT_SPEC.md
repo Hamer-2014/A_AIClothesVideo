@@ -602,16 +602,15 @@ https://aiclothesvideo.com/api/webhooks/creem
 - [ ] 校验文件大小。
 - [ ] 创建 `assets` 记录。
 - [ ] 保存 R2 key，不保存永久公开 URL。
-- [ ] 生成用户下载 signed URL。
-- [ ] 生成模型访问 signed URL。
-- [ ] 用户只能访问自己的文件。
-- [ ] 管理员访问文件也要权限校验。
+- [ ] 使用 `CLOUDFLARE_R2_PUBLIC_BASE_URL` 生成原图预览和模型输入 URL。
+- [ ] 公共 URL 仅由任务所有权校验后的应用接口返回，但 URL 持有者可直接访问。
+- [ ] 管理员获取公共 URL 前仍要权限校验。
 
 ### 7.5 验收
 
-- [ ] R2 bucket 不公开。
-- [ ] 用户不能下载别人的文件。
-- [ ] signed URL 有效期可配置。
+- [ ] 公共自定义域使用 HTTPS 且对象 key 不可枚举。
+- [ ] 应用接口不能向用户返回其他用户的对象 key 或公共 URL。
+- [ ] 缺少 `CLOUDFLARE_R2_PUBLIC_BASE_URL` 时 readiness 失败且不回退 signed read URL。
 - [ ] 删除采用 `deleted_at` + 异步清理。
 
 ### 7.6 素材权利声明与上传门禁

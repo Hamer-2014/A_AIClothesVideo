@@ -145,9 +145,9 @@ MVP 公开视频生成 provider/model/key 只由环境变量决定。数据库 `
 
 原则：
 
-- Bucket 默认不公开。
-- 前台下载使用 signed URL。
-- 模型读取图片也使用短期 signed URL。
+- 写入使用私有 S3-compatible 凭证和 signed upload URL。
+- 原图预览、视觉分析和视频生成输入强制使用 `CLOUDFLARE_R2_PUBLIC_BASE_URL` 的 HTTPS 公共自定义域。
+- 公共 URL 不包含签名且不会自动过期；拿到 URL 的第三方在对象删除前可以访问。
 - 供应商返回的视频链接必须及时转存到 R2。
 - 删除采用异步清理，不在用户请求中同步删除大文件。
 
@@ -751,11 +751,11 @@ Creem Prompt Moderation 不是普通模型 fallback。接入 Creem 后，它是�
 
 ### 12.2 访问
 
-- 用户只能访问自己的文件。
-- 管理员访问文件也必须经过后台权限校验。
-- signed URL 有效期建议 10-30 分钟。
-- 模型调用使用短期 signed URL。
-- 不把永久公开 URL 存到前端可见数据里。
+- 应用只向任务所有者返回其原图公共 URL，管理员页面仍需先经过后台权限校验。
+- 公共 URL 可被持有者转发，URL 本身不提供用户级鉴权。
+- 模型调用与任务二次预览使用同一个公共自定义域 URL。
+- 数据库和 provider call log 只保存对象 key 或素材数量，不持久化完整公共 URL。
+- `CLOUDFLARE_R2_PUBLIC_BASE_URL` 是 storage readiness 的必填 HTTPS 配置；缺失时不回退到 R2 signed read URL。
 
 ### 12.3 生命周期
 
