@@ -53,7 +53,7 @@ type CreateVirtualTryOnRequest = {
 
 ## 5. 数据、状态机与幂等
 
-新增 `virtual_tryon_jobs`（owner、mode、status、按 front/back/detail 角色保存 source key 的 snapshot、model/rights snapshot、creditCost、reserve/capture ledger id、`deliveryPersistAttemptCount`、lock fields）、`appearance_packs`（job、version、requiredViews、status、lockedAt）、`appearance_pack_assets`（pack、view、providerTaskId/status、attemptCount、r2Key、origin/provenance） 、`garment_fidelity_results`、`virtual_tryon_state_events`。唯一键：`appearance_packs(job_id, version)`、`appearance_pack_assets(pack_id, view)`、`garment_fidelity_results(pack_id, scope, view)`、`virtual_tryon_jobs(user_id, create_idempotency_key)`。
+新增 `virtual_tryon_jobs`（owner、mode、status、按 front/back/detail 角色保存 source key 的 snapshot、model/rights snapshot、creditCost、reserve/capture/release/refund ledger id、`deliveryPersistAttemptCount`、lock fields）、`appearance_packs`（job、version、requiredViews、status、lockedAt）、`appearance_pack_assets`（pack、view、providerTaskId/status、attemptCount、r2Key、origin/provenance） 、`garment_fidelity_results`、`virtual_tryon_state_events`。唯一键：`appearance_packs(job_id, version)`、`appearance_pack_assets(pack_id, view)`、`garment_fidelity_results(pack_id, scope, view)`、`virtual_tryon_jobs(user_id, create_idempotency_key)`。
 
 | from | worker action | to | 每 tick 的原子边界 |
 | --- | --- | --- | --- |

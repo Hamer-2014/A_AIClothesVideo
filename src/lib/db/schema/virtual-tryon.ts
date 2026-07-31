@@ -34,6 +34,7 @@ export const virtualTryonJobs = pgTable("virtual_tryon_jobs", {
   reservedLedgerId: uuid("reserved_ledger_id"),
   capturedLedgerId: uuid("captured_ledger_id"),
   releasedLedgerId: uuid("released_ledger_id"),
+  refundedLedgerId: uuid("refunded_ledger_id"),
   deliveryPersistAttemptCount: integer("delivery_persist_attempt_count").notNull().default(0),
   ...lockableJobFields,
   ...timestamps,
