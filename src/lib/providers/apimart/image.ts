@@ -24,7 +24,11 @@ function config(deps: Deps) {
   const apiKey = deps.apiKey?.trim() || deps.env?.APIMART_API_KEY?.trim() || process.env.APIMART_API_KEY?.trim();
   if (!apiKey) throw new APIMartImageProviderUnavailableError();
   const rawUrl = deps.env?.APIMART_BASE_URL || process.env.APIMART_BASE_URL || "https://api.apimart.ai";
-  return { apiKey, baseUrl: rawUrl.replace(/\/+$/, "").replace(/\/v1\/images\/generations$/i, ""), timeoutMs: deps.timeoutMs ?? 25_000 };
+  const baseUrl = rawUrl
+    .replace(/\/+$/, "")
+    .replace(/\/v1\/(?:images|videos)\/generations$/i, "")
+    .replace(/\/v1\/tasks$/i, "");
+  return { apiKey, baseUrl, timeoutMs: deps.timeoutMs ?? 25_000 };
 }
 
 async function request(fetchImpl: typeof fetch, url: string, init: RequestInit, timeoutMs: number, operation: "generation" | "poll") {

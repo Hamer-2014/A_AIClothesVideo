@@ -28,7 +28,7 @@ function positiveInteger(value: string | undefined) {
 }
 
 export function getVirtualTryOnConfig(env: Record<string, string | undefined> = process.env) {
-  const required = ["APIMART_API_KEY", "CLOUDFLARE_R2_ACCOUNT_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY", "CLOUDFLARE_R2_BUCKET", "VIRTUAL_TRYON_MODEL_FRONT_KEY", "VIRTUAL_TRYON_MODEL_SIDE_KEY", "VIRTUAL_TRYON_MODEL_BACK_KEY", "VISION_PROVIDER", "VISION_API_KEY", "VISION_MODEL_STRICT"];
+  const required = ["APIMART_API_KEY", "CLOUDFLARE_R2_ACCOUNT_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY", "CLOUDFLARE_R2_BUCKET", "VIRTUAL_TRYON_MODEL_BASE_KEY", "VISION_PROVIDER", "VISION_API_KEY", "VISION_MODEL_STRICT"];
   if (required.some((name) => !env[name]?.trim())) throw new Error("virtual_tryon_config_unavailable");
   if (!visionProviders.has(env.VISION_PROVIDER!)) throw new Error("virtual_tryon_config_unavailable");
   if (env.VISION_PROVIDER !== "openai" && !env.VISION_BASE_URL?.trim()) throw new Error("virtual_tryon_config_unavailable");
@@ -36,10 +36,11 @@ export function getVirtualTryOnConfig(env: Record<string, string | undefined> = 
   if (moderationMode === "creem" && !env.CREEM_MODERATION_API_KEY?.trim()) throw new Error("virtual_tryon_config_unavailable");
   if (moderationMode === "creem" && env.APP_ENV?.trim().toLowerCase() === "production" && (!env.CREEM_MODERATION_API_KEY!.startsWith("creem_") || env.CREEM_MODERATION_API_KEY!.startsWith("creem_test_"))) throw new Error("virtual_tryon_config_unavailable");
   if ((moderationMode === "off" || moderationMode === "dev_bypass") && !canUseDevBypass(env)) throw new Error("virtual_tryon_config_unavailable");
+  const modelBaseKey = env.VIRTUAL_TRYON_MODEL_BASE_KEY!.trim().replace(/\/+$/, "");
   return {
     frontOnlyCreditCost: positiveInteger(env.VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST),
     threeViewCreditCost: positiveInteger(env.VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST),
-    modelKeys: { front: env.VIRTUAL_TRYON_MODEL_FRONT_KEY!, side: env.VIRTUAL_TRYON_MODEL_SIDE_KEY!, back: env.VIRTUAL_TRYON_MODEL_BACK_KEY! },
+    modelKeys: { front: `${modelBaseKey}/front.png`, side: `${modelBaseKey}/side.png`, back: `${modelBaseKey}/back.png` },
   };
 }
 

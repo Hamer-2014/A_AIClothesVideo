@@ -59,7 +59,7 @@ test("rejects a zero pack price", () => {
 ~~~
 
 - [ ] Step 2: Run pnpm vitest run src/server/virtual-tryon/config.test.ts. Expected: FAIL, module missing.
-- [ ] Step 3: Require APIMART_API_KEY, R2 settings, three VIRTUAL_TRYON_MODEL_*_KEY values and positive VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST/VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST. Return front only required views as front; return three view required views as front/side/back only when all three source IDs exist.
+- [ ] Step 3: Require APIMART_API_KEY, R2 settings, one VIRTUAL_TRYON_MODEL_BASE_KEY directory containing front.png/side.png/back.png, and positive VIRTUAL_TRYON_FRONT_ONLY_CREDIT_COST/VIRTUAL_TRYON_THREE_VIEW_CREDIT_COST. Return front only required views as front; return three view required views as front/side/back only when all three source IDs exist.
 
 ~~~ts
 if (input.mode === "front_only") return ["front"] as const;
@@ -296,7 +296,7 @@ test("prints a clear skip when staging credentials are absent", () => {
 ~~~
 
 - [ ] Step 2: Run pnpm vitest run scripts/virtual-tryon-smoke.test.ts. Expected: FAIL, script missing.
-- [ ] Step 3: Check APIMART_API_KEY, three model keys, R2 and DATABASE_URL; skip explicitly when missing. With staging variables create an isTest front_only job, call tick until terminal, verify ready/R2/Strict pass and soft-delete it. Update docs to mark the module static-only and the video bridge unavailable.
+- [ ] Step 3: Check APIMART_API_KEY, VIRTUAL_TRYON_MODEL_BASE_KEY, R2 and DATABASE_URL; skip explicitly when missing. With staging variables create an isTest front_only job, call tick until terminal, verify ready/R2/Strict pass and soft-delete it. Update docs to mark the module static-only and the video bridge unavailable.
 
 ~~~js
 if (missing.length) {

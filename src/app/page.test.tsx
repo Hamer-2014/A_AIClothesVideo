@@ -174,6 +174,35 @@ describe("Home", () => {
       .toHaveAttribute("href", "/examples");
   });
 
+  it("exposes video generation and virtual try-on as separate homepage workflows", async () => {
+    mocks.getServerSession.mockResolvedValue(null);
+    mocks.getRequestLocale.mockResolvedValue("en");
+
+    render(await Home());
+
+    const englishSection = screen
+      .getByRole("heading", { level: 2, name: "Choose how to start this SKU" })
+      .closest("section");
+    expect(englishSection).not.toBeNull();
+    expect(within(englishSection as HTMLElement).getByRole("link", { name: "Open virtual try-on" }))
+      .toHaveAttribute("href", "/virtual-try-on");
+    expect(within(englishSection as HTMLElement).getByRole("link", { name: "Open video workspace" }))
+      .toHaveAttribute("href", "/workspace");
+
+    cleanup();
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+    render(await Home());
+
+    const chineseSection = screen
+      .getByRole("heading", { level: 2, name: "选择这个 SKU 的创作起点" })
+      .closest("section");
+    expect(chineseSection).not.toBeNull();
+    expect(within(chineseSection as HTMLElement).getByRole("link", { name: "开始虚拟试穿" }))
+      .toHaveAttribute("href", "/zh/virtual-try-on");
+    expect(within(chineseSection as HTMLElement).getByRole("link", { name: "进入视频工作台" }))
+      .toHaveAttribute("href", "/zh/workspace");
+  });
+
   it("shows anonymous trial actions to visitors", async () => {
     mocks.getServerSession.mockResolvedValue(null);
     mocks.getRequestLocale.mockResolvedValue("en");

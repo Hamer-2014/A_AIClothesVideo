@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { ArrowDown, ArrowRight, Check } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, Shirt, Video } from "lucide-react";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "@/components/public/cta-link";
 import { PublicFooter } from "@/components/public/public-footer";
@@ -28,6 +28,23 @@ const homeCopy = {
       trialNote: "8 seconds · low resolution · no audio · watermarked · low-risk shots only",
       boundary: "No back image means no back view. No detail image means no detail close-up.",
       scrollLabel: "View the generated source images",
+    },
+    workflows: {
+      kicker: "Two creation paths",
+      title: "Choose how to start this SKU",
+      body: "Lock a consistent AI-model appearance first, or move directly into video when your product images already provide enough evidence.",
+      tryOn: {
+        eyebrow: "Static appearance pack",
+        title: "Put the garment on an AI model",
+        body: "Create a front-only or three-view result, pass strict visual QA, then lock the approved appearance before future video work.",
+        cta: "Open virtual try-on",
+      },
+      video: {
+        eyebrow: "Product video",
+        title: "Generate from three product images",
+        body: "Upload front, back, and detail evidence, choose a use case, and generate only the shots those images support.",
+        cta: "Open video workspace",
+      },
     },
     evidence: {
       kicker: "01 / One garment, three source images",
@@ -100,6 +117,23 @@ const homeCopy = {
       trialNote: "8 秒 · 低清 · 无音频 · 带水印 · 仅低风险镜头",
       boundary: "没有背面图，不生成背面；没有细节图，不编造细节。",
       scrollLabel: "查看三张合成输入素材",
+    },
+    workflows: {
+      kicker: "两种创作路径",
+      title: "选择这个 SKU 的创作起点",
+      body: "需要统一真人模特形象时，先生成并锁定定妆图；已有商品素材足够时，也可以直接进入视频生成。",
+      tryOn: {
+        eyebrow: "静态定妆包",
+        title: "先让 AI 模特试穿商品",
+        body: "生成正面或正、侧、背三视图，通过严格视觉质检后锁定定妆结果，为后续视频保留一致形象。",
+        cta: "开始虚拟试穿",
+      },
+      video: {
+        eyebrow: "商品宣传视频",
+        title: "直接使用三张商品图生成",
+        body: "上传正面、背面和细节依据，选择使用场景，只生成现有素材能够支持的镜头。",
+        cta: "进入视频工作台",
+      },
     },
     evidence: {
       kicker: "01 / 同一件服装，三张素材",
@@ -228,6 +262,38 @@ export default async function Home() {
           </div>
         </div>
         <a aria-label={copy.hero.scrollLabel} className="absolute bottom-5 right-5 z-10 inline-flex size-11 items-center justify-center border border-white/40 text-white transition-colors hover:bg-white/10 sm:right-8" href="#source-proof"><ArrowDown aria-hidden="true" size={18} /></a>
+      </section>
+
+      <section aria-labelledby="workflow-entry-title" className="border-b border-[var(--line-strong)] bg-[var(--surface-raised)]">
+        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12 lg:py-20">
+          <div className="grid gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
+            <div>
+              <p className="section-kicker">{copy.workflows.kicker}</p>
+              <h2 className="section-title max-w-xl" id="workflow-entry-title">{copy.workflows.title}</h2>
+            </div>
+            <p className="max-w-xl text-base leading-7 text-[var(--muted)] lg:justify-self-end">{copy.workflows.body}</p>
+          </div>
+          <div className="mt-10 grid border-y border-[var(--line-strong)] md:grid-cols-2 md:divide-x md:divide-[var(--line-strong)]">
+            <article className="border-b border-[var(--line-strong)] py-8 md:border-b-0 md:pr-8 lg:pr-12">
+              <Shirt aria-hidden="true" className="text-[var(--brand)]" size={24} strokeWidth={1.8} />
+              <p className="mt-6 text-xs font-semibold text-[var(--muted)]">{copy.workflows.tryOn.eyebrow}</p>
+              <h3 className="mt-2 text-2xl font-semibold">{copy.workflows.tryOn.title}</h3>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--muted)]">{copy.workflows.tryOn.body}</p>
+              <TrackedMarketingLink className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--action)]" destination={localizeHref("/virtual-try-on", locale)} sourcePage="homepage">
+                {copy.workflows.tryOn.cta} <ArrowRight aria-hidden="true" size={16} />
+              </TrackedMarketingLink>
+            </article>
+            <article className="py-8 md:pl-8 lg:pl-12">
+              <Video aria-hidden="true" className="text-[var(--brand)]" size={24} strokeWidth={1.8} />
+              <p className="mt-6 text-xs font-semibold text-[var(--muted)]">{copy.workflows.video.eyebrow}</p>
+              <h3 className="mt-2 text-2xl font-semibold">{copy.workflows.video.title}</h3>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--muted)]">{copy.workflows.video.body}</p>
+              <TrackedMarketingLink className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--action)]" destination={localizeHref("/workspace", locale)} sourcePage="homepage">
+                {copy.workflows.video.cta} <ArrowRight aria-hidden="true" size={16} />
+              </TrackedMarketingLink>
+            </article>
+          </div>
+        </div>
       </section>
 
       <section className="bg-[var(--surface-raised)]" id="source-proof">

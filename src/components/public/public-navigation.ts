@@ -11,11 +11,13 @@ export const publicNavigationItems = {
       href: "/three-images-to-clothing-video",
       label: "Three-image workflow",
     },
+    { href: "/virtual-try-on", label: "Virtual try-on" },
     { href: "/pricing", label: "Pricing" },
     { href: "/faq", label: "FAQ" },
   ],
   "zh-CN": [
     { href: "/three-images-to-clothing-video", label: "三图生成" },
+    { href: "/virtual-try-on", label: "虚拟试穿" },
     { href: "/pricing", label: "价格" },
     { href: "/faq", label: "常见问题" },
   ],

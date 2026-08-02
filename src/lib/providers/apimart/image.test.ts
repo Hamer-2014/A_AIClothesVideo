@@ -10,6 +10,20 @@ describe("APIMart image provider", () => {
     expect(result).toEqual({ provider: "apimart", model: "gpt-image-2", providerTaskId: "task-1" });
   });
 
+  it("uses the shared APIMart service root when the configured URL contains a video endpoint", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 200, data: [{ status: "submitted", task_id: "task-1" }] }), { status: 200 }));
+
+    await createAPIMartImageGeneration(
+      { prompt: "front", imageUrls: ["model"] },
+      { fetch: fetchSpy, env: { APIMART_API_KEY: "key", APIMART_BASE_URL: "https://api.apimart.ai/v1/videos/generations/" } },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.apimart.ai/v1/images/generations",
+      expect.any(Object),
+    );
+  });
+
   it.each([
     { code: 200, data: { task_id: "task-1" } },
     { code: 200, data: [{ status: "submitted" }] },

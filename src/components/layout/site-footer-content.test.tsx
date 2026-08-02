@@ -31,6 +31,10 @@ describe("SiteFooterContent", () => {
       "href",
       "/pricing",
     );
+    expect(screen.getByRole("link", { name: "Virtual try-on" })).toHaveAttribute(
+      "href",
+      "/virtual-try-on",
+    );
     expect(screen.getByRole("link", { name: "Takedown requests" })).toHaveAttribute(
       "href",
       "/takedown",
@@ -53,6 +57,10 @@ describe("SiteFooterContent", () => {
     expect(screen.getByRole("link", { name: "三图生成视频" })).toHaveAttribute(
       "href",
       "/zh/three-images-to-clothing-video",
+    );
+    expect(screen.getByRole("link", { name: "虚拟试穿" })).toHaveAttribute(
+      "href",
+      "/zh/virtual-try-on",
     );
     expect(screen.getByRole("link", { name: "隐私政策" })).toHaveAttribute(
       "href",

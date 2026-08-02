@@ -32,9 +32,9 @@ export function SiteFooterContent({ language = "en" }: { language?: SiteLocale }
           <p className="text-sm font-semibold text-[var(--ink)]">{isChinese ? "产品" : "Product"}</p>
           <div className="mt-4 flex flex-col items-start gap-3">
             <Link className={linkClassName} href={localizeHref("/", language)}>{isChinese ? "首页" : "Home"}</Link>
-            {isChinese ? (
-              <Link className={linkClassName} href={localizeHref("/three-images-to-clothing-video", language)}>三图生成视频</Link>
-            ) : null}
+            <Link className={linkClassName} href={localizeHref("/three-images-to-clothing-video", language)}>{isChinese ? "三图生成视频" : "Three-image video"}</Link>
+            <Link className={linkClassName} href={localizeHref("/virtual-try-on", language)}>{isChinese ? "虚拟试穿" : "Virtual try-on"}</Link>
+            <Link className={linkClassName} href={localizeHref("/examples", language)}>{isChinese ? "素材案例" : "Source examples"}</Link>
           </div>
         </nav>
 

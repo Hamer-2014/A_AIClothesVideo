@@ -96,7 +96,7 @@ describe("public trust pages", () => {
     expect(container.textContent).not.toMatch(/MVP|内测|系统测试/);
   });
 
-  it("中文营销导航链接到三图专题、价格与常见问题", () => {
+  it("中文营销导航链接到两个创作入口、价格与常见问题", () => {
     const { rerender } = render(<PublicHeader language="zh-CN" />);
 
     expect(screen.getByRole("link", { name: "三图生成" })).toHaveAttribute(
@@ -106,6 +106,10 @@ describe("public trust pages", () => {
     expect(screen.getByRole("link", { name: "常见问题" })).toHaveAttribute(
       "href",
       "/zh/faq",
+    );
+    expect(screen.getByRole("link", { name: "虚拟试穿" })).toHaveAttribute(
+      "href",
+      "/zh/virtual-try-on",
     );
 
     rerender(<PublicFooter language="zh-CN" />);
@@ -132,6 +136,10 @@ describe("public trust pages", () => {
       "href",
       "/zh/pricing",
     );
+    expect(screen.getByRole("link", { name: "虚拟试穿" })).toHaveAttribute(
+      "href",
+      "/zh/virtual-try-on",
+    );
     expect(screen.getByRole("link", { name: "侵权删除" })).toHaveAttribute(
       "href",
       "/zh/takedown",
@@ -154,6 +162,9 @@ describe("public trust pages", () => {
         name: "Three-image workflow",
       }),
     ).toHaveAttribute("href", "/three-images-to-clothing-video");
+    expect(
+      within(desktopNavigation).getByRole("link", { name: "Virtual try-on" }),
+    ).toHaveAttribute("href", "/virtual-try-on");
     expect(within(desktopNavigation).getByRole("link", { name: "Pricing" }))
       .toHaveAttribute("href", "/pricing");
     expect(within(desktopNavigation).getByRole("link", { name: "FAQ" }))
@@ -172,6 +183,9 @@ describe("public trust pages", () => {
         name: "Three-image workflow",
       }),
     ).toHaveAttribute("href", "/three-images-to-clothing-video");
+    expect(
+      within(mobileNavigation).getByRole("link", { name: "Virtual try-on" }),
+    ).toHaveAttribute("href", "/virtual-try-on");
     expect(within(mobileNavigation).getByRole("link", { name: "Pricing" }))
       .toHaveAttribute("href", "/pricing");
     expect(within(mobileNavigation).getByRole("link", { name: "FAQ" }))
@@ -211,6 +225,8 @@ describe("public trust pages", () => {
       .toHaveAttribute("href", "/zh/pricing");
     expect(within(mobileNavigation).getByRole("link", { name: "常见问题" }))
       .toHaveAttribute("href", "/zh/faq");
+    expect(within(mobileNavigation).getByRole("link", { name: "虚拟试穿" }))
+      .toHaveAttribute("href", "/zh/virtual-try-on");
 
     firstMobileLink.focus();
     fireEvent.keyDown(document, { key: "Escape" });
