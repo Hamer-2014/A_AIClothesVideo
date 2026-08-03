@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ArrowDown, ArrowRight, Check, X } from "lucide-react";
 
 import { TrialCtaLink, WorkspaceCtaLink } from "@/components/public/cta-link";
@@ -8,6 +9,7 @@ import { SampleVideo } from "@/components/public/sample-video";
 import { ThreeImageStrip } from "@/components/public/three-image-strip";
 import { TrackedMarketingLink } from "@/components/public/tracked-marketing-link";
 import { getServerSession } from "@/lib/auth/server";
+import { guideArticles, guidePath, guideSlugs } from "@/lib/guides/catalog";
 import { localizeHref } from "@/lib/i18n/config";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { recordFunnelEventSafely } from "@/server/analytics/funnel-events";
@@ -94,6 +96,11 @@ const pageCopy = {
         ["Can I try it free?", "New users can create one low-resolution, silent, watermarked 8-second video using low-risk shots only."],
       ],
     },
+    guides: {
+      kicker: "07 / Practical guides",
+      title: "Make the next generation easier to evaluate",
+      body: "Prepare missing evidence, choose a useful duration, and review garment consistency before publishing.",
+    },
     final: {
       title: "Have three images of the same garment ready?",
       body: "Create one 8-second trial video to see which shots your material can support.",
@@ -172,6 +179,11 @@ const pageCopy = {
         ["没有背面图可以生成背面吗？", "不可以。系统不会把正面图推断成真实背面结构。"],
         ["可以免费试吗？", "新用户可生成 1 条 8 秒低清、无音频、带水印试用视频，且只使用低风险镜头。"],
       ],
+    },
+    guides: {
+      kicker: "07 / 实用指南",
+      title: "让下一次生成更容易判断",
+      body: "补齐缺失证据、选择有效时长，并在发布前检查服装一致性。",
     },
     final: {
       title: "准备好同一件服装的三张图了吗？",
@@ -282,6 +294,32 @@ export default async function ThreeImagesLandingPage() {
 
       <section className="bg-[var(--background)]">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.65fr_1.35fr] lg:px-12 lg:py-28"><div><p className="section-kicker">{copy.faq.kicker}</p><h2 className="section-title">{copy.faq.title}</h2><TrackedMarketingLink className="mt-7 inline-flex items-center gap-2 text-sm font-semibold hover:text-[var(--brand)]" destination={localizeHref("/faq", locale)} sourcePage="three_images_landing">{copy.faq.link} <ArrowRight aria-hidden="true" size={16} /></TrackedMarketingLink></div><div className="border-y border-[var(--line-strong)]">{copy.faq.items.map(([question, answer]) => <article className="border-b border-[var(--line)] py-6 last:border-b-0" key={question}><h3 className="font-semibold">{question}</h3><p className="mt-3 text-sm leading-6 text-[var(--muted)]">{answer}</p></article>)}</div></div>
+      </section>
+
+      <section className="border-y border-[var(--line)] bg-[var(--surface-subtle)]">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.65fr_1.35fr] lg:px-12 lg:py-20">
+          <div>
+            <p className="section-kicker">{copy.guides.kicker}</p>
+            <h2 className="section-title">{copy.guides.title}</h2>
+            <p className="section-copy">{copy.guides.body}</p>
+          </div>
+          <nav aria-label={copy.guides.kicker.replace(/^\d+ \/ /, "")} className="border-y border-[var(--line-strong)]">
+            {guideSlugs.map((slug, index) => {
+              const article = guideArticles[slug][locale];
+              return (
+                <Link
+                  className="group grid min-h-20 grid-cols-[2.5rem_1fr_auto] items-center gap-4 border-b border-[var(--line)] py-4 last:border-b-0 hover:text-[var(--brand)]"
+                  href={localizeHref(guidePath(slug), locale)}
+                  key={slug}
+                >
+                  <span aria-hidden="true" className="text-xs text-[var(--muted)]">0{index + 1}</span>
+                  <span className="text-sm font-semibold sm:text-base">{article.title}</span>
+                  <ArrowRight aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" size={16} />
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       </section>
 
       <section className="bg-[var(--brand)] text-white">

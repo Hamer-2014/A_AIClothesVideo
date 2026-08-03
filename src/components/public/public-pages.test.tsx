@@ -107,6 +107,10 @@ describe("public trust pages", () => {
       "href",
       "/zh/faq",
     );
+    expect(screen.getByRole("link", { name: "指南" })).toHaveAttribute(
+      "href",
+      "/zh/guides",
+    );
     expect(screen.getByRole("link", { name: "虚拟试穿" })).toHaveAttribute(
       "href",
       "/zh/virtual-try-on",
@@ -135,6 +139,10 @@ describe("public trust pages", () => {
     expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute(
       "href",
       "/zh/pricing",
+    );
+    expect(screen.getByRole("link", { name: "实用指南" })).toHaveAttribute(
+      "href",
+      "/zh/guides",
     );
     expect(screen.getByRole("link", { name: "虚拟试穿" })).toHaveAttribute(
       "href",
@@ -169,6 +177,8 @@ describe("public trust pages", () => {
       .toHaveAttribute("href", "/pricing");
     expect(within(desktopNavigation).getByRole("link", { name: "FAQ" }))
       .toHaveAttribute("href", "/faq");
+    expect(within(desktopNavigation).getByRole("link", { name: "Guides" }))
+      .toHaveAttribute("href", "/guides");
     expect(within(desktopNavigation).queryByRole("link", { name: "Privacy" }))
       .not.toBeInTheDocument();
     expect(within(desktopNavigation).queryByRole("link", { name: "Terms" }))
@@ -190,6 +200,8 @@ describe("public trust pages", () => {
       .toHaveAttribute("href", "/pricing");
     expect(within(mobileNavigation).getByRole("link", { name: "FAQ" }))
       .toHaveAttribute("href", "/faq");
+    expect(within(mobileNavigation).getByRole("link", { name: "Guides" }))
+      .toHaveAttribute("href", "/guides");
   });
 
   it("renders Chinese FAQ and legal content on /zh", async () => {
@@ -225,6 +237,8 @@ describe("public trust pages", () => {
       .toHaveAttribute("href", "/zh/pricing");
     expect(within(mobileNavigation).getByRole("link", { name: "常见问题" }))
       .toHaveAttribute("href", "/zh/faq");
+    expect(within(mobileNavigation).getByRole("link", { name: "指南" }))
+      .toHaveAttribute("href", "/zh/guides");
     expect(within(mobileNavigation).getByRole("link", { name: "虚拟试穿" }))
       .toHaveAttribute("href", "/zh/virtual-try-on");
 
