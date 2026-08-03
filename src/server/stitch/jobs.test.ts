@@ -5,6 +5,7 @@ import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 import {
   createInMemoryStitchStore,
   createStitchJobForVideo,
+  getQueuedStitchJobPayloadForVideo,
   handleStitchCallback,
   markStitchJobRunning,
 } from "./jobs";
@@ -22,7 +23,11 @@ afterEach(() => {
 const userId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
 
-function createStores(segmentCount = 2) {
+function createStores(
+  segmentCount = 2,
+  durationSeconds = segmentCount * 8,
+  segmentIndexes = Array.from({ length: segmentCount }, (_, index) => index),
+) {
   const jobStore = createInMemoryJobStore([
     {
       id: jobId,
@@ -39,11 +44,12 @@ function createStores(segmentCount = 2) {
       {
         id: jobId,
         status: "segment_succeeded",
+        durationSeconds,
         isTest: false,
         postQaMode: "standard",
       },
     ],
-    segments: Array.from({ length: segmentCount }, (_, segmentIndex) => ({
+    segments: segmentIndexes.map((segmentIndex) => ({
       id: `segment-${segmentIndex + 1}`,
       videoJobId: jobId,
       segmentIndex,
@@ -102,6 +108,50 @@ describe("stitch jobs", () => {
       "jobs/job-1/segments/segment-3/video.mp4",
       "jobs/job-1/segments/segment-4/video.mp4",
     ]);
+  });
+
+  it("rejects a 32-second stitch job when one of four segments is missing", async () => {
+    await expect(
+      createStitchJobForVideo({
+        ...createStores(3, 32),
+        jobId,
+      }),
+    ).rejects.toThrow(
+      "Video job requires exactly 4 contiguous segments for 32 seconds.",
+    );
+  });
+
+  it("rejects four 32-second segments when their indexes are not contiguous", async () => {
+    await expect(
+      createStitchJobForVideo({
+        ...createStores(4, 32, [0, 1, 2, 4]),
+        jobId,
+      }),
+    ).rejects.toThrow(
+      "Video job requires exactly 4 contiguous segments for 32 seconds.",
+    );
+  });
+
+  it("rejects an incomplete queued 32-second stitch job on retry", async () => {
+    const stores = createStores(4, 32);
+    await stores.stitchStore.createStitchJob({
+      videoJobId: jobId,
+      segmentKeys: [
+        "jobs/job-1/segments/segment-1/video.mp4",
+        "jobs/job-1/segments/segment-2/video.mp4",
+        "jobs/job-1/segments/segment-3/video.mp4",
+      ],
+      isTest: false,
+    });
+
+    await expect(
+      getQueuedStitchJobPayloadForVideo({
+        stitchStore: stores.stitchStore,
+        jobId,
+      }),
+    ).rejects.toThrow(
+      "Video job requires exactly 4 segments for 32 seconds.",
+    );
   });
 
   it("handles successful Cloud Run callback and queues post QA", async () => {

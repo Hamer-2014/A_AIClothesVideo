@@ -670,6 +670,13 @@ const debugResolutionValues = new Set(["360p", "540p", "720p", "1080p"]);
 function debugResolutionOverride(
   env: Record<string, string | undefined> = process.env,
 ) {
+  const isProduction = [env.APP_ENV, env.VERCEL_ENV].some(
+    (value) => value?.trim().toLowerCase() === "production",
+  );
+  if (isProduction) {
+    return null;
+  }
+
   const enabled =
     env.VIDEO_GENERATION_DEBUG_ENABLED?.trim().toLowerCase() === "true";
   if (!enabled) {

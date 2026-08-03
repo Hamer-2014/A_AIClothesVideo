@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { grantTrialCredits, reserveCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
+import { getVideoSpec } from "@/lib/video/specs";
 import { createInMemoryFunnelEventStore } from "@/server/analytics/funnel-events";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 
@@ -10,19 +11,19 @@ import { createInMemoryPostQaStore, resolvePostQaResult } from "./resolve";
 const userId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
 
-async function createStores() {
+async function createStores(creditCost = 130) {
   const creditStore = createInMemoryCreditLedgerStore();
   await grantTrialCredits({
     store: creditStore,
     userId,
-    amount: 200,
+    amount: creditCost + 50,
     reason: "test setup",
     idempotencyKey: "grant:user-1",
   });
   await reserveCredits({
     store: creditStore,
     userId,
-    amount: 130,
+    amount: creditCost,
     reason: "reserve test",
     idempotencyKey: `reserve:job:${jobId}`,
     relatedJobId: jobId,
@@ -47,7 +48,7 @@ async function createStores() {
         id: jobId,
         userId,
         status: "post_qa_running",
-        creditCost: 130,
+        creditCost,
         reservedLedgerId: reserveLedger?.id ?? null,
         isTest: true,
       },
@@ -58,6 +59,55 @@ async function createStores() {
 }
 
 describe("resolvePostQaResult", () => {
+  it.each([24, 32] as const)(
+    "uses the configured credit lifecycle for %i-second jobs",
+    async (durationSeconds) => {
+      const creditCost = getVideoSpec(durationSeconds).creditCost;
+      const passedStores = await createStores(creditCost);
+      await resolvePostQaResult({
+        ...passedStores,
+        jobId,
+        status: "passed",
+        mode: "standard",
+        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+        resultJson: { passed: true },
+      });
+
+      expect(
+        passedStores.creditStore.listLedger().map(({ type, amount }) => ({
+          type,
+          amount,
+        })),
+      ).toEqual([
+        { type: "trial_grant", amount: creditCost + 50 },
+        { type: "reserve", amount: creditCost },
+        { type: "capture", amount: creditCost },
+      ]);
+
+      const failedStores = await createStores(creditCost);
+      await resolvePostQaResult({
+        ...failedStores,
+        jobId,
+        status: "failed",
+        mode: "standard",
+        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+        resultJson: { passed: false },
+        failureCategory: "garment_mismatch",
+      });
+
+      expect(
+        failedStores.creditStore.listLedger().map(({ type, amount }) => ({
+          type,
+          amount,
+        })),
+      ).toEqual([
+        { type: "trial_grant", amount: creditCost + 50 },
+        { type: "reserve", amount: creditCost },
+        { type: "release", amount: creditCost },
+      ]);
+    },
+  );
+
   it("captures reserved credits and marks a job deliverable when QA passes", async () => {
     const stores = await createStores();
     const funnelStore = createInMemoryFunnelEventStore();
