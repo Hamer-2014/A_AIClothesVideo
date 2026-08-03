@@ -1403,7 +1403,11 @@ export function WorkspaceApp({
               </div>
             ) : durationSeconds !== 8 && initialMode === "trial" ? (
               <p className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-                {workspaceText(language, "The free trial supports 8 seconds only. Use paid generation for 16, 24, or 40 seconds.", "免费试用仅支持 8 秒。16/24/40 秒请使用付费生成。")}
+                {workspaceText(
+                  language,
+                  `The free trial supports 8 seconds only. Use paid generation for ${duration40Enabled ? "16, 24, 32, or 40" : "16, 24, or 32"} seconds.`,
+                  `免费试用仅支持 8 秒。${duration40Enabled ? "16/24/32/40" : "16/24/32"} 秒请使用付费生成。`,
+                )}
               </p>
             ) : null}
           </aside>

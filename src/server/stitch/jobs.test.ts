@@ -22,7 +22,7 @@ afterEach(() => {
 const userId = "22222222-2222-4222-8222-222222222222";
 const jobId = "33333333-3333-4333-8333-333333333333";
 
-function createStores() {
+function createStores(segmentCount = 2) {
   const jobStore = createInMemoryJobStore([
     {
       id: jobId,
@@ -43,22 +43,13 @@ function createStores() {
         postQaMode: "standard",
       },
     ],
-    segments: [
-      {
-        id: "segment-1",
-        videoJobId: jobId,
-        segmentIndex: 0,
-        status: "succeeded",
-        videoKey: "jobs/job-1/segments/segment-1/video.mp4",
-      },
-      {
-        id: "segment-2",
-        videoJobId: jobId,
-        segmentIndex: 1,
-        status: "succeeded",
-        videoKey: "jobs/job-1/segments/segment-2/video.mp4",
-      },
-    ],
+    segments: Array.from({ length: segmentCount }, (_, segmentIndex) => ({
+      id: `segment-${segmentIndex + 1}`,
+      videoJobId: jobId,
+      segmentIndex,
+      status: "succeeded",
+      videoKey: `jobs/job-1/segments/segment-${segmentIndex + 1}/video.mp4`,
+    })),
   });
 
   return { jobStore, stitchStore };
@@ -96,6 +87,21 @@ describe("stitch jobs", () => {
       ],
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("stitching_queued");
+  });
+
+  it("keeps all four 32-second segment keys in the stitch payload", async () => {
+    const result = await createStitchJobForVideo({
+      ...createStores(4),
+      jobId,
+    });
+
+    expect(result.segmentCount).toBe(4);
+    expect(result.segmentKeys).toEqual([
+      "jobs/job-1/segments/segment-1/video.mp4",
+      "jobs/job-1/segments/segment-2/video.mp4",
+      "jobs/job-1/segments/segment-3/video.mp4",
+      "jobs/job-1/segments/segment-4/video.mp4",
+    ]);
   });
 
   it("handles successful Cloud Run callback and queues post QA", async () => {

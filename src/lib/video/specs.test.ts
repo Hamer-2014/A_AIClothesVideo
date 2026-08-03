@@ -7,6 +7,17 @@ import {
 } from "./specs";
 
 describe("video specs", () => {
+  it("defines the active 32-second paid specification", () => {
+    expect(getVideoSpec(32)).toMatchObject({
+      durationSeconds: 32,
+      segmentCount: 4,
+      creditCost: 250,
+      trialAllowed: false,
+      releaseStage: "active",
+      paidPostQaMode: "standard",
+    });
+  });
+
   it("defines the 40-second paid Beta", () => {
     expect(getVideoSpec(40)).toMatchObject({
       durationSeconds: 40,
@@ -23,10 +34,11 @@ describe("video specs", () => {
       isVideoDurationEnabled(40, { VIDEO_DURATION_40_ENABLED: "true" }),
     ).toBe(true);
     expect(isVideoDurationEnabled(24, {})).toBe(true);
+    expect(isVideoDurationEnabled(32, {})).toBe(true);
   });
 
   it("accepts exactly the supported durations", () => {
-    expect([8, 16, 24, 40].every(isVideoDuration)).toBe(true);
-    expect(isVideoDuration(32)).toBe(false);
+    expect([8, 16, 24, 32, 40].every(isVideoDuration)).toBe(true);
+    expect(isVideoDuration(12)).toBe(false);
   });
 });

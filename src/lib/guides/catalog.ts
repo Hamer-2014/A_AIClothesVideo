@@ -234,11 +234,11 @@ export const guideArticles = {
     ],
     imageSrc: "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
     en: {
-      metadataTitle: "8, 16, or 24 seconds: choose a clothing product video length | AI Clothes Video",
-      title: "Should a clothing product video be 8, 16, or 24 seconds?",
-      description: "Choose clothing product video length by the number of buyer questions you need to answer. Compare the shot structure, source-image pressure, and best use for 8-, 16-, and 24-second videos.",
+      metadataTitle: "8, 16, 24, or 32 seconds: choose a clothing product video length | AI Clothes Video",
+      title: "Should a clothing product video be 8, 16, 24, or 32 seconds?",
+      description: "Choose clothing product video length by the number of buyer questions you need to answer. Compare the shot structure, source-image pressure, and best use for 8-, 16-, 24-, and 32-second videos.",
       eyebrow: "Decision guide · Video length",
-      directAnswer: "Choose 8 seconds for one clear product idea, 16 seconds for a main view plus one useful supplement, and 24 seconds only when three distinct shots have real source evidence. Longer is not automatically better.",
+      directAnswer: "Choose 8 seconds for one clear product idea, 16 seconds for a main view plus one useful supplement, 24 seconds when three distinct shots have evidence, and 32 seconds only when a fourth shot answers another real buyer question. Longer is not automatically better.",
       imageAlt: "Poster frame from a real 8-second minimal-studio clothing video workflow",
       imageCaption: "A real 8-second workflow result from a traceable synthetic source set. One focused shot can be enough when the objective is clear.",
       parentLabel: "See how three images become one clothing video",
@@ -247,7 +247,7 @@ export const guideArticles = {
           heading: "Start with the number of questions, not the number of seconds",
           paragraphs: [
             ["Before asking whether a longer video looks more professional, ask how many buyer questions this asset must answer. A single hero movement may be enough for product-page motion testing. Showing the overall shape, real back, and a visible construction detail needs more shots and more complete evidence."],
-            ["AI Clothes Video builds public lengths from independent 8-second shots: 8 seconds uses one shot, 16 seconds uses two, and 24 seconds uses three. The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " explains how source roles constrain each shot."],
+            ["AI Clothes Video builds public lengths from independent 8-second shots: 8 seconds uses one shot, 16 seconds uses two, 24 seconds uses three, and 32 seconds uses four. The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " explains how source roles constrain each shot."],
           ],
         },
         {
@@ -277,6 +277,13 @@ export const guideArticles = {
           ],
         },
         {
+          heading: "32 seconds: use four shots only when each adds evidence",
+          paragraphs: [
+            ["A 32-second video combines four 8-second shots. Use it when a well-documented SKU needs a fourth evidence-backed answer, such as a second construction detail, a supported side view, or a restrained alternate treatment that is materially different from the first three shots."],
+            ["Do not stretch a three-shot story by repeating motion. If you cannot name the buyer question and source evidence for the fourth shot, 24 seconds is the stronger choice."],
+          ],
+        },
+        {
           heading: "A practical length decision table",
           paragraphs: [
             ["Use this as a starting rule, then confirm current credit and delivery details on the ", { href: "/pricing", label: "pricing page" }, "."],
@@ -287,13 +294,14 @@ export const guideArticles = {
               ["Quick product test or one hero view", "8 seconds", "1 focused shot"],
               ["Standard single-SKU product introduction", "16 seconds", "Main view + 1 useful supplement"],
               ["Overall, second view, and detail all have evidence", "24 seconds", "3 shots with different jobs"],
+              ["Four buyer questions have distinct source evidence", "32 seconds", "4 evidence-backed shots"],
             ],
           },
         },
         {
           heading: "Choose the shortest length that completes the job",
           paragraphs: [
-            ["For a first generation, begin with 8 seconds and inspect whether the material and motion are suitable. Move to 16 or 24 seconds only when you can name the purpose and source image for every added shot. This keeps the video informative instead of merely longer."],
+            ["For a first generation, begin with 8 seconds and inspect whether the material and motion are suitable. Move to 16, 24, or 32 seconds only when you can name the purpose and source image for every added shot. This keeps the video informative instead of merely longer."],
           ],
         },
       ],
@@ -303,11 +311,11 @@ export const guideArticles = {
       ctaLabel: "Choose a video length in the workspace",
     },
     "zh-CN": {
-      metadataTitle: "服装商品视频做 8 秒、16 秒还是 24 秒？｜AI Clothes Video",
-      title: "服装商品视频做 8 秒、16 秒还是 24 秒？",
-      description: "按需要回答的购买问题选择服装商品视频时长，对比 8、16、24 秒的镜头结构、素材压力和适用场景。",
+      metadataTitle: "服装商品视频做 8 秒、16 秒、24 秒还是 32 秒？｜AI Clothes Video",
+      title: "服装商品视频做 8 秒、16 秒、24 秒还是 32 秒？",
+      description: "按需要回答的购买问题选择服装商品视频时长，对比 8、16、24、32 秒的镜头结构、素材压力和适用场景。",
       eyebrow: "决策指南 · 视频时长",
-      directAnswer: "只有一个明确商品信息时选 8 秒；主展示加一个有效补充时选 16 秒；只有三个不同镜头都有真实素材依据时才选 24 秒。更长不等于更好。",
+      directAnswer: "只有一个明确商品信息时选 8 秒；主展示加一个有效补充时选 16 秒；三个镜头都有素材依据时选 24 秒；只有第四个镜头还能回答新的购买问题时才选 32 秒。更长不等于更好。",
       imageAlt: "真实 8 秒极简棚拍服装视频工作流海报帧",
       imageCaption: "来自可追溯合成素材组的真实 8 秒工作流结果。目标明确时，一个聚焦镜头已经足够。",
       parentLabel: "了解三张图片如何组成一条服装视频",
@@ -316,7 +324,7 @@ export const guideArticles = {
           heading: "先数要回答的问题，不要先数秒数",
           paragraphs: [
             ["先别问更长的视频是否更专业，而要问这条素材需要回答几个购买问题。测试商品页主图动效时，一个镜头可能已经足够；同时展示整体、真实背面和可见工艺细节，则需要更多镜头和更完整的素材依据。"],
-            ["AI Clothes Video 的公开时长由独立的 8 秒镜头组成：8 秒使用一个镜头，16 秒使用两个，24 秒使用三个。", { href: "/zh/three-images-to-clothing-video", label: "三图生成流程" }, "会说明素材角色如何限制每个镜头。"],
+            ["AI Clothes Video 的公开时长由独立的 8 秒镜头组成：8 秒使用一个镜头，16 秒使用两个，24 秒使用三个，32 秒使用四个。", { href: "/zh/three-images-to-clothing-video", label: "三图生成流程" }, "会说明素材角色如何限制每个镜头。"],
           ],
         },
         {
@@ -346,6 +354,13 @@ export const guideArticles = {
           ],
         },
         {
+          heading: "32 秒：四个镜头都必须增加有效信息",
+          paragraphs: [
+            ["32 秒由四个 8 秒镜头组成，适合素材依据充分、且确实需要回答第四个购买问题的 SKU，例如补充第二个工艺细节、有依据的侧面视角，或与前三个镜头明显不同的克制展示方式。"],
+            ["不要用重复动作把三镜头结构硬拖到四镜头。如果说不清第四个镜头要回答什么、依据哪张素材，24 秒反而是更强的选择。"],
+          ],
+        },
+        {
           heading: "一张实用的时长选择表",
           paragraphs: [
             ["先用这张表判断，再到", { href: "/zh/pricing", label: "价格页面" }, "确认当前点数与交付规格。"],
@@ -356,13 +371,14 @@ export const guideArticles = {
               ["快速测款或一个主展示", "8 秒", "1 个聚焦镜头"],
               ["常规单 SKU 商品介绍", "16 秒", "主展示 + 1 个有效补充"],
               ["整体、第二视角和细节都有依据", "24 秒", "3 个职责不同的镜头"],
+              ["四个购买问题都有独立素材依据", "32 秒", "4 个有依据的镜头"],
             ],
           },
         },
         {
           heading: "选择刚好完成任务的最短时长",
           paragraphs: [
-            ["第一次生成可以先做 8 秒，检查素材和运动是否合适。只有在你能说清每个新增镜头的目的与对应图片时，再升级到 16 或 24 秒。这样视频增加的是信息，而不只是长度。"],
+            ["第一次生成可以先做 8 秒，检查素材和运动是否合适。只有在你能说清每个新增镜头的目的与对应图片时，再升级到 16、24 或 32 秒。这样视频增加的是信息，而不只是长度。"],
           ],
         },
       ],
@@ -415,7 +431,7 @@ export const guideArticles = {
           heading: "Cause 3: the camera or subject motion exceeds the evidence",
           paragraphs: [
             ["Large motion usually requires more unseen intermediate states. A slow push, restrained pan, or small framing change can rely mostly on visible features. A major turn, strong perspective change, or continuous rotation asks the model to preserve more angles, construction, and human state."],
-            ["Motion should serve product information. For a new SKU, validate one low-risk shot before stacking several high-motion shots. The ", { href: "/guides/choose-clothing-video-length", label: "8-, 16-, and 24-second guide" }, " explains how every added shot should have its own evidence and job."],
+            ["Motion should serve product information. For a new SKU, validate one low-risk shot before stacking several high-motion shots. The ", { href: "/guides/choose-clothing-video-length", label: "8-, 16-, 24-, and 32-second guide" }, " explains how every added shot should have its own evidence and job."],
           ],
         },
         {
@@ -491,7 +507,7 @@ export const guideArticles = {
           heading: "原因三：镜头或主体运动超过素材依据",
           paragraphs: [
             ["大幅运动通常需要补全更多看不见的中间状态。慢推、克制平移或小范围景别变化主要依赖已经可见的特征；大幅转身、强透视变化和连续旋转，则要求模型维持更多角度、结构与人物状态。"],
-            ["运动必须服务商品信息。新的 SKU 应先验证一个低风险镜头，再叠加多个大运动镜头。", { href: "/zh/guides/choose-clothing-video-length", label: "8、16 和 24 秒选择指南" }, "说明了每个新增镜头为什么都需要自己的素材依据和任务。"],
+            ["运动必须服务商品信息。新的 SKU 应先验证一个低风险镜头，再叠加多个大运动镜头。", { href: "/zh/guides/choose-clothing-video-length", label: "8、16、24 和 32 秒选择指南" }, "说明了每个新增镜头为什么都需要自己的素材依据和任务。"],
           ],
         },
         {

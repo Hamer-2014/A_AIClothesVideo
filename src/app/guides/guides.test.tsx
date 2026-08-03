@@ -58,7 +58,7 @@ describe("bilingual guide pages", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Can you make a clothing video without a back image?" }))
       .toHaveAttribute("href", "/guides/clothing-video-without-back-image");
-    expect(screen.getByRole("link", { name: "Should a clothing product video be 8, 16, or 24 seconds?" }))
+    expect(screen.getByRole("link", { name: "Should a clothing product video be 8, 16, 24, or 32 seconds?" }))
       .toHaveAttribute("href", "/guides/choose-clothing-video-length");
     expect(screen.getByRole("link", { name: "Why do AI clothing videos deform or drift?" }))
       .toHaveAttribute("href", "/guides/why-ai-clothing-videos-deform");
@@ -114,6 +114,36 @@ describe("bilingual guide pages", () => {
     for (const link of within(related).getAllByRole("link")) {
       expect(link.getAttribute("href")).toMatch(/^\/zh\/guides\//);
     }
+  });
+
+  it("explains the four-shot 32-second option in both length-guide locales", async () => {
+    render(await GuideArticlePage({
+      params: Promise.resolve({ slug: "choose-clothing-video-length" }),
+    }));
+
+    expect(screen.getByRole("heading", {
+      level: 1,
+      name: "Should a clothing product video be 8, 16, 24, or 32 seconds?",
+    })).toBeInTheDocument();
+    expect(screen.getByRole("heading", {
+      name: "32 seconds: use four shots only when each adds evidence",
+    })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "32 seconds" })).toBeInTheDocument();
+
+    cleanup();
+    mocks.getRequestLocale.mockResolvedValue("zh-CN");
+    render(await GuideArticlePage({
+      params: Promise.resolve({ slug: "choose-clothing-video-length" }),
+    }));
+
+    expect(screen.getByRole("heading", {
+      level: 1,
+      name: "服装商品视频做 8 秒、16 秒、24 秒还是 32 秒？",
+    })).toBeInTheDocument();
+    expect(screen.getByRole("heading", {
+      name: "32 秒：四个镜头都必须增加有效信息",
+    })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "32 秒" })).toBeInTheDocument();
   });
 
   it("publishes static params and symmetric English/Chinese metadata", async () => {

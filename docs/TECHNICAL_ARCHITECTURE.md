@@ -310,6 +310,8 @@ src/
 8. 保存 `storyboards`。
 9. 用户确认分镜和点数消耗。
 
+时长契约统一由应用内 Video Spec 提供：8/16/24/32 秒分别要求 1/2/3/4 个有序 8 秒片段；32 秒为 active 付费规格，消耗 250 点且不开放免费试用。只有 40 秒受 `VIDEO_DURATION_40_ENABLED` 控制，并使用 5 个有序槽位及其专属组合校验。storyboard schema、确认器、segment 创建和 stitch payload 都必须从该规格得到片段数，不能分别维护时长分支。
+
 ### 5.5 Prompt Moderation 与点数冻结
 
 1. 用户确认分镜后进入生成前校验。
@@ -821,7 +823,7 @@ Cloud Run `stitch-worker` 在拼接成功后直接抽帧：
 
 这样可以避免最终视频上传 R2 后再下载回来抽帧。
 
-40 秒付费 Beta 使用独立的分段抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
+1-4 个片段（8/16/24/32 秒）使用普通抽帧计划：Standard 固定 5 帧，Strict 固定 6 帧，不启用分段批次和局部重试。仅 5 个片段的 40 秒付费 Beta 使用独立抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
 
 Post-QA 对 40 秒任务分成 5 个片段批次和 1 个转场批次，逐批调用视觉模型后聚合一次结果。若且仅若一个片段批次失败、所有转场通过且失败不是 provider/schema 异常，任务保留冻结点数并只重排该片段一次；其他情况沿用终态失败和点数释放流程。
 

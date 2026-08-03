@@ -75,4 +75,24 @@ describe("SpecSelector", () => {
 
     expect(onDurationChange).toHaveBeenCalledWith(40);
   });
+
+  it("always exposes the active 32-second option", () => {
+    const onDurationChange = vi.fn();
+    render(
+      <SpecSelector
+        aspectRatio="9:16"
+        duration40Enabled={false}
+        durationSeconds={8}
+        onAspectRatioChange={vi.fn()}
+        onDurationChange={onDurationChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "32 秒" }));
+
+    expect(onDurationChange).toHaveBeenCalledWith(32);
+    expect(
+      screen.queryByRole("button", { name: "40 秒 Beta" }),
+    ).not.toBeInTheDocument();
+  });
 });

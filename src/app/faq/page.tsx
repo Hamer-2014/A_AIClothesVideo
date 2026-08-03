@@ -15,8 +15,8 @@ const content = {
     faqs: [
       ["Which images should I upload?", "The public workflow requires three valid images of the same garment for the selected protocol. The recommended set is front, back, and detail. Product rotation and model turn are Paid Beta modes with their own front, side, and back requirements."],
       ["Why can't I generate a back view?", "Without a back image, the system cannot invent back construction, vents, zippers, graphics, or silhouette. Back views, turns, front-to-back transitions, and 360-degree display remain unavailable."],
-      ["How long does generation take?", "Timing depends on video length, material, provider queues, and QA. An 8-second video is usually faster than a 16- or 24-second video. Provider queues or QA retries increase the wait."],
-      ["What is the difference between trial and paid generation?", "The free trial is one low-resolution, silent, watermarked 8-second video using low-risk shots. Paid generation supports 8, 16, and 24 seconds with high resolution, no watermark, and audio by default."],
+      ["How long does generation take?", "Timing depends on video length, material, provider queues, and QA. An 8-second video is usually faster than a 16-, 24-, or 32-second video. Provider queues or QA retries increase the wait."],
+      ["What is the difference between trial and paid generation?", "The free trial is one low-resolution, silent, watermarked 8-second video using low-risk shots. Paid generation supports 8, 16, 24, and 32 seconds with high resolution, no watermark, and audio by default. The 40-second Beta appears only when enabled."],
       ["What authorization is required for models or minors?", "Identifiable models require likeness and commercial-promotion authorization. Anyone under 18 also requires authorization from a parent or guardian. The uploader must actively confirm the declaration."],
       ["How do I submit a takedown request?", "Use the takedown page to provide the right type, a locatable content reference, and an explanation. The system returns an RR- reference after saving the case for administrator review. A complaint does not automatically remove content."],
     ],
@@ -29,8 +29,8 @@ const content = {
     faqs: [
       ["需要上传什么图片", "公开生成流程要求按所选协议上传三张同款有效素材。默认推荐正面主图、背面图和细节图；商品旋转与真人模特转身付费 Beta 分别要求对应的正面、侧面和背面素材。"],
       ["为什么不能生成背面", "如果没有背面图，系统不能凭空编造背面结构、开衩、拉链、印花或版型，所以背面展示、转身、正背切换和 360 展示都会被禁用。"],
-      ["多久生成", "生成时间会受时长、素材、模型排队和质检影响。8 秒通常比 16/24 秒更快；如果供应商排队或质检重试，等待时间会变长。"],
-      ["试用和付费有什么区别", "免费试用限 1 条 8 秒、低分辨率、无音频、带水印视频，只开放低风险镜头。付费生成支持 8/16/24 秒，高分辨率、无水印，并默认包含音频。"],
+      ["多久生成", "生成时间会受时长、素材、模型排队和质检影响。8 秒通常比 16/24/32 秒更快；如果供应商排队或质检重试，等待时间会变长。"],
+      ["试用和付费有什么区别", "免费试用限 1 条 8 秒、低分辨率、无音频、带水印视频，只开放低风险镜头。付费生成支持 8/16/24/32 秒，高分辨率、无水印，并默认包含音频；40 秒 Beta 仅在开关开放时出现。"],
       ["真人或儿童模特需要什么授权", "真人模特素材需要模特本人的肖像权和商业宣传授权。未满 18 周岁的模特还需要监护人授权。上传者必须主动确认声明，平台不会预先勾选。"],
       ["如何提交侵权删除请求", "通过侵权删除申请页面提交权利类型、可定位的内容引用和说明。系统在案件保存后返回 RR- 编号，管理员核验后处理；投诉不会自动删除内容。"],
     ],

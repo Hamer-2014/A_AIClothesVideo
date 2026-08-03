@@ -761,4 +761,45 @@ describe("create video job", () => {
       billingMode: "paid",
     });
   });
+
+  it("creates ungated 32-second paid jobs for 250 credits and rejects trial use", async () => {
+    const createStore = () =>
+      createInMemoryVideoJobCreationStore([
+        {
+          id: "asset-front",
+          userId,
+          status: "uploaded",
+          detectedRole: "front",
+        },
+      ]);
+
+    const result = await createVideoJobWithAssets({
+      store: createStore(),
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 32,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "false" },
+    });
+
+    expect(result.job).toMatchObject({
+      durationSeconds: 32,
+      creditCost: 250,
+      billingMode: "paid",
+      postQaMode: "standard",
+    });
+
+    await expect(
+      createVideoJobWithAssets({
+        store: createStore(),
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 32,
+        aspectRatio: "9:16",
+        useFreeTrialIfAvailable: true,
+        videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "false" },
+      }),
+    ).rejects.toThrow("Free trial only supports 8-second video.");
+  });
 });
