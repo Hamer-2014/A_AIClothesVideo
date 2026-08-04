@@ -42,6 +42,7 @@ export interface AdminJobRecord {
   presetId: string | null;
   presetSnapshot: unknown;
   trialEligibilitySnapshot: unknown;
+  generationSourceSnapshot?: unknown;
   reservedLedgerId: string | null;
   finalVideoKey: string | null;
   coverKey: string | null;
@@ -536,6 +537,7 @@ export function createDrizzleAdminJobStore(db: DbClient = getDb()): AdminJobStor
           presetId: videoJobs.presetId,
           presetSnapshot: videoJobs.presetSnapshot,
           trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
+          generationSourceSnapshot: videoJobs.generationSourceSnapshot,
           reservedLedgerId: videoJobs.reservedLedgerId,
           finalVideoKey: videoJobs.finalVideoKey,
           coverKey: videoJobs.coverKey,

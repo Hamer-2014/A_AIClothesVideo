@@ -73,6 +73,8 @@ interface VisionClientDeps {
   fetch?: typeof fetch;
 }
 
+const virtualTryOnQaTimeoutMs = 45_000;
+
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
   "Analyze clothing product images. Return only JSON with asset_role, garment_category, view_angle, human_present, subject_kind, visible_details, not_visible_details, quality, confidence, risk_flags. Set subject_kind to human_model only when the visible person is wearing the target garment; a person merely present in the scene is not enough. Use product for a garment shown without a real person wearing it, otherwise use unknown.";
@@ -501,7 +503,7 @@ export async function createVisionVirtualTryOnQa(
   const body = responsesApi
     ? { model: config.model, input: responsesInput(input.imageUrls, instruction), text: { format: { type: "json_object" } } }
     : { model: config.model, stream: false, response_format: { type: "json_object" }, messages: chatMessages(input.imageUrls, instruction) };
-  const response = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const response = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(virtualTryOnQaTimeoutMs) });
   const raw = asRecord(await response.json());
   if (!response.ok) throw new Error(`Vision provider failed with status ${response.status}.`);
   const qaJson = responsesApi ? parseResponsesOutput(raw) : parseJsonContent(asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content);

@@ -6,13 +6,157 @@ import { isStrictCrossViewQaPass, isStrictViewQaPass, parseStrictCrossViewQa, pa
 import type { VirtualTryOnQaStore } from "./qa-store";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-export async function runVirtualTryOnQa(input: { jobId: string; userId: string; packId: string; mode: VirtualTryOnMode; sourceKeys: { front: string; back?: string; detail?: string }; modelKeys: Record<AppearanceView, string>; generatedKeys: Partial<Record<AppearanceView, string>> }, deps: { signer: (key: string) => Promise<string>; visionProvider?: (input: Parameters<typeof createVisionVirtualTryOnQa>[0]) => Promise<VisionVirtualTryOnQaResult>; qaStore: VirtualTryOnQaStore; providerLogStore: ProviderCallLogStore }) {
-  const views: AppearanceView[] = input.mode === "front_only" ? ["front"] : ["front", "side", "back"]; const verdicts: Record<string, string> = {}; let allPassed = true;
-  for (const view of views) {
-    try { const generated = input.generatedKeys[view]; const model = input.modelKeys[view]; if (!generated || !model) throw new Error("model_or_generated_view_missing"); const keys = [model, input.sourceKeys.front, ...(input.sourceKeys.back ? [input.sourceKeys.back] : []), ...(input.sourceKeys.detail ? [input.sourceKeys.detail] : []), generated]; const urls = await Promise.all(keys.map(deps.signer)); const result = await (deps.visionProvider ?? createVisionVirtualTryOnQa)({ kind: "view", imageUrls: urls, targetView: view, requirements: ["ordered images: platform model reference, garment front, garment back if present, garment detail if present, generated target view", "compare generated identityConsistency only with the first platform model reference", "compare garment fields only with garment references", "use unknown when evidence is unavailable" ] }); const qa = parseStrictViewQa(result.qaJson); verdicts[view] = qa.verdict; allPassed &&= isStrictViewQaPass(qa, view); await deps.qaStore.upsertViewResult(input.packId, view, qa); await deps.providerLogStore.createCallLog({ provider: result.provider, model: result.model, purpose: "virtual_tryon_qa", userId: input.userId, virtualTryonJobId: input.jobId, requestSnapshot: { scope: "view", view, imageCount: urls.length, promptHash: hash(view) }, responseSummary: { verdict: qa.verdict, status: "completed" }, status: "succeeded" }); }
-    catch { verdicts[view] = "unknown"; allPassed = false; await deps.qaStore.upsertViewResult(input.packId, view, { verdict: "unknown" }); await deps.providerLogStore.createCallLog({ provider: "vision", model: "strict", purpose: "virtual_tryon_qa", userId: input.userId, virtualTryonJobId: input.jobId, requestSnapshot: { scope: "view", view, imageCount: 0, promptHash: hash(view) }, responseSummary: { verdict: "unknown", status: "failed" }, status: "failed", errorCode: "virtual_tryon_qa_failed", errorMessage: "Virtual try-on QA failed." }); }
+
+export class VirtualTryOnQaLeaseLostError extends Error {
+  readonly code = "virtual_tryon_qa_lease_lost";
+
+  constructor() {
+    super("virtual_tryon_qa_lease_lost");
+    this.name = "VirtualTryOnQaLeaseLostError";
   }
+}
+
+type VirtualTryOnQaDeps = {
+  signer: (key: string) => Promise<string>;
+  visionProvider?: (input: Parameters<typeof createVisionVirtualTryOnQa>[0]) => Promise<VisionVirtualTryOnQaResult>;
+  renewLease?: () => Promise<boolean>;
+  qaStore: VirtualTryOnQaStore;
+  providerLogStore: ProviderCallLogStore;
+};
+
+async function requireQaLease(deps: VirtualTryOnQaDeps) {
+  if (deps.renewLease && !await deps.renewLease()) {
+    throw new VirtualTryOnQaLeaseLostError();
+  }
+}
+
+function rethrowLeaseLoss(error: unknown) {
+  if (error instanceof VirtualTryOnQaLeaseLostError) throw error;
+}
+
+export async function runVirtualTryOnQa(
+  input: {
+    jobId: string;
+    userId: string;
+    packId: string;
+    mode: VirtualTryOnMode;
+    sourceKeys: { front: string; back?: string; detail?: string };
+    modelKeys: Record<AppearanceView, string>;
+    generatedKeys: Partial<Record<AppearanceView, string>>;
+  },
+  deps: VirtualTryOnQaDeps,
+) {
+  const views: AppearanceView[] = input.mode === "front_only" ? ["front"] : ["front", "side", "back"];
+  const verdicts: Record<string, string> = {};
+  let allPassed = true;
+
+  for (const view of views) {
+    try {
+      const generated = input.generatedKeys[view];
+      const model = input.modelKeys[view];
+      if (!generated || !model) throw new Error("model_or_generated_view_missing");
+      const keys = [model, input.sourceKeys.front, ...(input.sourceKeys.back ? [input.sourceKeys.back] : []), ...(input.sourceKeys.detail ? [input.sourceKeys.detail] : []), generated];
+      const urls = await Promise.all(keys.map(deps.signer));
+      await requireQaLease(deps);
+      const result = await (deps.visionProvider ?? createVisionVirtualTryOnQa)({
+        kind: "view",
+        imageUrls: urls,
+        targetView: view,
+        requirements: [
+          "ordered images: platform model reference, garment front, garment back if present, garment detail if present, generated target view",
+          "compare generated identityConsistency only with the first platform model reference",
+          "compare garment fields only with garment references",
+          "use unknown when evidence is unavailable",
+        ],
+      });
+      await requireQaLease(deps);
+      const qa = parseStrictViewQa(result.qaJson);
+      verdicts[view] = qa.verdict;
+      allPassed &&= isStrictViewQaPass(qa, view);
+      await deps.qaStore.upsertViewResult(input.packId, view, qa);
+      await deps.providerLogStore.createCallLog({
+        provider: result.provider,
+        model: result.model,
+        purpose: "virtual_tryon_qa",
+        userId: input.userId,
+        virtualTryonJobId: input.jobId,
+        requestSnapshot: { scope: "view", view, imageCount: urls.length, promptHash: hash(view) },
+        responseSummary: { verdict: qa.verdict, status: "completed" },
+        status: "succeeded",
+      });
+    } catch (error) {
+      rethrowLeaseLoss(error);
+      await requireQaLease(deps);
+      verdicts[view] = "unknown";
+      allPassed = false;
+      await deps.qaStore.upsertViewResult(input.packId, view, { verdict: "unknown" });
+      await deps.providerLogStore.createCallLog({
+        provider: "vision",
+        model: "strict",
+        purpose: "virtual_tryon_qa",
+        userId: input.userId,
+        virtualTryonJobId: input.jobId,
+        requestSnapshot: { scope: "view", view, imageCount: 0, promptHash: hash(view) },
+        responseSummary: { verdict: "unknown", status: "failed" },
+        status: "failed",
+        errorCode: "virtual_tryon_qa_failed",
+        errorMessage: "Virtual try-on QA failed.",
+      });
+    }
+  }
+
   let crossVerdict: string | null = null;
-  if (input.mode === "three_view") { try { const urls = await Promise.all(views.map((view) => { const key = input.generatedKeys[view]; if (!key) throw new Error("generated_view_missing"); return deps.signer(key); })); const result = await (deps.visionProvider ?? createVisionVirtualTryOnQa)({ kind: "cross", imageUrls: urls, requiredViews: views, requirements: ["cross view consistency"] }); const qa = parseStrictCrossViewQa(result.qaJson); crossVerdict = qa.verdict; allPassed &&= isStrictCrossViewQaPass(qa, views); await deps.qaStore.upsertCrossResult(input.packId, qa); await deps.providerLogStore.createCallLog({ provider: result.provider, model: result.model, purpose: "virtual_tryon_qa", userId: input.userId, virtualTryonJobId: input.jobId, requestSnapshot: { scope: "cross", imageCount: urls.length, promptHash: hash("front,side,back") }, responseSummary: { verdict: qa.verdict, status: "completed" }, status: "succeeded" }); } catch { crossVerdict = "unknown"; allPassed = false; await deps.qaStore.upsertCrossResult(input.packId, { verdict: "unknown" }); await deps.providerLogStore.createCallLog({ provider: "vision", model: "strict", purpose: "virtual_tryon_qa", userId: input.userId, virtualTryonJobId: input.jobId, requestSnapshot: { scope: "cross", imageCount: 0, promptHash: hash("front,side,back") }, responseSummary: { verdict: "unknown", status: "failed" }, status: "failed", errorCode: "virtual_tryon_qa_failed", errorMessage: "Virtual try-on QA failed." }); } }
-  const summary = { allPassed, views: verdicts, crossVerdict }; await deps.qaStore.updateQaSummary(input.packId, summary); return summary;
+  if (input.mode === "three_view") {
+    try {
+      const urls = await Promise.all(views.map((view) => {
+        const key = input.generatedKeys[view];
+        if (!key) throw new Error("generated_view_missing");
+        return deps.signer(key);
+      }));
+      await requireQaLease(deps);
+      const result = await (deps.visionProvider ?? createVisionVirtualTryOnQa)({
+        kind: "cross",
+        imageUrls: urls,
+        requiredViews: views,
+        requirements: ["cross view consistency"],
+      });
+      await requireQaLease(deps);
+      const qa = parseStrictCrossViewQa(result.qaJson);
+      crossVerdict = qa.verdict;
+      allPassed &&= isStrictCrossViewQaPass(qa, views);
+      await deps.qaStore.upsertCrossResult(input.packId, qa);
+      await deps.providerLogStore.createCallLog({
+        provider: result.provider,
+        model: result.model,
+        purpose: "virtual_tryon_qa",
+        userId: input.userId,
+        virtualTryonJobId: input.jobId,
+        requestSnapshot: { scope: "cross", imageCount: urls.length, promptHash: hash("front,side,back") },
+        responseSummary: { verdict: qa.verdict, status: "completed" },
+        status: "succeeded",
+      });
+    } catch (error) {
+      rethrowLeaseLoss(error);
+      await requireQaLease(deps);
+      crossVerdict = "unknown";
+      allPassed = false;
+      await deps.qaStore.upsertCrossResult(input.packId, { verdict: "unknown" });
+      await deps.providerLogStore.createCallLog({
+        provider: "vision",
+        model: "strict",
+        purpose: "virtual_tryon_qa",
+        userId: input.userId,
+        virtualTryonJobId: input.jobId,
+        requestSnapshot: { scope: "cross", imageCount: 0, promptHash: hash("front,side,back") },
+        responseSummary: { verdict: "unknown", status: "failed" },
+        status: "failed",
+        errorCode: "virtual_tryon_qa_failed",
+        errorMessage: "Virtual try-on QA failed.",
+      });
+    }
+  }
+
+  const summary = { allPassed, views: verdicts, crossVerdict };
+  await deps.qaStore.updateQaSummary(input.packId, summary);
+  return summary;
 }

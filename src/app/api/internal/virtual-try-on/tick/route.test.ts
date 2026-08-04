@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { handleVirtualTryOnTickRequest } from "./route";
@@ -12,6 +14,20 @@ function request(body: unknown = {}, headers: HeadersInit = {}) {
 
 describe("POST /api/internal/virtual-try-on/tick", () => {
   afterEach(() => vi.unstubAllEnvs());
+
+  it("defers heavy worker dependencies until after request validation", () => {
+    const source = readFileSync(
+      "src/app/api/internal/virtual-try-on/tick/route.ts",
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      /^import .*from "@\/(?:lib\/credits\/drizzle-store|server\/virtual-tryon\/(?:maintenance|runtime))";/m,
+    );
+    expect(source).toContain('import("@/lib/credits/drizzle-store")');
+    expect(source).toContain('import("@/server/virtual-tryon/maintenance")');
+    expect(source).toContain('import("@/server/virtual-tryon/runtime")');
+  });
 
   it("fails closed when CRON_JOB_SECRET is not configured", async () => {
     vi.stubEnv("CRON_JOB_SECRET", "");

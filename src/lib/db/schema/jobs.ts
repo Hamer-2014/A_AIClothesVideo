@@ -128,6 +128,7 @@ export const videoJobs = pgTable("video_jobs", {
   watermarkEnabled: boolean("watermark_enabled").notNull().default(false),
   trialEligibilitySnapshot: jsonSnapshot("trial_eligibility_snapshot"),
   rightsAttestationSnapshot: jsonSnapshot("rights_attestation_snapshot"),
+  generationSourceSnapshot: jsonSnapshot("generation_source_snapshot"),
   reservedLedgerId: uuid("reserved_ledger_id"),
   finalVideoKey: text("final_video_key"),
   coverKey: text("cover_key"),

@@ -155,7 +155,8 @@ MVP 付费默认生成音频，用于提升 TikTok、Instagram Reels、YouTube S
 - 真人模特素材不能复用无模特商品旋转模板；商品旋转模板不得生成真人、手、身体或虚拟模特，也不承担虚拟穿衣。
 - 同一真人模特穿着同一件服装的 front/side 或 front/side/back 素材，只有在任务内服装一致性和可见模特一致性均通过后，才允许轻侧身 15-45° 或连续转身 180°；缺少对应视角、人物不一致或服装不一致时必须禁用。
 - 单张正面真人模特图仍可使用 `model_front_pose`，但不能据此生成侧面、背面或转身。只有商品图时系统不得隐式造人。
-- 虚拟穿衣现为独立静态上游模块，入口为 `/virtual-try-on`。它仅支持 `front_only` 和 `three_view` 定妆包：后者必须有商品正面、背面和细节图，按 front -> side -> back 生成，R2 转存与 Strict QA 全部通过后才 capture、ready 和锁定。它不是已验证专业 VTON，不承诺绝对保真；视频动作、场景和 Flow Music 不属于该模块，视频桥接尚未启用。
+- 虚拟穿衣现为独立静态上游模块，入口为 `/virtual-try-on`。它仅支持 `front_only` 和 `three_view` 定妆包：后者必须有商品正面、背面和细节图，按 front -> side -> back 生成，R2 转存与 Strict QA 全部通过后才 capture、ready 和锁定。它不是已验证专业 VTON，不承诺绝对保真；视频动作、场景和 Flow Music 不属于静态生成模块。
+- 用户锁定最新定妆包后，可创建 8/16/24/32 秒付费视频任务。桥接必须把定妆视图物化为普通素材，继承仍有效的来源授权并保存不可变 provenance；任务重新进入标准素材分析与 `model_views` 一致性校验，强制 Strict Post-QA，且不能使用免费试用。front-only 仍禁止侧面、背面和转身，three-view 也不能绕过 Advanced-only、禁止自动选择等模板权限。
 - 虚拟试穿为收费静态交付：创建页必须在 reserve 前显示模式点数；服务配置缺失时不得允许上传或提交。撤权、源素材删除或 rights attestation redacted 后必须立即停止 detail/lock/preview/download。
 - 有细节图：允许对应细节特写；无细节图时禁止凭空生成细节。
 - 有场景图：允许场景化镜头；无场景图时只能使用通用模板场景，不允许生成强品牌或真实店铺背景。

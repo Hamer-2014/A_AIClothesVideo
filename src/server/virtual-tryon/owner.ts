@@ -5,10 +5,12 @@ import { appearancePackAssets, appearancePacks, assetRightsAttestations, assets,
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
 
 import type { AppearanceView, VirtualTryOnMode } from "./config";
+import { classifyVirtualTryOnQueueHealth, type VirtualTryOnQueueHealth } from "./queue-health";
 
 type DeliverableStatus = "ready" | "locked";
 type OwnedView = { id: string; view: AppearanceView; status: string };
-type OwnedJob = { id: string; mode: VirtualTryOnMode; status: string };
+type OwnedJob = { id: string; mode: VirtualTryOnMode; status: string; queueHealth: VirtualTryOnQueueHealth };
+type OwnerJobRecord = Omit<OwnedJob, "queueHealth"> & { attemptCount?: number; updatedAt?: Date };
 type OwnedPack = { id: string; version: number; status: string; lockedAt: Date | null };
 
 export type VirtualTryOnBridge = {
@@ -16,9 +18,8 @@ export type VirtualTryOnBridge = {
   appearancePackId: string;
   version: number;
   mode: VirtualTryOnMode;
-  assetIds: string[];
   provenance: string;
-  videoGeneration: "not_enabled";
+  videoGeneration: "requires_lock" | "enabled";
 };
 
 export type OwnedVirtualTryOnDetail = {
@@ -41,26 +42,35 @@ function isDeliverable(status: string): status is DeliverableStatus {
 }
 
 function detailFrom(input: {
-  job: OwnedJob;
+  job: OwnerJobRecord;
   pack: OwnedPack;
   views: OwnedView[];
   provenance: string;
 }): OwnedVirtualTryOnDetail {
+  const job: OwnedJob = {
+    id: input.job.id,
+    mode: input.job.mode,
+    status: input.job.status,
+    queueHealth: classifyVirtualTryOnQueueHealth({
+      status: input.job.status,
+      attemptCount: input.job.attemptCount ?? 0,
+      updatedAt: input.job.updatedAt ?? new Date(),
+    }),
+  };
   const bridge = isDeliverable(input.job.status) && isDeliverable(input.pack.status)
     ? {
       kind: "virtual_tryon_appearance_pack" as const,
       appearancePackId: input.pack.id,
       version: input.pack.version,
-      mode: input.job.mode,
-      assetIds: input.views.map((view) => view.id),
+      mode: job.mode,
       provenance: input.provenance,
-      videoGeneration: "not_enabled" as const,
+      videoGeneration: input.job.status === "locked" && input.pack.status === "locked" ? "enabled" as const : "requires_lock" as const,
     }
     : null;
-  return { job: input.job, pack: input.pack, views: input.views, bridge };
+  return { job, pack: input.pack, views: input.views, bridge };
 }
 
-type InMemoryJob = OwnedJob & { userId: string; deletedAt?: Date | null; sourceAuthorized?: boolean };
+type InMemoryJob = OwnerJobRecord & { userId: string; deletedAt?: Date | null; sourceAuthorized?: boolean };
 type InMemoryPack = OwnedPack & { jobId: string };
 type InMemoryAsset = OwnedView & { packId: string; r2Key: string | null; origin: string; providerTaskId?: string | null };
 
@@ -77,7 +87,7 @@ export function createInMemoryVirtualTryOnOwnerStore(initial: {
   const ownedJob = (userId: string, jobId: string) => jobs.find((job) => job.id === jobId && job.userId === userId && job.deletedAt == null && job.sourceAuthorized !== false) ?? null;
   const currentPack = (jobId: string) => packs.filter((pack) => pack.jobId === jobId).sort((left, right) => right.version - left.version)[0] ?? null;
   const viewsFor = (packId: string) => assets.filter((asset) => asset.packId === packId).map(({ id, view, status }) => ({ id, view, status }));
-  const detail = (job: InMemoryJob, pack: InMemoryPack) => detailFrom({ job: { id: job.id, mode: job.mode, status: job.status }, pack: { id: pack.id, version: pack.version, status: pack.status, lockedAt: pack.lockedAt }, views: viewsFor(pack.id), provenance: assets.find((asset) => asset.packId === pack.id)?.origin ?? "generated_apimart_gpt_image_2" });
+  const detail = (job: InMemoryJob, pack: InMemoryPack) => detailFrom({ job, pack: { id: pack.id, version: pack.version, status: pack.status, lockedAt: pack.lockedAt }, views: viewsFor(pack.id), provenance: assets.find((asset) => asset.packId === pack.id)?.origin ?? "generated_apimart_gpt_image_2" });
 
   return {
     async findOwnedDetail(userId, jobId) {
@@ -146,7 +156,7 @@ async function sourceDeliveryAuthorized(client: DbReader, userId: string, source
 export function createDrizzleVirtualTryOnOwnerStore(db = getDb()): VirtualTryOnOwnerStore {
   const ownedJobWhere = (userId: string, jobId: string) => and(eq(virtualTryonJobs.id, jobId), eq(virtualTryonJobs.userId, userId), isNull(virtualTryonJobs.deletedAt));
   const readDetail = async (client: typeof db, userId: string, jobId: string) => {
-    const [job] = await client.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
+    const [job] = await client.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, attemptCount: virtualTryonJobs.attemptCount, updatedAt: virtualTryonJobs.updatedAt, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
     if (!job) return null;
     if (!await sourceDeliveryAuthorized(client, userId, job.sourceSnapshot, job.rightsSnapshot)) return null;
     const [pack] = await client.select({ id: appearancePacks.id, version: appearancePacks.version, status: appearancePacks.status, lockedAt: appearancePacks.lockedAt }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, job.id)).orderBy(desc(appearancePacks.version)).limit(1);
@@ -162,7 +172,7 @@ export function createDrizzleVirtualTryOnOwnerStore(db = getDb()): VirtualTryOnO
     async lockReadyPack(userId, jobId, packId) {
       try {
         return await db.transaction(async (tx) => {
-          const [job] = await tx.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
+          const [job] = await tx.select({ id: virtualTryonJobs.id, mode: virtualTryonJobs.mode, status: virtualTryonJobs.status, attemptCount: virtualTryonJobs.attemptCount, updatedAt: virtualTryonJobs.updatedAt, sourceSnapshot: virtualTryonJobs.sourceSnapshot, rightsSnapshot: virtualTryonJobs.rightsSnapshot }).from(virtualTryonJobs).where(ownedJobWhere(userId, jobId)).limit(1);
           if (!job) return null;
           if (!await sourceDeliveryAuthorized(tx, userId, job.sourceSnapshot, job.rightsSnapshot)) return null;
           const [latestPack] = await tx.select({ id: appearancePacks.id }).from(appearancePacks).where(eq(appearancePacks.virtualTryonJobId, job.id)).orderBy(desc(appearancePacks.version)).limit(1);

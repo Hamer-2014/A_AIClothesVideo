@@ -65,12 +65,34 @@ export const appearancePackAssets = pgTable("appearance_pack_assets", {
   pollFailureCount: integer("poll_failure_count").notNull().default(0),
   deliveryFailureCount: integer("delivery_failure_count").notNull().default(0),
   r2Key: text("r2_key"),
+  mimeType: text("mime_type"),
+  fileSize: integer("file_size"),
+  materializedAssetId: uuid("materialized_asset_id"),
   origin: text("origin").notNull().default("generated_apimart_gpt_image_2"),
   provenance: jsonSnapshot("provenance").notNull(),
   lastErrorCode: text("last_error_code"),
   nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
   ...timestamps,
-}, (table) => [uniqueIndex("appearance_pack_assets_pack_view_unique").on(table.appearancePackId, table.view)]);
+}, (table) => [
+  uniqueIndex("appearance_pack_assets_pack_view_unique").on(table.appearancePackId, table.view),
+  uniqueIndex("appearance_pack_assets_materialized_asset_unique").on(table.materializedAssetId),
+]);
+
+export const appearancePackVideoBridges = pgTable("appearance_pack_video_bridges", {
+  ...id,
+  userId: text("user_id").notNull(),
+  virtualTryonJobId: uuid("virtual_tryon_job_id").notNull(),
+  appearancePackId: uuid("appearance_pack_id").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  status: text("status").notNull().default("creating"),
+  videoJobId: uuid("video_job_id"),
+  requestSnapshot: jsonSnapshot("request_snapshot").notNull(),
+  errorCode: text("error_code"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("appearance_pack_video_bridges_owner_idempotency_unique").on(table.userId, table.idempotencyKey),
+  uniqueIndex("appearance_pack_video_bridges_video_job_unique").on(table.videoJobId),
+]);
 
 export const garmentFidelityResults = pgTable("garment_fidelity_results", {
   ...id,

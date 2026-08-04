@@ -32,5 +32,7 @@ describe("createDrizzleVideoJobCreationStore", () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]).not.toContain('ara."asset_id" = "id"');
     expect(queries[0]).toContain('ara."asset_id" = "assets"."id"');
+    expect(queries[0]).toContain('ra."redacted_at" is null');
+    expect(queries[0]).toContain('ra."user_id" = "assets"."user_id"');
   });
 });

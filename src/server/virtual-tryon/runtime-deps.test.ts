@@ -49,6 +49,7 @@ describe("default virtual try-on runtime dependencies", () => {
     };
     const store: RuntimeStore = {
       acquire: async () => qaJob,
+      renewLease: async () => true,
       saveAsset: async () => true,
       transitionToGenerating: async () => true,
       transitionAssetsReadyToQaQueued: async () => true,

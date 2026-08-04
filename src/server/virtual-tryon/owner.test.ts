@@ -33,12 +33,32 @@ describe("virtual try-on owner delivery", () => {
     const result = await getVirtualTryOnDetail({ userId: "owner", jobId: "job" }, store());
 
     expect(result).toEqual({
-      job: { id: "job", mode: "front_only", status: "ready" },
+      job: { id: "job", mode: "front_only", status: "ready", queueHealth: "normal" },
       pack: { id: "pack", version: 1, status: "ready", lockedAt: null },
       views: [{ id: "asset", view: "front", status: "succeeded" }],
-      bridge: { kind: "virtual_tryon_appearance_pack", appearancePackId: "pack", version: 1, mode: "front_only", assetIds: ["asset"], provenance: "generated_apimart_gpt_image_2", videoGeneration: "not_enabled" },
+      bridge: { kind: "virtual_tryon_appearance_pack", appearancePackId: "pack", version: 1, mode: "front_only", provenance: "generated_apimart_gpt_image_2", videoGeneration: "requires_lock" },
     });
     expect(JSON.stringify(result)).not.toMatch(/r2Key|providerTaskId|virtual-try-on\//);
+  });
+
+  it("reports an old queued job that no worker has claimed as delayed", async () => {
+    const ownerStore = createInMemoryVirtualTryOnOwnerStore({
+      jobs: [{
+        id: "job",
+        userId: "owner",
+        mode: "front_only",
+        status: "queued",
+        attemptCount: 0,
+        updatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      }],
+      packs: [{ id: "pack", jobId: "job", version: 1, status: "draft", lockedAt: null }],
+      assets: [{ id: "asset", packId: "pack", view: "front", status: "pending", r2Key: null, origin: "generated_apimart_gpt_image_2" }],
+    });
+
+    const result = await getVirtualTryOnDetail({ userId: "owner", jobId: "job" }, ownerStore);
+
+    expect(result?.job.queueHealth).toBe("delayed");
+    expect(JSON.stringify(result)).not.toMatch(/attemptCount|updatedAt|lockedBy|cron/i);
   });
 
   it("returns null for a missing or other owner job", async () => {
@@ -116,6 +136,7 @@ describe("virtual try-on owner delivery", () => {
     const first = await lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "pack" }, ownerStore);
     const duplicate = await lockVirtualTryOnPack({ userId: "owner", jobId: "job", packId: "pack" }, ownerStore);
     expect(first.pack.status).toBe("locked");
+    expect(first.bridge?.videoGeneration).toBe("enabled");
     expect(duplicate.pack.status).toBe("locked");
     expect(first.views).toEqual([{ id: "asset", view: "front", status: "succeeded" }]);
     expect(ownerStore.listStateEvents()).toHaveLength(1);

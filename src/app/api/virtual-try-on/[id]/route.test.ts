@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { OwnedVirtualTryOnDetail } from "@/server/virtual-tryon/owner";
 import { handleGetVirtualTryOnRequest } from "./route";
 
-const detail: OwnedVirtualTryOnDetail = { job: { id: "job-1", mode: "front_only", status: "ready" }, pack: { id: "pack-1", version: 1, status: "ready", lockedAt: null }, views: [{ id: "asset-1", view: "front", status: "succeeded" }], bridge: { kind: "virtual_tryon_appearance_pack", appearancePackId: "pack-1", version: 1, mode: "front_only", assetIds: ["asset-1"], provenance: "generated_apimart_gpt_image_2", videoGeneration: "not_enabled" } };
+const detail: OwnedVirtualTryOnDetail = { job: { id: "job-1", mode: "front_only", status: "ready", queueHealth: "normal" }, pack: { id: "pack-1", version: 1, status: "ready", lockedAt: null }, views: [{ id: "asset-1", view: "front", status: "succeeded" }], bridge: { kind: "virtual_tryon_appearance_pack", appearancePackId: "pack-1", version: 1, mode: "front_only", provenance: "generated_apimart_gpt_image_2", videoGeneration: "requires_lock" } };
 
 describe("GET /api/virtual-try-on/[id]", () => {
   it("returns 401 for no session and 404 for an unknown or other owner job", async () => {

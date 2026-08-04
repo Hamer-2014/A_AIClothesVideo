@@ -681,7 +681,7 @@ https://aiclothesvideo.com/api/webhooks/creem
 - `model_quarter_turn` 要求同一真人模特穿同一服装的正面 + 侧面图，只允许 15-45°，付费、Advanced-only、Strict QA、禁止自动选择。
 - `model_half_turn` 要求同一真人模特穿同一服装的正面 + 侧面 + 背面图，只允许 front -> side -> back 的连续 180°，禁止 360°。
 - 两个真人转身模板必须同时通过 `model_views` 的服装一致性和当前任务内可见模特一致性；缺视角、人物不一致、服装不一致、provider 失败或证据不足均 fail closed。
-- 单张正面真人模特图仍允许 `model_front_pose`，但禁止据此生成侧面、背面或转身。商品图不得由视频模板隐式造人；虚拟穿衣已是独立静态模块，只能使用平台私有 R2 配置的 AI 模特和 GPT Image 2，输出带 provenance 的 `front_only` 或 `three_view` appearance pack。缺配置、授权、转存或 Strict QA 任一项均 fail closed；ready 前不 capture，失败 release，视频桥接未启用，后续复用模特模板前仍需重新校验。
+- 单张正面真人模特图仍允许 `model_front_pose`，但禁止据此生成侧面、背面或转身。商品图不得由视频模板隐式造人；虚拟穿衣已是独立静态模块，只能使用平台私有 R2 配置的 AI 模特和 GPT Image 2，输出带 provenance 的 `front_only` 或 `three_view` appearance pack。缺配置、授权、转存或 Strict QA 任一项均 fail closed；ready 前不 capture，失败 release。只有最新 locked pack 可桥接 8/16/24/32 秒付费视频；桥接需物化普通素材、继承有效来源授权、保存 generation source、重新执行素材/`model_views` 校验并强制 Strict Post-QA。
 
 ### 8.5 验收
 

@@ -808,7 +808,9 @@ video_segments 全部成功 -> Cloud Run 拼接 -> 抽帧 -> 视觉质检 -> cap
 
 `model_quarter_turn` 与 `model_half_turn` 同样在确认时强制 Strict，但只接受已通过 `model_views` 同服装、同模特任务内一致性校验的 `human_model` 素材，并按 front -> side -> back 确定性排序。Prompt 必须固定同一可见人物和服装，限制 15-45° 或 180° 终点，禁止换脸、体型/发型漂移、人体异常和继续到 360°。Post-QA 追加同一人物连续性、人体自然度、服装多视角一致性与转身角度检查。
 
-只有商品图时，视频模板层不得自动造人。虚拟穿衣作为独立静态上游模块：平台模特仅以私有 R2 key 临时签名引用，APIMart GPT Image 2 输出立即转存 R2，形成带 `generated_apimart_gpt_image_2` provenance 的不可变 appearance pack。create 只 reserve，受保护 worker tick 每次推进一个 view；Strict QA 全部通过才 capture/ready。视频桥接当前仅为契约，不得触发视频，未来仍须任务内一致性校验。
+只有商品图时，视频模板层不得自动造人。虚拟穿衣作为独立静态上游模块：平台模特仅以私有 R2 key 临时签名引用，APIMart GPT Image 2 输出立即转存 R2，形成带 `generated_apimart_gpt_image_2` provenance 的不可变 appearance pack。create 只 reserve，受保护 worker tick 每次推进一个 view；Strict QA 全部通过才 capture/ready。
+
+锁定后的最新 appearance pack 可通过 owner-only 幂等 API 创建付费视频任务；幂等范围是 `(user_id, idempotency_key)`，同一 pack 可在不同 key 下创建明确选择的时长、比例或 preset 变体。单一数据库事务先写 `appearance_pack_video_bridges`，以 `FOR UPDATE` 锁定并重新校验来源 asset、asset-attestation 关联和 attestation，再将每个必要视图物化为普通 `assets`、关联所有仍有效的来源 rights attestation、写 `video_jobs.generation_source_snapshot`，最后复用 `createVideoJobWithAssets` 创建 `asset_analysis_queued` 任务。桥接禁止 free trial、强制 Strict Post-QA，但不预填视觉分析结果；标准分析必须重新识别 `human_model` 并生成任务内 `model_views` 一致性。后续 DeepSeek 分镜 prompt 和最终视频 prompt 继续走两道 Creem Moderation，确认后才冻结视频点数。
 
 ### 13.3 执行
 

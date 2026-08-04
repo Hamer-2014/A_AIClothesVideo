@@ -186,6 +186,39 @@ describe("create video job", () => {
     });
   });
 
+  it("allows the trusted appearance-pack bridge to force Strict Post-QA and provenance", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+    const generationSourceSnapshot = {
+      kind: "virtual_tryon_appearance_pack",
+      appearancePackId: "pack-1",
+      version: 2,
+    } as const;
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 24,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      postQaModeOverride: "strict",
+      generationSourceSnapshot,
+    });
+
+    expect(result.job).toMatchObject({
+      billingMode: "paid",
+      postQaMode: "strict",
+      generationSourceSnapshot,
+    });
+  });
+
   it("records paid generation funnel event and does not block job creation when analytics fails", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {

@@ -7,7 +7,7 @@ describe("appearance pack finalization", () => {
     const capture = vi.fn().mockResolvedValue(undefined);
     const result = await finalizeAppearancePack({ jobId: "job", packId: "pack", mode: "three_view", r2Keys: { front: "f", side: "s", back: "b" }, viewPasses: [true, true, true], crossViewPass: true }, { capture });
     expect(capture).toHaveBeenCalledWith({ idempotencyKey: "virtual-tryon:job:capture" });
-    expect(result.videoGeneration).toBe("not_enabled");
+    expect(result.videoGeneration).toBe("requires_lock");
   });
 
   it("fails closed without a required view", async () => {

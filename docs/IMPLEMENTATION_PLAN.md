@@ -290,7 +290,7 @@
 - [x] 单张真人正面图继续允许 `model_front_pose`，但不能启用轻侧身或 180° 转身。
 - [x] 真人模特转身模板为付费 Beta、Advanced-only、禁止 Preset 自动选择，并强制 Strict QA。
 - [x] 模特转身 Prompt 固定同一可见人物、服装和自然人体，禁止换脸、体型/发型漂移及 360°；Post-QA 检查人物连续性和人体异常。
-- [x] 商品图不隐式造人；虚拟穿衣留作未来独立上游模块，输出仍需重新通过任务内一致性校验。
+- [x] 商品图不隐式造人；虚拟穿衣作为独立上游模块，锁定输出桥接视频时仍重新通过任务内一致性校验。
 - [ ] 每个模板包含素材要求、风险等级、禁用条件、试用权限、质检点。
 - [ ] 实现模板状态：draft / beta / active / paused。
 - [ ] 实现模板版本。
@@ -638,7 +638,7 @@
 
 ## 19. 独立静态虚拟试穿模块
 
-APIMart GPT Image 2 虚拟试穿是独立于视频工作台的静态上游模块。它提供 `front_only` 与要求 front/back/detail 的 `three_view`，以 worker tick 的 front -> side -> back 恢复式流程生成；所有必要图片 R2 转存和 Strict QA 通过后才 capture 点数并 ready。任何 ready 前失败 release，平台交付故障在 capture 后 refund。它不包含视频、动作、场景、Flow Music 或 Cloud Run 混音，bridge 在本阶段明确为未启用。
+APIMart GPT Image 2 虚拟试穿是独立于视频工作台的静态上游模块。它提供 `front_only` 与要求 front/back/detail 的 `three_view`，以 worker tick 的 front -> side -> back 恢复式流程生成；所有必要图片 R2 转存和 Strict QA 通过后才 capture 点数并 ready。任何 ready 前失败 release，平台交付故障在 capture 后 refund。静态模块本身不生成视频、动作、场景、Flow Music 或 Cloud Run 混音；锁定最新 pack 后可桥接到标准 8/16/24/32 秒付费视频任务。
 # 虚拟试穿交付状态
 
-静态 appearance pack 的 creation、worker、Strict QA、owner delivery、前台、admin 与 internal tick 已纳入实现；真实 staging smoke 仅在显式成本确认和完整 staging 凭据下执行。视频动作、Flow Music、场景与时长扩展仍不在该模块范围。
+静态 appearance pack 的 creation、worker、Strict QA、owner delivery、前台、admin 与 internal tick 已纳入实现；真实 staging smoke 仅在显式成本确认和完整 staging 凭据下执行。视频桥接已实现 owner/lock/latest/rights/QA 门禁、普通素材物化、provenance、幂等与 Strict Post-QA；实际视频动作、Flow Music 和场景仍由标准视频链路及模板权限控制。
