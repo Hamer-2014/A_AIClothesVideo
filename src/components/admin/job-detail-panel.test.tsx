@@ -33,6 +33,11 @@ describe("JobDetailPanel", () => {
               reasonCodes: ["email_trial_used"],
               riskScore: 100,
             },
+            generationSourceSnapshot: {
+              kind: "virtual_tryon_appearance_pack",
+              appearancePackId: "pack-2",
+              version: 2,
+            },
             reservedLedgerId: "ledger-1",
             finalVideoKey: null,
             coverKey: null,
@@ -168,6 +173,9 @@ describe("JobDetailPanel", () => {
         }}
       />,
     );
+
+    expect(screen.getByText("Generation Source")).toBeInTheDocument();
+    expect(screen.getByText(/virtual_tryon_appearance_pack/)).toBeInTheDocument();
 
     expect(screen.getByText("诊断摘要")).toBeInTheDocument();
     expect(screen.getByText("存在失败片段")).toBeInTheDocument();

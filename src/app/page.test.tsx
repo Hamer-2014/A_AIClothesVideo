@@ -103,6 +103,13 @@ describe("Home", () => {
       .toHaveAttribute("src", "/demo/cases/burgundy-midi-dress/minimal-studio.mp4");
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
       .toHaveAttribute("poster", "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp");
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Create an 8, 16, 24, or 32-second video for one SKU",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("32 sec")).toBeInTheDocument();
   });
 
   it("keeps the Chinese homepage at /zh without mixing languages", async () => {
@@ -144,6 +151,13 @@ describe("Home", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "查看全部素材案例" }))
       .toHaveAttribute("href", "/zh/examples");
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "为一个 SKU 生成 8、16、24 或 32 秒成片",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("32 秒")).toBeInTheDocument();
   });
 
   it("shows generated synthetic SKU material and links to the source library", async () => {

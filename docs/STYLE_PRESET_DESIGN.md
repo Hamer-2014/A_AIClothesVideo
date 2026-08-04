@@ -15,7 +15,7 @@ Preset 不替代镜头模板，也不决定模板是否可用。模板可用性�
 - Preset 负责表达“用户想要什么感觉和用途”。
 - 镜头模板负责表达“每个 8 秒片段具体怎么拍”。
 - 模板规则引擎负责判断“当前素材允许拍什么”。
-- 推荐算法负责在允许范围内选出最合适的 1/2/3 个模板；40 秒 Beta 生成 5 个有序槽位并允许受控重复。
+- 推荐算法负责在允许范围内选出最合适的 1/2/3/4 个模板；40 秒 Beta 生成 5 个有序槽位并允许受控重复。
 - DeepSeek 只能使用最终允许并被系统选中的模板 ID。
 
 一句话原则：
@@ -87,8 +87,8 @@ type StylePreset = {
   preferredTemplateIds: string[];
   discouragedTemplateIds?: string[];
   trialAllowed: boolean;
-  allowedDurationSeconds: Array<8 | 16 | 24 | 40>;
-  defaultDurationSeconds: 8 | 16 | 24 | 40;
+  allowedDurationSeconds: Array<8 | 16 | 24 | 32 | 40>;
+  defaultDurationSeconds: 8 | 16 | 24 | 32 | 40;
   defaultAspectRatio: "9:16" | "1:1" | "16:9";
   riskLevel: "low" | "medium";
 };
@@ -130,9 +130,9 @@ Preset: 极简棚拍
 
 `model_quarter_turn` 与 `model_half_turn` 同样是付费 Beta、Advanced-only 模板，`autoSelectAllowed=false`。它们只接受同一真人模特穿着同一件服装的对应多视角素材，且 `model_views` 的服装一致性和任务内可见模特一致性必须同时通过；单张正面真人图只能使用 `model_front_pose`。两个转身模板不进入任何 Preset 自动槽位。
 
-虚拟试穿的 `front_only` / `three_view` appearance pack 不属于 Style Preset，也不应被 Preset、视频模板或用户意图自动触发。它是独立收费静态入口，现阶段没有视频动作或场景生成能力。
+虚拟试穿的 `front_only` / `three_view` appearance pack 不属于 Style Preset，也不应被 Preset、视频模板或用户意图自动触发。它是独立收费静态入口；用户锁定 pack 后可显式选择 Preset 创建视频任务，但 Preset 只影响标准视频链路的生成意图和推荐排序。
 
-只有商品图时，Preset 不得隐式生成真人或虚拟模特。虚拟穿衣已作为独立静态上游入口，不受 Preset 触发；它使用平台模特生成带 `generated_apimart_gpt_image_2` provenance 的 `front_only` 或 `three_view` appearance pack，而非用户上传真人。视频桥接尚未启用，未来复用模特动作模板前仍须通过任务内一致性校验。
+只有商品图时，Preset 不得隐式生成真人或虚拟模特。虚拟穿衣已作为独立静态上游入口，不受 Preset 触发；它使用平台模特生成带 `generated_apimart_gpt_image_2` provenance 的 `front_only` 或 `three_view` appearance pack，而非用户上传真人。视频桥接不能把 Strict 静态 QA 当成视频模板授权，物化后的真人视图仍须重新通过任务内 `model_views` 校验；Preset 不得自动选择 Advanced-only 转身模板，也不得绕过 front-only 的视角限制。
 
 如果用户选择 `social_lifestyle`，但没有场景图，也不能生成强场景，例如真实街拍、咖啡馆、海边、店铺空间等。最多只能使用通用弱背景和低风险氛围表达。
 
@@ -169,7 +169,7 @@ flowchart TD
 
   Preferred --> Ranking[模板排序/推荐算法]
   Available --> Ranking
-  Duration --> AutoSelect[选择 1/2/3 个模板或 5 个有序槽位]
+  Duration --> AutoSelect[选择 1/2/3/4 个模板或 5 个有序槽位]
   Ranking --> AutoSelect
 
   AutoSelect --> Storyboard
@@ -207,7 +207,7 @@ Landing CTA
 3. 系统分析素材。
 4. 模板规则引擎过滤不可用模板。
 5. 推荐算法结合 preset 偏好排序。
-6. 系统按时长自动选择 1/2/3 个模板；40 秒 Beta 自动组成 5 个有序槽位。
+6. 系统按时长自动选择 1/2/3/4 个模板；40 秒 Beta 自动组成 5 个有序槽位。
 7. 用户点击一键生成，或展开“调整镜头”手动微调。
 8. DeepSeek 基于已选模板和生成意图生成分镜。
 9. Creem Moderation 审核通过后冻结点数或记录试用。
@@ -278,6 +278,7 @@ MVP 先做 3 个 preset，不要扩大到大量风格标签。
    - 8 秒：1 个模板。
    - 16 秒：2 个模板。
    - 24 秒：3 个模板。
+   - 32 秒：4 个模板，沿用普通选择逻辑，不套用 40 秒组合限制。
    - 40 秒 Beta：5 个槽位，至少 3 种模板、同模板最多 2 次且不可相邻重复。
 8. 如果 preset 偏好模板不足，从其他低风险可用模板补齐。
 9. 如果仍不足，提示素材不足，而不是放开不可用模板。
@@ -287,7 +288,7 @@ MVP 先做 3 个 preset，不要扩大到大量风格标签。
 ```ts
 function recommendTemplatesForPreset(input: {
   preset: StylePreset;
-  durationSeconds: 8 | 16 | 24 | 40;
+  durationSeconds: 8 | 16 | 24 | 32 | 40;
   billingMode: "free_trial" | "paid";
   assetCompleteness: AssetCompleteness;
   templateCatalog: ShotTemplate[];

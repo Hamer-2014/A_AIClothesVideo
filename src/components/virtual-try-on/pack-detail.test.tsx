@@ -5,8 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { VirtualTryOnPackDetail } from "./pack-detail";
 
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 const detail = (status: string, mode: "front_only" | "three_view" = "three_view") => ({
-  job: { id: "job-1", mode, status },
+  job: { id: "job-1", mode, status, queueHealth: "normal" as "normal" | "delayed" },
   pack: { id: "pack-1", version: 1, status, lockedAt: status === "locked" ? new Date("2026-08-01T00:00:00.000Z") : null },
   views: mode === "three_view"
     ? [
@@ -16,12 +19,12 @@ const detail = (status: string, mode: "front_only" | "three_view" = "three_view"
     ]
     : [{ id: "asset-front", view: "front" as const, status: "completed" }],
   bridge: status === "ready" || status === "locked"
-    ? { kind: "virtual_tryon_appearance_pack" as const, appearancePackId: "pack-1", version: 1, mode, assetIds: ["asset-front"], provenance: "generated_apimart_gpt_image_2", videoGeneration: "not_enabled" as const }
+    ? { kind: "virtual_tryon_appearance_pack" as const, appearancePackId: "pack-1", version: 1, mode, provenance: "generated_apimart_gpt_image_2", videoGeneration: status === "locked" ? "enabled" as const : "requires_lock" as const }
     : null,
 });
 
 describe("VirtualTryOnPackDetail", () => {
-  afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
+  afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); router.push.mockReset(); });
 
   it("polls a non-terminal task and stops polling a terminal task", async () => {
     vi.useFakeTimers();
@@ -60,7 +63,7 @@ describe("VirtualTryOnPackDetail", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/virtual-try-on/job-1/lock", expect.objectContaining({ method: "POST", body: JSON.stringify({ packId: "pack-1" }) })));
     expect(await screen.findByText("Appearance pack locked")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Lock appearance pack" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue to video generation (coming soon)" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create 8-sec video" })).toBeEnabled();
   });
 
   it("orders a three-view result grid from front to side to back", () => {
@@ -79,6 +82,47 @@ describe("VirtualTryOnPackDetail", () => {
     render(<VirtualTryOnPackDetail initialDetail={detail("ready", "front_only")} language="en" />);
     fireEvent.click(screen.getByRole("button", { name: "Lock appearance pack" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("could no longer be locked");
+  });
+
+  it("shows a safe warning when a queued job has not been claimed", () => {
+    const initialDetail = detail("queued", "front_only");
+    initialDetail.job.queueHealth = "delayed";
+
+    render(<VirtualTryOnPackDetail initialDetail={initialDetail} language="en" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Generation has not started on schedule");
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/cron|secret|internal\/virtual-try-on/i);
+  });
+
+  it("creates a 24-second video from a locked pack and opens the video job", async () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "bridge-request-123" });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ videoJobId: "video-job-1", status: "asset_analysis_queued", replayed: false }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<VirtualTryOnPackDetail initialDetail={detail("locked")} language="en" />);
+
+    expect(screen.queryByRole("button", { name: "40 sec" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "24 sec" }));
+    expect(screen.getByText("190 credits reserved at video confirmation")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "1:1" }));
+    fireEvent.change(screen.getByLabelText("Video style"), { target: { value: "social_lifestyle" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create 24-sec video" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/virtual-try-on/job-1/video", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ packId: "pack-1", idempotencyKey: "bridge-request-123", durationSeconds: 24, aspectRatio: "1:1", presetId: "social_lifestyle" }),
+    })));
+    expect(router.push).toHaveBeenCalledWith("/jobs/video-job-1");
+  });
+
+  it("keeps the selected specs and shows a safe retryable bridge error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: "appearance_pack_source_rights_revoked" }) }));
+    render(<VirtualTryOnPackDetail initialDetail={detail("locked", "front_only")} language="en" />);
+    fireEvent.click(screen.getByRole("button", { name: "32 sec" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create 32-sec video" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("source rights are no longer active");
+    expect(screen.getByRole("button", { name: "Create 32-sec video" })).toBeEnabled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("hides results and video actions for failed delivery", () => {

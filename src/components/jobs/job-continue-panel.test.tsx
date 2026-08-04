@@ -185,4 +185,38 @@ describe("JobContinuePanel", () => {
     expect(screen.getAllByRole("combobox", { name: /镜头 [1-5]/ })).toHaveLength(5);
     expect(screen.queryByText("template-picker")).not.toBeInTheDocument();
   });
+
+  it("keeps 32-second jobs on the regular four-template UI", () => {
+    render(
+      <JobContinuePanel
+        job={{
+          id: "job-32",
+          status: "asset_analysis_passed",
+          durationSeconds: 32,
+          aspectRatio: "9:16",
+          creditCost: 250,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        }}
+        latestStoryboard={null}
+        recommendations={{
+          recommended: [],
+          optional: [],
+          unavailable: [],
+          availableTemplateIds: [
+            "front_push_in",
+            "front_pan",
+            "front_crop_detail",
+            "minimal_studio",
+          ],
+        }}
+        templateCatalog={templateCatalog}
+      />,
+    );
+
+    expect(screen.getByText("template-picker")).toBeInTheDocument();
+    expect(screen.queryByText("40 秒镜头顺序")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+  });
 });

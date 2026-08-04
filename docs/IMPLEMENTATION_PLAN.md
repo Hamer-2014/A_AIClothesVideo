@@ -40,7 +40,7 @@
 
 - MVP 产品口径改为：免费试用低分辨率、无音频、带水印；付费默认高分辨率、无水印、包含音频，用户侧不暴露供应商具体分辨率。
 - Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
-- stitch-worker 抽帧已分级：现有 8/16/24 秒保持 `off = 0`、`lite = 3`、`standard = 5`、`strict = 6`；40 秒 Standard 为 24 帧、Strict 为 34 帧，并保留片段/转场位置。
+- stitch-worker 抽帧已分级：8/16/24/32 秒保持 `off = 0`、`lite = 3`、`standard = 5`、`strict = 6`；40 秒 Standard 为 24 帧、Strict 为 34 帧，并保留片段/转场位置。
 - 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。
 - 2026-06-13 Env-only Video Generation Config：公开视频 `video_generation` 的 provider/model/key 改为只读取环境变量；health check 检查 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL` 和当前 provider 对应的 `APIMART_API_KEY` / `EVOLINK_API_KEY`，不再要求 `PROVIDER_KEY_ENCRYPTION_SECRET` 才能生成视频。
 - 2026-06-13 风险收敛子项目 C：Cloud Run `stitch-worker` 在 final mp4 后抽取 `jobs/{jobId}/covers/cover.webp`，封面生成失败只写 warning 且不阻断 final video / QA frames / callback；前台任务详情优先显示封面、无封面时回退视频预览，任务列表通过内部 cover API 的 R2 signed URL 展示可用封面缩略图。
@@ -290,7 +290,7 @@
 - [x] 单张真人正面图继续允许 `model_front_pose`，但不能启用轻侧身或 180° 转身。
 - [x] 真人模特转身模板为付费 Beta、Advanced-only、禁止 Preset 自动选择，并强制 Strict QA。
 - [x] 模特转身 Prompt 固定同一可见人物、服装和自然人体，禁止换脸、体型/发型漂移及 360°；Post-QA 检查人物连续性和人体异常。
-- [x] 商品图不隐式造人；虚拟穿衣留作未来独立上游模块，输出仍需重新通过任务内一致性校验。
+- [x] 商品图不隐式造人；虚拟穿衣作为独立上游模块，锁定输出桥接视频时仍重新通过任务内一致性校验。
 - [ ] 每个模板包含素材要求、风险等级、禁用条件、试用权限、质检点。
 - [ ] 实现模板状态：draft / beta / active / paused。
 - [ ] 实现模板版本。
@@ -387,13 +387,14 @@
 
 **任务：**
 
-- [x] 用户选择 8/16/24 秒，服务端开关开放时可选择 40 秒付费 Beta。
+- [x] 用户选择 8/16/24/32 秒，服务端开关开放时可选择 40 秒付费 Beta。
 - [ ] 用户选择比例 9:16 / 1:1 / 16:9。
 - [ ] 用户选择模板。
 - [ ] 服务端校验模板数量：
   - 8 秒 1 个模板。
   - 16 秒 2 个模板。
   - 24 秒 3 个模板。
+  - 32 秒 4 个模板，沿用普通模板选择规则。
   - 40 秒 5 个有序槽位，至少 3 种模板并限制重复和高风险镜头。
 - [ ] 调用 DeepSeek 生成 storyboard JSON。
 - [ ] 校验 JSON schema。
@@ -451,7 +452,7 @@
 
 **验收：**
 
-- [ ] 16/24/40 秒不会因为某段生成失败整单重跑。
+- [ ] 16/24/32/40 秒不会因为某段生成失败整单重跑。
 - [ ] 供应商返回链接不会过期丢失，必须转存 R2。
 - [ ] 每个片段有 prompt、模板、输入素材快照和成本记录。
 
@@ -490,7 +491,7 @@
 - [ ] 支持 `post_qa_mode`: off / lite / standard / strict。
 - [ ] 普通用户不能选择 off。
 - [ ] 免费试用和低风险 8 秒默认 lite。
-- [x] 16/24/40 秒付费默认 standard；严格模板仍升级为 strict。
+- [x] 16/24/32/40 秒付费默认 standard；严格模板仍升级为 strict。
 - [ ] 真人、背面、正背切换、中高风险模板强制 strict。
 - [ ] 调用视觉模型分析抽帧图。
 - [ ] 保存 `post_qa_results`。
@@ -506,6 +507,7 @@
 
 ### 14.1 40 秒分段质检与局部重试
 
+- [x] 32 秒保持普通 QA：Standard 5 帧、Strict 6 帧，不进入五段批次和局部重试。
 - [x] Standard 40 秒抽取 24 帧，Strict 抽取 34 帧。
 - [x] QA 帧使用片段和转场语义文件名，不再依赖无位置的数字编号。
 - [x] 视觉模型按 5 个片段批次加 1 个转场批次调用，并聚合一次终态结果。
@@ -636,7 +638,7 @@
 
 ## 19. 独立静态虚拟试穿模块
 
-APIMart GPT Image 2 虚拟试穿是独立于视频工作台的静态上游模块。它提供 `front_only` 与要求 front/back/detail 的 `three_view`，以 worker tick 的 front -> side -> back 恢复式流程生成；所有必要图片 R2 转存和 Strict QA 通过后才 capture 点数并 ready。任何 ready 前失败 release，平台交付故障在 capture 后 refund。它不包含视频、动作、场景、Flow Music 或 Cloud Run 混音，bridge 在本阶段明确为未启用。
+APIMart GPT Image 2 虚拟试穿是独立于视频工作台的静态上游模块。它提供 `front_only` 与要求 front/back/detail 的 `three_view`，以 worker tick 的 front -> side -> back 恢复式流程生成；所有必要图片 R2 转存和 Strict QA 通过后才 capture 点数并 ready。任何 ready 前失败 release，平台交付故障在 capture 后 refund。静态模块本身不生成视频、动作、场景、Flow Music 或 Cloud Run 混音；锁定最新 pack 后可桥接到标准 8/16/24/32 秒付费视频任务。
 # 虚拟试穿交付状态
 
-静态 appearance pack 的 creation、worker、Strict QA、owner delivery、前台、admin 与 internal tick 已纳入实现；真实 staging smoke 仅在显式成本确认和完整 staging 凭据下执行。视频动作、Flow Music、场景与时长扩展仍不在该模块范围。
+静态 appearance pack 的 creation、worker、Strict QA、owner delivery、前台、admin 与 internal tick 已纳入实现；真实 staging smoke 仅在显式成本确认和完整 staging 凭据下执行。视频桥接已实现 owner/lock/latest/rights/QA 门禁、普通素材物化、provenance、幂等与 Strict Post-QA；实际视频动作、Flow Music 和场景仍由标准视频链路及模板权限控制。

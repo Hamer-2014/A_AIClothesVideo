@@ -99,6 +99,33 @@ describe("storyboard schema", () => {
     expect(result.segments).toHaveLength(5);
   });
 
+  it("parses exactly four ordered 8-second segments for a 32-second storyboard", () => {
+    const selected = [
+      "front_push_in",
+      "front_pan",
+      "front_crop_detail",
+      "minimal_studio",
+    ];
+    const result = parseStoryboardJson(
+      {
+        duration_seconds: 32,
+        segments: selected.map((templateId, index) => ({
+          index,
+          duration_seconds: 8,
+          template_id: templateId,
+          prompt: `Segment ${index + 1}`,
+        })),
+      },
+      {
+        durationSeconds: 32,
+        allowedTemplateIds: selected,
+        selectedTemplateIds: selected,
+      },
+    );
+
+    expect(result.segments).toHaveLength(4);
+  });
+
   it("rejects a segment that does not match its selected slot", () => {
     expect(() =>
       parseStoryboardJson(

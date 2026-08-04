@@ -19,11 +19,11 @@ const homeCopy = {
   en: {
     metadataTitle: "AI Clothes Video | Turn three clothing images into a product video",
     metadataDescription:
-      "Upload three valid images of the same garment. AI Clothes Video checks material boundaries, recommends supported shots, and creates an 8, 16, or 24-second product video.",
+      "Upload three valid images of the same garment. AI Clothes Video checks material boundaries, recommends supported shots, and creates an 8, 16, 24, or 32-second product video.",
     hero: {
       eyebrow: "Product videos for independent clothing sellers",
       title: "Three clothing images. One product video.",
-      body: "Upload front, back, and detail images of the same garment. The system checks the material first, then matches supported shots for an 8, 16, or 24-second product or social video.",
+      body: "Upload front, back, and detail images of the same garment. The system checks the material first, then matches supported shots for an 8, 16, 24, or 32-second product or social video.",
       secondary: "View the generated three-image source set",
       trialNote: "8 seconds · low resolution · no audio · watermarked · low-risk shots only",
       boundary: "No back image means no back view. No detail image means no detail close-up.",
@@ -87,13 +87,14 @@ const homeCopy = {
     },
     delivery: {
       kicker: "05 / A complete, publishable video",
-      title: "Create an 8, 16, or 24-second video for one SKU",
-      body: "The system combines one, two, or three 8-second shots, then handles generation, stitching, and QA in the background. You see one task with clear preview, progress, and download states.",
+      title: "Create an 8, 16, 24, or 32-second video for one SKU",
+      body: "The system combines one, two, three, or four 8-second shots, then handles generation, stitching, and QA in the background. You see one task with clear preview, progress, and download states.",
       link: "View trial and credit pricing",
       specs: [
         ["8 sec", "One shot for quick product testing"],
         ["16 sec", "Two shots for a standard product introduction"],
         ["24 sec", "Three shots for overall, back, and visible detail views"],
+        ["32 sec", "Four shots for a more complete paid product story"],
         ["Ratios", "9:16 / 1:1 / 16:9"],
       ],
     },
@@ -108,11 +109,11 @@ const homeCopy = {
   },
   "zh-CN": {
     metadataTitle: "AI Clothes Video｜三张服装图生成商品宣传视频",
-    metadataDescription: "上传同一件服装的三张素材图，系统检查素材边界、自动推荐可用镜头，生成 8、16 或 24 秒商品宣传视频。新用户可免费试用 1 条 8 秒视频。",
+    metadataDescription: "上传同一件服装的三张素材图，系统检查素材边界、自动推荐可用镜头，生成 8、16、24 或 32 秒商品宣传视频。新用户可免费试用 1 条 8 秒视频。",
     hero: {
       eyebrow: "为跨境服装卖家制作商品短视频",
       title: "三张服装图，生成一条商品宣传视频",
-      body: "上传同一件服装的正面、背面与细节图。系统先检查素材，再匹配可用镜头，生成适合商品页和社媒测款的 8、16 或 24 秒视频。",
+      body: "上传同一件服装的正面、背面与细节图。系统先检查素材，再匹配可用镜头，生成适合商品页和社媒测款的 8、16、24 或 32 秒视频。",
       secondary: "查看合成三图样例",
       trialNote: "8 秒 · 低清 · 无音频 · 带水印 · 仅低风险镜头",
       boundary: "没有背面图，不生成背面；没有细节图，不编造细节。",
@@ -176,13 +177,14 @@ const homeCopy = {
     },
     delivery: {
       kicker: "05 / 可发布的完整视频",
-      title: "为一个 SKU 生成 8、16 或 24 秒成片",
-      body: "系统根据时长组合 1、2 或 3 个 8 秒镜头，在后台完成生成、拼接和质检。你看到的是一条完整任务，以及清晰的预览、进度和下载状态。",
+      title: "为一个 SKU 生成 8、16、24 或 32 秒成片",
+      body: "系统根据时长组合 1、2、3 或 4 个 8 秒镜头，在后台完成生成、拼接和质检。你看到的是一条完整任务，以及清晰的预览、进度和下载状态。",
       link: "查看试用与点数价格",
       specs: [
         ["8 秒", "1 个镜头，适合快速试款"],
         ["16 秒", "2 个镜头，适合常规商品介绍"],
         ["24 秒", "3 个镜头，适合展示整体、背面与可见细节"],
+        ["32 秒", "4 个镜头，适合更完整的付费商品叙事"],
         ["常用比例", "9:16 / 1:1 / 16:9"],
       ],
     },

@@ -28,6 +28,7 @@ function stores() {
       {
         id: jobId,
         status: "segment_succeeded",
+        durationSeconds: 8,
         isTest: false,
         postQaMode: "standard",
       },
@@ -115,6 +116,7 @@ describe("stitch dispatch", () => {
         {
           id: jobId,
           status: "stitching_queued",
+          durationSeconds: 8,
           isTest: false,
           postQaMode: "lite",
         },

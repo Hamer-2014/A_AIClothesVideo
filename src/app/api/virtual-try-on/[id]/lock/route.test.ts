@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { OwnedVirtualTryOnDetail } from "@/server/virtual-tryon/owner";
 import { handleLockVirtualTryOnRequest } from "./route";
 
-const detail: OwnedVirtualTryOnDetail = { job: { id: "job-1", mode: "front_only", status: "ready" }, pack: { id: "pack-1", version: 1, status: "ready", lockedAt: null }, views: [], bridge: null };
+const detail: OwnedVirtualTryOnDetail = { job: { id: "job-1", mode: "front_only", status: "ready", queueHealth: "normal" }, pack: { id: "pack-1", version: 1, status: "ready", lockedAt: null }, views: [], bridge: null };
 
 describe("POST /api/virtual-try-on/[id]/lock", () => {
   it("requires a session and hides a missing owner detail", async () => {

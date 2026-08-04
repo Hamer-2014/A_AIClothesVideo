@@ -442,6 +442,7 @@ VIDEO_GENERATION_MODEL=pixverse-v6
 - 8 秒：70 点。
 - 16 秒：130 点。
 - 24 秒：190 点。
+- 32 秒：250 点，4 个独立 8 秒片段，不开放免费试用。
 - 40 秒付费 Beta：310 点，5 个独立 8 秒片段，不开放免费试用。
 - Strict 质检：每 8 秒 +20 点。
 
@@ -680,7 +681,7 @@ https://aiclothesvideo.com/api/webhooks/creem
 - `model_quarter_turn` 要求同一真人模特穿同一服装的正面 + 侧面图，只允许 15-45°，付费、Advanced-only、Strict QA、禁止自动选择。
 - `model_half_turn` 要求同一真人模特穿同一服装的正面 + 侧面 + 背面图，只允许 front -> side -> back 的连续 180°，禁止 360°。
 - 两个真人转身模板必须同时通过 `model_views` 的服装一致性和当前任务内可见模特一致性；缺视角、人物不一致、服装不一致、provider 失败或证据不足均 fail closed。
-- 单张正面真人模特图仍允许 `model_front_pose`，但禁止据此生成侧面、背面或转身。商品图不得由视频模板隐式造人；虚拟穿衣已是独立静态模块，只能使用平台私有 R2 配置的 AI 模特和 GPT Image 2，输出带 provenance 的 `front_only` 或 `three_view` appearance pack。缺配置、授权、转存或 Strict QA 任一项均 fail closed；ready 前不 capture，失败 release，视频桥接未启用，后续复用模特模板前仍需重新校验。
+- 单张正面真人模特图仍允许 `model_front_pose`，但禁止据此生成侧面、背面或转身。商品图不得由视频模板隐式造人；虚拟穿衣已是独立静态模块，只能使用平台私有 R2 配置的 AI 模特和 GPT Image 2，输出带 provenance 的 `front_only` 或 `three_view` appearance pack。缺配置、授权、转存或 Strict QA 任一项均 fail closed；ready 前不 capture，失败 release。只有最新 locked pack 可桥接 8/16/24/32 秒付费视频；桥接需物化普通素材、继承有效来源授权、保存 generation source、重新执行素材/`model_views` 校验并强制 Strict Post-QA。
 
 ### 8.5 验收
 
@@ -815,7 +816,8 @@ MVP 视频生成使用环境变量选择 provider/model/key，支持真实模型
 
 - [ ] 8 秒 storyboard 只包含 1 段。
 - [ ] 16 秒 storyboard 只包含 2 段。
-- [ ] 24 秒 storyboard 只包含 3 段；40 秒 storyboard 必须包含 5 个有序 8 秒段。
+- [ ] 24 秒 storyboard 只包含 3 段；32 秒 storyboard 只包含 4 个有序 8 秒段。
+- [ ] 40 秒 storyboard 必须包含 5 个有序 8 秒段，并通过五槽位组合校验。
 - [ ] JSON schema 校验失败时不进入生成。
 - [ ] storyboards 可在后台查看。
 
@@ -905,7 +907,8 @@ MVP 视频生成使用环境变量选择 provider/model/key，支持真实模型
 
 - 8 秒任务生成 1 个 segment。
 - 16 秒任务生成 2 个 segment。
-- 24 秒任务生成 3 个 segment；40 秒 Beta 生成 5 个 segment。
+- 24 秒任务生成 3 个 segment；32 秒任务生成 4 个 segment。
+- 40 秒 Beta 生成 5 个 segment。
 - 某个 segment 失败只重试该 segment。
 - 供应商输出链接必须及时转存 R2。
 - segment 保存 prompt、模板 ID、输入素材快照、provider task ID、成本、重试次数。
@@ -970,7 +973,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 ### 14.5 验收
 
 - [ ] Vercel 不执行 ffmpeg。
-- [ ] 16/24/40 秒任务输出一个完整视频。
+- [ ] 16/24/32/40 秒任务输出一个完整视频。
 - [ ] 抽帧图上传 R2。
 - [ ] 拼接失败可重试。
 - [ ] Cloud Run 日志可排查。
@@ -1001,7 +1004,8 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 
 - 普通用户不能关闭 Post-QA。
 - 免费试用和低风险 8 秒默认 lite。
-- 16/24/40 秒付费默认 standard。
+- 16/24/32/40 秒付费默认 standard。
+- 8/16/24/32 秒使用普通 QA 抽帧计划：standard 固定 5 帧，strict 固定 6 帧。
 - 40 秒 Standard 抽 24 帧，Strict 抽 34 帧；按 5 个片段批次和 1 个转场批次分析。
 - 40 秒只有一个精确定位片段失败时自动重试一次且不释放冻结点数；其他失败或重试耗尽 fail closed。
 - 真人、背面、正背切换、中高风险模板，以及商品旋转/真人转身付费 Beta 强制 strict。
@@ -1184,6 +1188,7 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - [ ] 付费 8 秒。
 - [ ] 付费 16 秒。
 - [ ] 付费 24 秒。
+- [ ] 付费 32 秒：250 点、4 段、普通 5/6 帧 QA，不启用五段局部重试。
 - [ ] 开关开启时完成付费 40 秒 Beta：310 点、5 段、24/34 帧 QA 和一次局部重试。
 - [ ] 无背面图时背面模板不可用。
 - [ ] 有背面图时背面展示可选。

@@ -1,4 +1,27 @@
 declare module "*.mjs" {
+  export interface LocalVirtualTryOnWorkerConfig {
+    endpoint: string;
+    cronSecret: string;
+    intervalMs: number;
+  }
+
+  export function validateLocalVirtualTryOnWorkerConfig(
+    env: Record<string, string | undefined>,
+  ): LocalVirtualTryOnWorkerConfig;
+
+  export function runVirtualTryOnTick(
+    config: LocalVirtualTryOnWorkerConfig,
+    fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>,
+  ): Promise<Record<string, number>>;
+
+  export function runLocalVirtualTryOnWorker(input: {
+    config: LocalVirtualTryOnWorkerConfig;
+    once?: boolean;
+    signal?: AbortSignal;
+    tick?: (config: LocalVirtualTryOnWorkerConfig) => Promise<Record<string, number>>;
+    log?: (message: string) => void;
+  }): Promise<void>;
+
   export function normalizeSmokeMode(
     value?: string | undefined,
   ): "stitch" | "full";

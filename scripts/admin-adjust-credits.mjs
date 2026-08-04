@@ -2,8 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 
-import { neon } from "@neondatabase/serverless";
 import { config as loadEnv } from "dotenv";
+import { Pool } from "pg";
 
 loadEnv({ path: ".env.local" });
 loadEnv();
@@ -64,16 +64,17 @@ function validateInput(input) {
   }
 }
 
-async function adjustCredits({ sql, input }) {
+async function adjustCredits({ query, input }) {
   const idempotencyKey =
     input.idempotencyKey ||
     `admin_adjust:email:${input.email}:${randomUUID()}`;
 
-  const [result] = await sql`
+  const { rows: [result] } = await query({
+    text: `
     with target_user as (
       select id, email
       from users
-      where lower(email) = ${input.email}
+      where lower(email) = $1
       limit 2
     ),
     user_count as (
@@ -96,44 +97,21 @@ async function adjustCredits({ sql, input }) {
         cw.reserved_balance
       from credit_ledger cl
       join credit_wallets cw on cw.user_id = cl.user_id
-      where cl.idempotency_key = ${idempotencyKey}
-      limit 1
-    ),
-    inserted_wallet as (
-      insert into credit_wallets (user_id)
-      select tu.id
-      from target_user tu
-      cross join user_count uc
-      where uc.count = 1
-        and not exists (
-          select 1 from credit_wallets where user_id = tu.id
-        )
-      returning *
-    ),
-    current_wallet as (
-      select cw.*
-      from credit_wallets cw
-      join target_user tu on tu.id = cw.user_id
-      cross join user_count uc
-      where uc.count = 1
-      limit 1
-    ),
-    wallet_source as (
-      select * from current_wallet
-      union all
-      select * from inserted_wallet
+      where cl.idempotency_key = $2
       limit 1
     ),
     updated_wallet as (
-      update credit_wallets
-      set
-        available_balance = ws.available_balance + ${input.amount},
-        updated_at = now()
-      from wallet_source ws
-      where credit_wallets.id = ws.id
-        and (select count from user_count) = 1
+      insert into credit_wallets (user_id, available_balance)
+      select tu.id, $3
+      from target_user tu
+      cross join user_count uc
+      where uc.count = 1
         and not exists (select 1 from existing_ledger)
-      returning credit_wallets.*
+      on conflict (user_id) do update
+      set
+        available_balance = credit_wallets.available_balance + excluded.available_balance,
+        updated_at = now()
+      returning *
     ),
     inserted_ledger as (
       insert into credit_ledger (
@@ -151,22 +129,21 @@ async function adjustCredits({ sql, input }) {
       )
       select
         tu.id,
-        ws.id,
+        uw.id,
         'admin_adjust',
-        ${input.amount},
-        ws.available_balance,
+        $3,
+        uw.available_balance - $3,
         uw.available_balance,
-        ws.reserved_balance,
         uw.reserved_balance,
-        ${input.reason},
-        ${idempotencyKey},
+        uw.reserved_balance,
+        $4,
+        $2,
         jsonb_build_object(
-          'actorEmail', ${input.adminEmail}::text,
+          'actorEmail', $5::text,
           'targetEmail', tu.email,
           'source', 'scripts/admin-adjust-credits.mjs'
         )
       from target_user tu
-      join wallet_source ws on ws.user_id = tu.id
       join updated_wallet uw on uw.user_id = tu.id
       where not exists (select 1 from existing_ledger)
       returning *
@@ -185,11 +162,11 @@ async function adjustCredits({ sql, input }) {
       )
       select
         null,
-        ${input.adminEmail},
+        $5,
         'credits:admin_adjust',
         'user',
         null,
-        ${input.reason},
+        $4,
         jsonb_build_object(
           'email', tu.email,
           'balanceBefore', il.balance_before,
@@ -270,7 +247,15 @@ async function adjustCredits({ sql, input }) {
       null as audit_id
     where (select count from user_count) <> 1
     limit 1
-  `;
+    `,
+    values: [
+      input.email,
+      idempotencyKey,
+      input.amount,
+      input.reason,
+      input.adminEmail,
+    ],
+  });
 
   if (!result) {
     throw new Error("Credit adjustment failed.");
@@ -335,9 +320,13 @@ function printResult(result, json) {
 async function main() {
   const input = parseArgs(process.argv.slice(2));
   validateInput(input);
-  const sql = neon(readEnv("DATABASE_URL"));
-  const result = await adjustCredits({ sql, input });
-  printResult(result, input.json);
+  const pool = new Pool({ connectionString: readEnv("DATABASE_URL") });
+  try {
+    const result = await adjustCredits({ query: (config) => pool.query(config), input });
+    printResult(result, input.json);
+  } finally {
+    await pool.end();
+  }
 }
 
 main().catch((error) => {

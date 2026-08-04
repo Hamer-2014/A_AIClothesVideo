@@ -60,7 +60,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps = {
               {isChinese ? "点数包" : "Credit packs"}
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-normal">
-              {isChinese ? "先免费试用，再用点数生成 8、16 或 24 秒商品视频。" : "Start with one free trial, then use credits for 8, 16, or 24-second product videos."}
+              {isChinese ? "先免费试用，再用点数生成 8、16、24 或 32 秒商品视频。" : "Start with one free trial, then use credits for 8, 16, 24, or 32-second product videos."}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
               {isChinese ? "免费试用为 1 条 8 秒低清、无音频、带水印视频。付费视频提供高分辨率、无水印并默认含音频。生成前预留点数，只有质检通过且视频可交付后才会扣除。" : "Free trials use a low-resolution, watermarked 8-second video with no audio. Paid videos include high resolution, no watermark, and audio. Credits are reserved before generation and only captured after quality checks pass and a video can be delivered."}
@@ -158,7 +158,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps = {
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
             <h2 className="text-base font-medium">{isChinese ? "免费试用" : "Free trial"}</h2>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              {isChinese ? `新用户可生成 1 条 8 秒低清、无音频、带水印试用视频，仅使用低风险镜头。16 秒、24 秒${duration40Enabled ? "和 40 秒 Beta" : ""}视频及高分辨率交付需要点数。` : <>New users can create one free trial video: 8 seconds, low resolution, no audio, and a watermark. It only uses low-risk shots. 16- and 24-second videos{duration40Enabled ? ", plus the 40-second Beta," : ""} and paid high-resolution delivery require credits.</>}
+              {isChinese ? `新用户可生成 1 条 8 秒低清、无音频、带水印试用视频，仅使用低风险镜头。16 秒、24 秒、32 秒${duration40Enabled ? "和 40 秒 Beta" : ""}视频及高分辨率交付需要点数。` : <>New users can create one free trial video: 8 seconds, low resolution, no audio, and a watermark. It only uses low-risk shots. 16-, 24-, and 32-second videos{duration40Enabled ? ", plus the 40-second Beta," : ""} and paid high-resolution delivery require credits.</>}
             </p>
           </div>
         </div>

@@ -76,6 +76,7 @@ export interface CreatedVideoJob {
   watermarkEnabled: boolean;
   trialEligibilitySnapshot: JsonValue | null;
   rightsAttestationSnapshot: JsonValue | null;
+  generationSourceSnapshot?: JsonValue | null;
   isTest: boolean;
 }
 
@@ -258,6 +259,7 @@ export function createInMemoryVideoJobCreationStore(
   listTrialUsages: () => FreeTrialUsageRecord[];
   listAccessEvents: () => UserAccessEventRecord[];
   listTrialAbuseSignals: () => TrialAbuseSignalInput[];
+  addAsset: (asset: JobCreatableAsset) => void;
 } {
   const ownedAssets = new Map(
     initialAssets.map((asset) => [
@@ -407,10 +409,15 @@ export function createInMemoryVideoJobCreationStore(
     listTrialAbuseSignals() {
       return trialAbuseSignalRecords;
     },
+    addAsset(asset) {
+      ownedAssets.set(asset.id, asset);
+    },
   };
 }
 
-type DbClient = ReturnType<typeof getDb>;
+type RootDbClient = ReturnType<typeof getDb>;
+type TransactionDbClient = Parameters<Parameters<RootDbClient["transaction"]>[0]>[0];
+type DbClient = RootDbClient | TransactionDbClient;
 
 export function createDrizzleVideoJobCreationStore(
   db: DbClient = getDb(),
@@ -422,6 +429,7 @@ export function createDrizzleVideoJobCreationStore(
       }
 
       const qualifiedAssetId = sql`${assets.id}`;
+      const qualifiedAssetUserId = sql`${assets.userId}`;
       const rows = await db
         .select({
           id: assets.id,
@@ -435,6 +443,8 @@ export function createDrizzleVideoJobCreationStore(
               on ra."id" = ara."rights_attestation_id"
             where ara."asset_id" = ${qualifiedAssetId}
               and ra."version" = 'image_rights_v1'
+              and ra."redacted_at" is null
+              and ra."user_id" = ${qualifiedAssetUserId}
           )`,
           rightsAttestationId: sql<string | null>`(
             select ara."rights_attestation_id"
@@ -443,6 +453,8 @@ export function createDrizzleVideoJobCreationStore(
               on ra."id" = ara."rights_attestation_id"
             where ara."asset_id" = ${qualifiedAssetId}
               and ra."version" = 'image_rights_v1'
+              and ra."redacted_at" is null
+              and ra."user_id" = ${qualifiedAssetUserId}
             order by ara."created_at" desc
             limit 1
           )`,
@@ -481,6 +493,7 @@ export function createDrizzleVideoJobCreationStore(
           watermarkEnabled: videoJobs.watermarkEnabled,
           trialEligibilitySnapshot: videoJobs.trialEligibilitySnapshot,
           rightsAttestationSnapshot: videoJobs.rightsAttestationSnapshot,
+          generationSourceSnapshot: videoJobs.generationSourceSnapshot,
           isTest: videoJobs.isTest,
         });
 
@@ -708,6 +721,9 @@ export async function createVideoJobWithAssets({
   appEnvironment = process.env.APP_ENV ?? process.env.NODE_ENV ?? "development",
   videoSpecEnv = process.env,
   funnelEventStore,
+  postQaModeOverride,
+  generationSourceSnapshot = null,
+  enforceCaptureProtocol: enforceCaptureProtocolInput,
 }: {
   store: VideoJobCreationStore;
   userId: string;
@@ -730,9 +746,12 @@ export async function createVideoJobWithAssets({
   appEnvironment?: string;
   videoSpecEnv?: Record<string, string | undefined>;
   funnelEventStore?: FunnelEventStore;
+  postQaModeOverride?: "strict";
+  generationSourceSnapshot?: JsonValue | null;
+  enforceCaptureProtocol?: boolean;
 }) {
   const uniqueAssetIds = Array.from(new Set(assetIds));
-  const enforceCaptureProtocol = captureProtocol != null;
+  const enforceCaptureProtocol = enforceCaptureProtocolInput ?? captureProtocol != null;
   const resolvedCaptureProtocol = getCaptureProtocol(captureProtocol);
   assertValidInput({ assetIds: uniqueAssetIds, durationSeconds, aspectRatio });
   if (!isVideoDuration(durationSeconds)) {
@@ -897,7 +916,7 @@ export async function createVideoJobWithAssets({
     skuName: normalizeSkuName(skuName),
     presetId: preset.id,
     presetSnapshot,
-    postQaMode: profile.postQaMode,
+    postQaMode: postQaModeOverride ?? profile.postQaMode,
     postQaRequired: "true",
     creditCost: billingMode === "free_trial" ? 0 : videoSpec.creditCost,
     billingMode,
@@ -905,6 +924,7 @@ export async function createVideoJobWithAssets({
     watermarkEnabled: profile.watermarkEnabled,
     trialEligibilitySnapshot,
     rightsAttestationSnapshot,
+    generationSourceSnapshot,
     isTest,
   });
 

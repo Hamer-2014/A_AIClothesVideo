@@ -655,6 +655,40 @@ describe("confirmStoryboard", () => {
     ]);
   });
 
+  it.each(["APP_ENV", "VERCEL_ENV"] as const)(
+    "ignores an enabled debug resolution override when %s is production",
+    async (productionEnvName) => {
+      vi.stubEnv(productionEnvName, "production");
+      vi.stubEnv("VIDEO_GENERATION_DEBUG_ENABLED", "true");
+      vi.stubEnv("VIDEO_GENERATION_DEBUG_RESOLUTION", "360p");
+      const stores = createStores();
+      await grantTrialCredits({
+        store: stores.creditStore,
+        userId,
+        amount: 200,
+        reason: "test setup",
+        idempotencyKey: `grant:production-debug-resolution:${productionEnvName}`,
+      });
+
+      await confirmStoryboard({
+        ...stores,
+        jobId,
+        userId,
+        storyboardId,
+        moderatePrompt: async () => ({
+          id: `mod-production-debug-resolution:${productionEnvName}`,
+          decision: "allow",
+          raw: { decision: "allow" },
+        }),
+      });
+
+      expect(stores.storyboardStore.listSegments()).toEqual([
+        expect.objectContaining({ resolution: "720p" }),
+        expect.objectContaining({ resolution: "720p" }),
+      ]);
+    },
+  );
+
   it("only attaches assets required by each segment template", async () => {
     const jobStore = createInMemoryJobStore([
       {

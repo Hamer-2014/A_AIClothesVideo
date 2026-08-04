@@ -22,6 +22,6 @@ export async function finalizeAppearancePack(input: {
     mode: input.mode,
     assetKeys: input.r2Keys,
     provenance: "generated_apimart_gpt_image_2" as const,
-    videoGeneration: "not_enabled" as const,
+    videoGeneration: "requires_lock" as const,
   };
 }

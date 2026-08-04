@@ -82,6 +82,14 @@ describe("PricingPage", () => {
     expect(screen.getAllByText(/8 seconds/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/16 seconds/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/24 seconds/).length).toBeGreaterThan(0);
+    expect(screen.getByText("32 seconds")).toBeInTheDocument();
+    expect(screen.getByText("250 credits · 4 segments")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Start with one free trial, then use credits for 8, 16, 24, or 32-second product videos.",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/Free trial/).length).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", { name: "Create one free trial video" }),

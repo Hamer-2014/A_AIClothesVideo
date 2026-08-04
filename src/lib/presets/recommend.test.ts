@@ -116,6 +116,31 @@ describe("style preset recommendation helpers", () => {
     ).toBeLessThanOrEqual(2);
   });
 
+  it("selects four ordered templates for 32 seconds", () => {
+    const base = recommendShotTemplates({
+      templates: mvpShotTemplates,
+      assetCompleteness: {
+        ...frontOnlyCompleteness,
+        hasDetail: true,
+        detailTypes: ["fabric", "neckline", "cuff", "print"],
+      },
+      isTrial: false,
+    });
+
+    expect(
+      selectTemplateIdsForPreset({
+        recommendations: base,
+        preset: getStylePreset("minimal_studio"),
+        durationSeconds: 32,
+      }),
+    ).toEqual([
+      "front_push_in",
+      "front_pan",
+      "front_crop_detail",
+      "minimal_studio",
+    ]);
+  });
+
   it("keeps advanced product rotations selectable but out of preset slots", () => {
     const base = recommendShotTemplates({
       templates: mvpShotTemplates,

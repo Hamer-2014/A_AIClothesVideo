@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db/client";
 import { stitchJobs, videoJobs, videoSegments } from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import { buildCoverKey, buildFinalVideoKey } from "@/lib/storage/keys";
+import { getVideoSpec, isVideoDuration } from "@/lib/video/specs";
 import {
   createDrizzleJobStore,
   type JobStore,
@@ -20,6 +21,7 @@ import {
 export interface StitchJobSourceRecord {
   id: string;
   status: string;
+  durationSeconds: number;
   isTest: boolean;
   postQaMode: "off" | "lite" | "standard" | "strict";
 }
@@ -97,16 +99,27 @@ function buildDispatchResult({
   jobId,
   stitchJob,
   segmentKeys,
+  durationSeconds,
   postQaMode,
 }: {
   jobId: string;
   stitchJob: StitchJobRecord;
   segmentKeys: string[];
+  durationSeconds: number;
   postQaMode: "off" | "lite" | "standard" | "strict";
 }): StitchDispatchResult {
   const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
   if (!appUrl) {
     throw new Error("APP_URL is required to create a Cloud Run stitch callback URL.");
+  }
+  if (!isVideoDuration(durationSeconds)) {
+    throw new Error(`Unsupported video duration: ${durationSeconds}.`);
+  }
+  const expectedSegmentCount = getVideoSpec(durationSeconds).segmentCount;
+  if (segmentKeys.length !== expectedSegmentCount) {
+    throw new Error(
+      `Video job requires exactly ${expectedSegmentCount} segments for ${durationSeconds} seconds.`,
+    );
   }
 
   return {
@@ -143,10 +156,24 @@ export async function createStitchJobForVideo({
 
   const segments = await stitchStore.listSegments(jobId);
   const sortedSegments = segments.sort((a, b) => a.segmentIndex - b.segmentIndex);
+  if (!isVideoDuration(job.durationSeconds)) {
+    throw new Error(`Unsupported video duration: ${job.durationSeconds}.`);
+  }
+  const expectedSegmentCount = getVideoSpec(job.durationSeconds).segmentCount;
+  const hasExpectedSegmentIndexes = sortedSegments.every(
+    (segment, index) => segment.segmentIndex === index,
+  );
+  if (
+    sortedSegments.length !== expectedSegmentCount ||
+    !hasExpectedSegmentIndexes
+  ) {
+    throw new Error(
+      `Video job requires exactly ${expectedSegmentCount} contiguous segments for ${job.durationSeconds} seconds.`,
+    );
+  }
   const segmentKeys = sortedSegments.map((segment) => segment.videoKey);
 
   if (
-    sortedSegments.length === 0 ||
     sortedSegments.some((segment) => segment.status !== "succeeded") ||
     segmentKeys.some((key) => !key)
   ) {
@@ -174,6 +201,7 @@ export async function createStitchJobForVideo({
     jobId,
     stitchJob,
     segmentKeys: segmentKeys as string[],
+    durationSeconds: job.durationSeconds,
     postQaMode: job.postQaMode,
   });
 }
@@ -199,6 +227,7 @@ export async function getQueuedStitchJobPayloadForVideo({
     jobId,
     stitchJob,
     segmentKeys: asStringArray(stitchJob.segmentKeys),
+    durationSeconds: job.durationSeconds,
     postQaMode: job.postQaMode,
   });
 }
@@ -481,6 +510,7 @@ export function createDrizzleStitchStore(db: DbClient = getDb()): StitchStore {
         .select({
           id: videoJobs.id,
           status: videoJobs.status,
+          durationSeconds: videoJobs.durationSeconds,
           isTest: videoJobs.isTest,
           postQaMode: videoJobs.postQaMode,
         })

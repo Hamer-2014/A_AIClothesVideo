@@ -310,6 +310,8 @@ src/
 8. 保存 `storyboards`。
 9. 用户确认分镜和点数消耗。
 
+时长契约统一由应用内 Video Spec 提供：8/16/24/32 秒分别要求 1/2/3/4 个有序 8 秒片段；32 秒为 active 付费规格，消耗 250 点且不开放免费试用。只有 40 秒受 `VIDEO_DURATION_40_ENABLED` 控制，并使用 5 个有序槽位及其专属组合校验。storyboard schema、确认器、segment 创建和 stitch payload 都必须从该规格得到片段数，不能分别维护时长分支。
+
 ### 5.5 Prompt Moderation 与点数冻结
 
 1. 用户确认分镜后进入生成前校验。
@@ -806,7 +808,9 @@ video_segments 全部成功 -> Cloud Run 拼接 -> 抽帧 -> 视觉质检 -> cap
 
 `model_quarter_turn` 与 `model_half_turn` 同样在确认时强制 Strict，但只接受已通过 `model_views` 同服装、同模特任务内一致性校验的 `human_model` 素材，并按 front -> side -> back 确定性排序。Prompt 必须固定同一可见人物和服装，限制 15-45° 或 180° 终点，禁止换脸、体型/发型漂移、人体异常和继续到 360°。Post-QA 追加同一人物连续性、人体自然度、服装多视角一致性与转身角度检查。
 
-只有商品图时，视频模板层不得自动造人。虚拟穿衣作为独立静态上游模块：平台模特仅以私有 R2 key 临时签名引用，APIMart GPT Image 2 输出立即转存 R2，形成带 `generated_apimart_gpt_image_2` provenance 的不可变 appearance pack。create 只 reserve，受保护 worker tick 每次推进一个 view；Strict QA 全部通过才 capture/ready。视频桥接当前仅为契约，不得触发视频，未来仍须任务内一致性校验。
+只有商品图时，视频模板层不得自动造人。虚拟穿衣作为独立静态上游模块：平台模特仅以私有 R2 key 临时签名引用，APIMart GPT Image 2 输出立即转存 R2，形成带 `generated_apimart_gpt_image_2` provenance 的不可变 appearance pack。create 只 reserve，受保护 worker tick 每次推进一个 view；Strict QA 全部通过才 capture/ready。
+
+锁定后的最新 appearance pack 可通过 owner-only 幂等 API 创建付费视频任务；幂等范围是 `(user_id, idempotency_key)`，同一 pack 可在不同 key 下创建明确选择的时长、比例或 preset 变体。单一数据库事务先写 `appearance_pack_video_bridges`，以 `FOR UPDATE` 锁定并重新校验来源 asset、asset-attestation 关联和 attestation，再将每个必要视图物化为普通 `assets`、关联所有仍有效的来源 rights attestation、写 `video_jobs.generation_source_snapshot`，最后复用 `createVideoJobWithAssets` 创建 `asset_analysis_queued` 任务。桥接禁止 free trial、强制 Strict Post-QA，但不预填视觉分析结果；标准分析必须重新识别 `human_model` 并生成任务内 `model_views` 一致性。后续 DeepSeek 分镜 prompt 和最终视频 prompt 继续走两道 Creem Moderation，确认后才冻结视频点数。
 
 ### 13.3 执行
 
@@ -821,7 +825,7 @@ Cloud Run `stitch-worker` 在拼接成功后直接抽帧：
 
 这样可以避免最终视频上传 R2 后再下载回来抽帧。
 
-40 秒付费 Beta 使用独立的分段抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
+1-4 个片段（8/16/24/32 秒）使用普通抽帧计划：Standard 固定 5 帧，Strict 固定 6 帧，不启用分段批次和局部重试。仅 5 个片段的 40 秒付费 Beta 使用独立抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
 
 Post-QA 对 40 秒任务分成 5 个片段批次和 1 个转场批次，逐批调用视觉模型后聚合一次结果。若且仅若一个片段批次失败、所有转场通过且失败不是 provider/schema 异常，任务保留冻结点数并只重排该片段一次；其他情况沿用终态失败和点数释放流程。
 

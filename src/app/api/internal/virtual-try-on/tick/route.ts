@@ -1,10 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
-import { createBillingMaintenanceCreditOperations, createDrizzleBillingMaintenanceStore, runBillingMaintenanceTick } from "@/server/virtual-tryon/maintenance";
-import { createDefaultVirtualTryOnRuntimeDeps, runVirtualTryOnTick } from "@/server/virtual-tryon/runtime";
-
 const defaultLimit = 1;
 
 type TickActionResult = { processed: number; action?: string };
@@ -50,7 +46,20 @@ async function parseLimit(request: Request) {
   return typeof limit === "number" && Number.isInteger(limit) && limit >= 1 && limit <= 20 ? limit : null;
 }
 
-function defaultRunners(): { runMaintenance: TickRunner; runGeneration: TickRunner } {
+async function defaultRunners(): Promise<{ runMaintenance: TickRunner; runGeneration: TickRunner }> {
+  const [
+    { createDrizzleCreditLedgerStore },
+    {
+      createBillingMaintenanceCreditOperations,
+      createDrizzleBillingMaintenanceStore,
+      runBillingMaintenanceTick,
+    },
+    { createDefaultVirtualTryOnRuntimeDeps, runVirtualTryOnTick },
+  ] = await Promise.all([
+    import("@/lib/credits/drizzle-store"),
+    import("@/server/virtual-tryon/maintenance"),
+    import("@/server/virtual-tryon/runtime"),
+  ]);
   const credits = createDrizzleCreditLedgerStore();
   const runtimeDeps = createDefaultVirtualTryOnRuntimeDeps({ credits });
   const maintenanceStore = createDrizzleBillingMaintenanceStore();
@@ -91,7 +100,7 @@ export async function handleVirtualTryOnTickRequest(request: Request, deps: Virt
   if (limit === null) return NextResponse.json({ error: "invalid_tick_limit" }, { status: 400 });
 
   try {
-    const defaults = deps.runMaintenance && deps.runGeneration ? undefined : defaultRunners();
+    const defaults = deps.runMaintenance && deps.runGeneration ? undefined : await defaultRunners();
     const runMaintenance = deps.runMaintenance ?? defaults?.runMaintenance;
     const runGeneration = deps.runGeneration ?? defaults?.runGeneration;
     if (!runMaintenance || !runGeneration) throw new Error("virtual_tryon_tick_runner_missing");

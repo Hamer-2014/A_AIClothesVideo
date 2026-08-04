@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Download, LoaderCircle, LockKeyhole, RefreshCw, Video } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Download, LoaderCircle, LockKeyhole, RefreshCw, TriangleAlert, Video } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { localizeHref, type SiteLocale } from "@/lib/i18n/config";
-import { workspaceText } from "@/lib/i18n/workspace";
+import { localizeStylePreset, workspaceText } from "@/lib/i18n/workspace";
+import { stylePresets, type StylePresetId } from "@/lib/presets";
+import { getVideoSpec, type VideoDuration } from "@/lib/video/specs";
 import type { OwnedVirtualTryOnDetail } from "@/server/virtual-tryon/owner";
 
 type DetailResponse = Pick<OwnedVirtualTryOnDetail, "job" | "pack" | "views"> & { videoBridge: OwnedVirtualTryOnDetail["bridge"] };
@@ -13,6 +16,8 @@ type DetailResponse = Pick<OwnedVirtualTryOnDetail, "job" | "pack" | "views"> & 
 const terminalStatuses = new Set(["ready", "locked", "failed_unreserved", "failed_released", "failed_refunded"]);
 const failedStatuses = new Set(["failed_unreserved", "failed_released", "failed_refunded", "recovering_release", "recovering_refund"]);
 const viewOrder = { front: 0, side: 1, back: 2 } as const;
+const videoDurations: VideoDuration[] = [8, 16, 24, 32];
+const aspectRatios = ["9:16", "1:1", "16:9"] as const;
 
 function fromResponse(response: DetailResponse): OwnedVirtualTryOnDetail {
   return { job: response.job, pack: response.pack, views: response.views, bridge: response.videoBridge };
@@ -59,14 +64,21 @@ function safeDetailError(language: SiteLocale) {
 }
 
 export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDetail: OwnedVirtualTryOnDetail; language: SiteLocale }) {
+  const router = useRouter();
   const [detail, setDetail] = useState(initialDetail);
   const [refreshing, setRefreshing] = useState(false);
   const [locking, setLocking] = useState(false);
+  const [creatingVideo, setCreatingVideo] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState<VideoDuration>(8);
+  const [aspectRatio, setAspectRatio] = useState<(typeof aspectRatios)[number]>("9:16");
+  const [presetId, setPresetId] = useState<StylePresetId>("minimal_studio");
   const [message, setMessage] = useState<string | null>(null);
+  const bridgeIdempotencyKey = useRef<string | null>(null);
   const terminal = terminalStatuses.has(detail.job.status);
   const deliverable = isDeliverable(detail);
   const failed = failedStatuses.has(detail.job.status);
   const canLock = detail.job.status === "ready" && detail.pack.status === "ready";
+  const videoCreditCost = getVideoSpec(durationSeconds).creditCost;
   const views = useMemo(
     () => detail.views
       .filter((view) => detail.job.mode === "three_view" || view.view === "front")
@@ -117,11 +129,49 @@ export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDet
       const result = await response.json() as { status?: string; lockedAt?: string | null };
       if (result.status !== "locked") throw new Error("lock_response_invalid");
       const lockedAt = typeof result.lockedAt === "string" ? new Date(result.lockedAt) : new Date();
-      setDetail((current) => ({ ...current, job: { ...current.job, status: "locked" }, pack: { ...current.pack, status: "locked", lockedAt }, bridge: current.bridge ?? { kind: "virtual_tryon_appearance_pack", appearancePackId: current.pack.id, version: current.pack.version, mode: current.job.mode, assetIds: current.views.map((view) => view.id), provenance: "generated_apimart_gpt_image_2", videoGeneration: "not_enabled" } }));
+      setDetail((current) => ({ ...current, job: { ...current.job, status: "locked" }, pack: { ...current.pack, status: "locked", lockedAt }, bridge: current.bridge ? { ...current.bridge, videoGeneration: "enabled" } : { kind: "virtual_tryon_appearance_pack", appearancePackId: current.pack.id, version: current.pack.version, mode: current.job.mode, provenance: "generated_apimart_gpt_image_2", videoGeneration: "enabled" } }));
     } catch {
       setMessage(workspaceText(language, "Could not lock this appearance pack. Try again shortly.", "无法锁定该定妆图，请稍后重试。"));
     } finally {
       setLocking(false);
+    }
+  }
+
+  function resetBridgeKey() {
+    bridgeIdempotencyKey.current = null;
+    setMessage(null);
+  }
+
+  async function createVideo() {
+    if (detail.bridge?.videoGeneration !== "enabled" || creatingVideo) return;
+    setCreatingVideo(true);
+    setMessage(null);
+    bridgeIdempotencyKey.current ??= crypto.randomUUID();
+    try {
+      const response = await fetch(`/api/virtual-try-on/${detail.job.id}/video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packId: detail.pack.id,
+          idempotencyKey: bridgeIdempotencyKey.current,
+          durationSeconds,
+          aspectRatio,
+          presetId,
+        }),
+      });
+      const body = await response.json().catch(() => ({})) as { videoJobId?: string; error?: string };
+      if (!response.ok || typeof body.videoJobId !== "string") {
+        const rightsRevoked = body.error === "appearance_pack_source_rights_revoked";
+        setMessage(rightsRevoked
+          ? workspaceText(language, "The source rights are no longer active, so this appearance pack cannot create a video.", "原始素材授权已失效，该定妆图不能继续生成视频。")
+          : workspaceText(language, "The video task could not be created. Check the appearance pack state and try again.", "视频任务创建失败，请检查定妆图状态后重试。"));
+        return;
+      }
+      router.push(localizeHref(`/jobs/${body.videoJobId}`, language));
+    } catch {
+      setMessage(workspaceText(language, "The video task could not be created. Try again shortly.", "视频任务暂时无法创建，请稍后重试。"));
+    } finally {
+      setCreatingVideo(false);
     }
   }
 
@@ -140,7 +190,7 @@ export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDet
             <p className="text-sm font-semibold">{statusCopy(detail.job.status, language)}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.job.mode === "three_view" ? workspaceText(language, "Front, side, and back appearance pack", "正面、侧面与背面定妆图") : workspaceText(language, "Front appearance pack", "正面定妆图")}</p>
           </div>
-          <button aria-label={workspaceText(language, "Refresh status", "刷新状态")} className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-60" disabled={refreshing || locking} onClick={() => void refresh()} title={workspaceText(language, "Refresh status", "刷新状态")} type="button">
+           <button aria-label={workspaceText(language, "Refresh status", "刷新状态")} className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--line)] text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-60" disabled={refreshing || locking || creatingVideo} onClick={() => void refresh()} title={workspaceText(language, "Refresh status", "刷新状态")} type="button">
             <RefreshCw aria-hidden="true" className={refreshing ? "animate-spin" : undefined} size={17} />
           </button>
         </div>
@@ -151,6 +201,13 @@ export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDet
           })}
         </ol>
       </div>
+
+      {detail.job.queueHealth === "delayed" ? (
+        <div className="flex items-start gap-3 border border-[var(--warning)] bg-[var(--surface-raised)] px-4 py-3 text-sm" role="alert">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--warning)]" size={17} />
+          <p>{workspaceText(language, "Generation has not started on schedule. Please try again later or contact support.", "生成任务未按计划启动，请稍后重试或联系支持人员。")}</p>
+        </div>
+      ) : null}
 
       {message ? <p aria-live="polite" className="text-sm text-[var(--danger)]" role="alert">{message}</p> : null}
 
@@ -176,9 +233,36 @@ export function VirtualTryOnPackDetail({ initialDetail, language }: { initialDet
               </article>;
             })}
           </div>
-          <div className="flex flex-col gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {canLock ? <button className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--action)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--action-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:bg-[var(--line-strong)]" disabled={locking || refreshing} onClick={() => void lockPack()} type="button">{locking ? <LoaderCircle aria-hidden="true" className="animate-spin" size={16} /> : <LockKeyhole aria-hidden="true" size={16} />}{locking ? workspaceText(language, "Locking appearance pack", "正在锁定定妆图") : workspaceText(language, "Lock appearance pack", "锁定定妆图")}</button> : <span />}
-            {detail.bridge?.videoGeneration === "not_enabled" ? <button className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--line)] px-3 text-sm text-[var(--muted)]" disabled title={workspaceText(language, "Video generation is coming soon", "视频生成功能即将推出")} type="button"><Video aria-hidden="true" size={16} />{workspaceText(language, "Continue to video generation (coming soon)", "继续生成视频（即将推出）")}</button> : null}
+          <div className="border-t border-[var(--line)] pt-4">
+            {canLock ? <button className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--action)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--action-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:bg-[var(--line-strong)]" disabled={locking || refreshing} onClick={() => void lockPack()} type="button">{locking ? <LoaderCircle aria-hidden="true" className="animate-spin" size={16} /> : <LockKeyhole aria-hidden="true" size={16} />}{locking ? workspaceText(language, "Locking appearance pack", "正在锁定定妆图") : workspaceText(language, "Lock appearance pack", "锁定定妆图")}</button> : null}
+            {detail.bridge?.videoGeneration === "enabled" ? (
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(12rem,0.7fr)_auto] xl:items-end">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <fieldset disabled={creatingVideo}>
+                    <legend className="text-xs font-semibold text-[var(--muted)]">{workspaceText(language, "Video duration", "视频时长")}</legend>
+                    <div className="mt-2 grid grid-cols-4 gap-2">
+                      {videoDurations.map((duration) => <button aria-pressed={durationSeconds === duration} className={`h-10 rounded-[var(--radius-sm)] border px-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] ${durationSeconds === duration ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--ink)]" : "border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"}`} key={duration} onClick={() => { setDurationSeconds(duration); resetBridgeKey(); }} type="button">{workspaceText(language, `${duration} sec`, `${duration} 秒`)}</button>)}
+                    </div>
+                  </fieldset>
+                  <fieldset disabled={creatingVideo}>
+                    <legend className="text-xs font-semibold text-[var(--muted)]">{workspaceText(language, "Aspect ratio", "视频比例")}</legend>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {aspectRatios.map((ratio) => <button aria-pressed={aspectRatio === ratio} className={`h-10 rounded-[var(--radius-sm)] border px-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] ${aspectRatio === ratio ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--ink)]" : "border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"}`} key={ratio} onClick={() => { setAspectRatio(ratio); resetBridgeKey(); }} type="button">{ratio}</button>)}
+                    </div>
+                  </fieldset>
+                </div>
+                <label className="block text-xs font-semibold text-[var(--muted)]">
+                  {workspaceText(language, "Video style", "视频风格")}
+                  <select className="mt-2 h-10 w-full rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] px-3 text-sm text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-60" disabled={creatingVideo} onChange={(event) => { setPresetId(event.target.value as StylePresetId); resetBridgeKey(); }} value={presetId}>
+                    {stylePresets.map((preset) => <option key={preset.id} value={preset.id}>{localizeStylePreset(preset, language).label}</option>)}
+                  </select>
+                </label>
+                <div className="flex flex-col gap-2 xl:items-end">
+                  <p className="text-xs text-[var(--muted)]">{workspaceText(language, `${videoCreditCost} credits reserved at video confirmation`, `确认视频时冻结 ${videoCreditCost} 点`)}</p>
+                  <button className="inline-flex h-11 min-w-44 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--action)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--action-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:bg-[var(--line-strong)]" disabled={creatingVideo} onClick={() => void createVideo()} type="button">{creatingVideo ? <LoaderCircle aria-hidden="true" className="animate-spin" size={16} /> : <Video aria-hidden="true" size={16} />}{creatingVideo ? workspaceText(language, "Creating video task", "正在创建视频任务") : workspaceText(language, `Create ${durationSeconds}-sec video`, `生成 ${durationSeconds} 秒视频`)}</button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

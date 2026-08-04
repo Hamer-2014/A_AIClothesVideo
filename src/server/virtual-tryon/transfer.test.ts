@@ -5,7 +5,7 @@ import { transferVirtualTryOnImageToR2 } from "./transfer";
 describe("virtual try-on output transfer", () => {
   const base = { key: "virtual-try-on/job/packs/pack/front.png", bucket: "bucket", client: { send: vi.fn() } };
   it("accepts an image from the official APIMart upload host without redirects", async () => {
-    await expect(transferVirtualTryOnImageToR2({ ...base, url: "https://upload.apimart.ai/output.png", fetch: async () => new Response("png", { headers: { "content-type": "image/png", "content-length": "3" } }) })).resolves.toMatchObject({ key: base.key, contentType: "image/png" });
+    await expect(transferVirtualTryOnImageToR2({ ...base, url: "https://upload.apimart.ai/output.png", fetch: async () => new Response("png", { headers: { "content-type": "image/png", "content-length": "3" } }) })).resolves.toMatchObject({ key: base.key, contentType: "image/png", fileSize: 3 });
   });
   it.each(["http://upload.apimart.ai/output.png", "https://elsewhere.example/output.png", "https://127.0.0.1/output.png", "https://169.254.169.254/latest", "https://localhost/output.png"]) ("rejects an unsafe output URL", async (url) => {
     await expect(transferVirtualTryOnImageToR2({ ...base, url, fetch: vi.fn() })).rejects.toThrow("virtual_tryon_output_url_rejected");

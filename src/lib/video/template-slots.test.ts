@@ -68,4 +68,19 @@ describe("validateTemplateSlots", () => {
       }),
     ).toEqual([]);
   });
+
+  it("does not apply 40-second composition rules to four 32-second slots", () => {
+    expect(
+      validateTemplateSlots({
+        durationSeconds: 32,
+        templateIds: [
+          "front_to_back_cut",
+          "front_to_back_cut",
+          "front_to_back_cut",
+          "front_to_back_cut",
+        ],
+        highRiskTemplateIds: ["front_to_back_cut"],
+      }),
+    ).toEqual([]);
+  });
 });

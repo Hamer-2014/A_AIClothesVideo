@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:virtual-try-on": "node scripts/virtual-try-on-dev-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

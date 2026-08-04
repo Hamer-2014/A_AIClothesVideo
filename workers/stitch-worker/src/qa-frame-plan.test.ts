@@ -23,4 +23,14 @@ describe("buildQaFramePlan", () => {
     expect(buildQaFramePlan("standard", 3)).toHaveLength(5);
     expect(buildQaFramePlan("strict", 3)).toHaveLength(6);
   });
+
+  it("keeps four segments on the normal Standard and Strict frame counts", () => {
+    const standard = buildQaFramePlan("standard", 4);
+    const strict = buildQaFramePlan("strict", 4);
+
+    expect(standard).toHaveLength(5);
+    expect(strict).toHaveLength(6);
+    expect(standard.every((point) => point.kind === "segment")).toBe(true);
+    expect(strict.every((point) => point.kind === "segment")).toBe(true);
+  });
 });

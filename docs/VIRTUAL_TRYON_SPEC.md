@@ -15,7 +15,7 @@
 | `front_only` | `front` | `front` | front | front 已 R2 转存且单视角 Strict QA pass |
 | `three_view` | `front` + `back` + `detail` | `front`, `side`, `back` | front -> side -> back | 三张均 R2 转存且所有单视角/跨视角 Strict QA pass |
 
-`three_view` 不接受缺 back 或缺 detail；这种输入只能创建 `front_only`，绝不生成部分三视图 pack。side 是生成目标而非用户输入。第一版不实现视频动作、Flow Music、Cloud Run 混音、24/32/40 秒视频、场景、跑步、舞蹈或 360。详情页的“继续生成视频”仅返回 bridge 契约与“尚未启用”状态，绝不创建视频任务或伪造成功。
+`three_view` 不接受缺 back 或缺 detail；这种输入只能创建 `front_only`，绝不生成部分三视图 pack。side 是生成目标而非用户输入。静态模块不实现视频动作、Flow Music、Cloud Run 混音、场景、跑步、舞蹈或 360。详情页仅在最新 pack 锁定后允许显式创建 8/16/24/32 秒付费视频任务；实际动作与场景仍由标准视频模板规则决定。
 
 ## 2. 用户、授权与资产协议
 
@@ -94,9 +94,10 @@ type StrictCrossViewQa = { verdict: "pass" | "fail" | "unknown"; requiredViews: 
 | `/api/virtual-try-on/[id]` | GET/session owner | 无 | `{ id, mode, status, pack, views, videoBridge }`；404 防枚举 |
 | `/api/virtual-try-on/[id]/lock` | POST/session owner | `{ packId }` | `{ packId, status:"locked", lockedAt }`；409 非 ready/旧 pack |
 | `/api/virtual-try-on/[id]/assets/[assetId]/download` | GET/session owner | 无 | 302 short R2 URL；404 非 owner/非 ready-locked/非 pack asset |
+| `/api/virtual-try-on/[id]/video` | POST/session owner | `{ packId, idempotencyKey, durationSeconds, aspectRatio, presetId }` | 201 新视频任务；200 幂等重放；409 lock/latest/QA/rights 冲突 |
 | `/api/internal/virtual-try-on/tick` | POST/cron secret | `{ limit?: number }` | tick 计数；401/503 fail closed |
 
-创建文件：`src/app/(dashboard)/virtual-try-on/page.tsx`、`page.test.tsx`、`src/app/(dashboard)/virtual-try-on/[id]/page.tsx`、`page.test.tsx`；组件 `src/components/virtual-try-on/create-form.tsx`、`create-form.test.tsx`、`pack-detail.tsx`、`pack-detail.test.tsx`；并修改 `src/components/dashboard/shell.tsx` 的调用处导航（`src/app/(dashboard)/workspace/page.tsx`）加入“虚拟试穿”。前台状态：配置缺失“试穿服务暂不可用”；排队“正在等待安全生成”；QA “正在核验服装与模特一致性”；failed “本次定妆未通过核验，未交付图片”；视频按钮“继续生成视频（即将推出）”。
+创建文件：`src/app/(dashboard)/virtual-try-on/page.tsx`、`page.test.tsx`、`src/app/(dashboard)/virtual-try-on/[id]/page.tsx`、`page.test.tsx`；组件 `src/components/virtual-try-on/create-form.tsx`、`create-form.test.tsx`、`pack-detail.tsx`、`pack-detail.test.tsx`；并修改 `src/components/dashboard/shell.tsx` 的调用处导航（`src/app/(dashboard)/workspace/page.tsx`）加入“虚拟试穿”。前台状态：配置缺失“试穿服务暂不可用”；排队“正在等待安全生成”；QA “正在核验服装与模特一致性”；failed “本次定妆未通过核验，未交付图片”；ready 仅显示锁定操作，locked 展示 8/16/24/32 秒、比例、Preset 和单一视频创建 CTA。
 
 后台新增 `GET /admin/virtual-try-on`、`GET /admin/virtual-try-on/[id]`，API `GET /api/admin/virtual-try-on`、`GET /api/admin/virtual-try-on/[id]`，使用 `getAdminSession`。列表显示 job id/owner/mode/status/pack version/required views/createdAt；详情再显示每 view task status/attempt/R2-key suffix、Strict verdict、provider/model、ledger 状态、失败 code、state events 和 provenance。实现文件为 `src/server/admin/virtual-tryon.ts`、`src/app/admin/virtual-try-on/page.tsx`、`src/app/admin/virtual-try-on/[id]/page.tsx` 与对应 tests；绝不显示 URL 或 API key。
 
@@ -104,4 +105,4 @@ type StrictCrossViewQa = { verdict: "pass" | "fail" | "unknown"; requiredViews: 
 
 source asset、rights snapshot、pack/provenance、QA、state event 和脱敏 provider log 按既有 retention/rights-removal 工作流保留；源资产删/撤权或 attestation redacted 后立即禁 detail/lock/preview/download（统一不可用，不泄露原因）。当前没有可靠 R2 异步物理清理队列，不宣称已调度删除。指标为创建/配置/审核/扣款失败率，视角提交/轮询/R2/QA 成功率，ready/lock/download 转化，重试次数、成本、退款人工工单率。
 
-桥接仅在 ready/locked 返回 `{ kind:"virtual_tryon_appearance_pack", appearancePackId, version, mode, assetIds, provenance:"generated_apimart_gpt_image_2", videoGeneration:"not_enabled" }`。真实 smoke 脚本为 `scripts/virtual-try-on-smoke.mjs`：先检查 `APIMART_API_KEY`、`VIRTUAL_TRYON_MODEL_BASE_KEY`、`CLOUDFLARE_R2_*`、`DATABASE_URL`；任一缺失输出 `SKIP: virtual try-on staging smoke requires ...` 并 exit 0；齐备时只在 staging 创建 `front_only` 且 `is_test=true` 的 job，循环调用内部 tick 至 terminal，验证 R2 对象、Strict 单视图 pass、无 front-only cross QA 与关联 job 的 reserve/capture `credit_ledger` 行，随后仅软删除脚本创建的 job。已有 `VIRTUAL_TRYON_SMOKE_JOB_ID` 绝不删除，并报告其 `is_test` 状态。使用 Node 预加载 `dotenv/config` 或部署平台注入环境变量后运行 `node scripts/virtual-try-on-smoke.mjs`；未提供真实变量时不得声称执行过。
+详情 bridge 在 ready 返回 `videoGeneration:"requires_lock"`，在 locked 返回 `videoGeneration:"enabled"`，不再暴露容易与普通素材混淆的 appearance-pack asset IDs。创建视频时，`appearance_pack_video_bridges` 以 `(user_id, idempotency_key)` 防止同一创建请求重复执行；同一 locked pack 可用不同 key 创建不同的付费时长、比例或 preset 变体。事务在物化前以行锁重新核对来源 asset、asset-attestation 关联和 attestation 仍有效，撤权竞争失败即 fail closed；必要视图物化为普通 `assets` 并关联仍有效的来源 attestation，`video_jobs.generation_source_snapshot` 保存 pack/version/mode/source rights，任务从 `asset_analysis_queued` 开始、禁止 free trial、强制 Strict Post-QA。真实 smoke 脚本为 `scripts/virtual-try-on-smoke.mjs`：先检查 `APIMART_API_KEY`、`VIRTUAL_TRYON_MODEL_BASE_KEY`、`CLOUDFLARE_R2_*`、`DATABASE_URL`；任一缺失输出 `SKIP: virtual try-on staging smoke requires ...` 并 exit 0；齐备时只在 staging 创建 `front_only` 且 `is_test=true` 的 job，循环调用内部 tick 至 terminal，验证 R2 对象、Strict 单视图 pass、无 front-only cross QA 与关联 job 的 reserve/capture `credit_ledger` 行，随后仅软删除脚本创建的 job。已有 `VIRTUAL_TRYON_SMOKE_JOB_ID` 绝不删除，并报告其 `is_test` 状态。该脚本当前只验收静态 pack，不得据此声称 staging 视频桥接已 smoke。使用 Node 预加载 `dotenv/config` 或部署平台注入环境变量后运行 `node scripts/virtual-try-on-smoke.mjs`；未提供真实变量时不得声称执行过。

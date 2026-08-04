@@ -186,6 +186,39 @@ describe("create video job", () => {
     });
   });
 
+  it("allows the trusted appearance-pack bridge to force Strict Post-QA and provenance", async () => {
+    const store = createInMemoryVideoJobCreationStore([
+      {
+        id: "asset-front",
+        userId,
+        status: "uploaded",
+        detectedRole: "front",
+      },
+    ]);
+    const generationSourceSnapshot = {
+      kind: "virtual_tryon_appearance_pack",
+      appearancePackId: "pack-1",
+      version: 2,
+    } as const;
+
+    const result = await createVideoJobWithAssets({
+      store,
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 24,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      postQaModeOverride: "strict",
+      generationSourceSnapshot,
+    });
+
+    expect(result.job).toMatchObject({
+      billingMode: "paid",
+      postQaMode: "strict",
+      generationSourceSnapshot,
+    });
+  });
+
   it("records paid generation funnel event and does not block job creation when analytics fails", async () => {
     const store = createInMemoryVideoJobCreationStore([
       {
@@ -760,5 +793,46 @@ describe("create video job", () => {
       creditCost: 310,
       billingMode: "paid",
     });
+  });
+
+  it("creates ungated 32-second paid jobs for 250 credits and rejects trial use", async () => {
+    const createStore = () =>
+      createInMemoryVideoJobCreationStore([
+        {
+          id: "asset-front",
+          userId,
+          status: "uploaded",
+          detectedRole: "front",
+        },
+      ]);
+
+    const result = await createVideoJobWithAssets({
+      store: createStore(),
+      userId,
+      assetIds: ["asset-front"],
+      durationSeconds: 32,
+      aspectRatio: "9:16",
+      useFreeTrialIfAvailable: false,
+      videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "false" },
+    });
+
+    expect(result.job).toMatchObject({
+      durationSeconds: 32,
+      creditCost: 250,
+      billingMode: "paid",
+      postQaMode: "standard",
+    });
+
+    await expect(
+      createVideoJobWithAssets({
+        store: createStore(),
+        userId,
+        assetIds: ["asset-front"],
+        durationSeconds: 32,
+        aspectRatio: "9:16",
+        useFreeTrialIfAvailable: true,
+        videoSpecEnv: { VIDEO_DURATION_40_ENABLED: "false" },
+      }),
+    ).rejects.toThrow("Free trial only supports 8-second video.");
   });
 });

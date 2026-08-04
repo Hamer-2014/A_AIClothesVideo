@@ -24,6 +24,23 @@ describe("virtual try-on QA", () => {
     ]);
   });
 
+  it("renews the worker lease around each paid QA call and stops after lease loss", async () => {
+    const provider = vi.fn().mockResolvedValue({ provider: "vision", model: "strict", qaJson: view, raw: {} });
+    const renewLease = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const result = runVirtualTryOnQa(
+      { jobId: "job", userId: "user", packId: "pack", mode: "three_view", sourceKeys: { front: "f", back: "b", detail: "d" }, modelKeys: { front: "mf", side: "ms", back: "mb" }, generatedKeys: { front: "gf", side: "gs", back: "gb" } },
+      { signer: async (key) => "https://signed/" + key, visionProvider: provider, renewLease, qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: createInMemoryProviderCallLogStore() },
+    );
+
+    await expect(result).rejects.toThrow("virtual_tryon_qa_lease_lost");
+    expect(renewLease).toHaveBeenCalledTimes(3);
+    expect(provider).toHaveBeenCalledTimes(1);
+  });
+
   it("fails closed when the model reference is missing or identity does not match", async () => {
     const logs = createInMemoryProviderCallLogStore();
     const missing = await runVirtualTryOnQa({ jobId: "job", userId: "user", packId: "pack", mode: "front_only", sourceKeys: { front: "f" }, modelKeys: { front: "", side: "ms", back: "mb" }, generatedKeys: { front: "gf" } }, { signer: async (key) => "https://signed/" + key, qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: logs });

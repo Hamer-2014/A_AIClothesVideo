@@ -1,10 +1,10 @@
-export const videoDurations = [8, 16, 24, 40] as const;
+export const videoDurations = [8, 16, 24, 32, 40] as const;
 
 export type VideoDuration = (typeof videoDurations)[number];
 
 export type VideoSpec = {
   durationSeconds: VideoDuration;
-  segmentCount: 1 | 2 | 3 | 5;
+  segmentCount: 1 | 2 | 3 | 4 | 5;
   creditCost: number;
   trialAllowed: boolean;
   releaseStage: "active" | "beta";
@@ -35,6 +35,15 @@ export const videoSpecs: Record<VideoDuration, VideoSpec> = {
     durationSeconds: 24,
     segmentCount: 3,
     creditCost: 190,
+    trialAllowed: false,
+    releaseStage: "active",
+    paidPostQaMode: "standard",
+    trialPostQaMode: null,
+  },
+  32: {
+    durationSeconds: 32,
+    segmentCount: 4,
+    creditCost: 250,
     trialAllowed: false,
     releaseStage: "active",
     paidPostQaMode: "standard",

@@ -163,6 +163,11 @@ export function JobDetailPanel({ detail }: AdminJobDetailPanelProps) {
       />
 
       <JsonBlock
+        title="Generation Source"
+        data={detail.job.generationSourceSnapshot ?? null}
+      />
+
+      <JsonBlock
         title="Style Preset Snapshot"
         data={detail.job.presetSnapshot ?? detail.latestStoryboard?.presetSnapshot ?? null}
       />

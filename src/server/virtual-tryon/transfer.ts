@@ -70,7 +70,7 @@ export async function transferVirtualTryOnImageToR2(input: { url: string; key: s
     const body = await readLimited(response, controller.signal);
     clearTimeout(timeout);
     await (input.client ?? createR2Client()).send(new PutObjectCommand({ Bucket: input.bucket ?? getR2Config().bucket, Key: input.key, Body: body, ContentType: contentType }));
-    return { key: input.key, contentType };
+    return { key: input.key, contentType, fileSize: body.byteLength };
   } catch (error) {
     if (error instanceof VirtualTryOnTransferError) throw error;
     if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) throw new VirtualTryOnTransferError("timeout");

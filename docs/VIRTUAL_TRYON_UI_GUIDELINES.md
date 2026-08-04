@@ -58,7 +58,7 @@
 | block | hidden_now_because | reveal_trigger | container |
 | --- | --- | --- | --- |
 | 任务状态、QA 与下载 | 创建前没有可展示的 pack | API 创建成功后进入详情页 | 详情页主内容 |
-| 视频桥接 | 本 Goal 不执行视频生成，创建阶段不能承诺成功 | ready/locked detail 返回 bridge | 详情页次级能力区 |
+| 视频桥接 | 创建页尚无可交付 pack | 最新 pack locked | 详情页结果 action band |
 | 服务条款与隐私完整内容 | 不帮助完成当前素材选择 | 用户点击 UploadPanel 内链接 | 独立页面 |
 | 错误恢复文案 | 正常流程下会干扰主任务 | 上传或创建出现安全错误 | CTA 邻近 alert |
 | 计费/审核的内部原因 | 对用户不能执行补救且可能泄露内部实现 | 永不在创建页展示 | 后台审计 |
@@ -120,9 +120,9 @@ DashboardShell
 
 | 层级 | 任务 | 信息角色 | 首屏 |
 | --- | --- | --- | --- |
-| Primary | 判断当前 pack 是否已可交付，并锁定或下载已核验图像 | action-critical / decision-supporting | 是 |
-| Secondary | 刷新等待中任务的安全状态 | status-feedback | 是，图标按钮 |
-| Low-frequency | 查看未来视频桥接能力 | reference | 否，仅 ready/locked 时作为禁用次级按钮 |
+| Primary | 确认并锁定可交付 pack，再创建一个视频任务 | action-critical / decision-supporting | 是 |
+| Secondary | 选择时长、比例和 Preset；刷新等待中任务状态 | decision-supporting / status-feedback | 是，按当前状态显示 |
+| Low-frequency | 下载单个定妆视图 | action-critical | 否，结果图内图标操作 |
 | Rare | 处理未预留、释放或退款中的失败交付 | exception-handling | 否，仅失败状态 |
 
 ## 状态模型
@@ -134,7 +134,7 @@ DashboardShell
 | `qa_queued` | 全部图像待严格 QA | 进度第三步 active、安全状态 | 图像、锁定、下载、视频 | 无 | capturing 或 recovering_release |
 | `capturing` | QA 已通过，正在确认可交付 | 进度第四步 active、安全状态 | 图像、锁定、下载、视频 | 无 | ready 或 recovering_refund |
 | `ready` | pack 与 job 均 ready | 真实结果网格、下载入口、锁定主 CTA | 错误恢复、重生成、内部 QA/供应商资料 | 锁定定妆图 | lock 成功或安全冲突提示 |
-| `locked` | 用户锁定同一 ready pack 成功 | 真实结果网格、下载入口、不可覆盖状态 | 锁定 CTA、重生成、内部资料 | 无 | 不可在本页离开 locked |
+| `locked` | 用户锁定同一 ready pack 成功 | 真实结果网格、下载入口、视频规格与创建 CTA | 锁定 CTA、静态重生成、内部资料 | 创建视频任务 | 成功后进入视频任务详情 |
 | `failed_unreserved` | 点数未预留，未提交生成 | 安全失败文案、返回创建页 | 图像、下载、锁定、视频、内部错误 | 创建新的定妆图 | 新建任务 |
 | `recovering_release` / `failed_released` | 交付前不可交付，正在或已释放预留点数 | 安全交付/点数处理文案、返回创建页 | 图像、下载、锁定、视频、供应商详情 | 创建新的定妆图 | 新建任务 |
 | `recovering_refund` / `failed_refunded` | capture 后交付未完成，正在或已退款 | 安全退款文案、返回创建页 | 图像、下载、锁定、视频、账本细节 | 创建新的定妆图 | 新建任务 |
@@ -148,7 +148,7 @@ DashboardShell
 | 已交付结果图 | 高 | 是 | ready/locked | pack 可交付 | 主舞台 result grid | 否 | decision-supporting |
 | 锁定定妆图 | 中 | 是 | ready | job/pack 同时 ready | 结果区 action band | 否 | action-critical |
 | 单图下载 | 中 | 是 | ready/locked | 对应 asset 是当前 pack deliverable | 结果图 item | 否 | action-critical |
-| 视频桥接 | 低 | 否 | ready/locked | `videoGeneration=not_enabled` | action band disabled control | 否 | reference |
+| 视频规格与创建 | 高 | 是 | locked | `videoGeneration=enabled` | action band | 否 | action-critical |
 | 失败恢复 | 低 | 否 | failed/recovering | 终态或账本恢复状态 | inline exception surface | 否 | exception-handling |
 | R2 key、签名 URL、provider task、QA 原始响应、账本记录 | 低 | 否 | never | 永不面对普通用户显示 | 后台审计 | 是 | audit/history |
 
@@ -157,9 +157,9 @@ DashboardShell
 | 分类 | 内容 |
 | --- | --- |
 | `must-see-now` | 当前安全状态、固定四步进度；ready/locked 时为真实结果视图与当前可用操作 |
-| `next-step-only` | ready 时锁定 CTA，locked 时仅下载，未来视频能力 |
-| `error-only` | 未预留、释放、退款、刷新和锁定失败的安全提示 |
-| `on-demand-reference` | 下载图像本身、视频桥接的即将推出提示 |
+| `next-step-only` | ready 时锁定 CTA；locked 时视频时长、比例、Preset 与创建 CTA |
+| `error-only` | 未预留、释放、退款、刷新、锁定和视频桥接失败的安全提示 |
+| `on-demand-reference` | 下载图像本身 |
 | `keep-off-first-viewport` | R2 key、签名 URL、provider/status raw、lastError、QA 证据、账本与供应商错误 |
 
 ## Deferred Blocks
@@ -168,7 +168,7 @@ DashboardShell
 | --- | --- | --- | --- |
 | 结果网格与下载 | 任务尚未形成可交付 appearance pack，不能展示装饰占位图 | job 和 pack 都为 ready/locked | 主舞台 result grid |
 | 锁定操作 | 不可交付的 pack 不能被用户确认，也不能覆盖状态 | job 与 pack 同时 ready | result action band |
-| 视频桥接 | 本 Goal 不执行视频生成，不应造成可点击的假成功入口 | bridge 返回且 `videoGeneration=not_enabled` | result action band 的 disabled control |
+| 视频规格与创建 | pack 未锁定时无法建立不可变生成来源 | 最新 pack locked 且 `videoGeneration=enabled` | result action band |
 | 失败恢复说明 | 正常交付时会干扰读取结果 | failed 或 recovering 状态 | inline exception surface |
 | 内部任务与存储信息 | 对用户没有可操作价值且可能泄露数据 | 永不显示 | 后台审计 |
 
@@ -184,7 +184,7 @@ DashboardShell
 ## Interaction / Content / Asset
 
 - `ready` 只有一个主 CTA“锁定定妆图 / Lock appearance pack”；锁定成功本地进入 `locked`，后续没有覆盖或重新生成入口。
-- `locked` 可下载当前 pack 的每个 view；视频按钮只有 bridge 已返回时才显示，并始终 disabled、文案明确“即将推出”。
+- `locked` 可下载当前 pack 的每个 view；仅当 bridge 为 `enabled` 时展示视频规格与创建 CTA，提交中统一禁用并显示 loading 状态。
 - `failed*` 和 `recovering*` 不渲染图像或视频能力，仅提供返回创建页的恢复路径。
 - 每个结果图的预览与下载都只使用 asset id 构造受保护 API path；不把临时 URL 写入状态、日志或 HTML。所有状态和错误经 `workspaceText` 输出中英文。
 

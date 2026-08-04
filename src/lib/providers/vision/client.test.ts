@@ -12,6 +12,7 @@ import {
 describe("vision provider client", () => {
   it("uses a dedicated virtual try-on QA request", async () => {
     vi.stubEnv("VISION_PROVIDER", "openai"); vi.stubEnv("VISION_API_KEY", "key"); vi.stubEnv("VISION_MODEL_STRICT", "model");
+    const timeout = vi.spyOn(AbortSignal, "timeout");
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ choices: [{ message: { content: JSON.stringify({ verdict: "unknown" }) } }] }));
     const result = await createVisionVirtualTryOnQa({ kind: "view", imageUrls: ["https://signed/model", "https://signed/source", "https://signed/generated"], targetView: "front", requirements: ["preserve garment"] }, { fetch: fetchMock });
     expect(result.qaJson).toEqual({ verdict: "unknown" });
@@ -19,9 +20,12 @@ describe("vision provider client", () => {
     expect(body.messages[0].content).toContain("strict virtual try-on view QA");
     expect(body.messages[0].content).toContain("platform model reference");
     expect(body.messages[0].content).toContain("identityConsistency only between the generated image and the first platform model reference");
+    expect(timeout).toHaveBeenCalledWith(45_000);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("throws when provider settings are missing", () => {

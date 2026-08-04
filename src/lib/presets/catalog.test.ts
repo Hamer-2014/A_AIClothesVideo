@@ -29,9 +29,11 @@ describe("style preset catalog", () => {
     });
   });
 
-  it("allows paid 40-second use for every preset", () => {
+  it("allows 24, 32, and gated 40-second use for every preset", () => {
     for (const preset of stylePresets) {
-      expect(preset.allowedDurationSeconds).toContain(40);
+      expect(preset.allowedDurationSeconds).toEqual(
+        expect.arrayContaining([24, 32, 40]),
+      );
     }
   });
 });

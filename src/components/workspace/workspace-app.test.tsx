@@ -165,9 +165,9 @@ vi.mock("./spec-selector", () => ({
   }: {
     aspectRatio: "9:16" | "1:1" | "16:9";
     duration40Enabled?: boolean;
-    durationSeconds: 8 | 16 | 24 | 40;
+    durationSeconds: 8 | 16 | 24 | 32 | 40;
     onAspectRatioChange: (aspectRatio: "9:16" | "1:1" | "16:9") => void;
-    onDurationChange: (duration: 8 | 16 | 24 | 40) => void;
+    onDurationChange: (duration: 8 | 16 | 24 | 32 | 40) => void;
   }) => (
     <div>
       spec-selector {durationSeconds} {aspectRatio}
@@ -176,6 +176,9 @@ vi.mock("./spec-selector", () => ({
       </button>
       <button onClick={() => onDurationChange(24)} type="button">
         mock-duration-24
+      </button>
+      <button onClick={() => onDurationChange(32)} type="button">
+        mock-duration-32
       </button>
       {duration40Enabled ? (
         <button onClick={() => onDurationChange(40)} type="button">
@@ -518,10 +521,16 @@ describe("WorkspaceApp", () => {
     });
   });
 
-  it("shows 40-second Beta cost and five-segment summary only when enabled", () => {
+  it("shows active 32-second pricing without five-segment UI and keeps 40 seconds gated", () => {
     const { rerender } = render(
       <WorkspaceApp duration40Enabled={false} templateCatalog={templateCatalog} />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "mock-duration-32" }));
+
+    expect(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 250 点" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/5 个片段/)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "mock-duration-40" }),
     ).not.toBeInTheDocument();
@@ -910,7 +919,7 @@ describe("WorkspaceApp", () => {
       screen.queryByRole("button", { name: "免费试用生成 · 8 秒带水印" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("免费试用仅支持 8 秒。16/24/40 秒请使用付费生成。"),
+      screen.getByText("免费试用仅支持 8 秒。16/24/32 秒请使用付费生成。"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "付费生成高清无水印 · 130 点" }),
