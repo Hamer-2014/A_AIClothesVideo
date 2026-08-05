@@ -1012,6 +1012,10 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 - 真人转身 Post-QA 必须检查同一可见人物连续性、头/手/臂/髋/腿自然度、服装 front/side/back 一致性和禁止继续到 360°。
 - 质检通过后执行 `credit_ledger.capture`。
 - 质检失败后进入重试、人工审核、释放或退款。
+- Post-QA 仅对网络错误、超时、HTTP 429 和 HTTP 5xx 做最多两次持久化退避重试；除 429 外的 HTTP 4xx、schema 错误和内容质检失败立即 fail closed。重试期间保持原冻结点数，耗尽后才释放。
+- Post-QA 重试次数按当前 `reserved_ledger_id` 隔离；管理员从已释放/退款状态重开付费任务时，必须在同一数据库事务中重新 reserve、替换 `reserved_ledger_id` 并重排队，余额不足时保持原失败状态。
+- Post-QA capture/release 及管理员 release 的幂等键必须绑定具体 `reserved_ledger_id`，不能以 job 级固定键吞掉后续轮次的账本操作。
+- Post-QA capture/release 成功但终态写入中断时，cron 必须读取已持久化 QA 结果补齐终态，不得重新调用视觉模型；付费任务只有当前 reserve 已存在对应结算账本才允许恢复，未结算的 `post_qa_failed` 必须保留冻结点数。
 - 前台不能承诺 100% 无异常。
 
 ### 15.5 验收
@@ -1237,4 +1241,4 @@ Cloud Run 独立执行视频拼接、封面生成和抽帧。
 不要打乱顺序去先写视频生成。先写视频生成看起来快，实际上会把账本、状态机、审计和失败恢复全部拖成烂尾。
 # 虚拟试穿安全补充
 
-APIMart 输出下载不跟随重定向，并限制在 allowlist、图片 MIME 与 25 MiB；平台模特私有 R2 key 只能临时签名。上线 checklist 必须保存平台模特商业授权和合成来源证据，env key 本身不构成授权证明。
+APIMart 输出下载接受公共 HTTPS 地址但不跟随重定向，并拒绝本机、IPv6、私网 IPv4 字面量和已知 metadata hostname，同时限制图片 MIME 与 25 MiB；平台模特私有 R2 key 只能临时签名。上线 checklist 必须保存平台模特商业授权和合成来源证据，env key 本身不构成授权证明。

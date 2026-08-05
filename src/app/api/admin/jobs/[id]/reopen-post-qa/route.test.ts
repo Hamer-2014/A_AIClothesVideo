@@ -67,4 +67,52 @@ describe("POST /api/admin/jobs/[id]/reopen-post-qa", () => {
       expect(response.status).toBe(400);
     }
   });
+
+  it("returns a conflict when the user cannot fund a paid reopen", async () => {
+    const response = await handleReopenPostQaRequest(
+      new Request("http://localhost/api/admin/jobs/job-1/reopen-post-qa", {
+        method: "POST",
+        body: JSON.stringify({ reason: "retry after provider recovery" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getAdminSession: async () => ({
+          userId: "operator-1",
+          email: "operator@example.com",
+          role: "operator",
+        }),
+        reopenPostQa: async () => {
+          throw new Error("Insufficient available credits.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "insufficient_credits",
+    });
+  });
+
+  it("returns a conflict while Post-QA failure settlement is still running", async () => {
+    const response = await handleReopenPostQaRequest(
+      new Request("http://localhost/api/admin/jobs/job-1/reopen-post-qa", {
+        method: "POST",
+        body: JSON.stringify({ reason: "retry after provider recovery" }),
+      }),
+      { params: { id: "job-1" } },
+      {
+        getAdminSession: async () => ({
+          userId: "operator-1",
+          email: "operator@example.com",
+          role: "operator",
+        }),
+        reopenPostQa: async () => {
+          throw new Error("Video job is not settled after Post-QA failure.");
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "post_qa_not_settled" });
+  });
 });

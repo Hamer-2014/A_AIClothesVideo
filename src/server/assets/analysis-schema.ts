@@ -60,12 +60,37 @@ const assetRoleAliases: Record<string, AssetRole> = {
   main_product: "front",
   clothing_item: "front",
   "clothing item": "front",
+  "apparel product image": "front",
   clothing_product_photo: "front",
   product_clothing_item: "front",
   product_clothing_item_on_mannequin: "front",
   none: "unknown",
   "n/a": "unknown",
 };
+const genericProductRoleLabels = new Set([
+  "apparel product image",
+  "catalog product image",
+  "fashion product image",
+]);
+const genericProductRolePrefixes = [
+  "product",
+  "primary",
+  "main_product",
+  "clothing_product",
+  "clothing_item",
+  "garment_on_mannequin",
+  "garment",
+  "model",
+];
+
+function isGenericProductRoleLabel(value: string) {
+  return genericProductRoleLabels.has(value)
+    || genericProductRolePrefixes.some((prefix) => (
+      value === prefix
+      || value.startsWith(`${prefix}_`)
+      || value.startsWith(`${prefix} `)
+    ));
+}
 
 function normalizeHumanPresent(value: string): HumanPresent {
   const normalized = value.trim().toLowerCase();
@@ -105,10 +130,6 @@ function normalizeAssetRole(
 ): AssetRole | string {
   const normalized = value.trim().toLowerCase();
   const aliased = assetRoleAliases[normalized];
-
-  if (aliased) {
-    return aliased;
-  }
 
   if (
     options.declaredRole === "scene" &&
@@ -172,17 +193,15 @@ function normalizeAssetRole(
     return "scene";
   }
 
-  if (
-    normalized.startsWith("product") ||
-    normalized.startsWith("primary") ||
-    normalized.startsWith("main_product") ||
-    normalized.startsWith("clothing_product") ||
-    normalized.startsWith("clothing_item") ||
-    normalized.startsWith("garment_on_mannequin") ||
-    normalized.startsWith("garment") ||
-    normalized.startsWith("model")
-  ) {
-    return "front";
+  if (isGenericProductRoleLabel(normalized)) {
+    return options.declaredRole
+      && ["front", "side", "back"].includes(options.declaredRole)
+      ? options.declaredRole
+      : aliased ?? "front";
+  }
+
+  if (aliased) {
+    return aliased;
   }
 
   return normalized;

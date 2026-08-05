@@ -5,12 +5,22 @@ import { transitionJobStatus } from "@/server/jobs/state-machine";
 
 export interface PostQaWorkerTickHandlers {
   checkPostQa: (job: LockableJobRecord) => Promise<void>;
+  resumePostQa: (job: LockableJobRecord) => Promise<void>;
 }
 
-const eligibleStatuses: JobStatus[] = ["post_qa_queued"];
+const eligibleStatuses: JobStatus[] = [
+  "post_qa_queued",
+  "post_qa_passed",
+  "post_qa_failed",
+];
+const RESOLUTION_RETRY_DELAY_MS = 30_000;
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown post QA worker error.";
+}
+
+function isResolutionRecoveryStatus(status: JobStatus) {
+  return status === "post_qa_passed" || status === "post_qa_failed";
 }
 
 export async function runPostQaWorkerTick({
@@ -19,6 +29,7 @@ export async function runPostQaWorkerTick({
   lockStore,
   jobStore,
   checkPostQa,
+  resumePostQa,
   now = new Date(),
   eligibleJobStatuses = eligibleStatuses,
 }: {
@@ -27,6 +38,7 @@ export async function runPostQaWorkerTick({
   lockStore: JobLockStore;
   jobStore: JobStore;
   checkPostQa: PostQaWorkerTickHandlers["checkPostQa"];
+  resumePostQa: PostQaWorkerTickHandlers["resumePostQa"];
   now?: Date;
   eligibleJobStatuses?: JobStatus[];
 }) {
@@ -52,16 +64,22 @@ export async function runPostQaWorkerTick({
     }
 
     processed += 1;
+    const isResolutionRecovery = isResolutionRecoveryStatus(job.status);
 
     try {
-      await transitionJobStatus({
-        store: jobStore,
-        jobId: job.id,
-        toStatus: "post_qa_running",
-        reason: "post_qa_worker_tick",
-        eventSnapshot: { workerId },
-      });
-      await checkPostQa(job);
+      if (isResolutionRecovery) {
+        await resumePostQa(job);
+      } else {
+        await transitionJobStatus({
+          store: jobStore,
+          jobId: job.id,
+          toStatus: "post_qa_running",
+          reason: "post_qa_worker_tick",
+          nextRetryAt: null,
+          eventSnapshot: { workerId },
+        });
+        await checkPostQa(job);
+      }
       const afterHandler = await jobStore.findJob(job.id);
       if (afterHandler?.lockedBy || afterHandler?.lockedUntil) {
         await jobStore.updateJobStatus(job.id, {
@@ -71,15 +89,31 @@ export async function runPostQaWorkerTick({
       }
       succeeded += 1;
     } catch (error) {
-      await transitionJobStatus({
-        store: jobStore,
-        jobId: job.id,
-        toStatus: "post_qa_failed",
-        reason: "post_qa_worker_tick_failed",
-        errorMessage: errorMessage(error),
-        clearLock: true,
-        eventSnapshot: { workerId },
-      });
+      const failedJob = await jobStore.findJob(job.id);
+      const recoveryStatus =
+        failedJob && isResolutionRecoveryStatus(failedJob.status)
+          ? failedJob.status
+          : isResolutionRecoveryStatus(job.status)
+            ? job.status
+            : null;
+      if (recoveryStatus) {
+        await jobStore.updateJobStatus(job.id, {
+          status: recoveryStatus,
+          lastError: errorMessage(error),
+          nextRetryAt: new Date(now.getTime() + RESOLUTION_RETRY_DELAY_MS),
+          clearLock: true,
+        });
+      } else {
+        await transitionJobStatus({
+          store: jobStore,
+          jobId: job.id,
+          toStatus: "post_qa_failed",
+          reason: "post_qa_worker_tick_failed",
+          errorMessage: errorMessage(error),
+          clearLock: true,
+          eventSnapshot: { workerId },
+        });
+      }
       failed += 1;
     }
   }

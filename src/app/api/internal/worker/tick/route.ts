@@ -10,6 +10,10 @@ import { createDrizzleJobStore } from "@/server/jobs/state-machine";
 import { createDrizzlePostQaJobStore, getPostQaJobInput } from "@/server/post-qa/jobs";
 import { runPostQaCheck } from "@/server/post-qa/check";
 import {
+  createDrizzlePostQaStore,
+  resumePostQaResolution,
+} from "@/server/post-qa/resolve";
+import {
   createAndTriggerStitchJobForVideo,
   createDrizzleStitchStore,
 } from "@/server/stitch/jobs";
@@ -60,6 +64,7 @@ async function defaultRunTick(): Promise<WorkerTickResult> {
   const segmentStore = createDrizzleVideoSegmentStore();
   const stitchStore = createDrizzleStitchStore();
   const postQaJobStore = createDrizzlePostQaJobStore();
+  const postQaStore = createDrizzlePostQaStore();
 
   const analysis = await runWorkerTick({
     workerId: `cron:${Date.now()}`,
@@ -141,11 +146,19 @@ async function defaultRunTick(): Promise<WorkerTickResult> {
       });
       await runPostQaCheck({
         jobStore,
+        postQaStore,
         jobId: input.jobId,
         userId: input.userId,
         mode: input.mode,
         frameKeys: input.frameKeys,
         selectedTemplateIds: input.selectedTemplateIds,
+      });
+    },
+    resumePostQa: async (job) => {
+      await resumePostQaResolution({
+        jobStore,
+        postQaStore,
+        jobId: job.id,
       });
     },
   });

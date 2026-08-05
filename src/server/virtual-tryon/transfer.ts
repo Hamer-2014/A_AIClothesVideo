@@ -11,22 +11,18 @@ export class VirtualTryOnTransferError extends Error {
 const maxBytes = 25 * 1024 * 1024;
 const imageTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 
-function allowlist(env: Record<string, string | undefined>) {
-  const configured = env.APIMART_IMAGE_OUTPUT_HOST_ALLOWLIST?.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-  return new Set(configured?.length ? configured : ["upload.apimart.ai"]);
-}
 function isBlockedHost(hostname: string) {
   const host = hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.includes(":")) return true;
+  if (host === "localhost" || host.endsWith(".localhost") || host === "metadata.google.internal" || host.includes(":")) return true;
   const parts = host.split(".");
   if (parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part))) return false;
   const octets = parts.map(Number);
   return octets.some((part) => part > 255) || octets[0] === 0 || octets[0] === 10 || octets[0] === 127 || (octets[0] === 169 && octets[1] === 254) || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || (octets[0] === 192 && octets[1] === 168);
 }
-function safeUrl(value: string, env: Record<string, string | undefined>) {
+function safeUrl(value: string) {
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:" || isBlockedHost(parsed.hostname) || !allowlist(env).has(parsed.hostname.toLowerCase())) throw new Error("rejected");
+    if (parsed.protocol !== "https:" || isBlockedHost(parsed.hostname)) throw new Error("rejected");
     return parsed;
   } catch { throw new VirtualTryOnTransferError("virtual_tryon_output_url_rejected"); }
 }
@@ -52,8 +48,8 @@ async function readLimited(response: Response, signal: AbortSignal) {
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 }
 
-export async function transferVirtualTryOnImageToR2(input: { url: string; key: string; bucket?: string; client?: UploadClient; fetch?: typeof fetch; env?: Record<string, string | undefined>; timeoutMs?: number }) {
-  const url = safeUrl(input.url, input.env ?? process.env);
+export async function transferVirtualTryOnImageToR2(input: { url: string; key: string; bucket?: string; client?: UploadClient; fetch?: typeof fetch; timeoutMs?: number }) {
+  const url = safeUrl(input.url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.min(input.timeoutMs ?? 25_000, 25_000));
   let response: Response;

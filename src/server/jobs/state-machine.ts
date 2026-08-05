@@ -24,6 +24,7 @@ export interface JobRecord {
   lockedUntil: Date | null;
   attemptCount: number;
   lastError: string | null;
+  nextRetryAt?: Date | null;
   updatedAt?: Date;
 }
 
@@ -47,6 +48,7 @@ export interface JobStatusChanges {
   failureReason?: string | null;
   lockedBy?: string | null;
   lockedUntil?: Date | null;
+  nextRetryAt?: Date | null;
   clearLock?: boolean;
   updatedAt?: Date;
 }
@@ -171,6 +173,10 @@ export function createInMemoryJobStore(initialJobs: JobRecord[] = []): JobStore 
             : changes.clearLock
               ? null
               : job.lockedUntil,
+        nextRetryAt:
+          changes.nextRetryAt === undefined
+            ? job.nextRetryAt
+            : changes.nextRetryAt,
         updatedAt: changes.updatedAt ?? job.updatedAt,
       };
       jobs.set(jobId, updated);
@@ -218,6 +224,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          nextRetryAt: videoJobs.nextRetryAt,
           updatedAt: videoJobs.updatedAt,
         })
         .from(videoJobs)
@@ -243,6 +250,9 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
         ...(changes.lockedUntil !== undefined
           ? { lockedUntil: changes.lockedUntil }
           : {}),
+        ...(changes.nextRetryAt !== undefined
+          ? { nextRetryAt: changes.nextRetryAt }
+          : {}),
         ...(changes.updatedAt !== undefined
           ? { updatedAt: changes.updatedAt }
           : {}),
@@ -262,6 +272,7 @@ export function createDrizzleJobStore(db: DbClient = getDb()): JobStore {
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          nextRetryAt: videoJobs.nextRetryAt,
           updatedAt: videoJobs.updatedAt,
         });
 
@@ -306,6 +317,7 @@ export async function transitionJobStatus({
   errorMessage,
   userVisibleStatus,
   failureReason,
+  nextRetryAt,
   clearLock = false,
 }: {
   store: JobStore;
@@ -318,6 +330,7 @@ export async function transitionJobStatus({
   errorMessage?: string | null;
   userVisibleStatus?: string;
   failureReason?: string | null;
+  nextRetryAt?: Date | null;
   clearLock?: boolean;
 }) {
   const job = await store.findJob(jobId);
@@ -334,6 +347,7 @@ export async function transitionJobStatus({
     lastError: errorMessage === undefined ? job.lastError : errorMessage,
     userVisibleStatus,
     failureReason,
+    nextRetryAt,
     clearLock,
     updatedAt: new Date(),
   });
@@ -356,6 +370,7 @@ export async function transitionJobStatus({
       failureReason: job.failureReason,
       lockedBy: job.lockedBy,
       lockedUntil: job.lockedUntil,
+      nextRetryAt: job.nextRetryAt,
       updatedAt: job.updatedAt,
       clearLock: false,
     });

@@ -29,6 +29,10 @@ export function createInMemoryJobLockStore(
       const eligible = Array.from(jobs.values())
         .filter((job) => eligibleStatuses.includes(job.status))
         .filter(
+          (job) =>
+            !job.nextRetryAt || job.nextRetryAt.getTime() <= now.getTime(),
+        )
+        .filter(
           (job) => !job.lockedUntil || job.lockedUntil.getTime() <= now.getTime(),
         )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -70,12 +74,14 @@ export function createDrizzleJobLockStore(
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          nextRetryAt: videoJobs.nextRetryAt,
           createdAt: videoJobs.createdAt,
         })
         .from(videoJobs)
         .where(
           and(
             inArray(videoJobs.status, eligibleStatuses),
+            or(isNull(videoJobs.nextRetryAt), lte(videoJobs.nextRetryAt, now)),
             or(isNull(videoJobs.lockedUntil), lte(videoJobs.lockedUntil, now)),
             isNull(videoJobs.deletedAt),
           ),
@@ -98,6 +104,7 @@ export function createDrizzleJobLockStore(
           and(
             eq(videoJobs.id, candidate.id),
             inArray(videoJobs.status, eligibleStatuses),
+            or(isNull(videoJobs.nextRetryAt), lte(videoJobs.nextRetryAt, now)),
             or(isNull(videoJobs.lockedUntil), lte(videoJobs.lockedUntil, now)),
           ),
         )
@@ -109,6 +116,7 @@ export function createDrizzleJobLockStore(
           lockedUntil: videoJobs.lockedUntil,
           attemptCount: videoJobs.attemptCount,
           lastError: videoJobs.lastError,
+          nextRetryAt: videoJobs.nextRetryAt,
           createdAt: videoJobs.createdAt,
         });
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   captureReservedCredits,
   grantTrialCredits,
+  releaseReservedCredits,
   reserveCredits,
 } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
@@ -170,7 +171,7 @@ describe("admin job actions", () => {
     });
   });
 
-  it("releases reserved credits for a failed job idempotently and writes audit once", async () => {
+  it("releases reserved credits idempotently and audits every admin invocation", async () => {
     const creditStore = createInMemoryCreditLedgerStore();
     await grantTrialCredits({
       store: creditStore,
@@ -249,7 +250,7 @@ describe("admin job actions", () => {
       "release",
     ]);
     expect(jobStore.listJobs()[0]?.status).toBe("failed_released");
-    expect(auditStore.listAuditLogs()).toHaveLength(1);
+    expect(auditStore.listAuditLogs()).toHaveLength(2);
     expect(auditStore.listAuditLogs()[0]).toMatchObject({
       action: "job:release_credits",
       targetType: "video_job",
@@ -375,7 +376,7 @@ describe("admin job actions", () => {
           },
         ], [
           { id: reserve.ledger.id, type: "reserve", relatedJobId: jobId },
-          { id: "ledger-capture", type: "capture", relatedJobId: jobId },
+          { id: "ledger-capture", type: "capture", relatedJobId: jobId, metadata: { reservedLedgerId: reserve.ledger.id } },
         ]),
         creditStore: capturedCreditStore,
         auditStore,
@@ -386,43 +387,95 @@ describe("admin job actions", () => {
     ).rejects.toThrow("Video job reserved credits are already resolved.");
   });
 
-  it("reopens a post-QA failed job when a stitched output and QA frames exist", async () => {
-    const jobStore = createInMemoryJobStore([
-      {
-        id: jobId,
-        userId,
-        status: "failed_released",
-        lockedBy: null,
-        lockedUntil: null,
-        attemptCount: 1,
-        lastError: "Post QA provider response is missing boolean passed.",
-      },
-    ]);
-    const actionStore = createInMemoryAdminJobActionStore([
-      {
-        id: jobId,
-        userId,
-        status: "failed_released",
-        creditCost: 70,
-        reservedLedgerId: "ledger-reserve",
-        failureReason: "Post-QA schema error",
-      },
-    ]);
-    const postQaStore = createInMemoryAdminPostQaReopenStore([
-      {
-        id: stitchJobId,
-        videoJobId: jobId,
-        status: "succeeded",
-        finalVideoKey: "jobs/job-1/stitched/final.mp4",
-        coverKey: "jobs/job-1/covers/cover.webp",
-        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
-      },
-    ]);
+  it("releases the current reservation after an earlier reservation was released", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({ store: creditStore, userId, amount: 140, reason: "setup", idempotencyKey: "grant:admin-release-current" });
+    const firstReserve = await reserveCredits({ store: creditStore, userId, amount: 70, reason: "first reserve", idempotencyKey: `reserve:job:${jobId}:first`, relatedJobId: jobId });
+    await releaseReservedCredits({ store: creditStore, userId, amount: 70, reason: "first release", idempotencyKey: `release:job:${jobId}:reserve:${firstReserve.ledger.id}`, relatedJobId: jobId, metadata: { reservedLedgerId: firstReserve.ledger.id } });
+    const currentReserve = await reserveCredits({ store: creditStore, userId, amount: 70, reason: "current reserve", idempotencyKey: `reserve:job:${jobId}:second`, relatedJobId: jobId });
+    const ledgerRecords = creditStore.listLedger().map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      relatedJobId: entry.relatedJobId,
+      metadata: entry.metadata,
+    }));
+
+    const result = await releaseJobCreditsByAdmin({
+      jobStore: createInMemoryJobStore([{ id: jobId, userId, status: "post_qa_failed", lockedBy: null, lockedUntil: null, attemptCount: 2, lastError: "qa failed" }]),
+      actionStore: createInMemoryAdminJobActionStore([{ id: jobId, userId, status: "post_qa_failed", creditCost: 70, reservedLedgerId: currentReserve.ledger.id, failureReason: "qa failed" }], ledgerRecords),
+      creditStore,
+      auditStore: createInMemoryAdminAuditStore(),
+      actor,
+      jobId,
+      reason: "release current retry reservation",
+    });
+
+    expect(result).toMatchObject({ ledgerType: "release", idempotent: false });
+    const releases = creditStore.listLedger().filter((entry) => entry.type === "release");
+    expect(releases).toHaveLength(2);
+    expect(releases[1]?.metadata).toMatchObject({ reservedLedgerId: currentReserve.ledger.id });
+    expect(releases[1]?.reservedAfter).toBe(0);
+  });
+
+  it("atomically reserves credits when reopening a released post-QA job", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 100,
+      reason: "setup",
+      idempotencyKey: "grant:post-qa-reopen",
+    });
+    const oldReserve = await reserveCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "old reserve",
+      idempotencyKey: `reserve:job:${jobId}:old`,
+      relatedJobId: jobId,
+    });
+    await releaseReservedCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "old release",
+      idempotencyKey: `release:job:${jobId}:reserve:${oldReserve.ledger.id}`,
+      relatedJobId: jobId,
+      metadata: { reservedLedgerId: oldReserve.ledger.id },
+    });
+    const postQaStore = createInMemoryAdminPostQaReopenStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "failed_released",
+          creditCost: 70,
+          reservedLedgerId: oldReserve.ledger.id,
+          failureReason: "Post-QA schema error",
+        },
+      ],
+      stitchJobs: [
+        {
+          id: stitchJobId,
+          videoJobId: jobId,
+          status: "succeeded",
+          finalVideoKey: "jobs/job-1/stitched/final.mp4",
+          coverKey: "jobs/job-1/covers/cover.webp",
+          frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+        },
+      ],
+      creditStore,
+    });
     const auditStore = createInMemoryAdminAuditStore();
 
-    const result = await reopenPostQaByAdmin({
-      jobStore,
-      actionStore,
+    const first = await reopenPostQaByAdmin({
+      postQaStore,
+      auditStore,
+      actor,
+      jobId,
+      reason: "retry with fixed Post-QA schema",
+    });
+    const second = await reopenPostQaByAdmin({
       postQaStore,
       auditStore,
       actor,
@@ -430,19 +483,31 @@ describe("admin job actions", () => {
       reason: "retry with fixed Post-QA schema",
     });
 
-    expect(result).toEqual({
+    const newReserve = creditStore
+      .listLedger()
+      .filter((entry) => entry.type === "reserve")[1];
+    expect(first).toEqual({
       jobId,
       status: "post_qa_queued",
       stitchJobId,
       frameCount: 1,
+      reservedLedgerId: newReserve?.id,
+      idempotent: false,
     });
-    expect(jobStore.listJobs()[0]).toMatchObject({
+    expect(second).toEqual({ ...first, idempotent: true });
+    expect(postQaStore.listJobs()[0]).toMatchObject({
       status: "post_qa_queued",
-      lastError: null,
+      reservedLedgerId: newReserve?.id,
+      failureReason: null,
     });
-    expect(actionStore.listJobs()[0]).toMatchObject({
-      failureReason: "",
-    });
+    expect(creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+      "release",
+      "reserve",
+    ]);
+    expect(newReserve?.reservedAfter).toBe(70);
+    expect(auditStore.listAuditLogs()).toHaveLength(2);
     expect(auditStore.listAuditLogs()[0]).toMatchObject({
       action: "job:reopen_post_qa",
       targetType: "video_job",
@@ -450,40 +515,146 @@ describe("admin job actions", () => {
     });
   });
 
+  it("repairs status and audit when a release ledger already exists", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "setup",
+      idempotencyKey: "grant:release-recovery",
+    });
+    const reserve = await reserveCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "reserve",
+      idempotencyKey: `reserve:job:${jobId}:release-recovery`,
+      relatedJobId: jobId,
+    });
+    await releaseReservedCredits({
+      store: creditStore,
+      userId,
+      amount: 70,
+      reason: "release before state update",
+      idempotencyKey: `admin_release:job:${jobId}:reserve:${reserve.ledger.id}`,
+      relatedJobId: jobId,
+      metadata: { reservedLedgerId: reserve.ledger.id },
+    });
+    const ledgerRecords = creditStore.listLedger().map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      relatedJobId: entry.relatedJobId,
+      metadata: entry.metadata,
+    }));
+    const jobStore = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "post_qa_failed",
+        lockedBy: "post-qa-worker",
+        lockedUntil: new Date("2026-08-05T12:00:00.000Z"),
+        attemptCount: 2,
+        lastError: "provider failed",
+      },
+    ]);
+    const auditStore = createInMemoryAdminAuditStore();
+
+    const result = await releaseJobCreditsByAdmin({
+      jobStore,
+      actionStore: createInMemoryAdminJobActionStore(
+        [
+          {
+            id: jobId,
+            userId,
+            status: "post_qa_failed",
+            creditCost: 70,
+            reservedLedgerId: reserve.ledger.id,
+            failureReason: "provider failed",
+          },
+        ],
+        ledgerRecords,
+      ),
+      creditStore,
+      auditStore,
+      actor,
+      jobId,
+      reason: "recover interrupted admin release",
+    });
+
+    expect(result).toMatchObject({ status: "failed_released", idempotent: true });
+    expect(jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      lockedBy: null,
+      lockedUntil: null,
+    });
+    expect(auditStore.listAuditLogs()).toHaveLength(1);
+    expect(creditStore.listLedger().filter((entry) => entry.type === "release")).toHaveLength(1);
+  });
+
+  it("rejects reopening the transient post_qa_failed state", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({ store: creditStore, userId, amount: 100, reason: "setup", idempotencyKey: "grant:post-qa-unresolved" });
+    const reserve = await reserveCredits({ store: creditStore, userId, amount: 70, reason: "active reserve", idempotencyKey: `reserve:job:${jobId}:active`, relatedJobId: jobId });
+    const postQaStore = createInMemoryAdminPostQaReopenStore({
+      jobs: [{ id: jobId, userId, status: "post_qa_failed", creditCost: 70, reservedLedgerId: reserve.ledger.id, failureReason: "provider_schema_error" }],
+      stitchJobs: [{ id: stitchJobId, videoJobId: jobId, status: "succeeded", finalVideoKey: "jobs/job-1/stitched/final.mp4", coverKey: null, frameKeys: ["jobs/job-1/qa/frames/0.jpg"] }],
+      creditStore,
+    });
+
+    await expect(reopenPostQaByAdmin({ postQaStore, auditStore: createInMemoryAdminAuditStore(), actor, jobId, reason: "retry after schema fix" })).rejects.toThrow("Video job is not settled after Post-QA failure.");
+    expect(creditStore.listLedger().filter((entry) => entry.type === "reserve")).toHaveLength(1);
+    expect(postQaStore.listJobs()[0]?.status).toBe("post_qa_failed");
+  });
+
+  it("can recover the audit log after an idempotent reopen replay", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({ store: creditStore, userId, amount: 70, reason: "setup", idempotencyKey: "grant:post-qa-audit-recovery" });
+    const oldReserve = await reserveCredits({ store: creditStore, userId, amount: 70, reason: "old reserve", idempotencyKey: `reserve:job:${jobId}:audit:old`, relatedJobId: jobId });
+    await releaseReservedCredits({ store: creditStore, userId, amount: 70, reason: "old release", idempotencyKey: `release:job:${jobId}:reserve:${oldReserve.ledger.id}`, relatedJobId: jobId, metadata: { reservedLedgerId: oldReserve.ledger.id } });
+    const postQaStore = createInMemoryAdminPostQaReopenStore({
+      jobs: [{ id: jobId, userId, status: "failed_released", creditCost: 70, reservedLedgerId: oldReserve.ledger.id, failureReason: "provider_unavailable" }],
+      stitchJobs: [{ id: stitchJobId, videoJobId: jobId, status: "succeeded", finalVideoKey: "jobs/job-1/stitched/final.mp4", coverKey: null, frameKeys: ["jobs/job-1/qa/frames/0.jpg"] }],
+      creditStore,
+    });
+
+    await expect(reopenPostQaByAdmin({
+      postQaStore,
+      auditStore: { createAuditLog: async () => { throw new Error("audit unavailable"); } },
+      actor,
+      jobId,
+      reason: "retry after provider recovery",
+    })).rejects.toThrow("audit unavailable");
+
+    const recoveredAuditStore = createInMemoryAdminAuditStore();
+    const replay = await reopenPostQaByAdmin({ postQaStore, auditStore: recoveredAuditStore, actor, jobId, reason: "retry after provider recovery" });
+    expect(replay.idempotent).toBe(true);
+    expect(recoveredAuditStore.listAuditLogs()).toHaveLength(1);
+    expect(creditStore.listLedger().filter((entry) => entry.type === "reserve")).toHaveLength(2);
+  });
+
+  it("leaves a released job unchanged when reopen credits are insufficient", async () => {
+    const creditStore = createInMemoryCreditLedgerStore();
+    await grantTrialCredits({ store: creditStore, userId, amount: 70, reason: "setup", idempotencyKey: "grant:post-qa-insufficient" });
+    const oldReserve = await reserveCredits({ store: creditStore, userId, amount: 70, reason: "old reserve", idempotencyKey: `reserve:job:${jobId}:insufficient:old`, relatedJobId: jobId });
+    await releaseReservedCredits({ store: creditStore, userId, amount: 70, reason: "old release", idempotencyKey: `release:job:${jobId}:reserve:${oldReserve.ledger.id}`, relatedJobId: jobId, metadata: { reservedLedgerId: oldReserve.ledger.id } });
+    await reserveCredits({ store: creditStore, userId, amount: 70, reason: "other job", idempotencyKey: "reserve:other-job", relatedJobId: "66666666-6666-4666-8666-666666666666" });
+    const postQaStore = createInMemoryAdminPostQaReopenStore({
+      jobs: [{ id: jobId, userId, status: "failed_released", creditCost: 70, reservedLedgerId: oldReserve.ledger.id, failureReason: "provider_unavailable" }],
+      stitchJobs: [{ id: stitchJobId, videoJobId: jobId, status: "succeeded", finalVideoKey: "jobs/job-1/stitched/final.mp4", coverKey: null, frameKeys: ["jobs/job-1/qa/frames/0.jpg"] }],
+      creditStore,
+    });
+
+    await expect(reopenPostQaByAdmin({ postQaStore, auditStore: createInMemoryAdminAuditStore(), actor, jobId, reason: "retry after provider recovery" })).rejects.toThrow("Insufficient available credits.");
+
+    expect(postQaStore.listJobs()[0]).toMatchObject({ status: "failed_released", reservedLedgerId: oldReserve.ledger.id });
+    expect(creditStore.listLedger().filter((entry) => entry.type === "reserve")).toHaveLength(2);
+  });
+
   it("rejects reopening post qa when reason is too short", async () => {
     await expect(
       reopenPostQaByAdmin({
-        jobStore: createInMemoryJobStore([
-          {
-            id: jobId,
-            userId,
-            status: "failed_released",
-            lockedBy: null,
-            lockedUntil: null,
-            attemptCount: 1,
-            lastError: "Post QA failed",
-          },
-        ]),
-        actionStore: createInMemoryAdminJobActionStore([
-          {
-            id: jobId,
-            userId,
-            status: "failed_released",
-            creditCost: 70,
-            reservedLedgerId: "ledger-reserve",
-            failureReason: "Post-QA failed",
-          },
-        ]),
-        postQaStore: createInMemoryAdminPostQaReopenStore([
-          {
-            id: stitchJobId,
-            videoJobId: jobId,
-            status: "succeeded",
-            finalVideoKey: "jobs/job-1/stitched/final.mp4",
-            coverKey: "jobs/job-1/covers/cover.webp",
-            frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
-          },
-        ]),
+        postQaStore: createInMemoryAdminPostQaReopenStore({ jobs: [], stitchJobs: [], creditStore: createInMemoryCreditLedgerStore() }),
         auditStore: createInMemoryAdminAuditStore(),
         actor,
         jobId,
@@ -493,33 +664,13 @@ describe("admin job actions", () => {
   });
 
   it("rejects post-QA reopen when no successful stitched output exists", async () => {
-    const jobStore = createInMemoryJobStore([
-      {
-        id: jobId,
-        userId,
-        status: "failed_released",
-        lockedBy: null,
-        lockedUntil: null,
-        attemptCount: 1,
-        lastError: "Post QA failed",
-      },
-    ]);
-    const actionStore = createInMemoryAdminJobActionStore([
-      {
-        id: jobId,
-        userId,
-        status: "failed_released",
-        creditCost: 70,
-        reservedLedgerId: "ledger-reserve",
-        failureReason: "Post-QA schema error",
-      },
-    ]);
-
     await expect(
       reopenPostQaByAdmin({
-        jobStore,
-        actionStore,
-        postQaStore: createInMemoryAdminPostQaReopenStore([]),
+        postQaStore: createInMemoryAdminPostQaReopenStore({
+          jobs: [{ id: jobId, userId, status: "failed_released", creditCost: 70, reservedLedgerId: null, failureReason: "Post-QA schema error" }],
+          stitchJobs: [],
+          creditStore: createInMemoryCreditLedgerStore(),
+        }),
         auditStore: createInMemoryAdminAuditStore(),
         actor,
         jobId,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { grantTrialCredits, reserveCredits } from "@/lib/credits/ledger";
 import { createInMemoryCreditLedgerStore } from "@/lib/credits/memory-store";
 import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
+import { VisionProviderRequestError } from "@/lib/providers/vision/client";
 import { createInMemoryJobStore } from "@/server/jobs/state-machine";
 import type { VideoSegmentRecord } from "@/server/storyboard/confirm";
 import { createInMemoryVideoSegmentStore } from "@/server/video/segments";
@@ -331,7 +332,81 @@ describe("runPostQaCheck", () => {
     });
   });
 
-  it("fails closed and releases credits when the vision provider errors", async () => {
+  it("retries provider outages twice before failing closed and releasing credits", async () => {
+    const stores = await createStores();
+    const run = (now: Date) =>
+      runPostQaCheck({
+        ...stores,
+        jobId,
+        userId,
+        mode: "strict",
+        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+        now,
+        createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+        visionProvider: async () => {
+          throw new VisionProviderRequestError({
+            provider: "apimart",
+            model: "gpt-5.4",
+            status: 500,
+          });
+        },
+      });
+
+    const first = await run(new Date("2026-08-05T00:00:00.000Z"));
+    expect(first).toEqual({
+      jobId,
+      status: "post_qa_queued",
+      ledgerType: null,
+      providerRetryAttempt: 1,
+      nextRetryAt: new Date("2026-08-05T00:00:30.000Z"),
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "post_qa_queued",
+      nextRetryAt: new Date("2026-08-05T00:00:30.000Z"),
+      failureReason: "provider_unavailable",
+    });
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
+
+    const second = await run(new Date("2026-08-05T00:00:30.000Z"));
+    expect(second).toEqual({
+      jobId,
+      status: "post_qa_queued",
+      ledgerType: null,
+      providerRetryAttempt: 2,
+      nextRetryAt: new Date("2026-08-05T00:01:30.000Z"),
+    });
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
+
+    const third = await run(new Date("2026-08-05T00:01:30.000Z"));
+    expect(third).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: "release",
+    });
+    expect(stores.jobStore.listJobs()[0]).toMatchObject({
+      status: "failed_released",
+      userVisibleStatus: "failed",
+      failureReason: "provider_unavailable",
+    });
+    expect(stores.postQaStore.listResults()).toHaveLength(3);
+    expect(stores.providerCallLogStore.listCallLogs()).toHaveLength(3);
+    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
+      provider: "apimart",
+      model: "gpt-5.4",
+      purpose: "post_qa",
+      status: "failed",
+      errorCode: "http_500",
+      errorMessage: "Vision provider request failed with status 500.",
+    });
+  });
+
+  it("does not retry a non-retryable provider 4xx response", async () => {
     const stores = await createStores();
 
     const result = await runPostQaCheck({
@@ -342,7 +417,11 @@ describe("runPostQaCheck", () => {
       frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
       createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
       visionProvider: async () => {
-        throw new Error("vision unavailable");
+        throw new VisionProviderRequestError({
+          provider: "apimart",
+          model: "gpt-5.4",
+          status: 400,
+        });
       },
     });
 
@@ -351,19 +430,88 @@ describe("runPostQaCheck", () => {
       status: "failed_released",
       ledgerType: "release",
     });
+    expect(stores.postQaStore.listResults()).toHaveLength(1);
+  });
+
+  it("fails immediately as frame access error when signed URL creation fails", async () => {
+    const stores = await createStores();
+    let providerCalls = 0;
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "strict",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      createSignedUrl: async () => {
+        throw new TypeError("R2 signer unavailable");
+      },
+      visionProvider: async () => {
+        providerCalls += 1;
+        throw new Error("must not call provider");
+      },
+    });
+
+    expect(result).toEqual({
+      jobId,
+      status: "failed_released",
+      ledgerType: "release",
+    });
+    expect(providerCalls).toBe(0);
     expect(stores.jobStore.listJobs()[0]).toMatchObject({
       status: "failed_released",
-      userVisibleStatus: "failed",
-      failureReason: "provider_unavailable",
+      failureReason: "frame_access_error",
     });
-    expect(stores.providerCallLogStore.listCallLogs()[0]).toMatchObject({
-      provider: "vision",
-      model: "unknown",
-      purpose: "post_qa",
-      status: "failed",
-      errorCode: "post_qa_provider_error",
-      errorMessage: "vision unavailable",
+    expect(stores.postQaStore.listResults()).toHaveLength(1);
+    expect(stores.providerCallLogStore.listCallLogs()).toHaveLength(0);
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+      "release",
+    ]);
+  });
+
+  it("does not count provider failures from an earlier reservation", async () => {
+    const stores = await createStores();
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      await stores.postQaStore.createResult({
+        videoJobId: jobId,
+        status: "failed",
+        mode: "strict",
+        frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+        resultJson: {
+          passed: false,
+          retryScopeId: `old-reserve-${attempt}`,
+        },
+        failureCategory: "provider_unavailable",
+      });
+    }
+
+    const result = await runPostQaCheck({
+      ...stores,
+      jobId,
+      userId,
+      mode: "strict",
+      frameKeys: ["jobs/job-1/qa/frames/0.jpg"],
+      now: new Date("2026-08-05T00:00:00.000Z"),
+      createSignedUrl: async ({ key }) => `https://r2.example/${key}`,
+      visionProvider: async () => {
+        throw new VisionProviderRequestError({
+          provider: "apimart",
+          model: "gpt-5.4",
+          status: 500,
+        });
+      },
     });
+
+    expect(result).toMatchObject({
+      status: "post_qa_queued",
+      providerRetryAttempt: 1,
+    });
+    expect(stores.creditStore.listLedger().map((entry) => entry.type)).toEqual([
+      "trial_grant",
+      "reserve",
+    ]);
   });
 
   it("fails closed when stitched output has no QA frames", async () => {

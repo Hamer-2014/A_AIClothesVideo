@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
 import {
@@ -56,9 +56,14 @@ export interface PostQaResultRecord {
 
 export interface PostQaStore {
   findJob(jobId: string): Promise<PostQaJobRecord | null>;
+  findLatestResult(input: {
+    videoJobId: string;
+    status: PostQaStatus;
+  }): Promise<PostQaResultRecord | null>;
   countResults(input: {
     videoJobId: string;
     failureCategory: string;
+    retryScopeId?: string;
   }): Promise<number>;
   createResult(input: {
     videoJobId: string;
@@ -122,33 +127,43 @@ export async function resolvePostQaResult({
     };
   }
 
-  await postQaStore.createResult({
-    videoJobId: jobId,
-    stitchJobId: null,
-    status,
-    mode,
-    frameKeys,
-    resultJson: resultJson ?? null,
-    failureCategory: failureCategory ?? null,
-    isTest: job.isTest === true,
-  });
+  const reservedLedgerId = job.reservedLedgerId;
+  if (job.creditCost > 0 && !reservedLedgerId) {
+    throw new Error("Paid post-QA job has no reserved ledger.");
+  }
 
   const failureMessage = failureCategory ?? "post_qa_failed";
+  const intermediateStatus =
+    status === "passed" ? "post_qa_passed" : "post_qa_failed";
+  const isResumingResolution = currentStatus === intermediateStatus;
 
-  await transitionJobStatus({
-    store: jobStore,
-    jobId,
-    toStatus: status === "passed" ? "post_qa_passed" : "post_qa_failed",
-    reason: status === "passed" ? "post_qa_passed" : "post_qa_failed",
-    errorMessage: status === "failed" ? failureMessage : null,
-    failureReason: status === "failed" ? failureMessage : null,
-    userVisibleStatus: status === "failed" ? "failed" : "quality_checking",
-    eventSnapshot: {
+  if (!isResumingResolution) {
+    await postQaStore.createResult({
+      videoJobId: jobId,
+      stitchJobId: null,
+      status,
       mode,
       frameKeys,
+      resultJson: resultJson ?? null,
       failureCategory: failureCategory ?? null,
-    },
-  });
+      isTest: job.isTest === true,
+    });
+
+    await transitionJobStatus({
+      store: jobStore,
+      jobId,
+      toStatus: intermediateStatus,
+      reason: status === "passed" ? "post_qa_passed" : "post_qa_failed",
+      errorMessage: status === "failed" ? failureMessage : null,
+      failureReason: status === "failed" ? failureMessage : null,
+      userVisibleStatus: status === "failed" ? "failed" : "quality_checking",
+      eventSnapshot: {
+        mode,
+        frameKeys,
+        failureCategory: failureCategory ?? null,
+      },
+    });
+  }
 
   let ledgerType: CreditLedgerType | null = null;
   if (status === "passed") {
@@ -158,9 +173,9 @@ export async function resolvePostQaResult({
         userId: job.userId,
         amount: job.creditCost,
         reason: "capture credits after post QA passed",
-        idempotencyKey: `capture:job:${jobId}`,
+        idempotencyKey: `capture:job:${jobId}:reserve:${reservedLedgerId}`,
         relatedJobId: jobId,
-        metadata: { reservedLedgerId: job.reservedLedgerId },
+        metadata: { reservedLedgerId },
       });
       ledgerType = "capture";
     }
@@ -190,10 +205,10 @@ export async function resolvePostQaResult({
         userId: job.userId,
         amount: job.creditCost,
         reason: "release credits after post QA failed",
-        idempotencyKey: `release:job:${jobId}:post_qa_failed`,
+        idempotencyKey: `release:job:${jobId}:reserve:${reservedLedgerId}`,
         relatedJobId: jobId,
         metadata: {
-          reservedLedgerId: job.reservedLedgerId,
+          reservedLedgerId,
           failureCategory: failureCategory ?? null,
         },
       });
@@ -231,6 +246,75 @@ export async function resolvePostQaResult({
   };
 }
 
+function frameKeysFromResult(value: JsonValue) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+export async function resumePostQaResolution({
+  jobStore = createDrizzleJobStore(),
+  postQaStore,
+  creditStore = createDrizzleCreditLedgerStore(),
+  jobId,
+  funnelEventStore,
+}: {
+  jobStore?: JobStore;
+  postQaStore: PostQaStore;
+  creditStore?: CreditLedgerStore;
+  jobId: string;
+  funnelEventStore?: FunnelEventStore;
+}) {
+  const job = await jobStore.findJob(jobId);
+  if (!job) {
+    throw new Error("Video job not found.");
+  }
+  if (!["post_qa_passed", "post_qa_failed"].includes(job.status)) {
+    throw new Error("Video job has no Post-QA resolution to resume.");
+  }
+
+  const status = job.status === "post_qa_passed" ? "passed" : "failed";
+  const postQaJob = await postQaStore.findJob(jobId);
+  if (!postQaJob) {
+    throw new Error("Video job not found.");
+  }
+  if (postQaJob.creditCost > 0) {
+    if (!postQaJob.reservedLedgerId) {
+      throw new Error("Paid post-QA job has no reserved ledger.");
+    }
+    const settlementType = status === "passed" ? "capture" : "release";
+    const settlement = await creditStore.transaction((tx) =>
+      tx.findLedgerByIdempotencyKey(
+        `${settlementType}:job:${jobId}:reserve:${postQaJob.reservedLedgerId}`,
+      ),
+    );
+    if (!settlement) {
+      throw new Error("Post-QA ledger settlement is incomplete.");
+    }
+  }
+
+  const result = await postQaStore.findLatestResult({
+    videoJobId: jobId,
+    status,
+  });
+  if (!result) {
+    throw new Error("Persisted Post-QA result not found.");
+  }
+
+  return resolvePostQaResult({
+    jobStore,
+    postQaStore,
+    creditStore,
+    jobId,
+    status,
+    mode: result.mode,
+    frameKeys: frameKeysFromResult(result.frameKeys),
+    resultJson: result.resultJson,
+    failureCategory: result.failureCategory,
+    funnelEventStore,
+  });
+}
+
 export function createInMemoryPostQaStore({
   jobs,
 }: {
@@ -246,11 +330,25 @@ export function createInMemoryPostQaStore({
       const job = jobRecords.get(jobId);
       return job ? { ...job } : null;
     },
-    async countResults({ videoJobId, failureCategory }) {
+    async findLatestResult({ videoJobId, status }) {
+      const result = [...results]
+        .reverse()
+        .find(
+          (candidate) =>
+            candidate.videoJobId === videoJobId && candidate.status === status,
+        );
+      return result ? { ...result } : null;
+    },
+    async countResults({ videoJobId, failureCategory, retryScopeId }) {
       return results.filter(
         (result) =>
           result.videoJobId === videoJobId &&
-          result.failureCategory === failureCategory,
+          result.failureCategory === failureCategory &&
+          (retryScopeId === undefined ||
+            (result.resultJson !== null &&
+              typeof result.resultJson === "object" &&
+              !Array.isArray(result.resultJson) &&
+              result.resultJson.retryScopeId === retryScopeId)),
       ).length;
     },
     async createResult(input) {
@@ -303,7 +401,21 @@ export function createDrizzlePostQaStore(db: DbClient = getDb()): PostQaStore {
 
       return (job as PostQaJobRecord | undefined) ?? null;
     },
-    async countResults({ videoJobId, failureCategory }) {
+    async findLatestResult({ videoJobId, status }) {
+      const [result] = await db
+        .select()
+        .from(postQaResults)
+        .where(
+          and(
+            eq(postQaResults.videoJobId, videoJobId),
+            eq(postQaResults.status, status),
+          ),
+        )
+        .orderBy(desc(postQaResults.createdAt))
+        .limit(1);
+      return (result as PostQaResultRecord | undefined) ?? null;
+    },
+    async countResults({ videoJobId, failureCategory, retryScopeId }) {
       const rows = await db
         .select({ id: postQaResults.id })
         .from(postQaResults)
@@ -311,6 +423,9 @@ export function createDrizzlePostQaStore(db: DbClient = getDb()): PostQaStore {
           and(
             eq(postQaResults.videoJobId, videoJobId),
             eq(postQaResults.failureCategory, failureCategory),
+            ...(retryScopeId === undefined
+              ? []
+              : [sql`${postQaResults.resultJson} ->> 'retryScopeId' = ${retryScopeId}`]),
           ),
         );
       return rows.length;

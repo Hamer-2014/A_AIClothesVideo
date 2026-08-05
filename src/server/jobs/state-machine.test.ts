@@ -163,6 +163,47 @@ describe("job state machine", () => {
     });
   });
 
+  it("persists and clears a scheduled retry timestamp", async () => {
+    const nextRetryAt = new Date("2026-08-05T00:01:00.000Z");
+    const store = createInMemoryJobStore([
+      {
+        id: jobId,
+        userId,
+        status: "retrying",
+        lockedBy: "worker-1",
+        lockedUntil: new Date("2026-08-05T00:00:30.000Z"),
+        attemptCount: 1,
+        lastError: "Vision provider failed with status 500.",
+        nextRetryAt: null,
+      },
+    ]);
+
+    const scheduled = await transitionJobStatus({
+      store,
+      jobId,
+      toStatus: "post_qa_queued",
+      reason: "post_qa_provider_retry_scheduled",
+      errorMessage: "Vision provider failed with status 500.",
+      nextRetryAt,
+      clearLock: true,
+    });
+    expect(scheduled).toMatchObject({
+      status: "post_qa_queued",
+      nextRetryAt,
+      lockedBy: null,
+      lockedUntil: null,
+    });
+
+    const running = await transitionJobStatus({
+      store,
+      jobId,
+      toStatus: "post_qa_running",
+      reason: "post_qa_retry_started",
+      nextRetryAt: null,
+    });
+    expect(running.nextRetryAt).toBeNull();
+  });
+
   it("restores the previous job state when event persistence fails", async () => {
     const lockedUntil = new Date("2026-06-10T10:00:00.000Z");
     const baseStore = createInMemoryJobStore([

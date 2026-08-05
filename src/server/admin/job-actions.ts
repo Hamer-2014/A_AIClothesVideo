@@ -1,10 +1,22 @@
 import { and, desc, eq } from "drizzle-orm";
 
-import { releaseReservedCredits } from "@/lib/credits/ledger";
-import { createDrizzleCreditLedgerStore } from "@/lib/credits/drizzle-store";
-import type { CreditLedgerStore, CreditLedgerType } from "@/lib/credits/types";
+import { releaseReservedCredits, reserveCredits } from "@/lib/credits/ledger";
+import {
+  createDrizzleCreditLedgerStore,
+  createDrizzleCreditLedgerStoreForTransaction,
+} from "@/lib/credits/drizzle-store";
+import type {
+  CreditLedgerEntry,
+  CreditLedgerStore,
+  CreditLedgerType,
+} from "@/lib/credits/types";
 import { getDb } from "@/lib/db/client";
-import { creditLedger, stitchJobs, videoJobs } from "@/lib/db/schema";
+import {
+  creditLedger,
+  jobStateEvents,
+  stitchJobs,
+  videoJobs,
+} from "@/lib/db/schema";
 import type { JsonValue } from "@/lib/db/schema/common";
 import { canRolePerformAdminAction, type AdminRole } from "@/server/auth/admin-access";
 import {
@@ -43,6 +55,7 @@ export interface AdminJobActionLedgerRecord {
   id: string;
   type: CreditLedgerType;
   relatedJobId: string | null;
+  metadata?: JsonValue | null;
 }
 
 export interface AdminJobActionStore {
@@ -64,9 +77,18 @@ export interface AdminPostQaReopenStitchRecord {
 }
 
 export interface AdminPostQaReopenStore {
-  findLatestSucceededStitchJob(
-    jobId: string,
-  ): Promise<AdminPostQaReopenStitchRecord | null>;
+  reopen(input: {
+    jobId: string;
+    actorUserId: string;
+    reason: string;
+  }): Promise<{
+    before: AdminJobActionRecord;
+    after: AdminJobActionRecord;
+    stitchJob: AdminPostQaReopenStitchRecord;
+    frameKeys: string[];
+    reservedLedgerId: string | null;
+    idempotent: boolean;
+  }>;
 }
 
 export async function retryVideoSegmentByAdmin({
@@ -163,8 +185,13 @@ const adminReleaseableStatuses = new Set([
 function hasLedgerResolution(
   ledger: AdminJobActionLedgerRecord[],
   types: CreditLedgerType[],
+  reservedLedgerId: string | null,
 ) {
-  return ledger.some((entry) => types.includes(entry.type));
+  return Boolean(reservedLedgerId) && ledger.some(
+    (entry) =>
+      types.includes(entry.type) &&
+      metadataReservedLedgerId(entry.metadata ?? null) === reservedLedgerId,
+  );
 }
 
 export async function releaseJobCreditsByAdmin({
@@ -197,17 +224,8 @@ export async function releaseJobCreditsByAdmin({
   }
 
   const ledger = await actionStore.listLedger(jobId);
-  if (hasLedgerResolution(ledger, ["capture", "refund"])) {
+  if (hasLedgerResolution(ledger, ["capture", "refund"], before.reservedLedgerId)) {
     throw new Error("Video job reserved credits are already resolved.");
-  }
-
-  if (hasLedgerResolution(ledger, ["release"])) {
-    return {
-      jobId,
-      status: before.status === "failed_released" ? before.status : "failed_released",
-      ledgerType: "release" as CreditLedgerType,
-      idempotent: true,
-    };
   }
 
   if (!before.reservedLedgerId) {
@@ -220,31 +238,30 @@ export async function releaseJobCreditsByAdmin({
     throw new Error("Video job credits cannot be released in this state.");
   }
 
-  const releaseResult = await releaseReservedCredits({
-    store: creditStore,
-    userId: before.userId,
-    amount: before.creditCost,
-    reason: normalizedReason,
-    idempotencyKey: `admin_release:job:${jobId}`,
-    relatedJobId: jobId,
-    metadata: {
-      actorUserId: actor.userId,
-      actorEmail: actor.email,
-      reservedLedgerId: before.reservedLedgerId,
-    },
-  });
-
-  if (releaseResult.idempotent) {
-    return {
-      jobId,
-      status: "failed_released" as const,
-      ledgerType: "release" as CreditLedgerType,
-      idempotent: true,
-    };
-  }
+  const existingRelease = ledger.find(
+    (entry) =>
+      entry.type === "release" &&
+      metadataReservedLedgerId(entry.metadata ?? null) === before.reservedLedgerId,
+  );
+  const releaseResult = existingRelease
+    ? { ledger: existingRelease, idempotent: true }
+    : await releaseReservedCredits({
+        store: creditStore,
+        userId: before.userId,
+        amount: before.creditCost,
+        reason: normalizedReason,
+        idempotencyKey: `admin_release:job:${jobId}:reserve:${before.reservedLedgerId}`,
+        relatedJobId: jobId,
+        metadata: {
+          actorUserId: actor.userId,
+          actorEmail: actor.email,
+          reservedLedgerId: before.reservedLedgerId,
+        },
+      });
 
   let after: AdminJobActionRecord = before;
-  if (before.status !== "failed_released") {
+  const currentJob = await jobStore.findJob(jobId);
+  if ((currentJob?.status ?? before.status) !== "failed_released") {
     await transitionJobStatus({
       store: jobStore,
       jobId,
@@ -296,9 +313,33 @@ function frameKeysFrom(value: JsonValue) {
     : [];
 }
 
+function metadataReservedLedgerId(value: JsonValue | null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return typeof value.reservedLedgerId === "string"
+    ? value.reservedLedgerId
+    : null;
+}
+
+function reservationIsResolved(
+  ledger: CreditLedgerEntry[],
+  reservedLedgerId: string,
+) {
+  return ledger.some(
+    (entry) =>
+      ["capture", "release", "refund"].includes(entry.type) &&
+      metadataReservedLedgerId(entry.metadata) === reservedLedgerId,
+  );
+}
+
+function isReopenReservation(entry: CreditLedgerEntry | undefined, jobId: string) {
+  return entry?.type === "reserve" &&
+    entry.idempotencyKey.startsWith(`reserve:job:${jobId}:post_qa_reopen:`);
+}
+
 export async function reopenPostQaByAdmin({
-  jobStore = createDrizzleJobStore(),
-  actionStore,
   postQaStore,
   auditStore,
   actor,
@@ -306,8 +347,6 @@ export async function reopenPostQaByAdmin({
   reason,
   requestMeta,
 }: {
-  jobStore?: JobStore;
-  actionStore: AdminJobActionStore;
   postQaStore: AdminPostQaReopenStore;
   auditStore: AdminAuditStore;
   actor: AdminJobActionActor;
@@ -320,49 +359,11 @@ export async function reopenPostQaByAdmin({
   }
 
   const normalizedReason = normalizeAdminReason(reason);
-
-  const before = await actionStore.findJob(jobId);
-  if (!before) {
-    throw new Error("Video job not found.");
-  }
-
-  if (!["post_qa_failed", "failed_released", "failed_refunded"].includes(before.status)) {
-    throw new Error("Video job is not failed in Post-QA.");
-  }
-
-  const stitchJob = await postQaStore.findLatestSucceededStitchJob(jobId);
-  const frameKeys = frameKeysFrom(stitchJob?.frameKeys ?? []);
-  if (!stitchJob?.finalVideoKey || frameKeys.length === 0) {
-    throw new Error("Successful stitch output is required to reopen Post-QA.");
-  }
-
-  await actionStore.updateFailureReason({ jobId, failureReason: "" });
-  await transitionJobStatus({
-    store: jobStore,
+  const reopened = await postQaStore.reopen({
     jobId,
-    toStatus: "retrying",
-    reason: "admin_reopen_post_qa",
-    actorType: "admin",
-    actorId: actor.userId,
-    errorMessage: null,
-    failureReason: null,
-    eventSnapshot: { reason: normalizedReason, stitchJobId: stitchJob.id },
+    actorUserId: actor.userId,
+    reason: normalizedReason,
   });
-  await transitionJobStatus({
-    store: jobStore,
-    jobId,
-    toStatus: "post_qa_queued",
-    reason: "admin_reopen_post_qa_requeued",
-    actorType: "admin",
-    actorId: actor.userId,
-    clearLock: true,
-    eventSnapshot: {
-      stitchJobId: stitchJob.id,
-      finalVideoKey: stitchJob.finalVideoKey,
-      frameKeys,
-    },
-  });
-  const after = await actionStore.findJob(jobId);
   await writeAdminAuditLog({
     store: auditStore,
     actor,
@@ -370,16 +371,21 @@ export async function reopenPostQaByAdmin({
     targetType: "video_job",
     targetId: jobId,
     reason: normalizedReason,
-    beforeSnapshot: toAuditSnapshot(before),
-    afterSnapshot: toAuditSnapshot(after),
+    beforeSnapshot: toAuditSnapshot(reopened.before),
+    afterSnapshot: toAuditSnapshot({
+      ...reopened.after,
+      idempotent: reopened.idempotent,
+    }),
     requestMeta,
   });
 
   return {
     jobId,
     status: "post_qa_queued" as const,
-    stitchJobId: stitchJob.id,
-    frameCount: frameKeys.length,
+    stitchJobId: reopened.stitchJob.id,
+    frameCount: reopened.frameKeys.length,
+    reservedLedgerId: reopened.reservedLedgerId,
+    idempotent: reopened.idempotent,
   };
 }
 
@@ -416,17 +422,93 @@ export function createInMemoryAdminJobActionStore(
 }
 
 export function createInMemoryAdminPostQaReopenStore(
-  stitchJobRecords: AdminPostQaReopenStitchRecord[],
-): AdminPostQaReopenStore {
-  const records = stitchJobRecords.map((record) => ({ ...record }));
+  input: {
+    jobs: AdminJobActionRecord[];
+    stitchJobs: AdminPostQaReopenStitchRecord[];
+    creditStore: CreditLedgerStore & { listLedger: () => CreditLedgerEntry[] };
+  },
+): AdminPostQaReopenStore & { listJobs: () => AdminJobActionRecord[] } {
+  const jobs = new Map(input.jobs.map((job) => [job.id, { ...job }]));
+  const stitchJobRecords = input.stitchJobs.map((record) => ({ ...record }));
 
   return {
-    async findLatestSucceededStitchJob(jobId) {
-      return (
-        records.find(
-          (record) => record.videoJobId === jobId && record.status === "succeeded",
-        ) ?? null
+    async reopen({ jobId, actorUserId, reason }) {
+      const before = jobs.get(jobId);
+      if (!before) {
+        throw new Error("Video job not found.");
+      }
+      const stitchJob = stitchJobRecords.find(
+        (record) => record.videoJobId === jobId && record.status === "succeeded",
       );
+      const frameKeys = frameKeysFrom(stitchJob?.frameKeys ?? []);
+      if (!stitchJob?.finalVideoKey || frameKeys.length === 0) {
+        throw new Error("Successful stitch output is required to reopen Post-QA.");
+      }
+
+      const ledger = input.creditStore.listLedger();
+      const currentReserve = ledger.find(
+        (entry) => entry.id === before.reservedLedgerId && entry.type === "reserve",
+      );
+      const currentReservationResolved = currentReserve
+        ? reservationIsResolved(ledger, currentReserve.id)
+        : true;
+      if (
+        before.status === "post_qa_queued" &&
+        currentReserve &&
+        isReopenReservation(currentReserve, jobId) &&
+        !currentReservationResolved
+      ) {
+        return {
+          before: { ...before },
+          after: { ...before },
+          stitchJob: { ...stitchJob },
+          frameKeys,
+          reservedLedgerId: currentReserve.id,
+          idempotent: true,
+        };
+      }
+      if (before.status === "post_qa_failed") {
+        throw new Error("Video job is not settled after Post-QA failure.");
+      }
+      if (!["failed_released", "failed_refunded"].includes(before.status)) {
+        throw new Error("Video job is not failed in Post-QA.");
+      }
+
+      let reservedLedgerId = currentReserve?.id ?? null;
+      if (before.creditCost > 0 && (!currentReserve || currentReservationResolved)) {
+        const reserveResult = await reserveCredits({
+          store: input.creditStore,
+          userId: before.userId,
+          amount: before.creditCost,
+          reason,
+          idempotencyKey: `reserve:job:${jobId}:post_qa_reopen:${currentReserve?.id ?? "none"}`,
+          relatedJobId: jobId,
+          metadata: {
+            actorUserId,
+            priorReservedLedgerId: currentReserve?.id ?? null,
+          },
+        });
+        reservedLedgerId = reserveResult.ledger.id;
+      }
+
+      const after: AdminJobActionRecord = {
+        ...before,
+        status: "post_qa_queued",
+        reservedLedgerId,
+        failureReason: null,
+      };
+      jobs.set(jobId, after);
+      return {
+        before: { ...before },
+        after: { ...after },
+        stitchJob: { ...stitchJob },
+        frameKeys,
+        reservedLedgerId,
+        idempotent: false,
+      };
+    },
+    listJobs() {
+      return Array.from(jobs.values()).map((job) => ({ ...job }));
     },
   };
 }
@@ -479,6 +561,7 @@ export function createDrizzleAdminJobActionStore(
           id: creditLedger.id,
           type: creditLedger.type,
           relatedJobId: creditLedger.relatedJobId,
+          metadata: creditLedger.metadata,
         })
         .from(creditLedger)
         .where(eq(creditLedger.relatedJobId, jobId));
@@ -490,24 +573,159 @@ export function createDrizzleAdminPostQaReopenStore(
   db: DbClient = getDb(),
 ): AdminPostQaReopenStore {
   return {
-    async findLatestSucceededStitchJob(jobId) {
-      const [record] = await db
-        .select({
-          id: stitchJobs.id,
-          videoJobId: stitchJobs.videoJobId,
-          status: stitchJobs.status,
-          finalVideoKey: stitchJobs.finalVideoKey,
-          coverKey: stitchJobs.coverKey,
-          frameKeys: stitchJobs.frameKeys,
-        })
-        .from(stitchJobs)
-        .where(
-          and(eq(stitchJobs.videoJobId, jobId), eq(stitchJobs.status, "succeeded")),
-        )
-        .orderBy(desc(stitchJobs.createdAt))
-        .limit(1);
+    async reopen({ jobId, actorUserId, reason }) {
+      return db.transaction(async (tx) => {
+        const [job] = await tx
+          .select({
+            id: videoJobs.id,
+            userId: videoJobs.userId,
+            status: videoJobs.status,
+            creditCost: videoJobs.creditCost,
+            reservedLedgerId: videoJobs.reservedLedgerId,
+            failureReason: videoJobs.failureReason,
+          })
+          .from(videoJobs)
+          .where(eq(videoJobs.id, jobId))
+          .limit(1)
+          .for("update");
+        if (!job) {
+          throw new Error("Video job not found.");
+        }
 
-      return (record as AdminPostQaReopenStitchRecord | undefined) ?? null;
+        const [stitchJob] = await tx
+          .select({
+            id: stitchJobs.id,
+            videoJobId: stitchJobs.videoJobId,
+            status: stitchJobs.status,
+            finalVideoKey: stitchJobs.finalVideoKey,
+            coverKey: stitchJobs.coverKey,
+            frameKeys: stitchJobs.frameKeys,
+          })
+          .from(stitchJobs)
+          .where(
+            and(eq(stitchJobs.videoJobId, jobId), eq(stitchJobs.status, "succeeded")),
+          )
+          .orderBy(desc(stitchJobs.createdAt))
+          .limit(1);
+        const frameKeys = frameKeysFrom(stitchJob?.frameKeys ?? []);
+        if (!stitchJob?.finalVideoKey || frameKeys.length === 0) {
+          throw new Error("Successful stitch output is required to reopen Post-QA.");
+        }
+
+        const ledger = (await tx
+          .select()
+          .from(creditLedger)
+          .where(eq(creditLedger.relatedJobId, jobId))) as CreditLedgerEntry[];
+        const currentReserve = ledger.find(
+          (entry) => entry.id === job.reservedLedgerId && entry.type === "reserve",
+        );
+        const currentReservationResolved = currentReserve
+          ? reservationIsResolved(ledger, currentReserve.id)
+          : true;
+        const before = job as AdminJobActionRecord;
+        if (
+          job.status === "post_qa_queued" &&
+          currentReserve &&
+          isReopenReservation(currentReserve, jobId) &&
+          !currentReservationResolved
+        ) {
+          return {
+            before,
+            after: before,
+            stitchJob: stitchJob as AdminPostQaReopenStitchRecord,
+            frameKeys,
+            reservedLedgerId: currentReserve.id,
+            idempotent: true,
+          };
+        }
+        if (job.status === "post_qa_failed") {
+          throw new Error("Video job is not settled after Post-QA failure.");
+        }
+        if (!["failed_released", "failed_refunded"].includes(job.status)) {
+          throw new Error("Video job is not failed in Post-QA.");
+        }
+
+        let reservedLedgerId = currentReserve?.id ?? null;
+        if (job.creditCost > 0 && (!currentReserve || currentReservationResolved)) {
+          const reserveResult = await reserveCredits({
+            store: createDrizzleCreditLedgerStoreForTransaction(tx),
+            userId: job.userId,
+            amount: job.creditCost,
+            reason,
+            idempotencyKey: `reserve:job:${jobId}:post_qa_reopen:${currentReserve?.id ?? "none"}`,
+            relatedJobId: jobId,
+            metadata: {
+              actorUserId,
+              priorReservedLedgerId: currentReserve?.id ?? null,
+            },
+          });
+          reservedLedgerId = reserveResult.ledger.id;
+        }
+
+        const [after] = await tx
+          .update(videoJobs)
+          .set({
+            status: "post_qa_queued",
+            userVisibleStatus: "quality_checking",
+            reservedLedgerId,
+            failureReason: null,
+            lastError: null,
+            lockedBy: null,
+            lockedUntil: null,
+            nextRetryAt: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(videoJobs.id, jobId), eq(videoJobs.status, job.status)))
+          .returning({
+            id: videoJobs.id,
+            userId: videoJobs.userId,
+            status: videoJobs.status,
+            creditCost: videoJobs.creditCost,
+            reservedLedgerId: videoJobs.reservedLedgerId,
+            failureReason: videoJobs.failureReason,
+          });
+        if (!after) {
+          throw new Error("Video job changed while reopening Post-QA.");
+        }
+
+        await tx.insert(jobStateEvents).values([
+          {
+            videoJobId: jobId,
+            fromStatus: job.status,
+            toStatus: "retrying",
+            reason: "admin_reopen_post_qa",
+            actorType: "admin",
+            actorId: actorUserId,
+            eventSnapshot: {
+              reason,
+              stitchJobId: stitchJob.id,
+              reservedLedgerId,
+            },
+          },
+          {
+            videoJobId: jobId,
+            fromStatus: "retrying",
+            toStatus: "post_qa_queued",
+            reason: "admin_reopen_post_qa_requeued",
+            actorType: "admin",
+            actorId: actorUserId,
+            eventSnapshot: {
+              stitchJobId: stitchJob.id,
+              frameCount: frameKeys.length,
+              reservedLedgerId,
+            },
+          },
+        ]);
+
+        return {
+          before,
+          after: after as AdminJobActionRecord,
+          stitchJob: stitchJob as AdminPostQaReopenStitchRecord,
+          frameKeys,
+          reservedLedgerId,
+          idempotent: false,
+        };
+      });
     },
   };
 }

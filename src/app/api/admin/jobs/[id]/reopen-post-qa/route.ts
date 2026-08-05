@@ -5,7 +5,6 @@ import {
   type AdminSession,
 } from "@/server/auth/admin-session";
 import {
-  createDrizzleAdminJobActionStore,
   createDrizzleAdminPostQaReopenStore,
   reopenPostQaByAdmin,
 } from "@/server/admin/job-actions";
@@ -48,7 +47,6 @@ function defaultReopenPostQa({
   reason: string;
 }) {
   return reopenPostQaByAdmin({
-    actionStore: createDrizzleAdminJobActionStore(),
     postQaStore: createDrizzleAdminPostQaReopenStore(),
     auditStore: createDrizzleAdminAuditStore(),
     actor: admin,
@@ -111,7 +109,24 @@ export async function handleReopenPostQaRequest(
         { status: 409 },
       );
     }
-
+    if (
+      error instanceof Error &&
+      error.message === "Insufficient available credits."
+    ) {
+      return NextResponse.json(
+        { error: "insufficient_credits" },
+        { status: 409 },
+      );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Video job is not settled after Post-QA failure."
+    ) {
+      return NextResponse.json(
+        { error: "post_qa_not_settled" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: "reopen_post_qa_failed" },
       { status: 500 },

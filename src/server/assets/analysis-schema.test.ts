@@ -185,6 +185,64 @@ describe("asset analysis schema", () => {
     expect(result.assetRole).toBe("front");
   });
 
+  it("preserves declared view roles for generic product labels", () => {
+    const cases = [
+      ["catalog product image", "side"],
+      ["fashion product image", "back"],
+      ["product_photo", "side"],
+    ] as const;
+
+    for (const [assetRole, declaredRole] of cases) {
+      const result = parseAssetAnalysisJson(
+        {
+          asset_role: assetRole,
+          garment_category: "dress",
+          view_angle: `${declaredRole} view`,
+          human_present: "yes",
+          subject_kind: "human_model",
+          visible_details: [`${declaredRole} silhouette`],
+          not_visible_details: [],
+          quality: {
+            is_garment: true,
+            is_clear: true,
+            is_safe: true,
+            has_flat_lay_or_white_background: true,
+          },
+          confidence: "high",
+          risk_flags: [],
+        },
+        { declaredRole },
+      );
+
+      expect(result.assetRole).toBe(declaredRole);
+    }
+  });
+
+  it("keeps explicit provider view directions over a conflicting declared role", () => {
+    const result = parseAssetAnalysisJson(
+      {
+        asset_role: "front-facing product image",
+        garment_category: "dress",
+        view_angle: "front view",
+        human_present: "yes",
+        subject_kind: "human_model",
+        visible_details: ["front silhouette"],
+        not_visible_details: [],
+        quality: {
+          is_garment: true,
+          is_clear: true,
+          is_safe: true,
+          has_flat_lay_or_white_background: true,
+        },
+        confidence: "high",
+        risk_flags: [],
+      },
+      { declaredRole: "back" },
+    );
+
+    expect(result.assetRole).toBe("front");
+  });
+
   it("normalizes newly observed APIMart asset_role variants into front", () => {
     const variants = [
       "primary",
@@ -194,6 +252,7 @@ describe("asset analysis schema", () => {
       "main_product",
       "clothing_product_photo",
       "clothing_item",
+      "apparel product image",
       "garment_on_mannequin",
       "product_photo",
       "front-facing product shot on mannequin",

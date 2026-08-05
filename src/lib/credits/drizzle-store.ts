@@ -73,6 +73,16 @@ function createTransactionAdapter(tx: TransactionClient): CreditLedgerTransactio
   };
 }
 
+export function createDrizzleCreditLedgerStoreForTransaction(
+  tx: TransactionClient,
+): CreditLedgerStore {
+  return {
+    async transaction(callback) {
+      return callback(createTransactionAdapter(tx));
+    },
+  };
+}
+
 export function createDrizzleCreditLedgerStore(
   db: DbClient = getDb(),
 ): CreditLedgerStore {

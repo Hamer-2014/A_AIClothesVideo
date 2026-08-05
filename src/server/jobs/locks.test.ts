@@ -98,4 +98,42 @@ describe("job locks", () => {
     });
     expect(job?.lockedUntil?.toISOString()).toBe("2026-06-07T00:04:00.000Z");
   });
+
+  it("does not lock a queued job until nextRetryAt is due", async () => {
+    const now = new Date("2026-08-05T00:00:00.000Z");
+    const store = createInMemoryJobLockStore([
+      {
+        id: "job-retrying",
+        userId,
+        status: "post_qa_queued",
+        lockedBy: null,
+        lockedUntil: null,
+        attemptCount: 1,
+        lastError: "Vision provider failed with status 500.",
+        nextRetryAt: new Date("2026-08-05T00:01:00.000Z"),
+        createdAt: new Date("2026-08-04T23:59:00.000Z"),
+      },
+    ]);
+
+    await expect(
+      acquireNextJobLock({
+        store,
+        workerId: "worker-1",
+        eligibleStatuses: ["post_qa_queued"],
+        now,
+      }),
+    ).resolves.toBeNull();
+
+    await expect(
+      acquireNextJobLock({
+        store,
+        workerId: "worker-1",
+        eligibleStatuses: ["post_qa_queued"],
+        now: new Date("2026-08-05T00:01:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      id: "job-retrying",
+      attemptCount: 2,
+    });
+  });
 });

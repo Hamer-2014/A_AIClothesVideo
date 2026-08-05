@@ -6,6 +6,7 @@ import {
 } from "@/lib/providers/log-call";
 import {
   createVisionPostQaCheck,
+  VisionProviderRequestError,
   type VisionAnalysisMode,
 } from "@/lib/providers/vision/client";
 import { createDownloadSignedUrl } from "@/lib/storage/presign";
@@ -216,6 +217,28 @@ type PostQaBatchResult = {
   qaJson: JsonValue;
 };
 
+const POST_QA_PROVIDER_MAX_ATTEMPTS = 3;
+const POST_QA_PROVIDER_RETRY_BASE_MS = 30_000;
+
+function providerRetryAt(now: Date, previousFailureCount: number) {
+  return new Date(
+    now.getTime() +
+      POST_QA_PROVIDER_RETRY_BASE_MS * 2 ** previousFailureCount,
+  );
+}
+
+function isRetryableProviderError(error: unknown) {
+  if (error instanceof VisionProviderRequestError) {
+    return (
+      ["network_error", "timeout"].includes(error.code) ||
+      error.status === 429 ||
+      (error.status !== undefined && error.status >= 500)
+    );
+  }
+
+  return false;
+}
+
 async function analyzeBatch({
   batch,
   mode,
@@ -246,24 +269,40 @@ async function analyzeBatch({
     humanTurnReview: qaRequirements.length > 0,
   } as unknown as JsonValue;
 
-  let visionResult: PostQaVisionResult;
+  let frameUrls: string[];
   try {
-    const frameUrls = await Promise.all(
+    frameUrls = await Promise.all(
       batch.frameKeys.map((key) => createSignedUrl({ key })),
     );
+  } catch (error) {
+    return {
+      batchId: batch.batchId,
+      kind: batch.kind,
+      segmentIndex: batch.segmentIndex,
+      frameLocations: batch.frameLocations,
+      passed: false,
+      failureCategory: "frame_access_error",
+      qaJson: { passed: false, error: errorMessage(error) },
+    };
+  }
+
+  let visionResult: PostQaVisionResult;
+  try {
     visionResult = await visionProvider({ mode, frameUrls, qaRequirements });
   } catch (error) {
     const message = errorMessage(error);
+    const requestError =
+      error instanceof VisionProviderRequestError ? error : null;
     await providerCallLogStore.createCallLog({
-      provider: "vision",
-      model: "unknown",
+      provider: requestError?.provider ?? "vision",
+      model: requestError?.model ?? "unknown",
       purpose: "post_qa",
       userId,
       videoJobId: jobId,
       requestSnapshot,
       durationMs: Date.now() - startedAt,
       status: "failed",
-      errorCode: "post_qa_provider_error",
+      errorCode: requestError?.code ?? "post_qa_provider_error",
       errorMessage: message,
     });
     return {
@@ -272,7 +311,9 @@ async function analyzeBatch({
       segmentIndex: batch.segmentIndex,
       frameLocations: batch.frameLocations,
       passed: false,
-      failureCategory: "provider_unavailable",
+      failureCategory: isRetryableProviderError(error)
+        ? "provider_unavailable"
+        : "provider_request_error",
       qaJson: { passed: false, error: message },
     };
   }
@@ -341,6 +382,7 @@ export async function runPostQaCheck({
   createSignedUrl = ({ key }) => createDownloadSignedUrl({ key }),
   visionProvider = defaultPostQaVisionProvider,
   selectedTemplateIds = [],
+  now = new Date(),
 }: {
   jobStore?: JobStore;
   postQaStore?: PostQaStore;
@@ -354,6 +396,7 @@ export async function runPostQaCheck({
   createSignedUrl?: (input: { key: string }) => Promise<string>;
   visionProvider?: PostQaVisionProvider;
   selectedTemplateIds?: string[];
+  now?: Date;
 }) {
   const hasHumanTurn = selectedTemplateIds.some((templateId) =>
     ["model_quarter_turn", "model_half_turn"].includes(templateId),
@@ -374,6 +417,7 @@ export async function runPostQaCheck({
         jobId,
         toStatus: "post_qa_running",
         reason: "post_qa_started",
+        nextRetryAt: null,
         eventSnapshot: { mode, frameCount: 0 },
       });
     }
@@ -398,6 +442,7 @@ export async function runPostQaCheck({
       jobId,
       toStatus: "post_qa_running",
       reason: "post_qa_started",
+      nextRetryAt: null,
       eventSnapshot: { mode, frameCount: frameKeys.length },
     });
   }
@@ -439,6 +484,84 @@ export async function runPostQaCheck({
     failedSegmentIndexes,
     failedTransitionLocations,
   } as unknown as JsonValue;
+
+  const failedBatches = batchResults.filter((batch) => !batch.passed);
+  const isProviderOnlyFailure =
+    failedBatches.length > 0 &&
+    failedBatches.every(
+      (batch) => batch.failureCategory === "provider_unavailable",
+    );
+  if (isProviderOnlyFailure) {
+    const retryJob = await postQaStore.findJob(jobId);
+    const retryScopeId = retryJob?.reservedLedgerId ?? "unreserved";
+    const previousFailureCount = await postQaStore.countResults({
+      videoJobId: jobId,
+      failureCategory: "provider_unavailable",
+      retryScopeId,
+    });
+    if (previousFailureCount < POST_QA_PROVIDER_MAX_ATTEMPTS - 1) {
+      const nextRetryAt = providerRetryAt(now, previousFailureCount);
+      const retryResultJson = {
+        ...(resultJson as Record<string, JsonValue>),
+        retryScopeId,
+      } as JsonValue;
+      await postQaStore.createResult({
+        videoJobId: jobId,
+        stitchJobId: null,
+        status: "failed",
+        mode,
+        frameKeys,
+        resultJson: retryResultJson,
+        failureCategory: "provider_unavailable",
+        isTest: retryJob?.isTest === true,
+      });
+      await transitionJobStatus({
+        store: jobStore,
+        jobId,
+        toStatus: "post_qa_failed",
+        reason: "post_qa_provider_unavailable",
+        errorMessage: "provider_unavailable",
+        failureReason: "provider_unavailable",
+        userVisibleStatus: "quality_checking",
+        eventSnapshot: {
+          providerRetryAttempt: previousFailureCount + 1,
+          nextRetryAt: nextRetryAt.toISOString(),
+        },
+      });
+      await transitionJobStatus({
+        store: jobStore,
+        jobId,
+        toStatus: "retrying",
+        reason: "post_qa_provider_retrying",
+        errorMessage: "provider_unavailable",
+        failureReason: "provider_unavailable",
+        userVisibleStatus: "quality_checking",
+      });
+      await transitionJobStatus({
+        store: jobStore,
+        jobId,
+        toStatus: "post_qa_queued",
+        reason: "post_qa_provider_retry_scheduled",
+        errorMessage: "provider_unavailable",
+        failureReason: "provider_unavailable",
+        userVisibleStatus: "quality_checking",
+        nextRetryAt,
+        clearLock: true,
+        eventSnapshot: {
+          providerRetryAttempt: previousFailureCount + 1,
+          nextRetryAt: nextRetryAt.toISOString(),
+        },
+      });
+
+      return {
+        jobId,
+        status: "post_qa_queued" as const,
+        ledgerType: null,
+        providerRetryAttempt: previousFailureCount + 1,
+        nextRetryAt,
+      };
+    }
+  }
 
   const isLocalizedSingleSegmentFailure =
     (frameKeys.length === 24 || frameKeys.length === 34) &&

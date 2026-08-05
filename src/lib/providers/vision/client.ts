@@ -9,6 +9,24 @@ export class VisionProviderUnavailableError extends Error {
   }
 }
 
+export class VisionProviderRequestError extends Error {
+  readonly code: string;
+  readonly status?: number;
+  readonly provider: string;
+  readonly model: string;
+
+  constructor(input: { provider: string; model: string; status?: number; code?: string }) {
+    super(input.status === undefined
+      ? "Vision provider request failed."
+      : `Vision provider request failed with status ${input.status}.`);
+    this.name = "VisionProviderRequestError";
+    this.provider = input.provider;
+    this.model = input.model;
+    this.status = input.status;
+    this.code = input.code ?? (input.status === undefined ? "provider_error" : `http_${input.status}`);
+  }
+}
+
 export interface VisionConfig {
   provider: string;
   apiKey: string;
@@ -74,6 +92,7 @@ interface VisionClientDeps {
 }
 
 const virtualTryOnQaTimeoutMs = 45_000;
+const postQaTimeoutMs = 45_000;
 
 const supportedProviders = ["openai", "apimart", "evolink", "custom"] as const;
 const systemInstruction =
@@ -174,6 +193,55 @@ const postQaJsonSchema = {
       items: { type: "string" },
     },
     summary: { type: "string" },
+  },
+} as const;
+const virtualTryOnViewQaJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "targetView", "garment", "person", "inventedDetails", "evidence"],
+  properties: {
+    verdict: { enum: ["pass", "fail", "unknown"] },
+    targetView: { enum: ["front", "side", "back"] },
+    garment: {
+      type: "object",
+      additionalProperties: false,
+      required: ["silhouette", "color", "pattern", "visibleDetails"],
+      properties: {
+        silhouette: { enum: ["match", "mismatch", "unknown"] },
+        color: { enum: ["match", "mismatch", "unknown"] },
+        pattern: { enum: ["match", "mismatch", "unknown"] },
+        visibleDetails: { enum: ["match", "mismatch", "unknown"] },
+      },
+    },
+    person: {
+      type: "object",
+      additionalProperties: false,
+      required: ["anatomy", "identityConsistency"],
+      properties: {
+        anatomy: { enum: ["natural", "abnormal", "unknown"] },
+        identityConsistency: { enum: ["match", "mismatch", "unknown"] },
+      },
+    },
+    inventedDetails: { type: "boolean" },
+    evidence: { type: "array", items: { type: "string" } },
+  },
+} as const;
+const virtualTryOnCrossQaJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "requiredViews", "coverage", "garmentConsistency", "personConsistency", "evidence"],
+  properties: {
+    verdict: { enum: ["pass", "fail", "unknown"] },
+    requiredViews: {
+      type: "array",
+      items: { enum: ["front", "side", "back"] },
+      minItems: 3,
+      maxItems: 3,
+    },
+    coverage: { enum: ["complete", "incomplete", "unknown"] },
+    garmentConsistency: { enum: ["match", "mismatch", "unknown"] },
+    personConsistency: { enum: ["match", "mismatch", "unknown"] },
+    evidence: { type: "array", items: { type: "string" } },
   },
 } as const;
 const consistencyJsonSchema = {
@@ -464,19 +532,36 @@ export async function createVisionPostQaCheck(
         messages: chatMessages(input.frameUrls, instruction),
       };
 
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const raw = asRecord(await response.json());
-
-  if (!response.ok) {
-    throw new Error(`Vision provider failed with status ${response.status}.`);
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(postQaTimeoutMs),
+    });
+  } catch (error) {
+    const code =
+      error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
+        ? "timeout"
+        : "network_error";
+    throw new VisionProviderRequestError({
+      provider: config.provider,
+      model: config.model,
+      code,
+    });
   }
+  if (!response.ok) {
+    throw new VisionProviderRequestError({
+      provider: config.provider,
+      model: config.model,
+      status: response.status,
+    });
+  }
+  const raw = asRecord(await response.json());
 
   const qaJson = responsesApi
     ? parseResponsesOutput(raw)
@@ -500,12 +585,21 @@ export async function createVisionVirtualTryOnQa(
   const url = responsesApi ? config.baseUrl : `${config.baseUrl}/chat/completions`;
   const target = input.kind === "view" ? `target view ${input.targetView ?? "unknown"}` : `required views ${(input.requiredViews ?? []).join(", ")}`;
   const instruction = `Perform strict virtual try-on ${input.kind} QA for ${target}. Return JSON only. A view result must contain verdict, targetView, garment {silhouette,color,pattern,visibleDetails}, person {anatomy,identityConsistency}, inventedDetails, evidence. A cross result must contain verdict, requiredViews, coverage, garmentConsistency, personConsistency, evidence. For a view request, images are ordered as platform model reference for the target view, garment front, optional garment back, optional garment detail, then generated target view. Compare identityConsistency only between the generated image and the first platform model reference. Compare garment fields only against the garment reference images. Use unknown whenever evidence is insufficient. Requirements: ${input.requirements.join("; ")}.`;
+  const responseSchema = input.kind === "view"
+    ? { name: "virtual_try_on_view_qa", schema: virtualTryOnViewQaJsonSchema }
+    : { name: "virtual_try_on_cross_qa", schema: virtualTryOnCrossQaJsonSchema };
   const body = responsesApi
-    ? { model: config.model, input: responsesInput(input.imageUrls, instruction), text: { format: { type: "json_object" } } }
+    ? { model: config.model, input: responsesInput(input.imageUrls, instruction), text: { format: { type: "json_schema", name: responseSchema.name, strict: true, schema: responseSchema.schema } } }
     : { model: config.model, stream: false, response_format: { type: "json_object" }, messages: chatMessages(input.imageUrls, instruction) };
   const response = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(virtualTryOnQaTimeoutMs) });
   const raw = asRecord(await response.json());
-  if (!response.ok) throw new Error(`Vision provider failed with status ${response.status}.`);
+  if (!response.ok) {
+    throw new VisionProviderRequestError({
+      provider: config.provider,
+      model: config.model,
+      status: response.status,
+    });
+  }
   const qaJson = responsesApi ? parseResponsesOutput(raw) : parseJsonContent(asRecord(asRecord((raw.choices as unknown[])?.[0]).message).content);
   return { provider: config.provider, model: config.model, qaJson, raw: raw as JsonValue };
 }

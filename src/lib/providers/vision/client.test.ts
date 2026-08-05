@@ -10,6 +10,99 @@ import {
 } from "./client";
 
 describe("vision provider client", () => {
+  it.each([
+    ["view", "virtual_try_on_view_qa", ["verdict", "targetView", "garment", "person", "inventedDetails", "evidence"]],
+    ["cross", "virtual_try_on_cross_qa", ["verdict", "requiredViews", "coverage", "garmentConsistency", "personConsistency", "evidence"]],
+  ] as const)("uses a strict Responses JSON schema for %s virtual try-on QA", async (kind, schemaName, required) => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+    const qaJson = kind === "view"
+      ? {
+          verdict: "unknown",
+          targetView: "front",
+          garment: { silhouette: "unknown", color: "unknown", pattern: "unknown", visibleDetails: "unknown" },
+          person: { anatomy: "unknown", identityConsistency: "unknown" },
+          inventedDetails: false,
+          evidence: [],
+        }
+      : {
+          verdict: "unknown",
+          requiredViews: ["front", "side", "back"],
+          coverage: "unknown",
+          garmentConsistency: "unknown",
+          personConsistency: "unknown",
+          evidence: [],
+        };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(qaJson) }] }],
+    }));
+
+    await createVisionVirtualTryOnQa({
+      kind,
+      imageUrls: ["https://signed/model", "https://signed/generated"],
+      targetView: kind === "view" ? "front" : undefined,
+      requiredViews: kind === "cross" ? ["front", "side", "back"] : undefined,
+      requirements: ["preserve garment"],
+    }, { fetch: fetchMock });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.text.format).toMatchObject({
+      type: "json_schema",
+      name: schemaName,
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required,
+      },
+    });
+    const schema = body.text.format.schema;
+    if (kind === "view") {
+      expect(schema.properties).toEqual({
+        verdict: { enum: ["pass", "fail", "unknown"] },
+        targetView: { enum: ["front", "side", "back"] },
+        garment: {
+          type: "object",
+          additionalProperties: false,
+          required: ["silhouette", "color", "pattern", "visibleDetails"],
+          properties: {
+            silhouette: { enum: ["match", "mismatch", "unknown"] },
+            color: { enum: ["match", "mismatch", "unknown"] },
+            pattern: { enum: ["match", "mismatch", "unknown"] },
+            visibleDetails: { enum: ["match", "mismatch", "unknown"] },
+          },
+        },
+        person: {
+          type: "object",
+          additionalProperties: false,
+          required: ["anatomy", "identityConsistency"],
+          properties: {
+            anatomy: { enum: ["natural", "abnormal", "unknown"] },
+            identityConsistency: { enum: ["match", "mismatch", "unknown"] },
+          },
+        },
+        inventedDetails: { type: "boolean" },
+        evidence: { type: "array", items: { type: "string" } },
+      });
+    } else {
+      expect(schema.properties).toEqual({
+        verdict: { enum: ["pass", "fail", "unknown"] },
+        requiredViews: {
+          type: "array",
+          items: { enum: ["front", "side", "back"] },
+          minItems: 3,
+          maxItems: 3,
+        },
+        coverage: { enum: ["complete", "incomplete", "unknown"] },
+        garmentConsistency: { enum: ["match", "mismatch", "unknown"] },
+        personConsistency: { enum: ["match", "mismatch", "unknown"] },
+        evidence: { type: "array", items: { type: "string" } },
+      });
+    }
+  });
+
   it("uses a dedicated virtual try-on QA request", async () => {
     vi.stubEnv("VISION_PROVIDER", "openai"); vi.stubEnv("VISION_API_KEY", "key"); vi.stubEnv("VISION_MODEL_STRICT", "model");
     const timeout = vi.spyOn(AbortSignal, "timeout");
@@ -22,6 +115,28 @@ describe("vision provider client", () => {
     expect(body.messages[0].content).toContain("identityConsistency only between the generated image and the first platform model reference");
     expect(timeout).toHaveBeenCalledWith(45_000);
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("exposes safe provider context when virtual try-on QA returns an HTTP error", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+
+    await expect(createVisionVirtualTryOnQa({
+      kind: "view",
+      imageUrls: ["https://signed/model", "https://signed/generated"],
+      targetView: "front",
+      requirements: ["preserve garment"],
+    }, {
+      fetch: async () => Response.json({ error: { message: "sensitive upstream detail" } }, { status: 500 }),
+    })).rejects.toMatchObject({
+      name: "VisionProviderRequestError",
+      provider: "apimart",
+      model: "gpt-5.4",
+      status: 500,
+      code: "http_500",
+    });
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -328,6 +443,7 @@ describe("vision provider client", () => {
     vi.stubEnv("VISION_API_KEY", "vision_key");
     vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
     vi.stubEnv("VISION_MODEL_LITE", "gpt-5.4-nano");
+    const timeout = vi.spyOn(AbortSignal, "timeout");
     const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     const fetchMock: typeof fetch = async (input, init) => {
       calls.push([input, init]);
@@ -382,9 +498,69 @@ describe("vision provider client", () => {
       "Return only JSON with passed",
     );
     expect(body.input[0].content[0].text).not.toContain("asset_role");
+    expect(timeout).toHaveBeenCalledWith(45_000);
+    expect(calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
     expect(result.qaJson).toMatchObject({
       passed: true,
       failure_category: null,
+    });
+  });
+
+  it("preserves the HTTP status when a post-QA request fails", async () => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+
+    await expect(
+      createVisionPostQaCheck(
+        {
+          mode: "strict",
+          frameUrls: ["https://signed.example/frame-0.jpg"],
+        },
+        {
+          fetch: async () =>
+            new Response("bad gateway", {
+              status: 502,
+              headers: { "content-type": "text/html" },
+            }),
+        },
+      ),
+    ).rejects.toMatchObject({
+      name: "VisionProviderRequestError",
+      provider: "apimart",
+      model: "gpt-5.4",
+      status: 502,
+      code: "http_502",
+    });
+  });
+
+  it.each([
+    ["network failure", new TypeError("fetch failed"), "network_error"],
+    ["timeout", Object.assign(new Error("timed out"), { name: "TimeoutError" }), "timeout"],
+  ])("classifies a post-QA %s", async (_label, fetchError, code) => {
+    vi.stubEnv("VISION_PROVIDER", "apimart");
+    vi.stubEnv("VISION_API_KEY", "vision_key");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
+
+    await expect(
+      createVisionPostQaCheck(
+        {
+          mode: "strict",
+          frameUrls: ["https://signed.example/frame-0.jpg"],
+        },
+        {
+          fetch: async () => {
+            throw fetchError;
+          },
+        },
+      ),
+    ).rejects.toMatchObject({
+      name: "VisionProviderRequestError",
+      provider: "apimart",
+      model: "gpt-5.4",
+      code,
     });
   });
 

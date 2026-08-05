@@ -48,4 +48,47 @@ describe("virtual try-on QA", () => {
     expect(missing.allPassed).toBe(false);
     expect(mismatch.allPassed).toBe(false);
   });
+
+  it("logs the actual model and provider failure stage without signed URLs", async () => {
+    const logs = createInMemoryProviderCallLogStore();
+    const providerError = Object.assign(new Error("sensitive provider response"), {
+      provider: "apimart",
+      model: "gpt-5.4",
+      status: 500,
+      code: "http_500",
+    });
+
+    const result = await runVirtualTryOnQa(
+      { jobId: "job", userId: "user", packId: "pack", mode: "front_only", sourceKeys: { front: "source" }, modelKeys: { front: "model", side: "side", back: "back" }, generatedKeys: { front: "generated" } },
+      { signer: async (key) => "https://signed/" + key, visionProvider: async () => { throw providerError; }, qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: logs },
+    );
+
+    expect(result.allPassed).toBe(false);
+    expect(logs.listCallLogs()[0]).toMatchObject({
+      provider: "apimart",
+      model: "gpt-5.4",
+      errorCode: "virtual_tryon_qa_provider_failed",
+      requestSnapshot: { scope: "view", view: "front", imageCount: 3, failurePhase: "provider" },
+      responseSummary: { status: "failed", verdict: "unknown", providerErrorCode: "http_500", httpStatus: 500 },
+    });
+    expect(JSON.stringify(logs.listCallLogs())).not.toContain("sensitive provider response");
+    expect(JSON.stringify(logs.listCallLogs())).not.toContain("https://signed/");
+  });
+
+  it("distinguishes strict schema failures from provider failures", async () => {
+    const logs = createInMemoryProviderCallLogStore();
+
+    await runVirtualTryOnQa(
+      { jobId: "job", userId: "user", packId: "pack", mode: "front_only", sourceKeys: { front: "source" }, modelKeys: { front: "model", side: "side", back: "back" }, generatedKeys: { front: "generated" } },
+      { signer: async (key) => "https://signed/" + key, visionProvider: async () => ({ provider: "apimart", model: "gpt-5.4", qaJson: { verdict: "pass" }, raw: {} }), qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: logs },
+    );
+
+    expect(logs.listCallLogs()[0]).toMatchObject({
+      provider: "apimart",
+      model: "gpt-5.4",
+      errorCode: "virtual_tryon_qa_schema_failed",
+      requestSnapshot: { imageCount: 3, failurePhase: "schema" },
+      responseSummary: { providerErrorCode: "qa_schema_error" },
+    });
+  });
 });
