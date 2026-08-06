@@ -26,7 +26,7 @@ export function buildQaFramePlan(
 
   if (segmentCount !== 5 || mode === "lite") {
     const durationSeconds = segmentCount * 8;
-    return Array.from({ length: legacyFrameCount[mode] }, (_, frameIndex) => {
+    const segmentPoints = Array.from({ length: legacyFrameCount[mode] }, (_, frameIndex) => {
       const timestampSeconds =
         (durationSeconds * (frameIndex + 1)) / (legacyFrameCount[mode] + 1);
       return {
@@ -39,6 +39,20 @@ export function buildQaFramePlan(
         frameIndex,
       };
     });
+
+    if (mode === "lite" || segmentCount === 1) return segmentPoints;
+
+    const transitionPoints = Array.from(
+      { length: segmentCount - 1 },
+      (_, segmentIndex) => ({
+        timestampSeconds: (segmentIndex + 1) * 8,
+        kind: "transition" as const,
+        segmentIndex,
+        frameIndex: 0,
+      }),
+    );
+
+    return [...segmentPoints, ...transitionPoints];
   }
 
   const points: QaFramePoint[] = [];

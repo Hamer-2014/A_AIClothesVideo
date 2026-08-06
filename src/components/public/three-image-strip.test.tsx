@@ -9,14 +9,14 @@ describe("ThreeImageStrip", () => {
   it("uses the adult burgundy dress source set by default", () => {
     render(<ThreeImageStrip />);
 
-    expect(screen.getByAltText("Front product image of an adult burgundy midi dress"))
+    expect(screen.getByAltText("Front appearance reference of an adult woman wearing a burgundy midi dress"))
       .toHaveAttribute(
         "src",
-        expect.stringContaining("/demo/cases/burgundy-midi-dress/front.webp"),
+        expect.stringContaining("/demo/cases/burgundy-midi-dress/appearance-front.webp"),
       );
-    expect(screen.getByAltText("Back image of an adult burgundy midi dress"))
+    expect(screen.getByAltText("Side appearance reference of an adult woman wearing a burgundy midi dress"))
       .toBeInTheDocument();
-    expect(screen.getByAltText("Detail image of an adult burgundy midi dress"))
+    expect(screen.getByAltText("Back appearance reference of an adult woman wearing a burgundy midi dress"))
       .toBeInTheDocument();
   });
 });

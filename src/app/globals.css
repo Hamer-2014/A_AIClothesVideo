@@ -162,6 +162,11 @@ textarea {
     object-position: 62% center;
   }
 
+  .landing-hero-video-portrait {
+    object-fit: contain;
+    object-position: right center;
+  }
+
   .landing-hero-shade {
     right: auto;
     width: 58%;

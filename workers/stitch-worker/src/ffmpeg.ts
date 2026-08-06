@@ -4,6 +4,10 @@ import { readdir } from "node:fs/promises";
 import type { QaFramePoint } from "./qa-frame-plan.js";
 
 export type RunCommand = (command: string, args: string[]) => Promise<void>;
+export type CaptureCommand = (
+  command: string,
+  args: string[],
+) => Promise<{ stdout: string; stderr: string }>;
 
 export const defaultRunCommand: RunCommand = (command, args) =>
   new Promise((resolve, reject) => {
@@ -18,6 +22,120 @@ export const defaultRunCommand: RunCommand = (command, args) =>
       reject(new Error(`${command} exited with code ${code}.`));
     });
   });
+
+export const defaultCaptureCommand: CaptureCommand = (command, args) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+
+      reject(new Error(`${command} exited with code ${code}.`));
+    });
+  });
+
+export function parseFreezeDurations(output: string) {
+  return Array.from(output.matchAll(/freeze_duration:\s*([0-9]+(?:\.[0-9]+)?)/g))
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite);
+}
+
+function parseVideoDimensions(output: string) {
+  try {
+    const parsed = JSON.parse(output) as {
+      streams?: Array<{ width?: unknown; height?: unknown }>;
+    };
+    const width = Number(parsed.streams?.[0]?.width);
+    const height = Number(parsed.streams?.[0]?.height);
+    if (Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0) {
+      return { width, height };
+    }
+  } catch {
+    // Use the stable probe error below.
+  }
+
+  throw new Error("video_quality_probe_failed");
+}
+
+const aspectRatioValues = {
+  "9:16": 9 / 16,
+  "1:1": 1,
+  "16:9": 16 / 9,
+} as const;
+
+export async function inspectVideoTechnicalQuality({
+  videoPath,
+  expectedAspectRatio,
+  minimumShortSide,
+  detectFreeze,
+  runCommand = defaultCaptureCommand,
+}: {
+  videoPath: string;
+  expectedAspectRatio: keyof typeof aspectRatioValues | null;
+  minimumShortSide: number | null;
+  detectFreeze: boolean;
+  runCommand?: CaptureCommand;
+}) {
+  const probe = await runCommand("ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height",
+    "-of",
+    "json",
+    videoPath,
+  ]);
+  const dimensions = parseVideoDimensions(probe.stdout);
+
+  if (expectedAspectRatio) {
+    const expected = aspectRatioValues[expectedAspectRatio];
+    const actual = dimensions.width / dimensions.height;
+    if (Math.abs(actual - expected) / expected > 0.03) {
+      throw new Error("video_quality_aspect_ratio_mismatch");
+    }
+  }
+
+  if (minimumShortSide && Math.min(dimensions.width, dimensions.height) < minimumShortSide) {
+    throw new Error("video_quality_resolution_below_minimum");
+  }
+
+  if (detectFreeze) {
+    const freezeResult = await runCommand("ffmpeg", [
+      "-v",
+      "info",
+      "-i",
+      videoPath,
+      "-vf",
+      "freezedetect=n=-50dB:d=1.0",
+      "-an",
+      "-f",
+      "null",
+      "-",
+    ]);
+    if (parseFreezeDurations(`${freezeResult.stdout}\n${freezeResult.stderr}`)
+      .some((duration) => duration >= 1)) {
+      throw new Error("video_quality_freeze_detected");
+    }
+  }
+
+  return dimensions;
+}
 
 function quoteConcatPath(path: string) {
   return `'${path.replaceAll("'", "'\\''")}'`;

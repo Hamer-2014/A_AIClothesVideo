@@ -45,6 +45,8 @@ content-type: application/json
   "coverKey": "jobs/video-job-id/covers/cover.webp",
   "frameKeyPrefix": "jobs/video-job-id/qa/frames",
   "postQaMode": "standard",
+  "expectedAspectRatio": "9:16",
+  "minimumShortSide": 720,
   "callbackUrl": "https://app.example.com/api/internal/stitch/callback"
 }
 ```
@@ -247,4 +249,6 @@ npm run smoke:backend
 
 - worker 不主动轮询数据库，只执行主应用触发的单个 job。
 - 封面从 final mp4 抽帧生成，不使用 AI 生成；封面失败只记录 warning，不阻断最终视频和 QA frames 交付。
-- 抽帧已按 `postQaMode` 分级：`off = 0`、`lite = 3`、`standard = 5`、`strict = 6`。strict 后续仍可扩展转场帧策略。
+- 抽帧按 `postQaMode` 分级；16/24/32 秒 Standard/Strict 在均匀帧之外包含每个拼接边界帧，40 秒使用独立强化计划。
+- `expectedAspectRatio` 和 `minimumShortSide` 由主应用从任务规格派生。新 worker 兼容缺少这两个字段的旧请求，但新主应用必须发送它们。
+- 最终视频、封面和 QA 图上传前，worker 使用 ffprobe 校验画幅/最低短边，并对 Standard/Strict 多段成片执行 `freezedetect=n=-50dB:d=1.0`。

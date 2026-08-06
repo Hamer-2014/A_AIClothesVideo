@@ -11,17 +11,18 @@ import {
 
 describe("vision provider client", () => {
   it.each([
-    ["view", "virtual_try_on_view_qa", ["verdict", "targetView", "garment", "person", "inventedDetails", "evidence"]],
+    ["view", "virtual_try_on_view_qa", ["verdict", "targetView", "observedView", "garment", "person", "inventedDetails", "evidence"]],
     ["cross", "virtual_try_on_cross_qa", ["verdict", "requiredViews", "coverage", "garmentConsistency", "personConsistency", "evidence"]],
   ] as const)("uses a strict Responses JSON schema for %s virtual try-on QA", async (kind, schemaName, required) => {
     vi.stubEnv("VISION_PROVIDER", "apimart");
     vi.stubEnv("VISION_API_KEY", "key");
-    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1");
     vi.stubEnv("VISION_MODEL_STRICT", "gpt-5.4");
     const qaJson = kind === "view"
       ? {
           verdict: "unknown",
           targetView: "front",
+          observedView: "unknown",
           garment: { silhouette: "unknown", color: "unknown", pattern: "unknown", visibleDetails: "unknown" },
           person: { anatomy: "unknown", identityConsistency: "unknown" },
           inventedDetails: false,
@@ -48,6 +49,7 @@ describe("vision provider client", () => {
     }, { fetch: fetchMock });
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.apimart.ai/v1/responses");
     expect(body.text.format).toMatchObject({
       type: "json_schema",
       name: schemaName,
@@ -63,6 +65,7 @@ describe("vision provider client", () => {
       expect(schema.properties).toEqual({
         verdict: { enum: ["pass", "fail", "unknown"] },
         targetView: { enum: ["front", "side", "back"] },
+        observedView: { enum: ["front", "side", "back", "unknown"] },
         garment: {
           type: "object",
           additionalProperties: false,
@@ -113,6 +116,9 @@ describe("vision provider client", () => {
     expect(body.messages[0].content).toContain("strict virtual try-on view QA");
     expect(body.messages[0].content).toContain("platform model reference");
     expect(body.messages[0].content).toContain("identityConsistency only between the generated image and the first platform model reference");
+    expect(body.messages[0].content).toContain("Independently classify observedView");
+    expect(body.messages[0].content).toContain("absence of a pattern");
+    expect(body.messages[0].content).toContain("only garment details physically visible");
     expect(timeout).toHaveBeenCalledWith(45_000);
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
@@ -264,7 +270,7 @@ describe("vision provider client", () => {
   it("targets the responses endpoint with structured output and parses output_text content", async () => {
     vi.stubEnv("VISION_PROVIDER", "apimart");
     vi.stubEnv("VISION_API_KEY", "vision_key");
-    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1");
     vi.stubEnv("VISION_MODEL_STANDARD", "gpt-5.4-mini");
     const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     const fetchMock: typeof fetch = async (input, init) => {
@@ -441,7 +447,7 @@ describe("vision provider client", () => {
   it("uses a dedicated post-QA schema requiring a boolean passed result", async () => {
     vi.stubEnv("VISION_PROVIDER", "apimart");
     vi.stubEnv("VISION_API_KEY", "vision_key");
-    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1/responses/");
+    vi.stubEnv("VISION_BASE_URL", "https://api.apimart.ai/v1");
     vi.stubEnv("VISION_MODEL_LITE", "gpt-5.4-nano");
     const timeout = vi.spyOn(AbortSignal, "timeout");
     const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];

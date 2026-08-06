@@ -817,15 +817,16 @@ video_segments 全部成功 -> Cloud Run 拼接 -> 抽帧 -> 视觉质检 -> cap
 Cloud Run `stitch-worker` 在拼接成功后直接抽帧：
 
 1. 拼接片段为最终视频。
-2. 根据 `post_qa_mode` 计算抽帧时间点。
-3. 使用 ffmpeg 输出 jpg/webp。
-4. 上传抽帧图到 R2。
-5. 写入 `post_qa_results` 的待检测记录。
-6. 后续 worker 调用视觉模型分析抽帧图。
+2. 使用 ffprobe 校验实际画幅和最低短边；Standard/Strict 多段成片再使用 FFmpeg `freezedetect` 检查至少 1 秒的冻结。
+3. 根据 `post_qa_mode` 计算抽帧时间点。
+4. 使用 ffmpeg 输出 jpg/webp。
+5. 技术门禁通过后才上传最终视频和抽帧图到 R2。
+6. 写入 `post_qa_results` 的待检测记录。
+7. 后续 worker 调用视觉模型分析抽帧图。
 
 这样可以避免最终视频上传 R2 后再下载回来抽帧。
 
-1-4 个片段（8/16/24/32 秒）使用普通抽帧计划：Standard 固定 5 帧，Strict 固定 6 帧，不启用分段批次和局部重试。仅 5 个片段的 40 秒付费 Beta 使用独立抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
+1 个片段（8 秒）使用普通抽帧计划：Standard 固定 5 帧，Strict 固定 6 帧。2-4 个片段（16/24/32 秒）保留相同数量的均匀帧，并为每个 8 秒拼接边界增加 transition 帧，不启用局部重试。仅 5 个片段的 40 秒付费 Beta 使用独立抽帧计划：Standard 为每段 4 帧加 4 个转场帧，共 24 帧；Strict 为每段 6 帧加 4 个转场帧，共 34 帧。R2 key 使用 `segment-{segmentIndex}-frame-{frameIndex}.jpg` 和 `transition-{from}-{to}.jpg` 保存位置语义。
 
 Post-QA 对 40 秒任务分成 5 个片段批次和 1 个转场批次，逐批调用视觉模型后聚合一次结果。若且仅若一个片段批次失败、所有转场通过且失败不是 provider/schema 异常，任务保留冻结点数并只重排该片段一次；其他情况沿用终态失败和点数释放流程。
 

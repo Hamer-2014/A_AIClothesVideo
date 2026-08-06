@@ -248,10 +248,22 @@ export async function getVideoJobDetail({
   const analyses = await store.listAnalyses(assets.map((asset) => asset.assetId));
   const consistencyAnalyses = await store.listConsistencyAnalyses(jobId);
   const latestStoryboard = await store.findLatestStoryboard(jobId);
+  const declaredRoleByAssetId = new Map(
+    assets.map((asset) => [asset.assetId, asset.role]),
+  );
   const parsedAnalyses = analyses.map((analysis) =>
     ({
       assetId: analysis.assetId,
-      parsed: parseAssetAnalysisJson(analysis.analysisJson),
+      parsed: parseAssetAnalysisJson(analysis.analysisJson, {
+        declaredRole: (() => {
+          const role = declaredRoleFromJobAsset(
+            declaredRoleByAssetId.get(analysis.assetId) ?? "unknown",
+          );
+          return role && ["front", "side", "back"].includes(role)
+            ? role
+            : undefined;
+        })(),
+      }),
     }),
   );
   const productConsistency = consistencyAnalyses.find(
@@ -275,10 +287,6 @@ export async function getVideoJobDetail({
       ? { ...modelConsistency, raw: modelConsistency.resultJson }
       : null,
   });
-
-  const declaredRoleByAssetId = new Map(
-    assets.map((asset) => [asset.assetId, asset.role]),
-  );
 
   return {
     job,

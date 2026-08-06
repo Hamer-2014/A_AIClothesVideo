@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "slug": "burgundy-midi-dress",
   "sourceType": "synthetic-demo",
-  "generatedAt": "2026-07-30",
+  "generatedAt": "2026-08-07",
   "imageGeneration": {
     "mode": "imagegen-cli-fallback",
     "model": "gpt-image-2",
@@ -33,6 +33,34 @@
       "sha256": "d68a8022c5b4a6a221a0b89c0c1751514440294b0ab86e7e2f4b9b32552f3cf2"
     }
   ],
+  "appearancePack": {
+    "virtualTryOnJobId": "c6d91dbd-183d-4b4f-8e0a-eeb0bdcea753",
+    "appearancePackId": "3ce301fd-047e-49aa-9669-cc88c8867c4a",
+    "status": "locked",
+    "mode": "three_view",
+    "dimensions": "1152x2048",
+    "qa": {
+      "viewStatus": "passed",
+      "crossViewStatus": "passed"
+    },
+    "assets": [
+      {
+        "role": "front",
+        "path": "/demo/cases/burgundy-midi-dress/appearance-front.webp",
+        "sha256": "c4aec2128910194c88cf5e4fb2951fb086fe1433f52bf539195fc53cf74351a2"
+      },
+      {
+        "role": "side",
+        "path": "/demo/cases/burgundy-midi-dress/appearance-side.webp",
+        "sha256": "9f5b040d52de6a19dbfa961bf021e1e04c62de6654f70ed6091a0906f56ce3bc"
+      },
+      {
+        "role": "back",
+        "path": "/demo/cases/burgundy-midi-dress/appearance-back.webp",
+        "sha256": "3c842c2d96ddd16a67fba958612239b8e613e9600e93360da9c46d262f4e8217"
+      }
+    ]
+  },
   "materialLimits": [
     "No person or scene reference is provided.",
     "Do not generate a person, child, model action, back turn, or continuous rotation.",
@@ -40,25 +68,85 @@
   ],
   "videoOutputs": [
     {
-      "path": "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
-      "posterPath": "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
-      "posterSha256": "df62d00f746138154964f83ce7b8e66cadb12cd203c2e33c9c9d622ead4ff225",
-      "videoSha256": "9e791bb39d2bc451ae8cab6acab065a549edac37c5fc3c89e928cd377a28c001",
-      "jobId": "bdec0abb-a7b1-4d5b-9d0c-1783c345487f",
-      "stitchJobId": "aa519799-a189-4e62-aaf6-4db14cb2cf71",
-      "isTest": true,
+      "path": "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s.mp4",
+      "posterPath": "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s-poster.webp",
+      "posterSha256": "d2430bcd677566bc7bb0d40ff04559311219242d7bc19acd668f9be0ccee84e4",
+      "posterDerivedFromSeconds": 0,
+      "videoSha256": "54f47d4b8101e143885b30091286cfee725f52f0c9241816d98d8c2d88d71b47",
+      "jobId": "f9d54e6e-403c-465d-ad66-f51c1e1e98ba",
+      "stitchJobId": "b73346cc-8aa1-4788-944e-874260a801fe",
+      "segmentId": "1d8b137d-afb4-484f-8e72-fb3aa9b6379e",
+      "virtualTryOnJobId": "c6d91dbd-183d-4b4f-8e0a-eeb0bdcea753",
+      "appearancePackId": "3ce301fd-047e-49aa-9669-cc88c8867c4a",
+      "sourceKind": "virtual_tryon_appearance_pack",
+      "isTest": false,
+      "publicationStatus": "approved",
       "presetId": "minimal_studio",
       "templateIds": [
-        "front_push_in"
+        "model_front_pose"
       ],
-      "segmentPrompt": "A slow front-facing push-in shot of a deep burgundy midi dress with a V neckline, long sleeves, shaped waist seam, A-line hem, and matte crepe texture. The dress is displayed in a clean minimal studio setting with a neutral background, stable camera, and no people. The wine-red color is consistent and no additional details are added.",
+      "segmentPrompts": [
+        "Vertical front-facing shot. The same adult woman stands centered, facing the camera, wearing the same burgundy midi dress. The dress's neckline, sleeves, waist, silhouette, visible seams, and hem remain exactly as in the reference. She makes a natural, subtle weight shift and gentle arm movement while the camera stays stable. The background is a neutral studio setting. Keep her identity, hairstyle, body proportions, and shoes unchanged."
+      ],
       "provider": "apimart",
       "model": "pixverse-v6",
       "generationProfile": "paid_720p_audio",
-      "providerReportedResolution": "360p",
-      "inspectedResolution": "336x640",
-      "durationSeconds": 8.073,
-      "aspectRatio": "9:16",
+      "requestedResolution": "720p",
+      "inspectedResolution": "720x1280",
+      "durationSeconds": 8.041667,
+      "requestedAspectRatio": "9:16",
+      "frameRate": 24,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "watermarkEnabled": false,
+      "fastStart": true,
+      "promptModeration": "passed",
+      "technicalQa": {
+        "freezeAtLeastOneSecond": false,
+        "blackFrameRun": false,
+        "status": "passed"
+      },
+      "manualReview": {
+        "status": "passed",
+        "scope": "front-facing segment only"
+      },
+      "fullVideoReview": {
+        "durationSeconds": 24.156006,
+        "inspectedResolution": "720x1280",
+        "pipelineStatus": "deliverable",
+        "publicationStatus": "rejected",
+        "reasons": [
+          "turn_range_exceeded_in_motion",
+          "visible_cross_segment_jump_cuts"
+        ]
+      }
+    },
+    {
+      "path": "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      "posterPath": "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      "posterSha256": "98370b05c2f3f9a437fc7cc8c221996d0944f15f14b08e64c1e5c9a2921047ea",
+      "videoSha256": "7cc95c8fb24f2afc1b7d066d4d0c042904c9af361808f221f362fed0eff0976b",
+      "jobId": "faab4894-2652-4073-bf1e-ca58e506659a",
+      "stitchJobId": "159546f9-b0af-46a6-a6a1-1ac402ebacce",
+      "isTest": false,
+      "presetId": "minimal_studio",
+      "templateIds": [
+        "front_push_in",
+        "front_pan",
+        "front_crop_detail"
+      ],
+      "segmentPrompts": [
+        "Slow front-facing push-in on the burgundy midi dress, preserving the V neckline, long sleeves, shaped waist, A-line hem, matte crepe texture, and deep burgundy color, on a clean neutral studio background, stable low-motion camera work.",
+        "Subtle front-facing pan across the burgundy midi dress, maintaining the V neckline, long sleeves, shaped waist, A-line hem, matte crepe texture, and deep burgundy color, on a clean neutral studio background, stable low-motion camera work.",
+        "Close crop from the front view of the burgundy midi dress, focusing on the matte crepe texture and deep burgundy color at the waist and sleeve area, on a clean neutral studio background, with stable low-motion camera work."
+      ],
+      "provider": "apimart",
+      "model": "pixverse-v6",
+      "generationProfile": "paid_720p_audio",
+      "requestedResolution": "720p",
+      "inspectedResolution": "672x1280",
+      "durationSeconds": 24.157,
+      "requestedAspectRatio": "9:16",
       "frameRate": 24,
       "videoCodec": "h264",
       "audioCodec": "aac",
@@ -69,9 +157,49 @@
         "mode": "standard",
         "status": "passed",
         "frameCount": 5,
-        "isTest": true
-      },
-      "stitchWorkerRevision": "stitch-worker-00068-7qh"
+        "isTest": false
+      }
+    },
+    {
+      "path": "/demo/cases/burgundy-midi-dress/minimal-studio-32s.mp4",
+      "posterPath": "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+      "posterSha256": "98370b05c2f3f9a437fc7cc8c221996d0944f15f14b08e64c1e5c9a2921047ea",
+      "videoSha256": "b6c4815c5b3b19d219689f888e305ede03cc2ae56c67511d795143aa399a8d30",
+      "jobId": "d0f0b5ef-c41a-4426-9375-d265d9c30e9e",
+      "stitchJobId": "a4dad2c8-b0a8-4483-8481-31b347cabb0a",
+      "isTest": false,
+      "presetId": "minimal_studio",
+      "templateIds": [
+        "minimal_studio",
+        "front_push_in",
+        "front_pan",
+        "front_crop_detail"
+      ],
+      "segmentPrompts": [
+        "Clean minimal studio product shot of an adult burgundy midi dress on a neutral background. Keep the deep burgundy matte crepe fabric, V neckline, long sleeves, shaped waist, and A-line hem fully consistent. Subtle stable camera, low motion, garment remains centered and unchanged.",
+        "Slow front-facing push-in on the adult burgundy midi dress. Maintain the V neckline, long sleeves, shaped waist, A-line hem, matte crepe texture, and deep burgundy color. Only the visible front is shown; no back side. Steady, restrained camera movement.",
+        "Subtle front-facing pan across the adult burgundy midi dress. Keep the deep burgundy matte crepe texture, V neckline, long sleeves, shaped waist, and A-line hem consistent. Stable low-motion camera, garment details remain unchanged.",
+        "Close crop from a visible front area of the adult burgundy midi dress, emphasizing the matte crepe fabric texture and deep burgundy color while preserving the garment's V neckline edge and seam details. Steady, minimal camera movement; no unseen details added."
+      ],
+      "provider": "apimart",
+      "model": "pixverse-v6",
+      "generationProfile": "paid_720p_audio",
+      "requestedResolution": "720p",
+      "inspectedResolution": "672x1280",
+      "durationSeconds": 32.199,
+      "requestedAspectRatio": "9:16",
+      "frameRate": 24,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "watermarkEnabled": false,
+      "fastStart": true,
+      "promptModeration": "passed",
+      "postQa": {
+        "mode": "standard",
+        "status": "passed",
+        "frameCount": 5,
+        "isTest": false
+      }
     }
   ]
 }

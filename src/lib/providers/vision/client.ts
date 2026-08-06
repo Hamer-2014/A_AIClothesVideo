@@ -198,10 +198,11 @@ const postQaJsonSchema = {
 const virtualTryOnViewQaJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["verdict", "targetView", "garment", "person", "inventedDetails", "evidence"],
+  required: ["verdict", "targetView", "observedView", "garment", "person", "inventedDetails", "evidence"],
   properties: {
     verdict: { enum: ["pass", "fail", "unknown"] },
     targetView: { enum: ["front", "side", "back"] },
+    observedView: { enum: ["front", "side", "back", "unknown"] },
     garment: {
       type: "object",
       additionalProperties: false,
@@ -327,6 +328,15 @@ function isResponsesApi(baseUrl: string) {
   return /\/responses$/i.test(baseUrl);
 }
 
+function usesResponsesApi(config: VisionConfig) {
+  return isResponsesApi(config.baseUrl)
+    || (config.provider === "apimart" && /^gpt-/i.test(config.model) && /\/v1$/i.test(config.baseUrl));
+}
+
+function responsesUrl(baseUrl: string) {
+  return isResponsesApi(baseUrl) ? baseUrl : `${baseUrl}/responses`;
+}
+
 function responsesInput(imageUrls: string[], instruction = systemInstruction) {
   return [
     {
@@ -387,9 +397,9 @@ export async function createVisionAssetAnalysis(
 ): Promise<VisionAssetAnalysisResult> {
   const config = getVisionConfig(input.mode);
   const fetchImpl = deps.fetch ?? fetch;
-  const responsesApi = isResponsesApi(config.baseUrl);
+  const responsesApi = usesResponsesApi(config);
   const url = responsesApi
-    ? config.baseUrl
+    ? responsesUrl(config.baseUrl)
     : `${config.baseUrl}/chat/completions`;
   const body = responsesApi
     ? {
@@ -443,9 +453,9 @@ export async function createVisionConsistencyAnalysis(
 ): Promise<VisionConsistencyResult> {
   const config = getVisionConfig("strict");
   const fetchImpl = deps.fetch ?? fetch;
-  const responsesApi = isResponsesApi(config.baseUrl);
+  const responsesApi = usesResponsesApi(config);
   const url = responsesApi
-    ? config.baseUrl
+    ? responsesUrl(config.baseUrl)
     : `${config.baseUrl}/chat/completions`;
   const instruction =
     `Perform a task-local consistency analysis of the ordered clothing images. ` +
@@ -507,9 +517,9 @@ export async function createVisionPostQaCheck(
 ): Promise<VisionPostQaResult> {
   const config = getVisionConfig(input.mode);
   const fetchImpl = deps.fetch ?? fetch;
-  const responsesApi = isResponsesApi(config.baseUrl);
+  const responsesApi = usesResponsesApi(config);
   const url = responsesApi
-    ? config.baseUrl
+    ? responsesUrl(config.baseUrl)
     : `${config.baseUrl}/chat/completions`;
   const instruction = postQaInstruction(input.qaRequirements);
   const body = responsesApi
@@ -581,10 +591,10 @@ export async function createVisionVirtualTryOnQa(
 ): Promise<VisionVirtualTryOnQaResult> {
   const config = getVisionConfig("strict");
   const fetchImpl = deps.fetch ?? fetch;
-  const responsesApi = isResponsesApi(config.baseUrl);
-  const url = responsesApi ? config.baseUrl : `${config.baseUrl}/chat/completions`;
+  const responsesApi = usesResponsesApi(config);
+  const url = responsesApi ? responsesUrl(config.baseUrl) : `${config.baseUrl}/chat/completions`;
   const target = input.kind === "view" ? `target view ${input.targetView ?? "unknown"}` : `required views ${(input.requiredViews ?? []).join(", ")}`;
-  const instruction = `Perform strict virtual try-on ${input.kind} QA for ${target}. Return JSON only. A view result must contain verdict, targetView, garment {silhouette,color,pattern,visibleDetails}, person {anatomy,identityConsistency}, inventedDetails, evidence. A cross result must contain verdict, requiredViews, coverage, garmentConsistency, personConsistency, evidence. For a view request, images are ordered as platform model reference for the target view, garment front, optional garment back, optional garment detail, then generated target view. Compare identityConsistency only between the generated image and the first platform model reference. Compare garment fields only against the garment reference images. Use unknown whenever evidence is insufficient. Requirements: ${input.requirements.join("; ")}.`;
+  const instruction = `Perform strict virtual try-on ${input.kind} QA for ${target}. Return JSON only. A view result must contain verdict, targetView, observedView, garment {silhouette,color,pattern,visibleDetails}, person {anatomy,identityConsistency}, inventedDetails, evidence. A cross result must contain verdict, requiredViews, coverage, garmentConsistency, personConsistency, evidence. For a view request, images are ordered as platform model reference for the target view, garment front, optional garment back, optional garment detail, then generated target view. Independently classify observedView from the final generated image using physical evidence: face and front neckline indicate front, profile indicates side, and back of head plus rear seams or zipper indicate back. Do not copy targetView into observedView unless the image itself proves it; return unknown when ambiguous, and verdict must not pass unless observedView equals targetView. Compare identityConsistency only between the generated image and the first platform model reference. Compare garment fields only against the garment reference images. For visibleDetails, compare only garment details physically visible in the generated target view; do not require a side or back view to prove front-only details. Pattern includes the absence of a pattern: return match when both the garment references and generated garment visibly appear solid with no pattern. Use unknown whenever evidence is insufficient. Requirements: ${input.requirements.join("; ")}.`;
   const responseSchema = input.kind === "view"
     ? { name: "virtual_try_on_view_qa", schema: virtualTryOnViewQaJsonSchema }
     : { name: "virtual_try_on_cross_qa", schema: virtualTryOnCrossQaJsonSchema };

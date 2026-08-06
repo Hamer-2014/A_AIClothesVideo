@@ -70,6 +70,7 @@ describe("default virtual try-on runtime dependencies", () => {
       qaJson: {
         verdict: "pass",
         targetView: "front",
+        observedView: "front",
         garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" },
         person: { anatomy: "natural", identityConsistency: "match" },
         inventedDetails: false,

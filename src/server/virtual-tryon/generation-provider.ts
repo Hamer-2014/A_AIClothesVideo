@@ -18,7 +18,7 @@ export type VirtualTryOnGenerationProviderDeps = {
 };
 
 function promptFor(view: AppearanceView) {
-  return "Create a single static " + view + " view of the configured AI model wearing the supplied garment. The ordered references are model, prior generated views when present, then garment front, garment back and garment detail. Use prior generated views only to preserve the same person and garment across views. Preserve the garment silhouette, color, pattern, construction and visible details. Do not invent garment details that are not present in the garment references.";
+  return "Create a single static " + view + " view of the configured AI model wearing the supplied garment. Compose for a 9:16 portrait frame and show the full body from head to toe. Keep the shoes and garment hem fully visible inside the safe area with breathing room; do not crop any part of the person or garment. The ordered references are model, prior generated views when present, then garment front, garment back and garment detail. Use prior generated views only to preserve the same person and garment across views. Preserve the garment silhouette, color, pattern, construction and visible details. Do not invent garment details that are not present in the garment references.";
 }
 
 function promptHash(prompt: string) {

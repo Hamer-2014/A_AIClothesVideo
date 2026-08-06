@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
-import { Pool } from "@neondatabase/serverless";
+import pg from "pg";
+
+const { Pool } = pg;
 
 dotenv.config({ path: ".env.local" });
 

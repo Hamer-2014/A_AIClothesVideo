@@ -39,8 +39,9 @@
 ### 本轮已收敛
 
 - MVP 产品口径改为：免费试用低分辨率、无音频、带水印；付费默认高分辨率、无水印、包含音频，用户侧不暴露供应商具体分辨率。
-- Cloud Run stitch payload 增加 `postQaMode`，主应用从 `video_jobs.post_qa_mode` 传递给 worker。
-- stitch-worker 抽帧已分级：8/16/24/32 秒保持 `off = 0`、`lite = 3`、`standard = 5`、`strict = 6`；40 秒 Standard 为 24 帧、Strict 为 34 帧，并保留片段/转场位置。
+- Cloud Run stitch payload 传递 `postQaMode`、`expectedAspectRatio` 和 `minimumShortSide`；主应用分别从 `video_jobs.post_qa_mode`、`aspect_ratio` 和 `generation_profile` 派生。
+- stitch-worker 抽帧已分级：8 秒保持 `off = 0`、`lite = 3`、`standard = 5`、`strict = 6`；16/24/32 秒的 Standard/Strict 在原均匀帧外增加全部拼接边界帧；40 秒 Standard 为 24 帧、Strict 为 34 帧，并保留片段/转场位置。
+- stitch-worker 在上传前校验实际画幅、档位最低短边，并对 Standard/Strict 多段成片执行至少 1 秒冻结检测。
 - 2026-06-13 风险收敛子项目 A：免费试用判断新增 `trial_abuse_signals`，接入 user/email/device/IP/user-agent 多信号、HMAC hash、生产缺 `ABUSE_HASH_SECRET` fail closed、普通用户统一拒绝文案、管理员任务详情展示 trial eligibility snapshot。
 - 2026-06-13 Env-only Video Generation Config：公开视频 `video_generation` 的 provider/model/key 改为只读取环境变量；health check 检查 `VIDEO_GENERATION_PROVIDER`、`VIDEO_GENERATION_MODEL` 和当前 provider 对应的 `APIMART_API_KEY` / `EVOLINK_API_KEY`，不再要求 `PROVIDER_KEY_ENCRYPTION_SECRET` 才能生成视频。
 - 2026-06-13 风险收敛子项目 C：Cloud Run `stitch-worker` 在 final mp4 后抽取 `jobs/{jobId}/covers/cover.webp`，封面生成失败只写 warning 且不阻断 final video / QA frames / callback；前台任务详情优先显示封面、无封面时回退视频预览，任务列表通过内部 cover API 的 R2 signed URL 展示可用封面缩略图。

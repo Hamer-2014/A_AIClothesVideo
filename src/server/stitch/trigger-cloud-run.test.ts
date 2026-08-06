@@ -17,6 +17,8 @@ describe("triggerCloudRunStitchJob", () => {
         coverKey: "jobs/job-1/covers/cover.webp",
         frameKeyPrefix: "jobs/job-1/qa/frames",
         postQaMode: "standard",
+        expectedAspectRatio: "9:16",
+        minimumShortSide: 720,
         callbackUrl: "https://app.example.com/api/internal/stitch/callback",
       },
       fetch: async (url, init) => {
@@ -36,6 +38,8 @@ describe("triggerCloudRunStitchJob", () => {
     expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({
       stitchJobId: "stitch-1",
       videoJobId: "job-1",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
     });
   });
 
@@ -50,6 +54,8 @@ describe("triggerCloudRunStitchJob", () => {
           segmentKeys: [],
           finalVideoKey: "jobs/job-1/stitched/final.mp4",
           postQaMode: "lite",
+          expectedAspectRatio: "9:16",
+          minimumShortSide: 540,
           callbackUrl: "https://app.example.com/api/internal/stitch/callback",
         },
         fetch: async () =>

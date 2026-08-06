@@ -48,7 +48,7 @@ describe("ExamplesPage", () => {
       .toBeInTheDocument();
     expect(screen.getByTestId("demo-case-video")).toHaveAttribute(
       "src",
-      "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+      "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s.mp4",
     );
 
     expect(

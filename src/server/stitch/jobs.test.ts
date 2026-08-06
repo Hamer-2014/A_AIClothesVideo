@@ -27,6 +27,7 @@ function createStores(
   segmentCount = 2,
   durationSeconds = segmentCount * 8,
   segmentIndexes = Array.from({ length: segmentCount }, (_, index) => index),
+  generationProfile: "trial_540p_watermarked" | "paid_720p_audio" | "paid_1080p_audio" = "paid_720p_audio",
 ) {
   const jobStore = createInMemoryJobStore([
     {
@@ -47,6 +48,8 @@ function createStores(
         durationSeconds,
         isTest: false,
         postQaMode: "standard",
+        aspectRatio: "9:16",
+        generationProfile,
       },
     ],
     segments: segmentIndexes.map((segmentIndex) => ({
@@ -82,6 +85,8 @@ describe("stitch jobs", () => {
       finalVideoKey: `jobs/${jobId}/stitched/final.mp4`,
       coverKey: `jobs/${jobId}/covers/cover.webp`,
       frameKeyPrefix: `jobs/${jobId}/qa/frames`,
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
       callbackUrl: "https://app.example.com/api/internal/stitch/callback",
     });
     expect(stores.stitchStore.listStitchJobs()[0]).toMatchObject({
@@ -93,6 +98,15 @@ describe("stitch jobs", () => {
       ],
     });
     expect(stores.jobStore.listJobs()[0]?.status).toBe("stitching_queued");
+  });
+
+  it("requires a 1080-pixel short side for the paid 1080p profile", async () => {
+    const result = await createStitchJobForVideo({
+      ...createStores(2, 16, [0, 1], "paid_1080p_audio"),
+      jobId,
+    });
+
+    expect(result.minimumShortSide).toBe(1080);
   });
 
   it("keeps all four 32-second segment keys in the stitch payload", async () => {

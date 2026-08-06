@@ -145,6 +145,8 @@ describe("32-second production flow", () => {
           durationSeconds: 32,
           isTest: false,
           postQaMode: "standard",
+          aspectRatio: "9:16",
+          generationProfile: "paid_720p_audio",
         },
       ],
       segments: confirmedSegments.map((segment) => ({

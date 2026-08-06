@@ -9,6 +9,7 @@ function strings(value: unknown) { if (!Array.isArray(value) || value.some((item
 export type StrictViewQa = {
   verdict: "pass" | "fail" | "unknown";
   targetView: AppearanceView;
+  observedView: AppearanceView | "unknown";
   garment: { silhouette: Match; color: Match; pattern: Match; visibleDetails: Match };
   person: { anatomy: "natural" | "abnormal" | "unknown"; identityConsistency: Match };
   inventedDetails: boolean | null;
@@ -26,7 +27,7 @@ export type StrictCrossViewQa = {
 
 export function parseStrictViewQa(value: unknown): StrictViewQa {
   const root = record(value); const garment = record(root.garment); const person = record(root.person);
-  return { verdict: oneOf(root.verdict, ["pass", "fail", "unknown"]), targetView: oneOf(root.targetView, ["front", "side", "back"]), garment: { silhouette: oneOf(garment.silhouette, ["match", "mismatch", "unknown"]), color: oneOf(garment.color, ["match", "mismatch", "unknown"]), pattern: oneOf(garment.pattern, ["match", "mismatch", "unknown"]), visibleDetails: oneOf(garment.visibleDetails, ["match", "mismatch", "unknown"]) }, person: { anatomy: oneOf(person.anatomy, ["natural", "abnormal", "unknown"]), identityConsistency: oneOf(person.identityConsistency, ["match", "mismatch", "unknown"]) }, inventedDetails: typeof root.inventedDetails === "boolean" ? root.inventedDetails : (() => { throw new Error("qa_schema_error"); })(), evidence: strings(root.evidence) };
+  return { verdict: oneOf(root.verdict, ["pass", "fail", "unknown"]), targetView: oneOf(root.targetView, ["front", "side", "back"]), observedView: oneOf(root.observedView, ["front", "side", "back", "unknown"]), garment: { silhouette: oneOf(garment.silhouette, ["match", "mismatch", "unknown"]), color: oneOf(garment.color, ["match", "mismatch", "unknown"]), pattern: oneOf(garment.pattern, ["match", "mismatch", "unknown"]), visibleDetails: oneOf(garment.visibleDetails, ["match", "mismatch", "unknown"]) }, person: { anatomy: oneOf(person.anatomy, ["natural", "abnormal", "unknown"]), identityConsistency: oneOf(person.identityConsistency, ["match", "mismatch", "unknown"]) }, inventedDetails: typeof root.inventedDetails === "boolean" ? root.inventedDetails : (() => { throw new Error("qa_schema_error"); })(), evidence: strings(root.evidence) };
 }
 
 export function parseStrictCrossViewQa(value: unknown): StrictCrossViewQa {
@@ -35,7 +36,8 @@ export function parseStrictCrossViewQa(value: unknown): StrictCrossViewQa {
 }
 
 export function isStrictViewQaPass(value: StrictViewQa, expectedView?: AppearanceView) {
-  return value.verdict === "pass" && (!expectedView || value.targetView === expectedView) && value.garment?.silhouette === "match" && value.garment.color === "match" && value.garment.pattern === "match" && value.garment.visibleDetails === "match" && value.person?.anatomy === "natural" && value.person.identityConsistency === "match" && value.inventedDetails === false;
+  const requiredView = expectedView ?? value.targetView;
+  return value.verdict === "pass" && value.targetView === requiredView && value.observedView === requiredView && value.garment?.silhouette === "match" && value.garment.color === "match" && value.garment.pattern === "match" && value.garment.visibleDetails === "match" && value.person?.anatomy === "natural" && value.person.identityConsistency === "match" && value.inventedDetails === false;
 }
 
 export function isStrictCrossViewQaPass(value: StrictCrossViewQa, expectedViews: AppearanceView[] = ["front", "side", "back"]) {

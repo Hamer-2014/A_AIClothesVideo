@@ -6,6 +6,8 @@ export interface CloudRunStitchPayload {
   coverKey?: string | null;
   frameKeyPrefix?: string | null;
   postQaMode: "off" | "lite" | "standard" | "strict";
+  expectedAspectRatio: "9:16" | "1:1" | "16:9";
+  minimumShortSide: number;
   callbackUrl: string;
 }
 

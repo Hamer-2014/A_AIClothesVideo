@@ -11,9 +11,9 @@ export function SampleVideo({
   className,
   controls = false,
   language = "en",
-  poster = "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+  poster = "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s-poster.webp",
   sourcePage,
-  src = "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+  src = "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s.mp4",
   testId,
 }: {
   ariaLabel?: string;

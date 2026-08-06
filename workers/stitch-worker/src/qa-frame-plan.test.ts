@@ -18,19 +18,35 @@ describe("buildQaFramePlan", () => {
     expect(buildQaFramePlan("lite", 1)).toHaveLength(3);
   });
 
-  it("preserves legacy total frame counts for 8/16/24 seconds", () => {
+  it("keeps the legacy segment frames and adds every boundary for Standard multi-segment videos", () => {
     expect(buildQaFramePlan("standard", 1)).toHaveLength(5);
-    expect(buildQaFramePlan("standard", 3)).toHaveLength(5);
-    expect(buildQaFramePlan("strict", 3)).toHaveLength(6);
+    const plan = buildQaFramePlan("standard", 3);
+
+    expect(plan).toHaveLength(7);
+    expect(plan.filter((point) => point.kind === "segment")).toHaveLength(5);
+    expect(plan.filter((point) => point.kind === "transition")).toEqual([
+      expect.objectContaining({ timestampSeconds: 8, segmentIndex: 0 }),
+      expect.objectContaining({ timestampSeconds: 16, segmentIndex: 1 }),
+    ]);
   });
 
-  it("keeps four segments on the normal Standard and Strict frame counts", () => {
+  it("adds every boundary to Strict 24-second and 32-second videos", () => {
+    const strict24 = buildQaFramePlan("strict", 3);
     const standard = buildQaFramePlan("standard", 4);
     const strict = buildQaFramePlan("strict", 4);
 
-    expect(standard).toHaveLength(5);
-    expect(strict).toHaveLength(6);
-    expect(standard.every((point) => point.kind === "segment")).toBe(true);
-    expect(strict.every((point) => point.kind === "segment")).toBe(true);
+    expect(strict24).toHaveLength(8);
+    expect(strict24.filter((point) => point.kind === "transition")).toHaveLength(2);
+    expect(standard).toHaveLength(8);
+    expect(strict).toHaveLength(9);
+    expect(standard.filter((point) => point.kind === "transition")).toHaveLength(3);
+    expect(strict.filter((point) => point.kind === "transition")).toHaveLength(3);
+  });
+
+  it("keeps Lite at three non-transition points for multi-segment videos", () => {
+    const plan = buildQaFramePlan("lite", 3);
+
+    expect(plan).toHaveLength(3);
+    expect(plan.every((point) => point.kind === "segment")).toBe(true);
   });
 });

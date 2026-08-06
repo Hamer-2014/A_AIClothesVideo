@@ -5,7 +5,7 @@ export interface LocalizedText {
   "zh-CN": string;
 }
 
-export type DemoSourceRole = "front" | "back" | "detail";
+export type DemoSourceRole = "front" | "side" | "back" | "detail";
 export type DemoSourceType = "internal-demo" | "synthetic-demo";
 export type DemoCaseStatus = "published" | "source-ready";
 

@@ -68,12 +68,12 @@ describe("SampleVideo", () => {
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
       .toHaveAttribute(
         "src",
-        "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+        "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s.mp4",
       );
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
       .toHaveAttribute(
         "poster",
-        "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+        "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s-poster.webp",
       );
   });
 

@@ -24,6 +24,8 @@ export interface StitchJobSourceRecord {
   durationSeconds: number;
   isTest: boolean;
   postQaMode: "off" | "lite" | "standard" | "strict";
+  aspectRatio: "9:16" | "1:1" | "16:9";
+  generationProfile: "trial_540p_watermarked" | "paid_720p_audio" | "paid_1080p_audio";
 }
 
 export interface StitchSegmentRecord {
@@ -86,6 +88,8 @@ export interface StitchDispatchResult {
   coverKey?: string | null;
   frameKeyPrefix?: string | null;
   postQaMode: "off" | "lite" | "standard" | "strict";
+  expectedAspectRatio: "9:16" | "1:1" | "16:9";
+  minimumShortSide: number;
   callbackUrl: string;
 }
 
@@ -95,18 +99,30 @@ function asStringArray(value: JsonValue) {
     : [];
 }
 
+function minimumShortSideForProfile(
+  profile: StitchJobSourceRecord["generationProfile"],
+) {
+  if (profile === "trial_540p_watermarked") return 540;
+  if (profile === "paid_1080p_audio") return 1080;
+  return 720;
+}
+
 function buildDispatchResult({
   jobId,
   stitchJob,
   segmentKeys,
   durationSeconds,
   postQaMode,
+  aspectRatio,
+  generationProfile,
 }: {
   jobId: string;
   stitchJob: StitchJobRecord;
   segmentKeys: string[];
   durationSeconds: number;
   postQaMode: "off" | "lite" | "standard" | "strict";
+  aspectRatio: StitchJobSourceRecord["aspectRatio"];
+  generationProfile: StitchJobSourceRecord["generationProfile"];
 }): StitchDispatchResult {
   const appUrl = (process.env.APP_URL ?? "").replace(/\/+$/, "");
   if (!appUrl) {
@@ -132,6 +148,8 @@ function buildDispatchResult({
     coverKey: buildCoverKey(jobId),
     frameKeyPrefix: `jobs/${jobId}/qa/frames`,
     postQaMode,
+    expectedAspectRatio: aspectRatio,
+    minimumShortSide: minimumShortSideForProfile(generationProfile),
     callbackUrl: `${appUrl}/api/internal/stitch/callback`,
   };
 }
@@ -203,6 +221,8 @@ export async function createStitchJobForVideo({
     segmentKeys: segmentKeys as string[],
     durationSeconds: job.durationSeconds,
     postQaMode: job.postQaMode,
+    aspectRatio: job.aspectRatio,
+    generationProfile: job.generationProfile,
   });
 }
 
@@ -229,6 +249,8 @@ export async function getQueuedStitchJobPayloadForVideo({
     segmentKeys: asStringArray(stitchJob.segmentKeys),
     durationSeconds: job.durationSeconds,
     postQaMode: job.postQaMode,
+    aspectRatio: job.aspectRatio,
+    generationProfile: job.generationProfile,
   });
 }
 
@@ -259,6 +281,8 @@ export async function triggerQueuedStitchJobForVideo({
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
     postQaMode: result.postQaMode,
+    expectedAspectRatio: result.expectedAspectRatio,
+    minimumShortSide: result.minimumShortSide,
     callbackUrl: result.callbackUrl,
   });
 
@@ -298,6 +322,8 @@ export async function createAndTriggerStitchJobForVideo({
     coverKey: result.coverKey,
     frameKeyPrefix: result.frameKeyPrefix,
     postQaMode: result.postQaMode,
+    expectedAspectRatio: result.expectedAspectRatio,
+    minimumShortSide: result.minimumShortSide,
     callbackUrl: result.callbackUrl,
   });
 
@@ -513,6 +539,8 @@ export function createDrizzleStitchStore(db: DbClient = getDb()): StitchStore {
           durationSeconds: videoJobs.durationSeconds,
           isTest: videoJobs.isTest,
           postQaMode: videoJobs.postQaMode,
+          aspectRatio: videoJobs.aspectRatio,
+          generationProfile: videoJobs.generationProfile,
         })
         .from(videoJobs)
         .where(eq(videoJobs.id, jobId))

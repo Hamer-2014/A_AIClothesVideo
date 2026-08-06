@@ -223,6 +223,59 @@ describe("runStitchJob", () => {
     expect(callbacks).toEqual(["failed:ffmpeg failed"]);
   });
 
+  it("rejects failed technical quality before uploading any stitched output", async () => {
+    const uploads: string[] = [];
+    const callbacks: string[] = [];
+
+    await expect(runStitchJob({
+      payload: {
+        stitchJobId: "stitch-quality",
+        videoJobId: "job-quality",
+        segmentKeys: ["segments/a.mp4", "segments/b.mp4", "segments/c.mp4"],
+        finalVideoKey: "jobs/job-quality/stitched/final.mp4",
+        coverKey: "jobs/job-quality/covers/cover.webp",
+        frameKeyPrefix: "jobs/job-quality/qa/frames",
+        postQaMode: "strict",
+        expectedAspectRatio: "9:16",
+        minimumShortSide: 1080,
+        callbackUrl: "https://app.example.com/api/internal/stitch/callback",
+      },
+      config: {
+        workerSecret: "secret",
+        callbackSecret: "callback-secret",
+        bucket: "bucket",
+        r2Endpoint: "https://account.r2.cloudflarestorage.com",
+        r2AccessKeyId: "access",
+        r2SecretAccessKey: "private",
+      },
+      createWorkDir: async () => "/tmp/stitch-quality",
+      writeTextFile: async () => {},
+      downloadObject: async () => {},
+      uploadObject: async ({ key }) => {
+        uploads.push(key);
+      },
+      stitchSegments: async () => {},
+      inspectVideoTechnicalQuality: async (input) => {
+        expect(input).toMatchObject({
+          videoPath: "/tmp/stitch-quality/final.mp4",
+          expectedAspectRatio: "9:16",
+          minimumShortSide: 1080,
+          detectFreeze: true,
+        });
+        throw new Error("video_quality_freeze_detected");
+      },
+      extractCoverFrame: async () => {},
+      extractQaFrames: async () => [],
+      sendCallback: async ({ result }) => {
+        callbacks.push(`${result.status}:${result.errorMessage}`);
+      },
+      cleanupWorkDir: async () => {},
+    })).rejects.toThrow("video_quality_freeze_detected");
+
+    expect(uploads).toEqual([]);
+    expect(callbacks).toEqual(["failed:video_quality_freeze_detected"]);
+  });
+
   it("uses the post QA mode to build a frame plan", async () => {
     const framePlanLengths: number[] = [];
 
@@ -300,6 +353,7 @@ describe("runStitchJob", () => {
         uploads.push(key);
       },
       stitchSegments: async () => {},
+      inspectVideoTechnicalQuality: async () => ({ width: 1080, height: 1920 }),
       extractQaFrames: async ({ framePlan }) =>
         framePlan.map((point) =>
           point.kind === "transition"

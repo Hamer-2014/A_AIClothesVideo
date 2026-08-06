@@ -39,6 +39,8 @@ describe("POST /api/internal/stitch/jobs", () => {
           coverKey: "jobs/job-1/covers/cover.webp",
           frameKeyPrefix: "jobs/job-1/qa/frames",
           postQaMode: "standard",
+          expectedAspectRatio: "9:16",
+          minimumShortSide: 720,
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
         triggerCloudRun: async (payload) => {
@@ -86,6 +88,8 @@ describe("POST /api/internal/stitch/jobs", () => {
           coverKey: "jobs/job-1/covers/cover.webp",
           frameKeyPrefix: "jobs/job-1/qa/frames",
           postQaMode: "standard",
+          expectedAspectRatio: "9:16",
+          minimumShortSide: 720,
           callbackUrl: "http://localhost/api/internal/stitch/callback",
         }),
         markRunning: async () => {},

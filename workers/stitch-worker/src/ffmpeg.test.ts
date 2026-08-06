@@ -4,7 +4,9 @@ import {
   buildConcatList,
   extractCoverFrame,
   extractQaFrames,
+  inspectVideoTechnicalQuality,
   listExtractedQaFrames,
+  parseFreezeDurations,
   stitchSegments,
 } from "./ffmpeg.js";
 
@@ -124,5 +126,72 @@ describe("ffmpeg helpers", () => {
       "/tmp/frames/frame-2.jpg",
       "/tmp/frames/frame-3.jpg",
     ]);
+  });
+
+  it("parses every completed freeze duration from ffmpeg diagnostics", () => {
+    expect(parseFreezeDurations(`
+[freezedetect @ 0x1] freeze_start: 8.073
+[freezedetect @ 0x1] freeze_duration: 1.041
+[freezedetect @ 0x1] freeze_end: 9.114
+[freezedetect @ 0x1] freeze_duration: 0.250
+    `)).toEqual([1.041, 0.25]);
+  });
+
+  it("accepts a 9:16 video that meets the minimum short side without a freeze", async () => {
+    const commands: Array<{ command: string; args: string[] }> = [];
+
+    await expect(inspectVideoTechnicalQuality({
+      videoPath: "/tmp/final.mp4",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
+      detectFreeze: true,
+      runCommand: async (command, args) => {
+        commands.push({ command, args });
+        return command === "ffprobe"
+          ? { stdout: JSON.stringify({ streams: [{ width: 720, height: 1280 }] }), stderr: "" }
+          : { stdout: "", stderr: "" };
+      },
+    })).resolves.toEqual({ width: 720, height: 1280 });
+
+    expect(commands.map(({ command }) => command)).toEqual(["ffprobe", "ffmpeg"]);
+    expect(commands[1]?.args).toContain("freezedetect=n=-50dB:d=1.0");
+  });
+
+  it("rejects a 2:3 video when the payload requires 9:16", async () => {
+    await expect(inspectVideoTechnicalQuality({
+      videoPath: "/tmp/final.mp4",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
+      detectFreeze: false,
+      runCommand: async () => ({
+        stdout: JSON.stringify({ streams: [{ width: 800, height: 1200 }] }),
+        stderr: "",
+      }),
+    })).rejects.toThrow("video_quality_aspect_ratio_mismatch");
+  });
+
+  it("rejects a video below the requested minimum short side", async () => {
+    await expect(inspectVideoTechnicalQuality({
+      videoPath: "/tmp/final.mp4",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 1080,
+      detectFreeze: false,
+      runCommand: async () => ({
+        stdout: JSON.stringify({ streams: [{ width: 720, height: 1280 }] }),
+        stderr: "",
+      }),
+    })).rejects.toThrow("video_quality_resolution_below_minimum");
+  });
+
+  it("rejects freezes at or above one second", async () => {
+    await expect(inspectVideoTechnicalQuality({
+      videoPath: "/tmp/final.mp4",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
+      detectFreeze: true,
+      runCommand: async (command) => command === "ffprobe"
+        ? { stdout: JSON.stringify({ streams: [{ width: 1080, height: 1920 }] }), stderr: "" }
+        : { stdout: "", stderr: "freeze_duration: 1.041" },
+    })).rejects.toThrow("video_quality_freeze_detected");
   });
 });

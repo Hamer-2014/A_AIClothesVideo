@@ -8,11 +8,15 @@ describe("virtual try-on strict QA", () => {
     expect(isStrictCrossViewQaPass({ verdict: "pass", requiredViews: ["front"], coverage: "incomplete", garmentConsistency: "match", personConsistency: "match", evidence: [] })).toBe(false);
   });
   it("rejects missing nested fields", () => {
-    expect(() => parseStrictViewQa({ verdict: "pass", targetView: "front", garment: {}, person: {}, inventedDetails: false, evidence: [] })).toThrow("qa_schema_error");
+    expect(() => parseStrictViewQa({ verdict: "pass", targetView: "front", observedView: "front", garment: {}, person: {}, inventedDetails: false, evidence: [] })).toThrow("qa_schema_error");
   });
   it("fails closed when a valid view result is bound to the wrong target", () => {
-    const qa = parseStrictViewQa({ verdict: "pass", targetView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] });
+    const qa = parseStrictViewQa({ verdict: "pass", targetView: "front", observedView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] });
     expect(isStrictViewQaPass(qa, "side")).toBe(false);
+  });
+  it("fails closed when the observed image orientation differs from the assigned target", () => {
+    const qa = parseStrictViewQa({ verdict: "pass", targetView: "front", observedView: "back", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] });
+    expect(isStrictViewQaPass(qa, "front")).toBe(false);
   });
   it("fails closed when a cross result has an out-of-order or incomplete view set", () => {
     const qa = parseStrictCrossViewQa({ verdict: "pass", requiredViews: ["front", "back", "side"], coverage: "complete", garmentConsistency: "match", personConsistency: "match", evidence: [] });

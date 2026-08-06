@@ -331,11 +331,6 @@ function buildFinalPromptSnapshot({
           "Do not copy people, faces, logos, storefront names, or readable text from scene assets.",
         ]
       : []),
-    ...parsed.segments.flatMap((segment) =>
-      mvpShotTemplates.find(
-        (template) => template.templateId === segment.templateId,
-      )?.systemConstraints ?? [],
-    ),
   ];
 
   return {

@@ -504,6 +504,11 @@ describe("confirmStoryboard", () => {
         },
       },
     });
+    const finalPromptSnapshot = stores.storyboardStore.listStoryboards()[0]
+      ?.finalPromptSnapshot as { globalHardConstraints?: string[] } | null;
+    expect(finalPromptSnapshot?.globalHardConstraints).not.toContain(
+      "Do not show the back side.",
+    );
     expect(moderatedPrompts[0]).toContain("GLOBAL HARD CONSTRAINTS:");
     expect(moderatedPrompts[0]).toContain("GLOBAL USER INTENT:");
     expect(moderatedPrompts[0]).toContain("- Clean ecommerce product video.");

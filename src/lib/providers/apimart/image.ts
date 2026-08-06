@@ -49,10 +49,10 @@ function parseSubmit(raw: unknown) {
   return first.task_id;
 }
 function parseStatus(value: unknown): ProviderStatus {
-  if (value === "submitted") return "queued";
+  if (value === "submitted" || value === "pending") return "queued";
   if (value === "processing") return "running";
   if (value === "completed") return "succeeded";
-  if (value === "failed") return "failed";
+  if (value === "failed" || value === "cancelled") return "failed";
   throw new APIMartImageProviderError({ operation: "poll", code: "response_schema_error" });
 }
 function parseCompletedOutput(raw: RecordValue) {
@@ -70,7 +70,7 @@ function parseCompletedOutput(raw: RecordValue) {
 export async function createAPIMartImageGeneration(input: { prompt: string; imageUrls: string[] }, deps: Deps = {}) {
   if (input.imageUrls.length < 1 || input.imageUrls.length > 16) throw new Error("APIMart image generation accepts 1 to 16 image URLs.");
   const current = config(deps);
-  const response = await request(deps.fetch ?? fetch, current.baseUrl + "/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer " + current.apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-image-2", n: 1, size: "2:3", resolution: "2k", prompt: input.prompt, image_urls: input.imageUrls }) }, current.timeoutMs, "generation");
+  const response = await request(deps.fetch ?? fetch, current.baseUrl + "/v1/images/generations", { method: "POST", headers: { Authorization: "Bearer " + current.apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-image-2", n: 1, size: "9:16", resolution: "2k", prompt: input.prompt, image_urls: input.imageUrls }) }, current.timeoutMs, "generation");
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new APIMartImageProviderError({ operation: "generation", status: response.status });
   return { provider: "apimart" as const, model: "gpt-image-2", providerTaskId: parseSubmit(body) };

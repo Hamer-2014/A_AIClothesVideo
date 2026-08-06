@@ -78,7 +78,7 @@ describe("virtual try-on runtime tick", () => {
     const { job, store } = qaReadyStore("qa_queued");
     const credits = await reservedCredits();
     const qaStore = createInMemoryVirtualTryOnQaStore();
-    const visionProvider = vi.fn().mockResolvedValue({ provider: "vision", model: "strict", qaJson: { verdict: "pass", targetView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] }, raw: { ignored: true } });
+    const visionProvider = vi.fn().mockResolvedValue({ provider: "vision", model: "strict", qaJson: { verdict: "pass", targetView: "front", observedView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] }, raw: { ignored: true } });
 
     const result = await runVirtualTryOnTick({ workerId: "worker", store, credits, submit: async () => "unexpected", poll: async () => ({ status: "succeeded", outputUrl: null }), qaDeps: { signer: async (key) => "https://signed.example/" + key, visionProvider, qaStore, providerLogStore: createInMemoryProviderCallLogStore() } });
 

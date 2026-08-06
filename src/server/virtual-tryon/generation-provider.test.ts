@@ -65,6 +65,11 @@ describe("virtual try-on APIMart generation provider", () => {
       "users/user-1/assets/front/original.png",
       "users/user-1/assets/detail/original.png",
     ]);
+    expect(imageClient).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.stringMatching(
+        /9:16[\s\S]*full body[\s\S]*shoes[\s\S]*garment hem[\s\S]*safe area/i,
+      ),
+    }));
   });
 
   it("fails closed when a side or back view lacks its transferred predecessor", async () => {

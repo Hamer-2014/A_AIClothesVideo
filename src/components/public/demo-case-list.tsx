@@ -9,11 +9,13 @@ import { SampleVideo } from "./sample-video";
 const roleLabels: Record<SiteLocale, Record<DemoSourceRole, string>> = {
   en: {
     front: "Front",
+    side: "Side",
     back: "Back",
     detail: "Detail",
   },
   "zh-CN": {
     front: "正面",
+    side: "侧面",
     back: "背面",
     detail: "细节",
   },
@@ -45,7 +47,7 @@ export function DemoCaseList({
               aria-labelledby={`demo-case-${item.slug}`}
               className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start lg:gap-12"
             >
-              <div className="relative aspect-[4/5] max-h-[680px] overflow-hidden bg-[var(--surface-subtle)]">
+              <div className={`relative max-h-[680px] overflow-hidden bg-[var(--surface-subtle)] ${item.featuredOutput ? "aspect-[9/16]" : "aspect-[4/5]"}`}>
                 {item.featuredOutput ? (
                   <SampleVideo
                     ariaLabel={
@@ -53,7 +55,7 @@ export function DemoCaseList({
                         ? `由${title}素材生成的商品视频`
                         : `Generated ${title.toLowerCase()} product video`
                     }
-                    className="size-full object-cover"
+                    className="size-full object-contain"
                     controls
                     language={language}
                     poster={item.featuredOutput.posterSrc}

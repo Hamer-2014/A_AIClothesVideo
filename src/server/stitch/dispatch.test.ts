@@ -31,6 +31,8 @@ function stores() {
         durationSeconds: 8,
         isTest: false,
         postQaMode: "standard",
+        aspectRatio: "9:16",
+        generationProfile: "paid_720p_audio",
       },
     ],
     segments: [
@@ -67,7 +69,11 @@ describe("stitch dispatch", () => {
 
     expect(result.cloudRun.accepted).toBe(true);
     expect(triggered).toHaveLength(1);
-    expect(triggered[0]).toMatchObject({ postQaMode: "standard" });
+    expect(triggered[0]).toMatchObject({
+      postQaMode: "standard",
+      expectedAspectRatio: "9:16",
+      minimumShortSide: 720,
+    });
     expect(stitchStore.listStitchJobs()[0]?.status).toBe("running");
     expect(jobStore.listJobs()[0]?.status).toBe("stitching_running");
     expect(calls).toEqual(["running"]);
@@ -119,6 +125,8 @@ describe("stitch dispatch", () => {
           durationSeconds: 8,
           isTest: false,
           postQaMode: "lite",
+          aspectRatio: "9:16",
+          generationProfile: "trial_540p_watermarked",
         },
       ],
       segments: [

@@ -27,6 +27,8 @@ interface CreateStitchJobDeps {
     coverKey?: string | null;
     frameKeyPrefix?: string | null;
     postQaMode: "off" | "lite" | "standard" | "strict";
+    expectedAspectRatio: "9:16" | "1:1" | "16:9";
+    minimumShortSide: number;
     callbackUrl: string;
     cloudRun?: CloudRunStitchTriggerResult;
   }>;
@@ -109,6 +111,8 @@ export async function handleCreateStitchJobRequest(
           coverKey: result.coverKey,
           frameKeyPrefix: result.frameKeyPrefix,
           postQaMode: result.postQaMode,
+          expectedAspectRatio: result.expectedAspectRatio,
+          minimumShortSide: result.minimumShortSide,
           callbackUrl: result.callbackUrl,
         });
       } catch {
@@ -128,6 +132,8 @@ export async function handleCreateStitchJobRequest(
           coverKey: result.coverKey,
           frameKeyPrefix: result.frameKeyPrefix,
           postQaMode: result.postQaMode,
+          expectedAspectRatio: result.expectedAspectRatio,
+          minimumShortSide: result.minimumShortSide,
           callbackUrl: result.callbackUrl,
         });
       } catch {

@@ -6,6 +6,8 @@ export interface StitchPayload {
   coverKey: string | null;
   frameKeyPrefix: string | null;
   postQaMode: "off" | "lite" | "standard" | "strict";
+  expectedAspectRatio?: "9:16" | "1:1" | "16:9" | null;
+  minimumShortSide?: number | null;
   callbackUrl: string;
 }
 
@@ -21,6 +23,20 @@ function postQaModeValue(value: unknown): StitchPayload["postQaMode"] {
     normalized === "lite"
     ? normalized
     : "lite";
+}
+
+function aspectRatioValue(value: unknown): StitchPayload["expectedAspectRatio"] {
+  const normalized = stringValue(value);
+  if (!normalized) return null;
+  return normalized === "9:16" || normalized === "1:1" || normalized === "16:9"
+    ? normalized
+    : undefined;
+}
+
+function positiveIntegerValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = Number(value);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : undefined;
 }
 
 export function parseStitchPayload(input: unknown): StitchPayload {
@@ -42,6 +58,8 @@ export function parseStitchPayload(input: unknown): StitchPayload {
     coverKey: stringValue(record.coverKey) || null,
     frameKeyPrefix: stringValue(record.frameKeyPrefix) || null,
     postQaMode: postQaModeValue(record.postQaMode),
+    expectedAspectRatio: aspectRatioValue(record.expectedAspectRatio) ?? null,
+    minimumShortSide: positiveIntegerValue(record.minimumShortSide) ?? null,
     callbackUrl: stringValue(record.callbackUrl),
   };
 
@@ -50,7 +68,9 @@ export function parseStitchPayload(input: unknown): StitchPayload {
     !payload.videoJobId ||
     payload.segmentKeys.length === 0 ||
     !payload.finalVideoKey ||
-    !payload.callbackUrl
+    !payload.callbackUrl ||
+    aspectRatioValue(record.expectedAspectRatio) === undefined ||
+    positiveIntegerValue(record.minimumShortSide) === undefined
   ) {
     throw new Error("invalid_stitch_payload");
   }

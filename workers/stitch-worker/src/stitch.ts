@@ -8,6 +8,7 @@ import {
   extractCoverFrame as defaultExtractCoverFrame,
   buildConcatList,
   extractQaFrames as defaultExtractQaFrames,
+  inspectVideoTechnicalQuality as defaultInspectVideoTechnicalQuality,
   listExtractedQaFrames as defaultListExtractedQaFrames,
   stitchSegments as defaultStitchSegments,
 } from "./ffmpeg.js";
@@ -26,6 +27,7 @@ interface RunStitchJobDeps {
   stitchSegments?: typeof defaultStitchSegments;
   extractCoverFrame?: typeof defaultExtractCoverFrame;
   extractQaFrames?: typeof defaultExtractQaFrames;
+  inspectVideoTechnicalQuality?: typeof defaultInspectVideoTechnicalQuality;
   listExtractedQaFrames?: typeof defaultListExtractedQaFrames;
   sendCallback?: typeof sendStitchCallback;
   cleanupWorkDir?: (workDir: string) => Promise<void>;
@@ -47,6 +49,7 @@ export async function runStitchJob({
   stitchSegments = defaultStitchSegments,
   extractCoverFrame = defaultExtractCoverFrame,
   extractQaFrames = defaultExtractQaFrames,
+  inspectVideoTechnicalQuality = defaultInspectVideoTechnicalQuality,
   sendCallback = sendStitchCallback,
   cleanupWorkDir = (workDir) => rm(workDir, { recursive: true, force: true }),
   downloadObject,
@@ -83,6 +86,18 @@ export async function runStitchJob({
     );
     await writeTextFile(concatListPath, buildConcatList(segmentPaths));
     await stitchSegments({ concatListPath, outputPath });
+
+    const detectFreeze =
+      payload.segmentKeys.length > 1 &&
+      (payload.postQaMode === "standard" || payload.postQaMode === "strict");
+    if (payload.expectedAspectRatio || payload.minimumShortSide || detectFreeze) {
+      await inspectVideoTechnicalQuality({
+        videoPath: outputPath,
+        expectedAspectRatio: payload.expectedAspectRatio ?? null,
+        minimumShortSide: payload.minimumShortSide ?? null,
+        detectFreeze,
+      });
+    }
 
     const warnings: string[] = [];
     let generatedCoverKey: string | null = null;

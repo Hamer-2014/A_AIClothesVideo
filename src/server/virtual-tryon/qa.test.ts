@@ -3,7 +3,7 @@ import { createInMemoryProviderCallLogStore } from "@/lib/providers/log-call";
 import { createInMemoryVirtualTryOnQaStore } from "./qa-store";
 import { runVirtualTryOnQa } from "./qa";
 
-const view = { verdict: "pass", targetView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] };
+const view = { verdict: "pass", targetView: "front", observedView: "front", garment: { silhouette: "match", color: "match", pattern: "match", visibleDetails: "match" }, person: { anatomy: "natural", identityConsistency: "match" }, inventedDetails: false, evidence: [] };
 const cross = { verdict: "pass", requiredViews: ["front", "side", "back"], coverage: "complete", garmentConsistency: "match", personConsistency: "match", evidence: [] };
 
 describe("virtual try-on QA", () => {
@@ -47,6 +47,15 @@ describe("virtual try-on QA", () => {
     const mismatch = await runVirtualTryOnQa({ jobId: "job2", userId: "user", packId: "pack2", mode: "front_only", sourceKeys: { front: "f" }, modelKeys: { front: "mf", side: "ms", back: "mb" }, generatedKeys: { front: "gf" } }, { signer: async (key) => "https://signed/" + key, visionProvider: async () => ({ provider: "vision", model: "strict", qaJson: { ...view, person: { anatomy: "natural", identityConsistency: "mismatch" } }, raw: {} }), qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: createInMemoryProviderCallLogStore() });
     expect(missing.allPassed).toBe(false);
     expect(mismatch.allPassed).toBe(false);
+  });
+
+  it("fails closed when the generated image orientation does not match its assigned view", async () => {
+    const result = await runVirtualTryOnQa(
+      { jobId: "job", userId: "user", packId: "pack", mode: "front_only", sourceKeys: { front: "f" }, modelKeys: { front: "mf", side: "ms", back: "mb" }, generatedKeys: { front: "gf" } },
+      { signer: async (key) => "https://signed/" + key, visionProvider: async () => ({ provider: "vision", model: "strict", qaJson: { ...view, observedView: "back" }, raw: {} }), qaStore: createInMemoryVirtualTryOnQaStore(), providerLogStore: createInMemoryProviderCallLogStore() },
+    );
+
+    expect(result.allPassed).toBe(false);
   });
 
   it("logs the actual model and provider failure stage without signed URLs", async () => {

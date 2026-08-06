@@ -501,6 +501,92 @@ describe("get video job detail", () => {
     expect(detail?.recommendations.availableTemplateIds).toContain("fabric_macro");
   });
 
+  it("preserves declared model view roles when reparsing persisted provider JSON", async () => {
+    const assets = [
+      { assetId: "model-front", role: "front", sortOrder: 0 },
+      { assetId: "model-side", role: "side", sortOrder: 1 },
+      { assetId: "model-back", role: "back", sortOrder: 2 },
+    ];
+    const analyses = assets.map((asset) => ({
+      assetId: asset.assetId,
+      analysisJson: {
+        asset_role: "apparel product image",
+        garment_category: "dress",
+        view_angle: `${asset.role} view`,
+        human_present: "yes",
+        subject_kind: "human_model",
+        visible_details: ["dress"],
+        not_visible_details: [],
+        quality: {
+          is_garment: true,
+          is_clear: true,
+          is_safe: true,
+        },
+        confidence: "high",
+        risk_flags: [],
+      },
+    }));
+    const store = createInMemoryVideoJobReadStore({
+      jobs: [
+        {
+          id: jobId,
+          userId,
+          status: "asset_analysis_passed",
+          userVisibleStatus: "assets_ready",
+          lastError: null,
+          failureReason: null,
+          durationSeconds: 24,
+          aspectRatio: "9:16",
+          presetId: "minimal_studio",
+          presetSnapshot: null,
+          creditCost: 190,
+          billingMode: "paid",
+          generationProfile: "paid_720p_audio",
+          watermarkEnabled: false,
+        },
+      ],
+      assets,
+      analyses,
+      consistencyAnalyses: [
+        {
+          videoJobId: jobId,
+          analysisKind: "model_views",
+          status: "passed",
+          garmentMatch: "pass",
+          modelMatch: "pass",
+          colorMatch: true,
+          patternMatch: true,
+          viewCoverage: ["front", "side", "back"],
+          confidence: "high",
+          riskFlags: [],
+          resultJson: {},
+        },
+      ],
+      storyboards: [],
+    });
+
+    const detail = await getVideoJobDetail({
+      store,
+      jobId,
+      userId,
+      templates: mvpShotTemplates,
+    });
+
+    expect(detail?.assetCompleteness).toMatchObject({
+      hasModelFront: true,
+      hasModelSide: true,
+      hasModelBack: true,
+      modelGarmentConsistency: "pass",
+      modelConsistency: "pass",
+    });
+    expect(detail?.recommendations.availableTemplateIds).toContain(
+      "model_quarter_turn",
+    );
+    expect(detail?.recommendations.availableTemplateIds).toContain(
+      "model_half_turn",
+    );
+  });
+
   it("returns analysis quality summaries for uploaded asset warnings", async () => {
     const store = createInMemoryVideoJobReadStore({
       jobs: [

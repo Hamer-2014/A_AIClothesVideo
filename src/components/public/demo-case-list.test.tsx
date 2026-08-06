@@ -26,11 +26,14 @@ describe("DemoCaseList", () => {
     expect(screen.getByLabelText("Generated adult burgundy midi dress product video"))
       .toHaveAttribute(
         "src",
-        "/demo/cases/burgundy-midi-dress/minimal-studio.mp4",
+        "/demo/cases/burgundy-midi-dress/virtual-try-on-homepage-8s.mp4",
       );
     expect(screen.getAllByText("Synthetic product input generated with ImageGen. It is not a customer case."))
       .toHaveLength(2);
     expect(screen.getAllByTestId("demo-case-video")).toHaveLength(1);
+    expect(screen.getByTestId("demo-case-video").parentElement)
+      .toHaveClass("aspect-[9/16]");
+    expect(screen.getByTestId("demo-case-video")).toHaveClass("object-contain");
   });
 
   it("renders the generated blazer and cardigan assets", () => {
@@ -58,6 +61,7 @@ describe("DemoCaseList", () => {
       .toHaveLength(2);
     expect(screen.getAllByText("正面")).toHaveLength(3);
     expect(screen.getAllByText("背面")).toHaveLength(3);
-    expect(screen.getAllByText("细节")).toHaveLength(3);
+    expect(screen.getByText("侧面")).toBeInTheDocument();
+    expect(screen.getAllByText("细节")).toHaveLength(2);
   });
 });
