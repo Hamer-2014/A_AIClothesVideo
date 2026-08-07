@@ -47,7 +47,7 @@ describe("bilingual guide pages", () => {
     vi.clearAllMocks();
   });
 
-  it("publishes an English-first guide index with three discoverable articles", async () => {
+  it("publishes an English-first guide index with six discoverable articles", async () => {
     render(await GuidesIndexPage());
 
     expect(
@@ -62,6 +62,12 @@ describe("bilingual guide pages", () => {
       .toHaveAttribute("href", "/guides/choose-clothing-video-length");
     expect(screen.getByRole("link", { name: "Why do AI clothing videos deform or drift?" }))
       .toHaveAttribute("href", "/guides/why-ai-clothing-videos-deform");
+    expect(screen.getByRole("link", { name: "How do you check whether clothing images show the same SKU?" }))
+      .toHaveAttribute("href", "/guides/check-clothing-images-match");
+    expect(screen.getByRole("link", { name: "Model, mannequin, or flat lay: which clothing photos work for AI video?" }))
+      .toHaveAttribute("href", "/guides/model-mannequin-flat-lay-for-ai-video");
+    expect(screen.getByRole("link", { name: "How to plan a clothing product video shot list" }))
+      .toHaveAttribute("href", "/guides/plan-clothing-video-shots");
     expect(screen.getByRole("link", { name: "Start with the three-image workflow" }))
       .toHaveAttribute("href", "/three-images-to-clothing-video");
   });
@@ -75,6 +81,10 @@ describe("bilingual guide pages", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "没有背面图可以生成服装视频吗？" }))
       .toHaveAttribute("href", "/zh/guides/clothing-video-without-back-image");
+    expect(screen.getByRole("link", { name: "如何检查服装图片是不是同一件 SKU？" }))
+      .toHaveAttribute("href", "/zh/guides/check-clothing-images-match");
+    expect(screen.getByRole("link", { name: "真人模特、人台还是平铺图：哪种素材适合 AI 服装视频？" }))
+      .toHaveAttribute("href", "/zh/guides/model-mannequin-flat-lay-for-ai-video");
     expect(screen.getByRole("link", { name: "先了解三图生成流程" }))
       .toHaveAttribute("href", "/zh/three-images-to-clothing-video");
   });
@@ -151,6 +161,9 @@ describe("bilingual guide pages", () => {
       { slug: "clothing-video-without-back-image" },
       { slug: "choose-clothing-video-length" },
       { slug: "why-ai-clothing-videos-deform" },
+      { slug: "check-clothing-images-match" },
+      { slug: "model-mannequin-flat-lay-for-ai-video" },
+      { slug: "plan-clothing-video-shots" },
     ]);
 
     expect(await generateIndexMetadata()).toMatchObject({

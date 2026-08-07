@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import { guideArticles, guideSlugs } from "./catalog";
 
 describe("guide catalog", () => {
-  it("publishes three complete English-first bilingual guides", () => {
+  it("publishes six complete English-first bilingual guides", () => {
     expect(guideSlugs).toEqual([
       "clothing-video-without-back-image",
       "choose-clothing-video-length",
       "why-ai-clothing-videos-deform",
+      "check-clothing-images-match",
+      "model-mannequin-flat-lay-for-ai-video",
+      "plan-clothing-video-shots",
     ]);
 
     for (const slug of guideSlugs) {

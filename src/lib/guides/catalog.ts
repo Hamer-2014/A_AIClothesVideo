@@ -4,6 +4,9 @@ export const guideSlugs = [
   "clothing-video-without-back-image",
   "choose-clothing-video-length",
   "why-ai-clothing-videos-deform",
+  "check-clothing-images-match",
+  "model-mannequin-flat-lay-for-ai-video",
+  "plan-clothing-video-shots",
 ] as const;
 
 export type GuideSlug = (typeof guideSlugs)[number];
@@ -55,10 +58,10 @@ export interface GuideArticle {
 export const guideIndexCopy = {
   en: {
     metadataTitle: "Clothing product video guides | AI Clothes Video",
-    metadataDescription: "Practical, evidence-led guides for preparing clothing images, choosing video length, and reducing garment drift in AI product videos.",
+    metadataDescription: "Practical, evidence-led guides for matching clothing images, choosing source formats and video length, planning shots, and reducing garment drift.",
     eyebrow: "AI Clothes Video · Practical guides",
     title: "Make better clothing videos before you press generate",
-    intro: "Use these field guides to prepare one traceable SKU, choose only the shots your images can support, and review the result with realistic expectations.",
+    intro: "Use these field guides to match one traceable SKU, choose the right source format, plan only the shots your images can support, and review the result with realistic expectations.",
     parentLabel: "Start with the three-image workflow",
     articleLabel: "Read guide",
     evidenceTitle: "The shared rule behind every guide",
@@ -66,10 +69,10 @@ export const guideIndexCopy = {
   },
   "zh-CN": {
     metadataTitle: "服装商品视频实用指南｜AI Clothes Video",
-    metadataDescription: "从服装素材准备、视频时长选择到减少细节漂移，了解如何用三张同款图片制作更可控的 AI 商品视频。",
+    metadataDescription: "从核对同款素材、选择图片形态、规划分镜和视频时长到减少细节漂移，了解如何制作更可控的 AI 服装商品视频。",
     eyebrow: "AI Clothes Video · 实用指南",
     title: "点击生成前，先把服装视频做对",
-    intro: "用这些指南核对同一件 SKU 的素材、选择图片真正支持的镜头，并以合理预期检查生成结果。",
+    intro: "用这些指南核对同一件 SKU、选择合适的素材形态、规划图片真正支持的镜头，并以合理预期检查生成结果。",
     parentLabel: "先了解三图生成流程",
     articleLabel: "阅读指南",
     evidenceTitle: "所有指南共用的一条原则",
@@ -548,6 +551,432 @@ export const guideArticles = {
       ctaTitle: "准备验证一组同款素材了吗？",
       ctaBody: "先生成一条低风险 8 秒试用视频，再用三张源图片核对完整运动。",
       ctaLabel: "用三张同款素材开始生成",
+    },
+  },
+  "check-clothing-images-match": {
+    slug: "check-clothing-images-match",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "why-ai-clothing-videos-deform",
+      "model-mannequin-flat-lay-for-ai-video",
+    ],
+    imageSrc: "/demo/cases/structured-blazer/front.webp",
+    en: {
+      metadataTitle: "Clothing product image consistency checklist | AI Clothes Video",
+      title: "How do you check whether clothing images show the same SKU?",
+      description: "Use a practical clothing product image consistency checklist before making an AI video. Compare color, silhouette, print placement, trim, crop, and source rights.",
+      eyebrow: "Source checklist · SKU consistency",
+      directAnswer: "Place every source image side by side and verify the product facts, not just the filename. Color, silhouette, print placement, hardware, and construction must describe the same SKU before you plan motion.",
+      imageAlt: "Front product image of a structured blazer used for a same-SKU consistency check",
+      imageCaption: "A clean front image establishes visible product facts. Back and detail images should confirm this exact color, construction, trim, and version.",
+      parentLabel: "See where each source image fits in the three-image workflow",
+      sections: [
+        {
+          heading: "The same filename does not prove the same product",
+          paragraphs: [
+            ["Two images can share a product code and still show different colors, samples, production runs, or retouched versions. AI video generation has to reconcile everything visible in the frame, so a small source disagreement can become a moving color shift, changing button, or unstable hem."],
+            ["The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " treats front, back, and detail images as evidence for one garment. Before uploading, your job is to confirm that those pieces of evidence agree."],
+          ],
+        },
+        {
+          heading: "Run a five-point same-SKU check",
+          paragraphs: [
+            ["Open the images at a similar scale and compare fixed product facts. Do not rely on an overall impression; inspect the places most likely to reveal a nearby colorway or sample version."],
+          ],
+          bullets: [
+            "Color and material: compare neutral areas, highlights, knit density, sheen, and wash effects.",
+            "Silhouette and proportions: check length, shoulder width, waist position, sleeve shape, and hem.",
+            "Print and panel placement: match repeats, logo position, stripes, seams, and color blocking.",
+            "Trim and hardware: count buttons, pockets, zippers, snaps, ties, labels, and decorative pieces.",
+            "Construction details: compare neckline, cuffs, vents, pleats, lining, and back closures.",
+          ],
+        },
+        {
+          heading: "Separate photography differences from product differences",
+          paragraphs: [
+            ["Lighting, white balance, camera distance, and pose can make a matching garment look different. A warm studio light may shift color; a close detail crop may enlarge a print; a model pose may change the apparent hemline. These are photography differences, not automatic proof of a mismatch."],
+            ["Look for facts that should not move with the camera: the number of buttons, the order of stripes, the location of a seam, or the shape of a zipper pull. If those disagree, replace the image. If only exposure or crop differs, choose the clearest set and keep the planned motion restrained."],
+          ],
+        },
+        {
+          heading: "What to do when one source image conflicts",
+          paragraphs: [
+            ["Do not ask the prompt to choose the correct version. A text instruction cannot erase conflicting visual evidence. Resolve the source set before generation."],
+          ],
+          numberedItems: [
+            "Identify the exact conflicting fact, such as color, button count, print position, or length.",
+            "Check the product record or original shoot folder to determine which image belongs to the active SKU.",
+            "Replace the outlier with a front, back, or detail image from the same product version.",
+            "If no replacement exists, capture the missing view instead of filling the slot with a similar item.",
+            "Repeat the side-by-side check and confirm the required image and likeness rights.",
+          ],
+        },
+        {
+          heading: "Match the source set before choosing shots",
+          paragraphs: [
+            ["Once the three images agree, decide what each one can actually support. A real back view can support back-facing options; a visible detail can support a restrained close-up. The guide to ", { href: "/guides/why-ai-clothing-videos-deform", label: "why clothing videos deform or drift" }, " explains what happens when sources disagree, while the ", { href: "/guides/model-mannequin-flat-lay-for-ai-video", label: "model, mannequin, and flat-lay comparison" }, " helps you choose the right source format."],
+            ["For a visual benchmark, compare the traceable sets on the ", { href: "/examples", label: "source examples page" }, ". Your own SKU still needs its own evidence check."],
+          ],
+        },
+      ],
+      relatedHeading: "Continue improving the source set",
+      ctaTitle: "Do all three images describe one garment?",
+      ctaBody: "Upload the verified front, back, and detail set, then start with one low-risk 8-second trial.",
+      ctaLabel: "Test a matched source set",
+    },
+    "zh-CN": {
+      metadataTitle: "服装商品图同款一致性检查清单｜AI Clothes Video",
+      title: "如何检查服装图片是不是同一件 SKU？",
+      description: "生成 AI 服装视频前，用清单核对商品图的颜色、版型、印花位置、辅料、裁切和素材授权，排除不同色号或版本混用。",
+      eyebrow: "素材清单 · 同款一致性",
+      directAnswer: "把所有素材图并排放大，核对真实商品信息，而不是只看文件名。颜色、版型、印花位置、辅料和结构都必须指向同一件 SKU，再开始规划运动镜头。",
+      imageAlt: "用于同款一致性检查的结构感西装正面商品图",
+      imageCaption: "清晰正面图用于确认可见商品信息。背面和细节图应继续证明同一颜色、结构、辅料与商品版本。",
+      parentLabel: "查看每张素材图在三图流程中的作用",
+      sections: [
+        {
+          heading: "文件名相同，不代表商品一定相同",
+          paragraphs: [
+            ["两张图片可能使用同一个货号，却来自不同颜色、样衣、生产批次或修图版本。AI 视频需要同时协调画面中的所有信息，源图里一个不起眼的矛盾，到了连续画面里可能变成颜色跳变、纽扣变化或下摆漂移。"],
+            ["在", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "中，正面、背面和细节图共同为同一件服装提供证据。上传前必须先确认这些证据彼此一致。"],
+          ],
+        },
+        {
+          heading: "用五项清单核对同一件 SKU",
+          paragraphs: [
+            ["把图片调整到接近的显示尺度，逐项检查固定商品信息。不要只凭整体感觉，要重点看最容易暴露相似款、不同色号或不同样衣版本的位置。"],
+          ],
+          bullets: [
+            "颜色与材质：比较中性区域、高光、针织密度、光泽和水洗效果。",
+            "版型与比例：检查衣长、肩宽、腰线、袖型和下摆。",
+            "印花与拼片位置：对应图案循环、Logo、条纹、缝线和撞色区域。",
+            "辅料与五金：清点纽扣、口袋、拉链、按扣、系带、标签和装饰件。",
+            "结构细节：比较领口、袖口、开衩、褶裥、里布和背部闭合方式。",
+          ],
+        },
+        {
+          heading: "区分拍摄差异和商品差异",
+          paragraphs: [
+            ["灯光、白平衡、拍摄距离和姿势会让同一件衣服看起来不同。暖色棚灯可能改变颜色，细节近拍会放大图案，模特姿势也会改变下摆的视觉位置。这些属于拍摄差异，不能直接判定为不同款。"],
+            ["优先核对不会随相机变化的事实：纽扣数量、条纹顺序、缝线位置或拉链头形状。如果这些信息冲突，应更换图片；如果只是曝光或裁切不同，就选择更清晰的一组，并降低镜头运动幅度。"],
+          ],
+        },
+        {
+          heading: "发现一张图冲突时怎么办",
+          paragraphs: [
+            ["不要在 prompt 里要求模型自行选择正确版本。文字指令无法消除互相冲突的视觉证据，应在生成前先修正素材组。"],
+          ],
+          numberedItems: [
+            "指出具体冲突项，例如颜色、纽扣数量、印花位置或衣长。",
+            "检查商品资料或原始拍摄文件夹，确认哪张图属于当前销售 SKU。",
+            "用同一商品版本的正面、背面或细节图替换异常图片。",
+            "没有替代图时补拍缺失视角，不要用相似款凑满上传位置。",
+            "再次并排核对，并确认图片、肖像和商业使用授权。",
+          ],
+        },
+        {
+          heading: "素材一致后再选择镜头",
+          paragraphs: [
+            ["三张图一致后，再决定每张图实际能支持什么。真实背面图可以支持背面相关选项，清晰细节图可以支持克制的局部特写。可以继续阅读", { href: "/guides/why-ai-clothing-videos-deform", label: "AI 服装视频为什么会变形" }, "，了解素材冲突如何影响连续画面；也可以对比", { href: "/guides/model-mannequin-flat-lay-for-ai-video", label: "真人模特、人台和平铺素材" }, "的适用边界。"],
+            ["需要视觉参照时，可查看", { href: "/examples", label: "可追溯素材案例" }, "。但示例不能替代对自己 SKU 的逐项检查。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续改善素材组",
+      ctaTitle: "三张图都在描述同一件服装吗？",
+      ctaBody: "上传核对完成的正面、背面和细节图，先生成一条低风险 8 秒试用视频。",
+      ctaLabel: "验证一组同款素材",
+    },
+  },
+  "model-mannequin-flat-lay-for-ai-video": {
+    slug: "model-mannequin-flat-lay-for-ai-video",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "check-clothing-images-match",
+      "plan-clothing-video-shots",
+    ],
+    imageSrc: "/demo/cases/knit-cardigan/front.webp",
+    en: {
+      metadataTitle: "Model vs mannequin vs flat lay for AI clothing video | AI Clothes Video",
+      title: "Model, mannequin, or flat lay: which clothing photos work for AI video?",
+      description: "Compare model, mannequin, and flat-lay clothing photos for AI video by garment evidence, occlusion, fit information, rights, and the shots each format can support.",
+      eyebrow: "Source comparison · Presentation format",
+      directAnswer: "There is no universal winner. Model photos show fit and drape, mannequin images isolate structure, and flat lays show outline and visible details. Choose the format that answers the buyer question and keep all three sources consistent.",
+      imageAlt: "Front product image of a knit cardigan prepared as a traceable clothing source",
+      imageCaption: "The useful source format is the one that clearly proves the garment facts needed by the planned shot.",
+      parentLabel: "See the accepted source roles in the three-image workflow",
+      sections: [
+        {
+          heading: "Choose evidence before you choose a look",
+          paragraphs: [
+            ["Sellers often ask which presentation style produces the most impressive AI video. That starts from the wrong decision. First decide whether the video needs to prove fit, construction, outline, or a visible detail; then choose images that contain that evidence."],
+            ["Whichever format you use, the ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " still requires a consistent source set and applies shot permissions from the visible material. A style preset cannot invent a hidden view."],
+          ],
+        },
+        {
+          heading: "Compare the three source formats",
+          paragraphs: [
+            ["Each format removes one uncertainty and introduces another. Use the trade-offs rather than treating the options as a quality ranking."],
+          ],
+          table: {
+            headers: ["Source format", "Strongest evidence", "Main limitation", "Safer starting use"],
+            rows: [
+              ["Model photo", "Fit, drape, scale, and styling on a person", "Hands, hair, pose, and body can occlude the garment; likeness rights apply", "Stable framing or restrained motion using the visible pose"],
+              ["Mannequin photo", "Garment shape and construction with fewer body distractions", "Pins, clips, hollow areas, or hidden back structure may still be missing", "Product-focused push-in, pan, or front/back sequence when both views exist"],
+              ["Flat lay", "Outline, print placement, and visible details on one plane", "Weak evidence for worn fit, depth, and natural drape", "Slow pan, crop change, or detail-led product motion"],
+            ],
+          },
+        },
+        {
+          heading: "When model photos are the right source",
+          paragraphs: [
+            ["Use model images when fit, proportion, and drape are central to the buyer question. The source should show the garment clearly, with key areas unobstructed and the same adult model across views used in one task."],
+            ["Model images also carry extra responsibilities. Confirm likeness and commercial-use rights, avoid mixing different people in one source set, and do not infer an unseen pose or body angle. Review the ", { href: "/faq", label: "material and authorization guidance" }, " before using a campaign image."],
+          ],
+        },
+        {
+          heading: "When mannequin or flat-lay images are more useful",
+          paragraphs: [
+            ["A mannequin set can be stronger when buyers need to inspect tailoring, closures, seams, or a clean silhouette without pose changes. A flat lay can be stronger for graphic placement, knit texture, accessories, or simple outline-led content."],
+            ["Neither format proves worn fit. Do not turn a flat lay into an unsupported model performance or assume a mannequin front view proves the back. If a view is missing, follow the ", { href: "/guides/clothing-video-without-back-image", label: "back-image evidence rule" }, " and capture it first."],
+          ],
+        },
+        {
+          heading: "Build one coherent set",
+          paragraphs: [
+            ["Mixing formats can work only when every image still describes the same product version and each role is clear. For example, a model front, clean product back, and macro detail may answer complementary questions, but color, trim, and construction must match."],
+            ["Run the ", { href: "/guides/check-clothing-images-match", label: "same-SKU image checklist" }, " before upload. Then use the ", { href: "/guides/plan-clothing-video-shots", label: "shot-list planning guide" }, " to map each source to one useful buyer question."],
+          ],
+        },
+      ],
+      relatedHeading: "Choose and verify the source format",
+      ctaTitle: "Have one coherent three-image set?",
+      ctaBody: "Upload the source format that best proves your product facts and start with a restrained 8-second trial.",
+      ctaLabel: "Try the selected source set",
+    },
+    "zh-CN": {
+      metadataTitle: "真人模特、人台还是平铺图适合 AI 服装视频？｜AI Clothes Video",
+      title: "真人模特、人台还是平铺图：哪种素材适合 AI 服装视频？",
+      description: "从商品证据、遮挡、上身效果、授权和可支持镜头，对比真人模特、人台和平铺服装图，选择适合 AI 商品视频的素材。",
+      eyebrow: "素材对比 · 展示形态",
+      directAnswer: "没有一种素材永远最好。真人图适合证明上身效果与垂坠，人台图更集中展示结构，平铺图擅长轮廓与可见细节。应根据买家问题选择，并确保三张素材一致。",
+      imageAlt: "作为可追溯服装素材准备的针织开衫正面商品图",
+      imageCaption: "真正有用的素材形态，是能清楚证明计划镜头所需服装信息的那一种。",
+      parentLabel: "查看三图流程接受的素材角色",
+      sections: [
+        {
+          heading: "先选择证据，再选择画面风格",
+          paragraphs: [
+            ["很多卖家先问哪种素材能生成最有冲击力的视频，这个问题的起点就偏了。应该先确认视频要证明上身效果、服装结构、整体轮廓还是某个可见细节，再选择包含相应证据的图片。"],
+            ["无论使用哪种形态，", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "都要求素材组保持一致，并根据真实可见内容决定镜头权限。风格预设不能创造被遮挡或缺失的视角。"],
+          ],
+        },
+        {
+          heading: "对比三种素材形态",
+          paragraphs: [
+            ["每种形态都会减少一种不确定性，同时带来另一种限制。请根据取舍选择，而不是把它们简单排成质量高低。"],
+          ],
+          table: {
+            headers: ["素材形态", "最强证据", "主要限制", "更稳妥的起始用途"],
+            rows: [
+              ["真人模特图", "上身比例、垂坠、尺度和穿搭效果", "手、头发、姿势和身体可能遮挡服装，并涉及肖像授权", "沿用可见姿势的稳定构图或克制运动"],
+              ["人台图", "减少人物干扰，集中展示版型与结构", "别针、夹子、中空区域或背部结构仍可能不可见", "有对应视角时做商品慢推、平移或正背序列"],
+              ["平铺图", "同一平面上的轮廓、印花位置和可见细节", "无法充分证明上身比例、厚度与自然垂坠", "慢速平移、裁切变化或细节导向运动"],
+            ],
+          },
+        },
+        {
+          heading: "什么时候适合使用真人模特图",
+          paragraphs: [
+            ["当买家重点关心上身比例、版型和垂坠时，真人素材更有价值。图片应清楚展示服装，关键区域不能被遮挡；同一任务使用的多个真人视角也应保持同一位成年模特。"],
+            ["真人素材还带来额外责任：确认肖像与商业使用授权，不要在同一素材组混用不同人物，也不要推断图片中没有的姿势或身体角度。使用活动拍摄图片前，先阅读", { href: "/faq", label: "素材与授权说明" }, "。"],
+          ],
+        },
+        {
+          heading: "什么时候人台图或平铺图更有用",
+          paragraphs: [
+            ["如果买家需要查看剪裁、闭合方式、缝线或干净轮廓，人台素材可能更直接；如果重点是印花位置、针织纹理、配件或简单轮廓，平铺图可能更清楚。"],
+            ["但这两种形态都不能证明真实上身效果。不要把平铺图强行变成没有依据的真人表演，也不要因为有人台正面图就假设背面结构。缺少视角时，应遵守", { href: "/guides/clothing-video-without-back-image", label: "背面素材证据规则" }, "并先补拍。"],
+          ],
+        },
+        {
+          heading: "组成一组逻辑一致的素材",
+          paragraphs: [
+            ["只有当每张图仍指向同一商品版本、角色也清楚时，混合素材形态才可能有效。例如真人正面、干净商品背面和微距细节可以回答互补问题，但颜色、辅料与结构必须一致。"],
+            ["上传前先执行", { href: "/guides/check-clothing-images-match", label: "同款图片检查清单" }, "，再用", { href: "/guides/plan-clothing-video-shots", label: "分镜规划指南" }, "把每张素材对应到一个有用的买家问题。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续选择并核对素材形态",
+      ctaTitle: "已经准备好一组逻辑一致的三张图了吗？",
+      ctaBody: "上传最能证明商品信息的素材形态，先生成一条运动克制的 8 秒试用视频。",
+      ctaLabel: "试用选定的素材组",
+    },
+  },
+  "plan-clothing-video-shots": {
+    slug: "plan-clothing-video-shots",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "choose-clothing-video-length",
+      "check-clothing-images-match",
+    ],
+    imageSrc: "/demo/cases/burgundy-midi-dress/front.webp",
+    en: {
+      metadataTitle: "How to plan a clothing product video shot list | AI Clothes Video",
+      title: "How to plan a clothing product video shot list",
+      description: "Plan a clothing product video shot list by mapping each buyer question to a real source image, a restrained camera move, and an 8-second segment.",
+      eyebrow: "Shot planning · Buyer questions",
+      directAnswer: "Give each 8-second shot one buyer question, one identifiable source image, and one restrained motion. If you cannot point to the evidence for a shot, remove it or capture the missing view.",
+      imageAlt: "Front product image of a burgundy midi dress used to plan a clothing video shot list",
+      imageCaption: "Start a shot list with a buyer question and a source image, not with a dramatic camera move.",
+      parentLabel: "See how the three-image workflow limits available shots",
+      sections: [
+        {
+          heading: "Start with buyer questions, not camera moves",
+          paragraphs: [
+            ["A useful product video helps a shopper inspect something specific: overall silhouette, back construction, visible texture, print placement, or fit. Writing “cinematic orbit” first gives the model a motion request but gives the buyer no reason for that motion."],
+            ["In the ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, ", available shots come from the source roles and template rules. Build the shot list inside those boundaries, then choose a style preset for tone."],
+          ],
+        },
+        {
+          heading: "Map each question to source evidence",
+          paragraphs: [
+            ["Use this map as a planning gate. The source column must name an image that actually contains the information; a prompt is not a substitute for a missing view."],
+          ],
+          table: {
+            headers: ["Buyer question", "Required source evidence", "Lower-risk shot idea"],
+            rows: [
+              ["What is the overall front silhouette?", "Clear front image of the same SKU", "Stable hero frame with a slow push-in"],
+              ["What does the real back look like?", "Unobstructed back image", "Back-facing product frame or a permitted front/back sequence"],
+              ["Where are the visible details?", "Sharp detail image matching the main product", "Restrained close-up or small pan across the visible detail"],
+              ["How does it fit or drape?", "Authorized adult model image showing that fit", "Small framing change that preserves the visible pose"],
+            ],
+          },
+        },
+        {
+          heading: "Use one job per 8-second segment",
+          paragraphs: [
+            ["Treat each 8-second segment as one information job. An 8-second video answers one question; 16 seconds can answer two; 24 seconds can answer three; 32 seconds can answer four only when the source set supports four distinct jobs."],
+            ["The ", { href: "/guides/choose-clothing-video-length", label: "video length guide" }, " helps you decide how many questions the SKU needs to answer. Do not stretch one weak idea across extra segments or repeat the same motion to make the video look longer."],
+          ],
+        },
+        {
+          heading: "Set a motion budget for every shot",
+          paragraphs: [
+            ["Motion should reveal existing evidence, not force the model to invent intermediate views. A slow push-in changes scale; a small pan changes framing. A large turn, orbit, or perspective shift asks for substantially more unseen structure."],
+            ["Start with the smallest motion that communicates the product fact. Increase movement only when the required angles are present, the relevant template is enabled, and the result can be reviewed for drift."],
+          ],
+          bullets: [
+            "Front-only evidence: prefer stable framing, a slow push-in, or a limited pan.",
+            "Front and real back evidence: consider only the back or transition options allowed by the current rules.",
+            "Detail evidence: keep the crop on the detail that is actually visible.",
+            "Incomplete multi-angle evidence: do not request a continuous 360-degree reconstruction.",
+          ],
+        },
+        {
+          heading: "Write and review the shot list",
+          paragraphs: [
+            ["Before generation, use a short worksheet. After generation, review the complete motion rather than only the cover frame. Remove a shot if its product value is unclear or its evidence cannot be named."],
+          ],
+          numberedItems: [
+            "Write one buyer question for the segment.",
+            "Name the front, back, detail, or authorized model image that answers it.",
+            "Choose an enabled template whose permissions match that evidence.",
+            "Specify the smallest useful movement and avoid unsupported angles.",
+            "Check the result against the source set, including transitions and final frames.",
+          ],
+        },
+        {
+          heading: "Fix source conflicts before finalizing the plan",
+          paragraphs: [
+            ["A clean shot list cannot repair mismatched inputs. Run the ", { href: "/guides/check-clothing-images-match", label: "same-SKU consistency checklist" }, " before assigning shots. If the source set conflicts, replace the image first; if a view is missing, narrow the plan."],
+          ],
+        },
+      ],
+      relatedHeading: "Continue planning the product video",
+      ctaTitle: "Can every planned shot name its evidence?",
+      ctaBody: "Upload the verified source set and validate the first buyer question with one low-risk 8-second trial.",
+      ctaLabel: "Build the first evidence-led shot",
+    },
+    "zh-CN": {
+      metadataTitle: "如何规划服装商品视频分镜清单？｜AI Clothes Video",
+      title: "如何规划服装商品视频分镜清单？",
+      description: "把每个买家问题对应到真实素材图、克制的镜头运动和独立 8 秒片段，规划有证据依据的服装商品视频分镜。",
+      eyebrow: "分镜规划 · 买家问题",
+      directAnswer: "每个 8 秒镜头只回答一个买家问题，并明确对应一张真实素材图和一种克制运动。如果无法指出镜头证据，就删掉该镜头或先补拍缺失视角。",
+      imageAlt: "用于规划服装商品视频分镜的深酒红中长连衣裙正面商品图",
+      imageCaption: "规划分镜时应先写买家问题和对应素材，而不是先追求夸张的镜头运动。",
+      parentLabel: "查看三图流程如何限制可用镜头",
+      sections: [
+        {
+          heading: "先写买家问题，不要先写镜头运动",
+          paragraphs: [
+            ["有用的商品视频会帮助买家检查一项具体信息：整体版型、背部结构、可见纹理、印花位置或上身效果。如果一开始只写“电影感环绕”，模型得到的是运动要求，买家却未必从运动中获得商品信息。"],
+            ["在", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "中，可用镜头由素材角色和模板规则共同决定。应先在这些边界内规划分镜，再用风格预设调整画面基调。"],
+          ],
+        },
+        {
+          heading: "把每个问题映射到素材证据",
+          paragraphs: [
+            ["把这张表当作分镜门禁。素材一栏必须能指出真正包含该信息的图片；文字 prompt 不能代替缺失视角。"],
+          ],
+          table: {
+            headers: ["买家问题", "需要的素材证据", "较低风险的镜头思路"],
+            rows: [
+              ["正面整体版型是什么样？", "同一 SKU 的清晰正面图", "稳定主画面配合缓慢推进"],
+              ["真实背面是什么样？", "无遮挡的背面图", "背面商品画面或规则允许的正背序列"],
+              ["可见细节在哪里？", "与主商品一致的清晰细节图", "克制特写或沿可见细节小幅平移"],
+              ["上身比例或垂坠如何？", "展示对应效果且已授权的成年模特图", "保留现有姿势的小幅构图变化"],
+            ],
+          },
+        },
+        {
+          heading: "每个 8 秒片段只承担一项任务",
+          paragraphs: [
+            ["把每个 8 秒片段看成一个信息任务。8 秒回答一个问题，16 秒可以回答两个，24 秒可以回答三个；只有素材确实支持四项不同任务时，32 秒才有意义。"],
+            ["可以用", { href: "/guides/choose-clothing-video-length", label: "视频时长选择指南" }, "判断这个 SKU 需要回答几个问题。不要为了显得更长，把一个薄弱想法拉成多个片段，也不要重复同一种运动。"],
+          ],
+        },
+        {
+          heading: "给每个镜头设置运动预算",
+          paragraphs: [
+            ["运动应该揭示已经存在的证据，而不是逼迫模型编造中间视角。慢推主要改变尺度，小幅平移主要改变构图；大幅转身、环绕或透视变化则需要补全更多未显示结构。"],
+            ["先选择能表达商品信息的最小运动。只有相关角度已经存在、对应模板已启用，并且结果能接受漂移检查时，才考虑增加运动。"],
+          ],
+          bullets: [
+            "只有正面证据：优先稳定构图、慢推或有限平移。",
+            "有正面和真实背面证据：只考虑当前规则允许的背面或切换选项。",
+            "有细节证据：让裁切始终围绕真正可见的细节。",
+            "多角度证据不完整：不要要求连续 360 度重建。",
+          ],
+        },
+        {
+          heading: "写出并检查分镜清单",
+          paragraphs: [
+            ["生成前用一份简短工作表确认分镜；生成后检查完整运动，而不是只看封面帧。如果某个镜头的商品价值说不清，或者找不到素材证据，就应移除。"],
+          ],
+          numberedItems: [
+            "为当前片段写一个买家问题。",
+            "指出回答该问题的正面、背面、细节或已授权模特图。",
+            "选择权限与素材证据一致的已启用模板。",
+            "写出最小有效运动，并排除没有依据的角度。",
+            "用源素材检查生成结果，包括转场和最后几帧。",
+          ],
+        },
+        {
+          heading: "最终确定前先解决素材冲突",
+          paragraphs: [
+            ["清楚的分镜也无法修复互相矛盾的输入。分配镜头前先执行", { href: "/guides/check-clothing-images-match", label: "同款一致性检查" }, "。素材冲突时先换图，缺少视角时就缩小分镜范围。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续规划商品视频",
+      ctaTitle: "每个计划镜头都能指出素材证据吗？",
+      ctaBody: "上传核对完成的素材组，用一条低风险 8 秒试用视频验证第一个买家问题。",
+      ctaLabel: "创建第一个有证据的镜头",
     },
   },
 } as const satisfies Record<GuideSlug, GuideArticle>;

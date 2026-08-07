@@ -65,6 +65,9 @@ describe("ThreeImagesLandingPage", () => {
       .toHaveAttribute("href", "/guides/choose-clothing-video-length");
     expect(within(guides).getByRole("link", { name: "Why do AI clothing videos deform or drift?" }))
       .toHaveAttribute("href", "/guides/why-ai-clothing-videos-deform");
+    expect(within(guides).getByRole("link", { name: "How do you check whether clothing images show the same SKU?" }))
+      .toHaveAttribute("href", "/guides/check-clothing-images-match");
+    expect(within(guides).getAllByRole("link")).toHaveLength(6);
     expect(container.textContent).not.toMatch(/100%|zero hallucination|any three images/i);
   });
 
@@ -88,6 +91,9 @@ describe("ThreeImagesLandingPage", () => {
       .toHaveAttribute("href", "/zh/guides/choose-clothing-video-length");
     expect(within(guides).getByRole("link", { name: "AI 服装视频为什么会变形或漂移？" }))
       .toHaveAttribute("href", "/zh/guides/why-ai-clothing-videos-deform");
+    expect(within(guides).getByRole("link", { name: "如何规划服装商品视频分镜清单？" }))
+      .toHaveAttribute("href", "/zh/guides/plan-clothing-video-shots");
+    expect(within(guides).getAllByRole("link")).toHaveLength(6);
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "landing_viewed",
