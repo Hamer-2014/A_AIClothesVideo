@@ -13,9 +13,16 @@ export function buildRootMetadata(locale: SiteLocale): Metadata {
       locale === "zh-CN"
         ? "上传 3 张服装图，生成可发布的商品宣传视频。"
         : "Upload three clothing images to create a product marketing video.",
+    manifest: "/manifest.webmanifest?v=1",
     icons: {
-      icon: [{ url: "/icon.svg?v=4", type: "image/svg+xml" }],
-      shortcut: [{ url: "/icon.svg?v=4", type: "image/svg+xml" }],
+      icon: [
+        { url: "/icon.svg?v=4", type: "image/svg+xml" },
+        { url: "/favicon.ico?v=1", sizes: "any" },
+      ],
+      shortcut: [{ url: "/favicon.ico?v=1", sizes: "any" }],
+      apple: [
+        { url: "/apple-icon.png?v=1", sizes: "180x180", type: "image/png" },
+      ],
     },
   };
 }

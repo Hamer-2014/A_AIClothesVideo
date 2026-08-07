@@ -20,8 +20,10 @@ describe("root metadata", () => {
     expect(icons).toContain("/icon.svg?v=4");
     expect(icons).not.toContain("/icon.svg?v=3");
     expect(icons).toContain("image/svg+xml");
-    expect(icons).not.toContain("/favicon.ico");
+    expect(icons).toContain("/favicon.ico?v=1");
+    expect(icons).toContain("/apple-icon.png?v=1");
     expect(icons).not.toContain("/brand/logo.png");
+    expect(metadata.manifest).toBe("/manifest.webmanifest?v=1");
   });
 
   it("provides Chinese metadata for Chinese URLs", () => {
