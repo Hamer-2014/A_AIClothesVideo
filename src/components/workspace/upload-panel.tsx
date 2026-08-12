@@ -97,6 +97,7 @@ export function UploadPanel({
     () => new Set(),
   );
   const uploadTokens = useRef<Partial<Record<UploadSlotRole, number>>>({});
+  const mountedRef = useRef(true);
   const accept = useMemo(() => "image/png,image/jpeg,image/webp", []);
   const uploadedByRole = useMemo(
     () =>
@@ -129,6 +130,17 @@ export function UploadPanel({
   useEffect(() => {
     onUploadingChange(uploadingRoles.size > 0);
   }, [onUploadingChange, uploadingRoles.size]);
+
+  useEffect(() => {
+    const tokens = uploadTokens.current;
+    return () => {
+      mountedRef.current = false;
+      for (const role of Object.keys(tokens) as UploadSlotRole[]) {
+        tokens[role] = (tokens[role] ?? 0) + 1;
+      }
+      onUploadingChange(false);
+    };
+  }, [onUploadingChange]);
 
   function setRoleUploading(role: UploadSlotRole, uploading: boolean) {
     setUploadingRoles((current) => {
@@ -218,7 +230,10 @@ export function UploadPanel({
       const presignBody = await presignResponse.json();
 
       if (!presignResponse.ok || !Array.isArray(presignBody.files)) {
-        if (uploadTokens.current[role] === token) {
+        if (
+          uploadTokens.current[role] === token &&
+          mountedRef.current
+        ) {
           onUploaded({
             assetId: crypto.randomUUID(),
             fileName: file.name,
@@ -248,7 +263,10 @@ export function UploadPanel({
       if (!completeResponse.ok) {
         throw new Error("complete_failed");
       }
-      if (uploadTokens.current[role] === token) {
+      if (
+        uploadTokens.current[role] === token &&
+        mountedRef.current
+      ) {
         onUploaded({
           assetId: signed.assetId,
           fileName: file.name,
@@ -258,7 +276,10 @@ export function UploadPanel({
         });
       }
     } catch {
-      if (uploadTokens.current[role] === token) {
+      if (
+        uploadTokens.current[role] === token &&
+        mountedRef.current
+      ) {
         onUploaded({
           assetId: crypto.randomUUID(),
           fileName: file.name,
@@ -269,7 +290,10 @@ export function UploadPanel({
         });
       }
     } finally {
-      if (uploadTokens.current[role] === token) {
+      if (
+        uploadTokens.current[role] === token &&
+        mountedRef.current
+      ) {
         setRoleUploading(role, false);
       }
     }
@@ -376,7 +400,7 @@ export function UploadPanel({
                 {fileName ? (
                   <button
                     aria-label={`${workspaceText(language, "Remove", "删除")}${language === "en" ? " " : ""}${slot.label}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] transition hover:border-[var(--danger)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--line-strong)]"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-raised)] text-[var(--muted)] transition hover:border-[var(--danger)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--line-strong)]"
                     disabled={disabled}
                     onClick={() => removeSlot(slot.role)}
                     type="button"
@@ -384,7 +408,7 @@ export function UploadPanel({
                     <X size={16} />
                   </button>
                 ) : (
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] text-[var(--action)]">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] text-[var(--action)]">
                     {failed ? <RotateCcw size={16} /> : <ImagePlus size={16} />}
                   </div>
                 )}

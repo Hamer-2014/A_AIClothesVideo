@@ -53,7 +53,7 @@ export function TrialStatusPanel({ status, language: requestedLanguage }: TrialS
         </div>
       ) : (
         <a
-          className="mt-3 inline-flex h-9 items-center rounded-md border border-[var(--line)] px-3 text-xs font-medium"
+          className="mt-3 inline-flex h-11 items-center rounded-md border border-[var(--line)] px-3 text-xs font-medium"
           href={requestedLanguage ? localizeHref("/pricing", language) : "/pricing"}
         >
           {workspaceText(language, "Buy credits", "购买点数")}

@@ -14,8 +14,8 @@
 | 层级 | 目标 |
 |---|---|
 | primary goal | 上传当前 SKU 的三张合规素材并创建完整宣传视频。 |
-| secondary goal | 在提交前确认协议、Style Preset、时长、比例、生成意图和点数。 |
-| low-frequency goal | 查看素材分析、调整推荐镜头或预览分镜。 |
+| secondary goal | 在提交前确认协议、Style Preset、时长、比例和点数。 |
+| low-frequency goal | 补充 SKU 与生成意图、查看素材分析、调整推荐镜头或预览分镜。 |
 | rare goal | 处理授权失效、预检阻断、重新分析或恢复未完成草稿。 |
 
 ## State Model
@@ -46,9 +46,10 @@
 |---|---:|---|---|---|---|---|
 | 三图协议与槽位 | 高 | 是 | empty/ready | 始终 | 主素材画布 | 否 |
 | 上传授权 | 高 | 是 | empty/uploading | 始终 | 槽位上方内联 | 否 |
-| SKU、规格、Style Preset | 高 | 是 | empty/ready | 始终 | 右侧 inspector | 否 |
+| 规格、Style Preset | 高 | 是 | empty/ready | 始终 | 右侧 inspector | 否 |
 | 点数与主 CTA | 高 | 是 | ready | 始终邻近 | inspector 底部 | 否 |
 | 上传/阻断状态 | 中高 | 状态发生时是 | uploading/blocked | 有状态时 | 主 CTA 邻近提示 | 否 |
+| SKU、生成意图 | 低 | 否 | empty/ready | 用户主动展开 | 补充信息 disclosure | 是 |
 | 素材分析与模板 | 中低 | 否 | validating/submitted | 素材可预览后 | 首屏之后的分析区 | 否 |
 | 40 秒五槽位编辑 | 低 | 否 | submitted 前 | 开关开启且选择 40 秒 | 模板分析区 | 否 |
 | 手动分镜 | 低 | 否 | submitted 前 | 用户主动展开或自动流程保留草稿 | 高级 disclosure | 是 |
@@ -56,10 +57,10 @@
 
 ## Content Audit
 
-- must-see-now: 协议、三张素材、授权、规格、点数、上传状态、主 CTA。
+- must-see-now: 协议、三张素材、授权、规格、Style Preset、点数、上传状态、主 CTA。
 - next-step-only: 素材分析、推荐模板、40 秒镜头顺序、分镜草稿。
 - error-only: 上传失败、Preflight 阻断、审核失败、余额不足、供应商异常。
-- on-demand-reference: 模板风险说明、手动分镜、素材分析摘要。
+- on-demand-reference: SKU、生成意图、模板风险说明、手动分镜、素材分析摘要。
 - keep-off-first-viewport: 供应商 ID、完整 prompt、单个 8 秒片段下载、审计历史。
 
 ## Visibility Plan
@@ -71,6 +72,7 @@
   {"id":"material_canvas","role":"action-critical","priority":"high","visibility":"always","stage":["empty","uploading","ready"],"container":"main-stage"},
   {"id":"generation_inspector","role":"decision-supporting","priority":"high","visibility":"always","stage":["empty","ready"],"container":"right-rail"},
   {"id":"control_status","role":"status-feedback","priority":"high","visibility":"conditional","stage":["uploading","validating","blocked"],"container":"cta-adjacent"},
+  {"id":"product_details","role":"decision-supporting","priority":"low","visibility":"on-demand","stage":["empty","ready"],"container":"disclosure"},
   {"id":"analysis","role":"reference","priority":"medium","visibility":"below-fold","stage":["validating","submitted"],"container":"analysis-section"},
   {"id":"manual_storyboard","role":"reference","priority":"low","visibility":"on-demand","stage":["ready"],"container":"disclosure"}
 ]
@@ -80,6 +82,7 @@
 
 | block | hidden_now_because | reveal_trigger | container |
 |---|---|---|---|
+| 商品补充信息 | SKU 与自定义生成意图均为可选，常驻会把主 CTA 挤出桌面首屏 | 用户主动展开“商品补充信息” | 设置 inspector 内 disclosure |
 | 素材分析与模板 | 上传前缺少服务端素材事实，而且普通用户可以直接采用推荐 | 用户滚动到首屏之后；任务创建后填充真实分析 | `workspace-deferred-analysis` |
 | 40 秒镜头顺序 | 仅 40 秒 Beta 需要五个镜头槽位 | 打开功能开关、选择 40 秒并完成分析 | 模板分析区 |
 | 手动分镜确认 | 一键生成不要求用户先理解分镜结构 | 展开“高级设置”或自动流程保留分镜草稿 | 高级 disclosure |

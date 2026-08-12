@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 
 import { SpecSelector } from "./spec-selector";
 import { TrialStatusPanel } from "./trial-status-panel";
@@ -380,6 +381,8 @@ export function WorkspaceApp({
   const [rightsAccepted, setRightsAccepted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
+  const [pendingCaptureProtocolId, setPendingCaptureProtocolId] =
+    useState<CaptureProtocolId | null>(null);
 
   useEffect(() => {
     void trackFunnelEvent("workspace_entered", {
@@ -499,6 +502,24 @@ export function WorkspaceApp({
       ? `Upload ${missingCaptureSlots.map((slot) => slot.label).join(missingCaptureSlots.length === 2 ? " and " : ", ")} to continue.`
       : `还需上传${missingCaptureSlots.map((slot) => slot.label).join(missingCaptureSlots.length === 2 ? "和" : "、")}。`;
   const controlStatusMessage = generationStatus ?? assetGateMessage;
+  const pendingCaptureProtocol = pendingCaptureProtocolId
+    ? localizeCaptureProtocol(getCaptureProtocol(pendingCaptureProtocolId), language)
+    : null;
+  const pendingProtocolRoles = new Set<string>(
+    pendingCaptureProtocol?.slots.map((slot) => slot.role) ?? [],
+  );
+  const incompatibleProtocolAssetLabels = Array.from(
+    new Set(
+      assets
+        .filter((asset) => !pendingProtocolRoles.has(asset.intendedRole))
+        .map(
+          (asset) =>
+            currentCaptureProtocol.slots.find(
+              (slot) => slot.role === asset.intendedRole,
+            )?.label ?? asset.fileName,
+        ),
+    ),
+  );
   const materialWarnings = useMemo(() => {
     if (!jobDetail) {
       return [];
@@ -561,17 +582,66 @@ export function WorkspaceApp({
   }
 
   function changeCaptureProtocol(protocolId: CaptureProtocolId) {
+    if (imagesUploading) {
+      setMessage(workspaceText(language, "Wait for the current image upload to finish before switching generation methods.", "当前图片上传完成后再切换生成方式。"));
+      return;
+    }
+    const nextProtocol = getCaptureProtocol(protocolId);
+    const nextRoles = new Set<string>(
+      nextProtocol.slots.map((slot) => slot.role),
+    );
+    const incompatibleAssets = assets.filter(
+      (asset) => !nextRoles.has(asset.intendedRole),
+    );
+    if (incompatibleAssets.length > 0) {
+      setPendingCaptureProtocolId(nextProtocol.id);
+      return;
+    }
+    applyCaptureProtocol(nextProtocol.id);
+  }
+
+  function applyCaptureProtocol(protocolId: CaptureProtocolId) {
     const nextProtocol = getCaptureProtocol(protocolId);
     const nextRoles = new Set<string>(
       nextProtocol.slots.map((slot) => slot.role),
     );
     setCaptureProtocolId(nextProtocol.id);
-    setAssets((current) =>
-      current.filter((asset) => nextRoles.has(asset.intendedRole)),
-    );
+    setAssets((current) => {
+      for (const asset of current) {
+        if (!nextRoles.has(asset.intendedRole) && asset.previewUrl) {
+          URL.revokeObjectURL(asset.previewUrl);
+        }
+      }
+      return current.filter((asset) => nextRoles.has(asset.intendedRole));
+    });
     setMessage(null);
     setJobDetail(null);
     setSelectedTemplateIds([]);
+    setPendingCaptureProtocolId(null);
+  }
+
+  function handleProtocolDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setPendingCaptureProtocolId(null);
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const buttons = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+    );
+    const firstButton = buttons[0];
+    const lastButton = buttons.at(-1);
+    if (event.shiftKey && document.activeElement === firstButton) {
+      event.preventDefault();
+      lastButton?.focus();
+    } else if (!event.shiftKey && document.activeElement === lastButton) {
+      event.preventDefault();
+      firstButton?.focus();
+    }
   }
 
   function changeDurationSeconds(value: VideoDuration) {
@@ -1248,6 +1318,7 @@ export function WorkspaceApp({
             <UploadPanel
               assets={assets}
               isAuthenticated={isAuthenticated}
+              key={captureProtocolId}
               language={language}
               onRemoveUploaded={removeUploadedAsset}
               onRightsAcceptedChange={setRightsAccepted}
@@ -1259,7 +1330,7 @@ export function WorkspaceApp({
           </section>
 
           <aside
-            className="space-y-5 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-raised)] p-4 xl:min-h-full"
+            className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface-raised)] p-4 xl:min-h-full"
             data-testid="workspace-control-rail"
           >
             <div
@@ -1276,22 +1347,6 @@ export function WorkspaceApp({
                 </p>
               </div>
             </div>
-            <div>
-              <label
-                className="text-xs font-medium text-[var(--muted)]"
-                htmlFor="workspace-sku-name"
-              >
-                {workspaceText(language, "Product name or SKU (optional)", "商品名称或 SKU（可选）")}
-              </label>
-              <input
-                className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-3 text-sm outline-none transition focus:border-[var(--action)] focus:ring-2 focus:ring-[var(--focus)]"
-                id="workspace-sku-name"
-                maxLength={80}
-                onChange={(event) => setSkuName(event.target.value)}
-                placeholder={workspaceText(language, "e.g. Linen Dress / SKU-1024", "例如 Linen Dress / SKU-1024")}
-                value={skuName}
-              />
-            </div>
             <SpecSelector
               aspectRatio={aspectRatio}
               duration40Enabled={duration40Enabled}
@@ -1305,92 +1360,57 @@ export function WorkspaceApp({
               onChange={changePreset}
               selectedPresetId={selectedPresetId}
             />
-            <section
-              aria-label={workspaceText(language, "Current image requirements", "当前风格素材要求")}
-              className="rounded-[var(--radius-md)] border border-[var(--line-strong)] bg-[var(--brand-soft)] px-3 py-2 text-xs leading-5 text-[var(--ink)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">
-                    {workspaceText(language, "Three-image requirements / Pre-check", "三图要求 / 生成前检查")}
-                  </p>
-                  <p className="mt-1 text-[var(--muted)]">
-                    {currentCaptureProtocol.description}
-                  </p>
-                  {uploadedRoles.has("scene") ? (
-                    <p className="mt-1 text-[var(--muted)]">
-                      {workspaceText(language, "The scene image is used only for background and atmosphere, never as a source of garment details.", "场景图只作为背景和氛围参考，不作为服装细节来源。")}
-                    </p>
-                  ) : null}
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    hasRequiredAssets
-                      ? "bg-white text-[var(--success)]"
-                      : "bg-white text-[var(--warning)]"
-                  }`}
-                >
-                  {hasRequiredAssets
-                    ? workspaceText(language, "3 / 3 ready", "3 / 3 已就绪")
-                    : workspaceText(language, `${3 - missingCaptureSlots.length} / 3 ready`, `${3 - missingCaptureSlots.length} / 3 已就绪`)}
-                </span>
-              </div>
-            </section>
-            <div>
-              <label
-                className="text-xs font-medium text-[var(--muted)]"
-                htmlFor="workspace-user-prompt"
-              >
-                {workspaceText(language, "Generation intent", "生成意图")}
-              </label>
-              <textarea
-                className="mt-2 min-h-32 w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
-                id="workspace-user-prompt"
-                onChange={(event) => setUserPrompt(event.target.value)}
-                value={userPrompt}
-              />
-              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-                {workspaceText(language, "Optionally add selling points, scene, or style preferences. All text passes through Creem Moderation first.", "可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。")}
-              </p>
-            </div>
             {initialMode === "trial" && trialStatus ? (
               <TrialStatusPanel language={language} status={trialStatus} />
             ) : null}
-            <div className="rounded-md border border-[var(--line)] bg-white p-3 text-xs leading-5 text-[var(--muted)]">
-              {workspaceText(language, `Paid generation: high resolution, no watermark. ${paidCost} credits are reserved for ${durationSeconds} seconds and charged after QA; failed generations release the reservation.`, `付费生成：高清无水印，${durationSeconds} 秒将冻结 ${paidCost} 点，质检通过后正式扣除；生成失败会释放冻结点数。`)}
-              {durationSeconds === 40 ? workspaceText(language, " The 40-second Beta contains five segments.", " 40 秒 Beta 由 5 个片段组成。") : ""}
-            </div>
-            {controlStatusMessage ? (
+            <div
+              className="space-y-3 border-t border-[var(--line)] pt-4"
+              data-testid="workspace-submit-bar"
+            >
               <div
                 aria-live="polite"
-                className={`rounded-md border px-3 py-2 text-sm leading-5 ${
+                className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm leading-5 ${
                   generationStatus
                     ? "border-[var(--action)] bg-[var(--brand-soft)] text-[var(--ink)]"
-                    : "border-amber-300 bg-amber-50 text-amber-900"
+                    : hasRequiredAssets
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : "border-amber-300 bg-amber-50 text-amber-900"
                 }`}
               >
-                {controlStatusMessage}
+                {hasRequiredAssets && !generationStatus ? (
+                  <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
+                ) : !generationStatus ? (
+                  <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
+                ) : null}
+                <span>
+                  {controlStatusMessage ?? workspaceText(language, "Images are ready. You can generate now.", "素材已齐，可以生成。")}
+                </span>
               </div>
-            ) : null}
-            <button
-              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={generationDisabled}
-              onClick={() => oneClickGenerate(false)}
-              type="button"
-            >
-              {imagesUploading
-                ? workspaceText(language, "Uploading images...", "图片上传中...")
-                : busyAction === "one-click" ||
-                    busyAction === "preflight" ||
-                    busyAction === "create-job" ||
-                    busyAction === "analyze"
-                  ? workspaceText(language, "Generating...", "正在生成...")
-                  : workspaceText(language, `Generate high-resolution video · ${paidCost} credits`, `付费生成高清无水印 · ${paidCost} 点`)}
-            </button>
+              <p className="text-xs leading-5 text-[var(--muted)]">
+                {workspaceText(language, `High resolution · no watermark · reserve ${paidCost} credits · charge after QA`, `高清无水印 · 冻结 ${paidCost} 点 · 质检通过后扣除`)}
+                {durationSeconds === 40 ? workspaceText(language, " · the 40-second Beta contains five segments", " · 40 秒 Beta 由 5 个片段组成") : ""}
+              </p>
+              <button
+                aria-busy={busyAction !== null || imagesUploading}
+                className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={generationDisabled}
+                onClick={() => oneClickGenerate(false)}
+                type="button"
+              >
+                {imagesUploading
+                  ? workspaceText(language, "Uploading images...", "图片上传中...")
+                  : busyAction === "one-click" ||
+                      busyAction === "preflight" ||
+                      busyAction === "create-job" ||
+                      busyAction === "analyze"
+                    ? workspaceText(language, "Generating...", "正在生成...")
+                    : workspaceText(language, `Generate high-resolution video · ${paidCost} credits`, `付费生成高清无水印 · ${paidCost} 点`)}
+              </button>
+            </div>
             {canUseFreeTrial ? (
               <div className="space-y-2 rounded-md border border-[var(--line)] bg-white p-3">
                 <button
-                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={generationDisabled}
                   onClick={() => oneClickGenerate(true)}
                   type="button"
@@ -1410,10 +1430,123 @@ export function WorkspaceApp({
                 )}
               </p>
             ) : null}
+            <details className="group rounded-[var(--radius-md)] border border-[var(--line)] bg-white">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-medium marker:hidden">
+                <span>{workspaceText(language, "Product details (optional)", "商品补充信息（可选）")}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="shrink-0 text-[var(--muted)] transition group-open:rotate-180"
+                  size={16}
+                />
+              </summary>
+              <div className="space-y-4 border-t border-[var(--line)] p-3">
+                <div>
+                  <label className="text-xs font-medium text-[var(--muted)]" htmlFor="workspace-sku-name">
+                    {workspaceText(language, "Product name or SKU (optional)", "商品名称或 SKU（可选）")}
+                  </label>
+                  <input
+                    className="mt-2 h-11 w-full rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-raised)] px-3 text-sm outline-none transition focus:border-[var(--action)] focus:ring-2 focus:ring-[var(--focus)]"
+                    id="workspace-sku-name"
+                    maxLength={80}
+                    onChange={(event) => setSkuName(event.target.value)}
+                    placeholder={workspaceText(language, "e.g. Linen Dress / SKU-1024", "例如 Linen Dress / SKU-1024")}
+                    value={skuName}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[var(--muted)]" htmlFor="workspace-user-prompt">
+                    {workspaceText(language, "Generation intent", "生成意图")}
+                  </label>
+                  <textarea
+                    className="mt-2 min-h-28 w-full rounded-md border border-[var(--line)] bg-white px-3 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                    id="workspace-user-prompt"
+                    onChange={(event) => setUserPrompt(event.target.value)}
+                    value={userPrompt}
+                  />
+                  <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                    {workspaceText(language, "Optionally add selling points, scene, or style preferences. All text passes through Creem Moderation first.", "可选填写卖点、场景或风格偏好；所有文本都会先经过 Creem Moderation。")}
+                  </p>
+                </div>
+              </div>
+            </details>
+            <section
+              aria-label={workspaceText(language, "Current image requirements", "当前风格素材要求")}
+              className="rounded-[var(--radius-md)] border border-[var(--line-strong)] bg-[var(--brand-soft)] px-3 py-2 text-xs leading-5 text-[var(--ink)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">
+                    {workspaceText(language, "Three-image requirements", "三图要求")}
+                  </p>
+                  <p className="mt-1 text-[var(--muted)]">
+                    {currentCaptureProtocol.description}
+                  </p>
+                  {uploadedRoles.has("scene") ? (
+                    <p className="mt-1 text-[var(--muted)]">
+                      {workspaceText(language, "The scene image is used only for background and atmosphere, never as a source of garment details.", "场景图只作为背景和氛围参考，不作为服装细节来源。")}
+                    </p>
+                  ) : null}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium ${
+                    hasRequiredAssets ? "text-[var(--success)]" : "text-[var(--warning)]"
+                  }`}
+                >
+                  {hasRequiredAssets
+                    ? workspaceText(language, "3 / 3 ready", "3 / 3 已就绪")
+                    : workspaceText(language, `${3 - missingCaptureSlots.length} / 3 ready`, `${3 - missingCaptureSlots.length} / 3 已就绪`)}
+                </span>
+              </div>
+            </section>
           </aside>
 
         </div>
       </section>
+
+      {pendingCaptureProtocol ? (
+        <div
+          aria-labelledby="protocol-switch-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onKeyDown={handleProtocolDialogKeyDown}
+          role="alertdialog"
+        >
+          <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--line)] bg-white p-5 shadow-[var(--shadow-md)]">
+            <div className="flex items-start gap-3">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--warning)]" size={20} />
+              <div>
+                <h2 className="text-base font-semibold" id="protocol-switch-title">
+                  {workspaceText(language, "Switch generation method?", "切换生成方式？")}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                  {workspaceText(
+                    language,
+                    `Switching generation method will remove ${incompatibleProtocolAssetLabels.join(", ")}. You will need to select the image required by ${pendingCaptureProtocol.shortLabel}.`,
+                    `切换生成方式会移除${incompatibleProtocolAssetLabels.join("、")}。之后需要补选“${pendingCaptureProtocol.shortLabel}”要求的新素材。`,
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                autoFocus
+                className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium hover:border-[var(--line-strong)]"
+                onClick={() => setPendingCaptureProtocolId(null)}
+                type="button"
+              >
+                {workspaceText(language, "Cancel", "取消")}
+              </button>
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--ink)] px-4 text-sm font-medium text-white hover:bg-black"
+                onClick={() => applyCaptureProtocol(pendingCaptureProtocol.id)}
+                type="button"
+              >
+                {workspaceText(language, "Switch and remove", "切换并移除")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section
         className="rounded-lg border border-[var(--line)] bg-white p-5"
@@ -1427,7 +1560,7 @@ export function WorkspaceApp({
               </p>
             </div>
             <button
-              className="inline-flex h-10 items-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 items-center rounded-md border border-[var(--line)] bg-white px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!jobId || busyAction !== null}
               onClick={analyzeJob}
               type="button"
@@ -1574,7 +1707,8 @@ export function WorkspaceApp({
 
       <section className="rounded-lg border border-[var(--line)] bg-white p-5">
           <button
-            className="text-left text-base font-medium"
+            aria-expanded={showAdvancedManualControls}
+            className="inline-flex min-h-11 items-center text-left text-base font-medium"
             onClick={() => setAdvancedOpen((current) => !current)}
             type="button"
           >

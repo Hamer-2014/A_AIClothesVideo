@@ -23,6 +23,7 @@ describe("SpecSelector", () => {
     const activeDuration = screen.getByRole("button", { name: "8 秒" });
     expect(activeDuration.className).toContain("bg-[var(--accent)]");
     expect(activeDuration.className).toContain("border-[var(--accent-strong)]");
+    expect(activeDuration.className).toContain("h-11");
     expect(activeDuration.className).not.toContain("bg-[var(--ink)]");
   });
 

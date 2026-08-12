@@ -30,10 +30,10 @@ function SegmentedButton<T extends string | number>({
 }) {
   return (
     <button
-      className={`h-10 rounded-md border px-3 text-sm font-medium transition ${
+      className={`h-11 rounded-md border px-3 text-sm font-medium transition ${
         active
           ? "border-[var(--accent-strong)] bg-[var(--accent)] text-white shadow-sm"
-          : "border-[var(--line)] bg-white text-[var(--ink)]"
+          : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--action)] hover:bg-[var(--brand-soft)]"
       }`}
       onClick={onClick}
       type="button"

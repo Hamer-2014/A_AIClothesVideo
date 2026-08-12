@@ -482,6 +482,65 @@ describe("WorkspaceApp", () => {
     );
   });
 
+  it("asks for confirmation before a protocol switch removes incompatible images", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    uploadProductShowcaseAssets();
+
+    fireEvent.click(screen.getByRole("button", { name: /商品旋转/ }));
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(
+      "切换生成方式会移除细节图",
+    );
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-slot-roles",
+      "front,back,detail",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "切换并移除" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-slot-roles",
+      "front,side,back",
+    );
+    expect(screen.getByText("还需上传商品侧面。" )).toBeInTheDocument();
+  });
+
+  it("keeps keyboard focus inside the protocol switch dialog and closes it with Escape", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    uploadProductShowcaseAssets();
+    fireEvent.click(screen.getByRole("button", { name: /商品旋转/ }));
+
+    const dialog = screen.getByRole("alertdialog");
+    const cancel = screen.getByRole("button", { name: "取消" });
+    const confirm = screen.getByRole("button", { name: "切换并移除" });
+
+    confirm.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(cancel).toHaveFocus();
+
+    cancel.focus();
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(confirm).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the current protocol while an image upload is in progress", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    fireEvent.click(screen.getByRole("button", { name: "mock-uploading" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /商品旋转/ }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mock-upload-panel")).toHaveAttribute(
+      "data-slot-roles",
+      "front,back,detail",
+    );
+    expect(screen.getByText("当前图片上传完成后再切换生成方式。")).toBeInTheDocument();
+  });
+
   it("sends capture protocol and sku name through preflight and creation", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -1589,6 +1648,34 @@ describe("WorkspaceApp", () => {
     expect(generateButton).toBeInTheDocument();
     expect(generateButton.className).toContain("bg-[var(--accent)]");
     expect(generateButton.className).not.toContain("bg-[var(--ink)]");
+  });
+
+  it("shows a positive ready state beside the primary generation action", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+    uploadProductShowcaseAssets();
+
+    const submitBar = screen.getByTestId("workspace-submit-bar");
+    expect(submitBar).toHaveTextContent("素材已齐，可以生成");
+    expect(submitBar).toContainElement(
+      screen.getByRole("button", { name: "付费生成高清无水印 · 70 点" }),
+    );
+  });
+
+  it("places the primary submit bar before optional and reference settings", () => {
+    render(<WorkspaceApp templateCatalog={templateCatalog} />);
+
+    const submitBar = screen.getByTestId("workspace-submit-bar");
+    const optionalDetails = screen.getByText("商品补充信息（可选）").closest("details");
+    const requirements = screen.getByRole("region", { name: "当前风格素材要求" });
+
+    expect(
+      submitBar.compareDocumentPosition(optionalDetails as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      submitBar.compareDocumentPosition(requirements) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("does not show non-garment warnings for scene assets", async () => {

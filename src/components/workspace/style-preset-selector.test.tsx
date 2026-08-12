@@ -40,4 +40,24 @@ describe("StylePresetSelector", () => {
 
     expect(onChange).toHaveBeenCalledWith("marketplace_clean");
   });
+
+  it("keeps preset choices compact and shows only the selected description", () => {
+    render(
+      <StylePresetSelector
+        onChange={vi.fn()}
+        selectedPresetId="minimal_studio"
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "选择风格预设" })).toHaveClass(
+      "grid-cols-3",
+    );
+    expect(screen.getByText("干净背景，突出服装版型，适合商品页展示。")).toBeInTheDocument();
+    expect(
+      screen.queryByText("适合白底图和平铺图，把静态商品图做成干净动效。"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "极简棚拍" })).toHaveClass(
+      "min-h-11",
+    );
+  });
 });

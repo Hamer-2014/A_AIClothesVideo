@@ -288,6 +288,10 @@ describe("UploadPanel", () => {
 
     expect(screen.getByLabelText("选择正面主图")).toBeDisabled();
     expect(screen.getByRole("button", { name: "删除正面主图" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "删除正面主图" })).toHaveClass(
+      "h-11",
+      "w-11",
+    );
     expect(screen.getByRole("checkbox")).toBeDisabled();
   });
 });

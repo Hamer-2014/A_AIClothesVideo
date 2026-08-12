@@ -117,7 +117,7 @@ function TemplateSection({
         ) : (
           <button
             aria-expanded={isOpen}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--line)] bg-white px-3 text-xs text-[var(--muted)] transition hover:border-[var(--accent)]"
+            className="inline-flex h-11 items-center gap-1 rounded-md border border-[var(--line)] bg-white px-3 text-xs text-[var(--muted)] transition hover:border-[var(--accent)]"
             onClick={() => setOpen((current) => !current)}
             type="button"
           >

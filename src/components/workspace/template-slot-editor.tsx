@@ -23,7 +23,7 @@ export function TemplateSlotEditor({
           </span>
           <select
             aria-label={`${workspaceText(language, "Shot", "镜头")} ${index + 1}`}
-            className="h-10 min-w-0 rounded-md border border-[var(--line)] bg-white px-2 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-11 min-w-0 rounded-md border border-[var(--line)] bg-white px-2 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => {
               const next = [...slots];
               next[index] = event.target.value;
