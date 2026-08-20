@@ -1,7 +1,7 @@
 # 中英文内链内容包：服装商品图生成视频
 
 日期：2026-08-03
-最近更新：2026-08-07
+最近更新：2026-08-21
 状态：英文优先的双语页面已实现，待部署发布
 
 ## 1. 使用说明
@@ -38,7 +38,13 @@
     ├── /guides/why-ai-clothing-videos-deform
     ├── /guides/check-clothing-images-match
     ├── /guides/model-mannequin-flat-lay-for-ai-video
-    └── /guides/plan-clothing-video-shots
+    ├── /guides/plan-clothing-video-shots
+    ├── /guides/how-to-photograph-clothing-details
+    ├── /guides/choose-clothing-video-aspect-ratio
+    ├── /guides/review-clothing-video-before-publishing
+    ├── /guides/choose-background-for-clothing-video
+    ├── /guides/choose-clothing-video-cover-image
+    └── /guides/when-to-reshoot-clothing-photos
 
 /zh                                       中文核心转化页
 └── /zh/three-images-to-clothing-video    中文主题父页面
@@ -47,14 +53,20 @@
     ├── /zh/guides/why-ai-clothing-videos-deform
     ├── /zh/guides/check-clothing-images-match
     ├── /zh/guides/model-mannequin-flat-lay-for-ai-video
-    └── /zh/guides/plan-clothing-video-shots
+    ├── /zh/guides/plan-clothing-video-shots
+    ├── /zh/guides/how-to-photograph-clothing-details
+    ├── /zh/guides/choose-clothing-video-aspect-ratio
+    ├── /zh/guides/review-clothing-video-before-publishing
+    ├── /zh/guides/choose-background-for-clothing-video
+    ├── /zh/guides/choose-clothing-video-cover-image
+    └── /zh/guides/when-to-reshoot-clothing-photos
 ```
 
-6 组双语文章应同批发布，确保每篇都能获得父页面回链并拥有至少 2 个同层相关页面。代码已完成以下接入，部署时仍需逐项验收：
+12 组双语文章应同批发布，确保每篇都能获得父页面回链并拥有至少 2 个同层相关页面。代码已完成以下接入，部署时仍需逐项验收：
 
 1. `/guides` 与 `/zh/guides` 索引入口。
-2. 14 个双语索引/文章 URL 的 sitemap、canonical、title、description 和 hreflang。
-3. 英文与中文三图专题页的 6 篇文章回链。
+2. 26 个双语索引/文章 URL 的 sitemap、canonical、title、description 和 hreflang。
+3. 英文与中文三图专题页的 12 篇文章回链。
 4. 页头、移动导航和页脚的指南入口。
 5. 上线后用 Search Console 的实际查询和转化数据调整标题，不虚构搜索量。
 
@@ -185,6 +197,132 @@ English SEO Title：How to plan a clothing product video shot list | AI Clothes 
 English Meta Description：Plan a clothing product video shot list by mapping each buyer question to a real source image, a restrained camera move, and an 8-second segment.
 中文 SEO Title：如何规划服装商品视频分镜清单？｜AI Clothes Video
 中文 Meta Description：把每个买家问题对应到真实素材图、克制的镜头运动和独立 8 秒片段，规划有证据依据的服装商品视频分镜。
+
+### 4.7 如何拍摄适合 AI 视频的服装细节图
+
+- Target layer: Long-tail Support
+- Primary keyword: how to photograph clothing details for AI video
+- Localized keyword: 如何拍摄适合 AI 视频的服装细节图
+- Search intent: How-to / Problem-solving
+- Target URL slug: /guides/how-to-photograph-clothing-details
+- Localized URL: /zh/guides/how-to-photograph-clothing-details
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/check-clothing-images-match、/guides/clothing-video-without-back-image；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 不是泛泛讲摄影参数，而是按买家问题选择一个可见细节，同时保留可识别的服装结构锚点，并检查同款、色彩与光线一致性，让细节图能成为镜头证据。
+- Reader stage: Awareness / Consideration
+- Required examples or assets: 保留驳领与纽扣位置关系的西装细节图；有结构锚点与无结构锚点的裁切对照
+- Status: Ready，双语页面已实现
+
+English SEO Title：How to photograph clothing details for AI video | AI Clothes Video
+English Meta Description：Capture a useful clothing detail image for AI video. Choose one buyer question, keep a recognizable garment anchor, preserve color, and match the same SKU.
+中文 SEO Title：如何拍摄适合 AI 视频的服装细节图？｜AI Clothes Video
+中文 Meta Description：拍摄可用于 AI 视频的服装细节图：围绕一个买家问题保留可识别结构，控制颜色与光线，并确认素材属于同一 SKU。
+
+### 4.8 服装视频选 9:16、1:1 还是 16:9
+
+- Target layer: Long-tail Support
+- Primary keyword: clothing video aspect ratio
+- Localized keyword: 服装视频画幅比例怎么选
+- Search intent: Comparison / Decision
+- Target URL slug: /guides/choose-clothing-video-aspect-ratio
+- Localized URL: /zh/guides/choose-clothing-video-aspect-ratio
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/choose-clothing-video-length、/guides/plan-clothing-video-shots；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 把画幅选择拆成发布位置、服装构图压力、界面安全区和真实位置预览，不把会变化的平台规范写成永久结论，也不把画幅与时长混为一谈。
+- Reader stage: Consideration / Decision
+- Required examples or assets: 同一服装视频在 9:16、1:1 与 16:9 中的构图示意；平台控件安全区示意
+- Status: Ready，双语页面已实现
+
+English SEO Title：9:16, 1:1, or 16:9 clothing video aspect ratio | AI Clothes Video
+English Meta Description：Choose a clothing video aspect ratio by placement and composition. Compare 9:16, 1:1, and 16:9, protect garment details, and preview platform overlays.
+中文 SEO Title：服装视频选 9:16、1:1 还是 16:9？｜AI Clothes Video
+中文 Meta Description：根据发布位置和构图选择服装视频画幅，对比 9:16、1:1 与 16:9，保护服装关键细节，并预览平台界面遮挡。
+
+### 4.9 AI 服装视频发布前要检查什么
+
+- Target layer: Long-tail Support
+- Primary keyword: AI clothing video quality checklist
+- Localized keyword: AI 服装视频发布前质量检查
+- Search intent: Checklist / Problem-solving
+- Target URL slug: /guides/review-clothing-video-before-publishing
+- Localized URL: /zh/guides/review-clothing-video-before-publishing
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/why-ai-clothing-videos-deform、/guides/choose-clothing-video-aspect-ratio；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 覆盖自动质检无法替代的人工责任，把源素材事实、跨片段连续性、裁切安全区、音频、商品陈述、授权和真实发布位置组合成可执行清单。
+- Reader stage: Consideration / Decision
+- Required examples or assets: 完整服装视频封面帧；源图与成片逐项对照清单；发布草稿预览
+- Status: Ready，双语页面已实现
+
+English SEO Title：AI clothing video quality checklist before publishing | AI Clothes Video
+English Meta Description：Use an AI clothing video quality checklist after generation. Review garment facts, continuity, crop, audio, rights, claims, and the real publishing placement.
+中文 SEO Title：AI 服装视频发布前质量检查清单｜AI Clothes Video
+中文 Meta Description：生成后使用 AI 服装视频质量清单，检查商品信息、连续性、裁切、音频、授权、商品陈述和真实发布位置。
+
+### 4.10 服装视频用白底还是场景背景
+
+- Target layer: Long-tail Support
+- Primary keyword: white background vs lifestyle background for clothing video
+- Localized keyword: 服装视频用白底还是场景背景
+- Search intent: Comparison / Decision
+- Target URL slug: /guides/choose-background-for-clothing-video
+- Localized URL: /zh/guides/choose-background-for-clothing-video
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/model-mannequin-flat-lay-for-ai-video、/guides/plan-clothing-video-shots；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 区分服装商品证据与场景氛围参考，用选择矩阵说明白底、平铺与真实生活场景各自承担的镜头任务，并明确场景图不能创造服装细节、真实店铺或强品牌背景。
+- Reader stage: Consideration / Decision
+- Required examples or assets: 干净中性背景的结构感西装商品图；白底、平铺与生活场景对比表
+- Status: Ready，双语页面已实现
+
+English SEO Title：White or lifestyle background for clothing video | AI Clothes Video
+English Meta Description：Choose a clothing video background by the job of the shot. Compare clean product views, flat lays, and lifestyle scenes without confusing atmosphere with garment evidence.
+中文 SEO Title：服装视频用白底还是场景背景？｜AI Clothes Video
+中文 Meta Description：根据镜头任务选择服装视频背景，对比白底、平铺和真实场景素材，并明确场景氛围不能替代服装商品证据。
+
+### 4.11 服装商品视频封面图怎么选
+
+- Target layer: Long-tail Support
+- Primary keyword: clothing product video thumbnail
+- Localized keyword: 服装商品视频封面图怎么选
+- Search intent: How-to / Checklist
+- Target URL slug: /guides/choose-clothing-video-cover-image
+- Localized URL: /zh/guides/choose-clothing-video-cover-image
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/review-clothing-video-before-publishing、/guides/choose-clothing-video-aspect-ratio；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 把封面视为播放前的商品承诺，用商品真实性、小尺寸可读性、裁切安全和成片代表性四项标准筛选候选帧，明确好看封面不能替代完整成片质检。
+- Reader stage: Consideration / Decision
+- Required examples or assets: 红色连衣裙视频封面帧；候选帧四项评分表；缩略图界面遮挡示意
+- Status: Ready，双语页面已实现
+
+English SEO Title：Choose a clothing product video cover image | AI Clothes Video
+English Meta Description：Choose a clothing product video thumbnail that stays truthful, readable at small sizes, safe to crop, and representative of the motion viewers will see.
+中文 SEO Title：服装商品视频封面图怎么选？｜AI Clothes Video
+中文 Meta Description：选择真实、缩小后仍清晰、适合目标裁切并能代表完整成片的服装商品视频封面，不要只挑最夸张的一帧。
+
+### 4.12 制作 AI 视频前什么情况下应该重拍服装图
+
+- Target layer: Long-tail Support
+- Primary keyword: when to reshoot clothing product photos for AI video
+- Localized keyword: AI 服装视频素材什么时候需要重拍
+- Search intent: Decision / Problem-solving
+- Target URL slug: /guides/when-to-reshoot-clothing-photos
+- Localized URL: /zh/guides/when-to-reshoot-clothing-photos
+- Parent page: /three-images-to-clothing-video；中文 /zh/three-images-to-clothing-video
+- Related pages: /guides/check-clothing-images-match、/guides/how-to-photograph-clothing-details；均有 /zh 对应页
+- CTA target: /workspace?mode=trial&preset=minimal_studio；中文 /zh/workspace?mode=trial&preset=minimal_studio
+- Unique value: 先区分可通过重新导出、克制校色或裁切解决的技术问题，再列出视角缺失、遮挡、版本冲突和事实不可判断等必须重拍的证据问题，并提供最小补拍清单。
+- Reader stage: Awareness / Consideration
+- Required examples or assets: 针织开衫细节图；技术修复与必须重拍的决策表；最小补拍步骤
+- Status: Ready，双语页面已实现
+
+English SEO Title：When to reshoot clothing photos for AI video | AI Clothes Video
+English Meta Description：Decide whether a clothing photo can be re-exported or cropped, or whether missing, obscured, contradictory, or inaccurate product evidence requires a reshoot.
+中文 SEO Title：制作 AI 视频前，什么情况下应该重拍服装图？｜AI Clothes Video
+中文 Meta Description：判断服装图只需重新导出或裁切，还是因为视角缺失、遮挡、冲突或商品信息不可靠而必须重拍。
 
 ---
 
@@ -417,9 +555,9 @@ AI Clothes Video 会在生成后进行抽帧质检，但自动检查不能消除
 
 ## 8. 发布验收清单
 
-- [ ] 12 个双语文章 URL 均可访问，并返回独立页面内容。
-- [ ] `/guides` 与 `/zh/guides` 索引页能发现全部 6 篇文章。
-- [ ] 英文与中文三图专题页均向下链接 6 篇文章。
+- [ ] 24 个双语文章 URL 均可访问，并返回独立页面内容。
+- [ ] `/guides` 与 `/zh/guides` 索引页能发现全部 12 篇文章。
+- [ ] 英文与中文三图专题页均向下链接 12 篇文章。
 - [ ] 每篇文章都有父页面链接、至少 2 个相关页面链接和工作台 CTA。
 - [ ] 文章之间的计划链接没有 404。
 - [ ] title、description、canonical 和 sitemap 已更新。

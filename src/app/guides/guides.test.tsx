@@ -47,7 +47,7 @@ describe("bilingual guide pages", () => {
     vi.clearAllMocks();
   });
 
-  it("publishes an English-first guide index with six discoverable articles", async () => {
+  it("publishes an English-first guide index with twelve discoverable articles", async () => {
     render(await GuidesIndexPage());
 
     expect(
@@ -68,6 +68,18 @@ describe("bilingual guide pages", () => {
       .toHaveAttribute("href", "/guides/model-mannequin-flat-lay-for-ai-video");
     expect(screen.getByRole("link", { name: "How to plan a clothing product video shot list" }))
       .toHaveAttribute("href", "/guides/plan-clothing-video-shots");
+    expect(screen.getByRole("link", { name: "How to photograph clothing details for AI video" }))
+      .toHaveAttribute("href", "/guides/how-to-photograph-clothing-details");
+    expect(screen.getByRole("link", { name: "9:16, 1:1, or 16:9: which clothing video aspect ratio should you choose?" }))
+      .toHaveAttribute("href", "/guides/choose-clothing-video-aspect-ratio");
+    expect(screen.getByRole("link", { name: "How to review an AI clothing video before publishing" }))
+      .toHaveAttribute("href", "/guides/review-clothing-video-before-publishing");
+    expect(screen.getByRole("link", { name: "White background or lifestyle scene: which works for a clothing video?" }))
+      .toHaveAttribute("href", "/guides/choose-background-for-clothing-video");
+    expect(screen.getByRole("link", { name: "How to choose a cover image for a clothing product video" }))
+      .toHaveAttribute("href", "/guides/choose-clothing-video-cover-image");
+    expect(screen.getByRole("link", { name: "When should you reshoot clothing photos before making an AI video?" }))
+      .toHaveAttribute("href", "/guides/when-to-reshoot-clothing-photos");
     expect(screen.getByRole("link", { name: "Start with the three-image workflow" }))
       .toHaveAttribute("href", "/three-images-to-clothing-video");
   });
@@ -85,6 +97,16 @@ describe("bilingual guide pages", () => {
       .toHaveAttribute("href", "/zh/guides/check-clothing-images-match");
     expect(screen.getByRole("link", { name: "真人模特、人台还是平铺图：哪种素材适合 AI 服装视频？" }))
       .toHaveAttribute("href", "/zh/guides/model-mannequin-flat-lay-for-ai-video");
+    expect(screen.getByRole("link", { name: "如何拍摄适合 AI 视频的服装细节图？" }))
+      .toHaveAttribute("href", "/zh/guides/how-to-photograph-clothing-details");
+    expect(screen.getByRole("link", { name: "服装视频选 9:16、1:1 还是 16:9？" }))
+      .toHaveAttribute("href", "/zh/guides/choose-clothing-video-aspect-ratio");
+    expect(screen.getByRole("link", { name: "服装视频用白底还是场景背景？" }))
+      .toHaveAttribute("href", "/zh/guides/choose-background-for-clothing-video");
+    expect(screen.getByRole("link", { name: "服装商品视频封面图怎么选？" }))
+      .toHaveAttribute("href", "/zh/guides/choose-clothing-video-cover-image");
+    expect(screen.getByRole("link", { name: "制作 AI 视频前，什么情况下应该重拍服装图？" }))
+      .toHaveAttribute("href", "/zh/guides/when-to-reshoot-clothing-photos");
     expect(screen.getByRole("link", { name: "先了解三图生成流程" }))
       .toHaveAttribute("href", "/zh/three-images-to-clothing-video");
   });
@@ -164,6 +186,12 @@ describe("bilingual guide pages", () => {
       { slug: "check-clothing-images-match" },
       { slug: "model-mannequin-flat-lay-for-ai-video" },
       { slug: "plan-clothing-video-shots" },
+      { slug: "how-to-photograph-clothing-details" },
+      { slug: "choose-clothing-video-aspect-ratio" },
+      { slug: "review-clothing-video-before-publishing" },
+      { slug: "choose-background-for-clothing-video" },
+      { slug: "choose-clothing-video-cover-image" },
+      { slug: "when-to-reshoot-clothing-photos" },
     ]);
 
     expect(await generateIndexMetadata()).toMatchObject({

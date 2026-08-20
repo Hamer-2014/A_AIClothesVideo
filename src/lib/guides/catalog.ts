@@ -7,6 +7,12 @@ export const guideSlugs = [
   "check-clothing-images-match",
   "model-mannequin-flat-lay-for-ai-video",
   "plan-clothing-video-shots",
+  "how-to-photograph-clothing-details",
+  "choose-clothing-video-aspect-ratio",
+  "review-clothing-video-before-publishing",
+  "choose-background-for-clothing-video",
+  "choose-clothing-video-cover-image",
+  "when-to-reshoot-clothing-photos",
 ] as const;
 
 export type GuideSlug = (typeof guideSlugs)[number];
@@ -58,10 +64,10 @@ export interface GuideArticle {
 export const guideIndexCopy = {
   en: {
     metadataTitle: "Clothing product video guides | AI Clothes Video",
-    metadataDescription: "Practical, evidence-led guides for matching clothing images, choosing source formats and video length, planning shots, and reducing garment drift.",
+    metadataDescription: "Evidence-led guides for clothing photos, backgrounds, video format, cover images, shot planning, source triage, and quality review.",
     eyebrow: "AI Clothes Video · Practical guides",
     title: "Make better clothing videos before you press generate",
-    intro: "Use these field guides to match one traceable SKU, choose the right source format, plan only the shots your images can support, and review the result with realistic expectations.",
+    intro: "Use these field guides to prepare one traceable SKU, choose the background and format, plan supported shots, select an honest cover, and review the result before publishing.",
     parentLabel: "Start with the three-image workflow",
     articleLabel: "Read guide",
     evidenceTitle: "The shared rule behind every guide",
@@ -69,10 +75,10 @@ export const guideIndexCopy = {
   },
   "zh-CN": {
     metadataTitle: "服装商品视频实用指南｜AI Clothes Video",
-    metadataDescription: "从核对同款素材、选择图片形态、规划分镜和视频时长到减少细节漂移，了解如何制作更可控的 AI 服装商品视频。",
+    metadataDescription: "从核对与重拍素材、选择背景、时长、画幅和封面，到规划分镜与发布前检查，了解如何制作更可控的 AI 服装商品视频。",
     eyebrow: "AI Clothes Video · 实用指南",
     title: "点击生成前，先把服装视频做对",
-    intro: "用这些指南核对同一件 SKU、选择合适的素材形态、规划图片真正支持的镜头，并以合理预期检查生成结果。",
+    intro: "用这些指南准备同一件 SKU、判断是否需要重拍、选择背景与格式、规划有证据的镜头，并在发布前检查成片和封面。",
     parentLabel: "先了解三图生成流程",
     articleLabel: "阅读指南",
     evidenceTitle: "所有指南共用的一条原则",
@@ -977,6 +983,870 @@ export const guideArticles = {
       ctaTitle: "每个计划镜头都能指出素材证据吗？",
       ctaBody: "上传核对完成的素材组，用一条低风险 8 秒试用视频验证第一个买家问题。",
       ctaLabel: "创建第一个有证据的镜头",
+    },
+  },
+  "how-to-photograph-clothing-details": {
+    slug: "how-to-photograph-clothing-details",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "check-clothing-images-match",
+      "clothing-video-without-back-image",
+    ],
+    imageSrc: "/demo/cases/structured-blazer/detail.webp",
+    en: {
+      metadataTitle: "How to photograph clothing details for AI video | AI Clothes Video",
+      title: "How to photograph clothing details for AI video",
+      description: "Capture a useful clothing detail image for AI video. Choose one buyer question, keep a recognizable garment anchor, preserve color, and match the same SKU.",
+      eyebrow: "Source guide · Detail evidence",
+      directAnswer: "Photograph one visible product fact at a time, but keep enough surrounding garment structure to identify where the detail belongs. A sharp fabric patch with no recognizable anchor is not a reliable detail source.",
+      imageAlt: "Close detail product image of a structured blazer showing lapel and button construction",
+      imageCaption: "A useful detail image is close enough to inspect while retaining enough structure to match it to the main garment.",
+      parentLabel: "See how detail evidence fits the three-image workflow",
+      sections: [
+        {
+          heading: "Start with one buyer question",
+          paragraphs: [
+            ["A detail image should answer something a shopper may reasonably inspect: how a closure works, where a print sits, what the cuff looks like, or which visible texture defines the garment. Trying to capture every feature in one crop usually makes none of them clear."],
+            ["The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " assigns the detail slot to visible evidence. It does not turn a generic texture sample into proof of every fabric property or hidden construction."],
+          ],
+          table: {
+            headers: ["Buyer question", "Useful detail frame", "Avoid"],
+            rows: [
+              ["How is it fastened?", "Closure plus nearby seam or neckline", "A cropped button with no garment context"],
+              ["Where is the print placed?", "Print plus a recognizable edge or panel", "A pattern swatch from another product"],
+              ["What does the cuff or collar look like?", "Complete cuff or collar with its attachment", "A partial edge cut off by the frame"],
+              ["What visible texture is present?", "Sharp surface detail plus a matching construction cue", "An extreme macro that hides color and location"],
+            ],
+          },
+        },
+        {
+          heading: "Keep a recognizable garment anchor",
+          paragraphs: [
+            ["Move close enough for the feature to be readable, then leave one stable anchor in frame: a lapel edge, pocket opening, waist seam, zipper track, sleeve join, or print boundary. That anchor helps a reviewer match the crop to the front and back images."],
+            ["If nobody can tell where the crop came from when the three images are placed side by side, widen the frame. The goal is product evidence, not the closest possible macro."],
+          ],
+        },
+        {
+          heading: "Protect color, sharpness, and construction",
+          paragraphs: [
+            ["Use even light, avoid colored reflections, and focus on the feature rather than the background. Strong filters, beauty retouching, fabric smoothing, and oversharpening can change the product fact you are trying to preserve."],
+          ],
+          bullets: [
+            "Keep the complete feature inside the frame without cutting off its edges.",
+            "Remove hands, tags, props, or hair when they cover the relevant construction.",
+            "Use the same product color and version as the front and back images.",
+            "Check that highlights do not erase stitching, texture, or hardware shape.",
+            "Do not claim softness, weight, stretch, or composition from appearance alone.",
+          ],
+        },
+        {
+          heading: "Match the detail to the same SKU",
+          paragraphs: [
+            ["A beautiful close-up from a nearby colorway is still the wrong source. Compare button count, thread color, print order, seam placement, and hardware shape against the main product images before uploading."],
+            ["Run the ", { href: "/guides/check-clothing-images-match", label: "same-SKU consistency checklist" }, " when the crop is hard to identify. If the detail cannot be confirmed, reshoot it instead of asking a prompt to reconcile the difference."],
+          ],
+        },
+        {
+          heading: "Plan only the close-up the image supports",
+          paragraphs: [
+            ["A detail image can support a restrained close-up of the visible feature when the corresponding template is available. It does not prove an unseen lining, reverse side, full fabric behavior, or another part of the garment."],
+            ["The same evidence rule applies to missing views. If you also need real back construction, follow the ", { href: "/guides/clothing-video-without-back-image", label: "back-image capture checklist" }, " rather than trying to extract it from a detail crop."],
+          ],
+        },
+      ],
+      relatedHeading: "Complete and verify the source set",
+      ctaTitle: "Is the detail both clear and traceable?",
+      ctaBody: "Upload the matched front, back, and detail images, then start with one low-risk 8-second trial.",
+      ctaLabel: "Test the verified detail image",
+    },
+    "zh-CN": {
+      metadataTitle: "如何拍摄适合 AI 视频的服装细节图？｜AI Clothes Video",
+      title: "如何拍摄适合 AI 视频的服装细节图？",
+      description: "拍摄适合 AI 服装视频的细节素材：明确一个买家问题，保留可识别的服装结构锚点，维持真实颜色，并确认属于同一 SKU。",
+      eyebrow: "素材指南 · 细节证据",
+      directAnswer: "每张细节图只聚焦一个可见商品事实，同时保留足够的周边结构，让人能确认细节属于服装哪个位置。只有一块面料、却没有可识别锚点的微距图，并不是可靠素材。",
+      imageAlt: "展示驳领与纽扣结构的西装细节商品图",
+      imageCaption: "有效细节图既要足够近，便于检查，也要保留足够结构，能够和主商品图对应。",
+      parentLabel: "查看细节证据在三图流程中的作用",
+      sections: [
+        {
+          heading: "先确定一个买家问题",
+          paragraphs: [
+            ["细节图应该回答买家可能真正检查的问题：闭合方式是什么、印花位于哪里、袖口或领口是什么结构，或者哪一种可见纹理构成商品特征。一张图想同时拍清所有细节，通常会让每项信息都不够明确。"],
+            ["在", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "中，细节图位置用于提供真实可见证据。它不会把一块普通纹理样本自动变成所有面料属性或隐藏结构的证明。"],
+          ],
+          table: {
+            headers: ["买家问题", "有效细节画面", "需要避免"],
+            rows: [
+              ["服装如何闭合？", "闭合件加附近缝线或领口", "没有服装上下文的单颗纽扣"],
+              ["印花位于哪里？", "印花加可识别边缘或拼片", "来自其他商品的图案样本"],
+              ["袖口或领口是什么样？", "完整结构及其连接位置", "被画面裁掉一半的边缘"],
+              ["有哪些可见纹理？", "清晰表面加可对应的结构线索", "隐藏颜色和位置的极端微距"],
+            ],
+          },
+        },
+        {
+          heading: "保留一个可识别的服装锚点",
+          paragraphs: [
+            ["靠近到细节能够看清，然后在画面中保留一个稳定锚点，例如驳领边缘、口袋开口、腰线、拉链轨道、袖子接缝或印花边界。这样才能把细节图与正面、背面图对应起来。"],
+            ["把三张图并排后，如果没有人能判断这张细节图来自哪里，就把画面拍宽一点。目标是提供商品证据，不是追求尽可能近的微距。"],
+          ],
+        },
+        {
+          heading: "保护真实颜色、清晰度与结构",
+          paragraphs: [
+            ["使用均匀光线，避免彩色反光，并把焦点放在商品结构而不是背景上。强滤镜、美颜修图、面料磨皮和过度锐化都可能改变你原本想保留的商品事实。"],
+          ],
+          bullets: [
+            "让完整细节保持在画面内，不要切掉关键边缘。",
+            "手、吊牌、道具或头发遮挡结构时应移开。",
+            "必须与正面、背面图使用同一商品颜色和版本。",
+            "检查高光是否抹掉缝线、纹理或五金形状。",
+            "不要仅凭画面宣称柔软度、重量、弹性或成分。",
+          ],
+        },
+        {
+          heading: "确认细节来自同一件 SKU",
+          paragraphs: [
+            ["附近色号的漂亮特写仍然是错误素材。上传前要把纽扣数量、线色、印花顺序、缝线位置和五金形状与主商品图逐项对应。"],
+            ["细节来源难以确认时，执行", { href: "/guides/check-clothing-images-match", label: "同款一致性检查" }, "。无法确认就重新拍摄，不要要求 prompt 自动协调差异。"],
+          ],
+        },
+        {
+          heading: "只规划素材真正支持的特写",
+          paragraphs: [
+            ["当对应模板可用时，细节图可以支持围绕真实可见特征的克制特写，但不能证明隐藏里布、反面结构、完整面料动态或服装其他位置。"],
+            ["缺失视角也遵循同一规则。如果还要展示真实背部，请使用", { href: "/guides/clothing-video-without-back-image", label: "背面图补拍清单" }, "，不要尝试从局部细节图推断背面。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续补齐并核对素材组",
+      ctaTitle: "这张细节图既清楚又可追溯吗？",
+      ctaBody: "上传核对完成的正面、背面和细节图，先生成一条低风险 8 秒试用视频。",
+      ctaLabel: "验证这张细节素材",
+    },
+  },
+  "choose-clothing-video-aspect-ratio": {
+    slug: "choose-clothing-video-aspect-ratio",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "choose-clothing-video-length",
+      "plan-clothing-video-shots",
+    ],
+    imageSrc: "/demo/cases/burgundy-midi-dress/minimal-studio-poster.webp",
+    en: {
+      metadataTitle: "9:16, 1:1, or 16:9 clothing video aspect ratio | AI Clothes Video",
+      title: "9:16, 1:1, or 16:9: which clothing video aspect ratio should you choose?",
+      description: "Choose a clothing video aspect ratio by placement and composition. Compare 9:16, 1:1, and 16:9, protect garment details, and preview platform overlays.",
+      eyebrow: "Format guide · Aspect ratio",
+      directAnswer: "Choose the placement first: 9:16 for a vertical-first frame, 1:1 for a compact square placement, or 16:9 for a horizontal canvas. Then compose for that ratio before generation instead of relying on a destructive crop afterward.",
+      imageAlt: "Vertical poster frame from an 8-second minimal-studio clothing product video",
+      imageCaption: "A vertical frame works when the garment remains readable from neckline to hem and important details stay away from interface overlays.",
+      parentLabel: "See how source images become a clothing product video",
+      sections: [
+        {
+          heading: "Start with the final placement",
+          paragraphs: [
+            ["Aspect ratio is a distribution decision, not a style filter. The same garment may need different framing on a vertical short-video feed, a square product tile, or a horizontal page section. Decide where the primary version will appear before you generate it."],
+            ["AI Clothes Video supports 9:16, 1:1, and 16:9 in the workspace. The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " still controls which garment views are available; changing the canvas cannot create missing product evidence."],
+          ],
+        },
+        {
+          heading: "Compare 9:16, 1:1, and 16:9",
+          paragraphs: [
+            ["Use these as composition starting points. Platform requirements and interface overlays change, so verify the current destination before publishing rather than treating any table as permanent platform policy."],
+          ],
+          table: {
+            headers: ["Ratio", "Best starting use", "Composition pressure", "Check before export"],
+            rows: [
+              ["9:16", "Vertical-first short video and mobile viewing", "Limited side space; full garments can become narrow", "Keep neckline, hem, and selling detail clear of top and bottom overlays"],
+              ["1:1", "Compact product placements and reusable social crops", "Less vertical room for long garments", "Confirm the full silhouette is not cut at head, sleeve, or hem"],
+              ["16:9", "Horizontal page sections, presentations, and wider viewing", "Extra side space can weaken a centered product", "Use intentional negative space without shrinking the garment too far"],
+            ],
+          },
+        },
+        {
+          heading: "Compose instead of cropping later",
+          paragraphs: [
+            ["A late crop can remove cuffs, hems, a back closure, or the exact detail a shot was meant to show. It can also enlarge a low-resolution region and shift the garment away from the intended focal point."],
+            ["Choose the ratio in the workspace, then inspect every source image inside that shape. If a long dress becomes too small in 16:9 or a wide pose is clipped in 9:16, adjust the planned shot rather than assuming post-production will repair it."],
+          ],
+          bullets: [
+            "Keep the complete product fact for the shot inside the frame.",
+            "Leave breathing room around hems, sleeves, and moving edges.",
+            "Reserve safe space for captions, controls, or commerce overlays.",
+            "Do not place essential details at the extreme edge of the canvas.",
+          ],
+        },
+        {
+          heading: "Keep aspect ratio separate from video length",
+          paragraphs: [
+            ["Ratio answers where and how the frame will be viewed. Length answers how many buyer questions the video needs to cover. A 9:16 video is not automatically short, and a 16:9 video does not need more shots."],
+            ["Use the ", { href: "/guides/choose-clothing-video-length", label: "8-, 16-, 24-, and 32-second decision guide" }, " for duration, then use the ", { href: "/guides/plan-clothing-video-shots", label: "shot-list worksheet" }, " to confirm each segment still has identifiable source evidence."],
+          ],
+        },
+        {
+          heading: "Preview the real destination",
+          paragraphs: [
+            ["Before publishing, test the exported video in the actual product page or platform draft. Check the mobile and desktop presentation, poster frame, captions, controls, and any interface area that may cover the garment."],
+            ["If one version must serve several placements, preserve a clear central product zone. For important campaigns, generate or edit placement-specific versions instead of forcing one crop to perform every job."],
+          ],
+        },
+      ],
+      relatedHeading: "Plan the format and shot structure",
+      ctaTitle: "Know where the first version will appear?",
+      ctaBody: "Choose 9:16, 1:1, or 16:9 in the workspace and validate one focused shot before building longer versions.",
+      ctaLabel: "Choose the video aspect ratio",
+    },
+    "zh-CN": {
+      metadataTitle: "服装视频选 9:16、1:1 还是 16:9？｜AI Clothes Video",
+      title: "服装视频选 9:16、1:1 还是 16:9？",
+      description: "根据发布位置和构图选择服装视频画幅，对比 9:16、1:1 与 16:9，保护服装关键细节，并预览平台界面遮挡。",
+      eyebrow: "格式指南 · 视频画幅",
+      directAnswer: "先确定发布位置：竖屏优先画面可选 9:16，紧凑方形位置可选 1:1，横向展示可选 16:9。应在生成前按目标画幅构图，不要依赖生成后的破坏性裁切。",
+      imageAlt: "8 秒极简影棚服装商品视频的竖屏封面帧",
+      imageCaption: "竖屏画面要确保服装从领口到下摆仍清晰可读，并让关键细节避开界面遮挡区域。",
+      parentLabel: "查看素材图如何组成服装商品视频",
+      sections: [
+        {
+          heading: "先确定最终发布位置",
+          paragraphs: [
+            ["画幅比例是分发决策，不是风格滤镜。同一件服装放在竖屏短视频信息流、方形商品位置或横向页面区块时，所需构图不同。生成前先决定哪个位置是主要版本。"],
+            ["AI Clothes Video 工作台支持 9:16、1:1 和 16:9。", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "仍然决定可以展示哪些服装视角；改变画布不能创造缺失的商品证据。"],
+          ],
+        },
+        {
+          heading: "对比 9:16、1:1 和 16:9",
+          paragraphs: [
+            ["把下面内容作为构图起点。平台要求和界面遮挡会变化，发布前必须核对目标位置的最新规则，不能把任何尺寸表当作永久平台政策。"],
+          ],
+          table: {
+            headers: ["比例", "适合的起始用途", "构图压力", "导出前检查"],
+            rows: [
+              ["9:16", "竖屏优先短视频与移动观看", "横向空间有限，完整长款服装可能显得过窄", "让领口、下摆和卖点避开上下界面遮挡"],
+              ["1:1", "紧凑商品位置与可复用社交媒体裁切", "长款服装的纵向空间较少", "确认头部、袖子和下摆没有被切掉"],
+              ["16:9", "横向页面区块、演示与宽屏观看", "多余侧边空间可能削弱居中商品", "合理利用留白，不要把服装缩得过小"],
+            ],
+          },
+        },
+        {
+          heading: "按画幅构图，不要事后硬裁",
+          paragraphs: [
+            ["后期强行裁切可能切掉袖口、下摆、背部闭合结构，或恰好删掉镜头原本要展示的细节；还可能放大低分辨率区域，让服装偏离原定视觉重点。"],
+            ["先在工作台选择比例，再检查每张素材放进该画幅后的效果。如果长裙在 16:9 中过小，或宽幅姿势在 9:16 中被切掉，应调整计划镜头，而不是假设后期一定能补救。"],
+          ],
+          bullets: [
+            "镜头要表达的完整商品信息必须保留在画面内。",
+            "下摆、袖子和运动边缘周围要留出呼吸空间。",
+            "为字幕、控件或电商界面预留安全区域。",
+            "关键细节不要贴在画布最边缘。",
+          ],
+        },
+        {
+          heading: "把画幅和视频时长分开决定",
+          paragraphs: [
+            ["画幅回答画面在哪里、如何被观看；时长回答视频需要处理几个买家问题。9:16 不代表一定短，16:9 也不代表必须增加镜头。"],
+            ["时长可参考", { href: "/guides/choose-clothing-video-length", label: "8、16、24、32 秒选择指南" }, "，然后用", { href: "/guides/plan-clothing-video-shots", label: "分镜清单" }, "确认每个片段仍能指出明确素材证据。"],
+          ],
+        },
+        {
+          heading: "在真实发布位置预览",
+          paragraphs: [
+            ["发布前，把导出视频放进真实商品页或平台草稿中测试。检查移动端与桌面端展示、封面帧、字幕、控件，以及任何可能遮挡服装的界面区域。"],
+            ["如果一个版本必须用于多个位置，就保留清晰的中央商品安全区。重要活动更适合生成或编辑不同发布位置的专用版本，不要强迫一个裁切承担所有任务。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续规划格式与镜头结构",
+      ctaTitle: "已经确定第一个版本的发布位置了吗？",
+      ctaBody: "在工作台选择 9:16、1:1 或 16:9，先验证一个聚焦镜头，再制作更长版本。",
+      ctaLabel: "选择服装视频画幅",
+    },
+  },
+  "review-clothing-video-before-publishing": {
+    slug: "review-clothing-video-before-publishing",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "why-ai-clothing-videos-deform",
+      "choose-clothing-video-aspect-ratio",
+    ],
+    imageSrc: "/demo/red-dress-poster.webp",
+    en: {
+      metadataTitle: "AI clothing video quality checklist before publishing | AI Clothes Video",
+      title: "How to review an AI clothing video before publishing",
+      description: "Use an AI clothing video quality checklist after generation. Review garment facts, continuity, crop, audio, rights, claims, and the real publishing placement.",
+      eyebrow: "Publishing checklist · Human review",
+      directAnswer: "Watch the complete video at normal speed and frame by frame, compare it with the source images, then preview it in the real destination. Automated QA reduces risk; it does not replace the seller who knows the SKU.",
+      imageAlt: "Poster frame from a completed clothing product video ready for human review",
+      imageCaption: "A good poster frame is only the start. Review the complete motion, transitions, audio, crop, and product claims before publishing.",
+      parentLabel: "Review the complete three-image generation workflow",
+      sections: [
+        {
+          heading: "Automated QA is a gate, not final approval",
+          paragraphs: [
+            ["AI Clothes Video performs post-generation quality checks before a deliverable is released, but automated sampling cannot understand every commercial fact about your SKU. A result can pass a technical check and still contain a subtle color, trim, or product-claim problem that only the seller recognizes."],
+            ["The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " reduces unsupported shots; the final human review decides whether the video is accurate enough for its actual listing or campaign."],
+          ],
+        },
+        {
+          heading: "Compare garment facts with every source image",
+          paragraphs: [
+            ["Open the front, back, and detail images beside the video. Watch once at normal speed for overall coherence, then pause around motion peaks and transitions where drift is easier to miss."],
+          ],
+          bullets: [
+            "Color, silhouette, length, neckline, sleeves, waist, and hem stay consistent.",
+            "Prints, logos, buttons, pockets, zippers, ties, and seams do not move or disappear.",
+            "Front, back, and detail shots still look like the same SKU and version.",
+            "No unsupported body part, garment panel, background object, or accessory appears.",
+            "The final frame remains usable and does not end on a distorted transition.",
+          ],
+        },
+        {
+          heading: "Check continuity, crop, and safe areas",
+          paragraphs: [
+            ["For multi-segment videos, inspect every join for a jump in garment scale, pose, lighting, background, or silhouette. Then review the selected canvas at the real display size."],
+            ["Use the ", { href: "/guides/choose-clothing-video-aspect-ratio", label: "9:16, 1:1, and 16:9 guide" }, " to check whether hems, sleeves, captions, and important details remain clear of interface overlays. A technically valid frame can still be unusable when a commerce button covers the selling point."],
+          ],
+        },
+        {
+          heading: "Listen to audio and verify every claim",
+          paragraphs: [
+            ["Free trials are silent; paid generation includes audio by default. For a video with audio, listen on speakers and headphones for abrupt cuts, unexpected speech, clipping, or a mismatch with the brand context. Remove or replace audio that you cannot confidently publish."],
+            ["Review every visible or spoken product statement. Do not imply an unseen material composition, performance property, fit guarantee, sustainability claim, or construction detail that the listing and source evidence cannot support."],
+          ],
+        },
+        {
+          heading: "Confirm rights and the destination preview",
+          paragraphs: [
+            ["Confirm the commercial-use rights for product images, logos, music, copy, and any recognizable adult model. Then load the video into the actual product page or platform draft without publishing it yet."],
+          ],
+          numberedItems: [
+            "Preview the poster frame, first seconds, captions, controls, and autoplay behavior.",
+            "Check mobile and desktop layouts where both are relevant.",
+            "Confirm the video belongs to the correct SKU, color, locale, and listing.",
+            "Record the approved version so an older draft is not uploaded by mistake.",
+            "Keep a source-to-output audit trail for support, complaints, or takedown requests.",
+          ],
+        },
+        {
+          heading: "What to do when the video fails review",
+          paragraphs: [
+            ["Do not publish and hope viewers will ignore the problem. Identify whether the failure comes from mismatched sources, a missing view, an overambitious shot, the selected ratio, audio, or the final placement."],
+            ["Use the guide to ", { href: "/guides/why-ai-clothing-videos-deform", label: "diagnose garment drift" }, ", replace the conflicting source or narrow the shot, then generate and review a new version. A failed human review is useful evidence for the next controlled attempt."],
+          ],
+        },
+      ],
+      relatedHeading: "Resolve issues before publishing",
+      ctaTitle: "Ready to validate a controlled first version?",
+      ctaBody: "Generate one low-risk 8-second trial, compare it with the source set, and apply the publishing checklist before wider use.",
+      ctaLabel: "Create a version to review",
+    },
+    "zh-CN": {
+      metadataTitle: "AI 服装视频发布前质量检查清单｜AI Clothes Video",
+      title: "AI 服装视频发布前要检查什么？",
+      description: "生成后使用 AI 服装视频质量清单，检查商品信息、连续性、裁切、音频、授权、商品陈述和真实发布位置。",
+      eyebrow: "发布清单 · 人工复核",
+      directAnswer: "先以正常速度观看完整视频，再逐帧检查关键位置，把成片与源图片对照，并放进真实发布位置预览。自动质检可以降低风险，但不能替代真正了解 SKU 的卖家。",
+      imageAlt: "等待人工发布检查的服装商品视频封面帧",
+      imageCaption: "好看的封面帧只是开始。发布前还要检查完整运动、转场、音频、裁切和商品陈述。",
+      parentLabel: "回顾完整三图生成流程",
+      sections: [
+        {
+          heading: "自动质检是门禁，不是最终批准",
+          paragraphs: [
+            ["AI Clothes Video 会在可交付前执行生成后质检，但自动抽帧无法理解你这件 SKU 的所有商业事实。成片可能通过技术检查，却仍有细微颜色、辅料或商品陈述问题，只有卖家自己能够识别。"],
+            ["", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "会减少没有素材依据的镜头；最终人工复核则决定视频是否足够准确，可以用于真实商品页或推广活动。"],
+          ],
+        },
+        {
+          heading: "用每张源图片核对商品事实",
+          paragraphs: [
+            ["把正面、背面和细节图放在视频旁边。先按正常速度看一遍整体连续性，再停在运动峰值和转场附近，因为这些位置更容易隐藏细节漂移。"],
+          ],
+          bullets: [
+            "颜色、版型、衣长、领口、袖子、腰线与下摆保持一致。",
+            "印花、Logo、纽扣、口袋、拉链、系带与缝线没有移动或消失。",
+            "正面、背面与细节镜头仍然像同一件 SKU 和同一版本。",
+            "没有出现无素材依据的人体部位、服装拼片、背景物体或配件。",
+            "最后一帧仍可使用，没有停在变形的转场中间。",
+          ],
+        },
+        {
+          heading: "检查连续性、裁切和安全区域",
+          paragraphs: [
+            ["多片段视频要检查每个拼接点，看服装尺度、姿势、灯光、背景或版型是否突然跳变。然后按真实显示尺寸检查所选画布。"],
+            ["使用", { href: "/guides/choose-clothing-video-aspect-ratio", label: "9:16、1:1 与 16:9 画幅指南" }, "确认下摆、袖子、字幕和关键细节没有被界面遮挡。技术上有效的画面，也可能因为电商按钮盖住卖点而无法使用。"],
+          ],
+        },
+        {
+          heading: "试听音频并核对所有商品陈述",
+          paragraphs: [
+            ["免费试用没有音频，付费生成默认包含音频。有音频的视频要分别用扬声器和耳机试听，检查突兀剪切、意外人声、爆音或与品牌场景不符的内容。无法确认可发布的音频应移除或替换。"],
+            ["检查所有画面和语音中的商品陈述。不要暗示素材与商品资料无法证明的面料成分、性能、合身保证、可持续性或隐藏结构。"],
+          ],
+        },
+        {
+          heading: "确认授权并在真实位置预览",
+          paragraphs: [
+            ["确认商品图片、Logo、音乐、文案和可识别成年模特都具备商业使用权。然后先把视频放进真实商品页或平台草稿，不要立即发布。"],
+          ],
+          numberedItems: [
+            "预览封面帧、开头几秒、字幕、控件和自动播放行为。",
+            "同时涉及移动端与桌面端时，分别检查布局。",
+            "确认视频对应正确的 SKU、颜色、语言和商品页面。",
+            "记录已批准版本，避免误传旧草稿。",
+            "保留素材到成片的证据链，用于客服、投诉或下架请求。",
+          ],
+        },
+        {
+          heading: "人工检查不通过时怎么办",
+          paragraphs: [
+            ["不要抱着观众不会注意的侥幸心理发布。先判断问题来自素材冲突、缺失视角、镜头过度、画幅选择、音频还是最终发布位置。"],
+            ["可以用", { href: "/guides/why-ai-clothing-videos-deform", label: "服装漂移诊断指南" }, "定位原因，更换冲突素材或收窄镜头，再生成并检查新版本。一次未通过的人工复核，是下一次可控尝试的有效证据。"],
+          ],
+        },
+      ],
+      relatedHeading: "发布前继续解决问题",
+      ctaTitle: "准备验证一个可控的首版视频了吗？",
+      ctaBody: "先生成一条低风险 8 秒试用视频，与源素材对照，并在扩大使用前执行发布检查清单。",
+      ctaLabel: "生成一个待检查版本",
+    },
+  },
+  "choose-background-for-clothing-video": {
+    slug: "choose-background-for-clothing-video",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "model-mannequin-flat-lay-for-ai-video",
+      "plan-clothing-video-shots",
+    ],
+    imageSrc: "/demo/cases/structured-blazer/front.webp",
+    en: {
+      metadataTitle: "White or lifestyle background for clothing video | AI Clothes Video",
+      title: "White background or lifestyle scene: which works for a clothing video?",
+      description: "Choose a clothing video background by the job of the shot. Compare clean product views, flat lays, and lifestyle scenes without confusing atmosphere with garment evidence.",
+      eyebrow: "Source decision · Background",
+      directAnswer: "Use a clean or white background when the shot must make the garment easy to inspect. Use a real lifestyle scene when context is part of the message and you have permission to use it. In either case, the background cannot supply missing garment details.",
+      imageAlt: "Structured blazer product image on a clean neutral background",
+      imageCaption: "A clean background reduces visual competition and keeps the garment silhouette easy to inspect.",
+      parentLabel: "See how every source image receives a defined role",
+      sections: [
+        {
+          heading: "Give the background one clear job",
+          paragraphs: [
+            ["A background can isolate the product, show scale, suggest a use occasion, or establish a visual mood. Problems begin when one image is expected to do all four jobs. Decide what the shot must communicate before choosing a source."],
+            ["In the ", { href: "/three-images-to-clothing-video", label: "three-image clothing video workflow" }, ", front, back, and detail images remain the evidence for the garment itself. Background choice changes presentation; it does not expand which clothing views are proven."],
+          ],
+        },
+        {
+          heading: "Compare clean, flat-lay, and lifestyle sources",
+          paragraphs: [
+            ["There is no universally best background. Choose the least complicated source that answers the buyer question without hiding the product."],
+          ],
+          table: {
+            headers: ["Source", "Best use", "Main advantage", "Main risk"],
+            rows: [
+              ["White or neutral background", "Silhouette, construction, marketplace-style product view", "Low visual competition", "Weak context for occasion or scale"],
+              ["Flat lay", "Outline, arrangement, visible front details", "Garment can fill the frame", "Does not prove worn fit or drape"],
+              ["Real lifestyle scene", "Occasion, mood, environment", "Adds recognizable context", "Props, people, lighting, or clutter can obscure the garment"],
+            ],
+          },
+        },
+        {
+          heading: "Treat a scene image as atmosphere, not product proof",
+          paragraphs: [
+            ["A scene image may guide background, lighting, and mood only. It should not be used to infer a different collar, fabric, print, accessory, body shape, storefront, or hidden garment view. Strong brand or real-store backgrounds also need actual source evidence and usage rights."],
+            ["If the scene includes another garment, crop or replace it before use. Otherwise the model receives two competing answers about what the product looks like. Run the ", { href: "/guides/check-clothing-images-match", label: "same-SKU consistency check" }, " whenever a scene and product image appear to disagree."],
+          ],
+        },
+        {
+          heading: "Keep backgrounds consistent across a sequence",
+          paragraphs: [
+            ["A single good frame can still produce a weak multi-shot video if the floor line, light direction, color cast, scale, or camera height jumps between segments. Decide whether the background should stay continuous or whether a deliberate scene change adds new information."],
+            ["The ", { href: "/guides/model-mannequin-flat-lay-for-ai-video", label: "model, mannequin, and flat-lay comparison" }, " helps separate source format from background choice. Then map the selected source to one job with the ", { href: "/guides/plan-clothing-video-shots", label: "shot-list guide" }, "."],
+          ],
+          bullets: [
+            "Match the dominant light direction and avoid strong color contamination.",
+            "Keep the garment large enough to inspect in the final canvas.",
+            "Remove props that overlap the neckline, sleeves, waist, or hem.",
+            "Do not use background cleanup to redraw product edges or construction.",
+          ],
+        },
+        {
+          heading: "Choose the simpler first test",
+          paragraphs: [
+            ["For a new SKU, start with the background that makes comparison with the source easiest. A restrained clean-background shot is often a better diagnostic than a complex scene because garment drift is easier to spot."],
+            ["Once the product remains stable, test a scene only when it answers a different buyer question. Also verify the chosen ", { href: "/guides/choose-clothing-video-aspect-ratio", label: "video aspect ratio" }, " because a wide scene can become cluttered or lose the garment when cropped vertically."],
+          ],
+        },
+      ],
+      relatedHeading: "Prepare the source format and shot",
+      ctaTitle: "Ready to test the simplest useful background?",
+      ctaBody: "Upload one matched source set and validate a clean, low-risk 8-second shot before adding scene complexity.",
+      ctaLabel: "Test a clean-background shot",
+    },
+    "zh-CN": {
+      metadataTitle: "服装视频用白底还是场景背景？｜AI Clothes Video",
+      title: "服装视频用白底还是场景背景？",
+      description: "根据镜头任务选择服装视频背景，对比白底、平铺和真实场景素材，并明确场景氛围不能替代服装商品证据。",
+      eyebrow: "素材决策 · 背景",
+      directAnswer: "需要清楚检查服装时，优先使用白色或干净背景；需要表达使用场景、且拥有真实可用场景素材时，可以选择生活方式背景。无论选哪种，背景都不能补充素材中缺失的服装细节。",
+      imageAlt: "干净中性背景上的结构感西装商品图",
+      imageCaption: "干净背景可以减少视觉干扰，让服装轮廓和结构更容易检查。",
+      parentLabel: "了解三图流程如何定义每张素材的角色",
+      sections: [
+        {
+          heading: "先给背景一个明确任务",
+          paragraphs: [
+            ["背景可以隔离商品、说明尺度、暗示穿着场合或建立视觉氛围。问题通常来自要求一张图同时完成所有任务。选择素材前，先确定这个镜头必须传达什么。"],
+            ["在", { href: "/three-images-to-clothing-video", label: "三张服装图生成视频流程" }, "中，正面、背面和细节图仍然是服装本身的证据。背景只改变展示方式，不能扩大已经得到证明的服装视角。"],
+          ],
+        },
+        {
+          heading: "对比白底、平铺和真实场景",
+          paragraphs: [
+            ["没有一种背景永远最好。应选择能回答买家问题、同时最少遮挡商品的素材。"],
+          ],
+          table: {
+            headers: ["素材", "适合任务", "主要优势", "主要风险"],
+            rows: [
+              ["白色或中性背景", "版型、结构、平台型商品展示", "视觉干扰少", "缺少穿着场合和尺度语境"],
+              ["平铺", "轮廓、摆放方式、正面可见细节", "服装可以充分占据画面", "不能证明真实上身与垂坠"],
+              ["真实生活场景", "场合、氛围、环境", "提供可识别语境", "道具、人物、光线和杂物可能遮挡服装"],
+            ],
+          },
+        },
+        {
+          heading: "场景图只提供氛围，不提供商品事实",
+          paragraphs: [
+            ["场景图只能用于背景、光线和氛围参考，不能用来推断另一种领口、面料、印花、配饰、人物体型、真实店铺或隐藏服装视角。强品牌场景和真实店铺背景也必须有真实素材依据与使用授权。"],
+            ["如果场景里出现另一件服装，应先裁掉或更换场景，否则模型会收到两个互相竞争的商品答案。场景图和商品图不一致时，先执行", { href: "/guides/check-clothing-images-match", label: "同款一致性检查" }, "。"],
+          ],
+        },
+        {
+          heading: "让一组镜头的背景保持连续",
+          paragraphs: [
+            ["单帧看起来不错，不代表多镜头成片稳定。如果地平线、光线方向、色偏、商品尺度或机位高度在片段间突然变化，背景会比商品更抢注意力。应提前决定背景保持连续，还是场景切换确实增加了新信息。"],
+            ["先用", { href: "/guides/model-mannequin-flat-lay-for-ai-video", label: "真人、人台与平铺素材对比" }, "区分素材形态，再用", { href: "/guides/plan-clothing-video-shots", label: "分镜清单" }, "把选定素材对应到一个镜头任务。"],
+          ],
+          bullets: [
+            "匹配主要光线方向，避免强烈彩色反光污染服装颜色。",
+            "确保服装在最终画幅中足够大，可以检查关键结构。",
+            "移除遮挡领口、袖子、腰线或下摆的道具。",
+            "不要借背景清理重新绘制服装边缘或结构。",
+          ],
+        },
+        {
+          heading: "第一次先测试更简单的背景",
+          paragraphs: [
+            ["新 SKU 更适合从容易和源图对照的背景开始。克制的干净背景镜头通常比复杂场景更适合诊断，因为服装漂移更容易被发现。"],
+            ["商品稳定后，只有场景能回答不同买家问题时再测试。还要核对", { href: "/guides/choose-clothing-video-aspect-ratio", label: "视频画幅" }, "，因为宽场景裁成竖屏后可能变得拥挤，或者让服装缩得过小。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续准备素材形态与镜头",
+      ctaTitle: "准备先测试最简单有效的背景了吗？",
+      ctaBody: "上传一组同款素材，先验证一条干净背景的低风险 8 秒镜头，再增加场景复杂度。",
+      ctaLabel: "测试干净背景镜头",
+    },
+  },
+  "choose-clothing-video-cover-image": {
+    slug: "choose-clothing-video-cover-image",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "review-clothing-video-before-publishing",
+      "choose-clothing-video-aspect-ratio",
+    ],
+    imageSrc: "/demo/red-dress-poster.webp",
+    en: {
+      metadataTitle: "Choose a clothing product video cover image | AI Clothes Video",
+      title: "How to choose a cover image for a clothing product video",
+      description: "Choose a clothing product video thumbnail that stays truthful, readable at small sizes, safe to crop, and representative of the motion viewers will see.",
+      eyebrow: "Publishing guide · Cover image",
+      directAnswer: "Choose the clearest truthful frame, not automatically the most dramatic one. The garment should remain recognizable at thumbnail size, important details must survive the target crop, and the cover must not promise a view or styling that the video does not deliver.",
+      imageAlt: "Cover frame showing a red dress centered against a restrained background",
+      imageCaption: "A useful cover keeps the garment recognizable before the viewer presses play.",
+      parentLabel: "See how the complete video is built from source evidence",
+      sections: [
+        {
+          heading: "Treat the cover as a product promise",
+          paragraphs: [
+            ["A cover has one job before playback: help the viewer recognize the product and understand what the video is about. A dramatic transition frame may attract attention while showing a stretched sleeve, hidden hem, motion blur, or an angle that appears for only a fraction of a second."],
+            ["The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " limits the video to supported garment evidence. Apply the same rule to the cover: it should represent the SKU and a view the complete video can actually support."],
+          ],
+        },
+        {
+          heading: "Score candidate frames on four criteria",
+          paragraphs: [
+            ["Pause on several stable moments and compare them side by side. Do not choose from memory after watching at full speed."],
+          ],
+          table: {
+            headers: ["Criterion", "Pass condition", "Reject when"],
+            rows: [
+              ["Product truth", "Color, silhouette, trim, and visible construction match the source", "A detail moves, disappears, or is invented"],
+              ["Small-size readability", "The garment remains identifiable without zooming", "The product becomes a tiny shape or merges into the background"],
+              ["Crop safety", "Neckline, sleeves, and hem survive the intended placement", "A key selling detail sits at an edge or under an overlay"],
+              ["Video representation", "The frame reflects the actual opening or main story", "The cover suggests a model, view, or scene the video barely contains"],
+            ],
+          },
+        },
+        {
+          heading: "Avoid motion peaks and transition frames",
+          paragraphs: [
+            ["The middle of a turn, zoom, garment sway, or stitched transition is often the least stable point. Check fingers, edges, prints, buttons, waistlines, and hems at full resolution before approving a frame."],
+            ["A generated cover is only a candidate. Compare it with the complete output and use the ", { href: "/guides/review-clothing-video-before-publishing", label: "pre-publish quality checklist" }, " before treating it as final. A clean cover cannot compensate for a video that fails later."],
+          ],
+          bullets: [
+            "Reject blur that hides product construction rather than indicating intentional motion.",
+            "Reject frames captured between two different poses or backgrounds.",
+            "Reject a flattering crop that removes the feature named in the listing.",
+            "Keep the approved cover tied to the correct SKU, color, locale, and video version.",
+          ],
+        },
+        {
+          heading: "Test the real thumbnail size and crop",
+          paragraphs: [
+            ["A frame that looks strong on a desktop monitor can become unreadable in a compact product tile. Preview it at the actual destination size, with the play icon, duration badge, price block, captions, and interface overlays visible."],
+            ["Use the ", { href: "/guides/choose-clothing-video-aspect-ratio", label: "aspect-ratio guide" }, " to protect the product when the same cover is adapted to 9:16, 1:1, or 16:9. If one crop removes essential information, create a placement-specific cover instead of forcing a universal version."],
+          ],
+        },
+        {
+          heading: "Keep text and claims outside the product evidence",
+          paragraphs: [
+            ["If the publishing platform adds text, keep it short and separate from the garment. Do not place unverified material, fit, performance, sustainability, or discount claims on the cover. Text should describe the real listing, not fill gaps in the visual evidence."],
+            ["Confirm commercial rights for the source image, visible adult model, logo, typeface, and any graphic element. Save the approved cover with the final video so an older draft is not published by mistake."],
+          ],
+        },
+      ],
+      relatedHeading: "Validate the cover and final placement",
+      ctaTitle: "Need a truthful frame to evaluate?",
+      ctaBody: "Generate one focused 8-second version, compare its stable frames with the source images, and test the cover at the real destination size.",
+      ctaLabel: "Create a cover candidate",
+    },
+    "zh-CN": {
+      metadataTitle: "服装商品视频封面图怎么选？｜AI Clothes Video",
+      title: "服装商品视频封面图怎么选？",
+      description: "选择真实、缩小后仍清晰、适合目标裁切并能代表完整成片的服装商品视频封面，不要只挑最夸张的一帧。",
+      eyebrow: "发布指南 · 封面图",
+      directAnswer: "应选择最清楚、最真实的一帧，而不是默认选择动作最夸张的一帧。服装在缩略图尺寸下仍要可识别，关键细节必须经得起目标裁切，封面也不能承诺成片中没有真正展示的视角或造型。",
+      imageAlt: "克制背景中居中展示红色连衣裙的视频封面帧",
+      imageCaption: "有效封面要让观众在播放前就能识别正在展示的服装。",
+      parentLabel: "了解完整视频如何从素材证据构建",
+      sections: [
+        {
+          heading: "把封面当作商品承诺",
+          paragraphs: [
+            ["封面在播放前只有一个任务：让观众识别商品，并理解视频要展示什么。戏剧化转场帧可能更显眼，却可能带有拉长的袖子、被遮挡的下摆、运动模糊，或只出现极短时间的角度。"],
+            ["", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "会把成片限制在素材支持的服装证据内，封面也应遵守同一原则：它必须代表真实 SKU 和完整视频确实能够支持的视角。"],
+          ],
+        },
+        {
+          heading: "用四项标准比较候选帧",
+          paragraphs: [
+            ["暂停在几个稳定时刻，把候选帧并排比较。不要只凭看完视频后的印象选择。"],
+          ],
+          table: {
+            headers: ["标准", "通过条件", "应淘汰的情况"],
+            rows: [
+              ["商品真实性", "颜色、版型、辅料与可见结构符合源图", "细节移动、消失或被创造"],
+              ["小尺寸可读性", "无需放大也能识别服装", "商品缩成小块或与背景融在一起"],
+              ["裁切安全", "领口、袖子和下摆在目标位置中保留", "关键卖点贴边或被界面遮挡"],
+              ["代表完整成片", "封面符合真实开头或主要叙事", "暗示成片几乎没有的人物、视角或场景"],
+            ],
+          },
+        },
+        {
+          heading: "避开动作峰值和转场中间帧",
+          paragraphs: [
+            ["转身、缩放、衣摆摆动或片段拼接的中间位置，往往是最不稳定的时刻。批准封面前，要按完整分辨率检查手指、边缘、印花、纽扣、腰线和下摆。"],
+            ["系统生成的封面只能视为候选。应与完整成片对照，并执行", { href: "/guides/review-clothing-video-before-publishing", label: "发布前质量检查" }, "。干净封面无法弥补成片后半段的失败。"],
+          ],
+          bullets: [
+            "淘汰掩盖商品结构、而非表达合理运动的模糊帧。",
+            "淘汰两个姿势或两种背景之间的过渡帧。",
+            "淘汰为了显瘦或好看而切掉商品页主卖点的裁切。",
+            "把批准封面绑定到正确 SKU、颜色、语言和视频版本。",
+          ],
+        },
+        {
+          heading: "按真实缩略图尺寸和裁切预览",
+          paragraphs: [
+            ["在桌面大图上清楚的画面，放进紧凑商品卡片后可能无法识别。要按真实发布尺寸预览，并同时显示播放图标、时长标签、价格区域、字幕和界面遮挡。"],
+            ["使用", { href: "/guides/choose-clothing-video-aspect-ratio", label: "画幅选择指南" }, "检查同一封面适配 9:16、1:1 或 16:9 后是否仍保留商品。如果一种裁切会删掉必要信息，应制作对应位置的专用封面，不要强迫一个版本通用。"],
+          ],
+        },
+        {
+          heading: "文案与商品证据分开处理",
+          paragraphs: [
+            ["发布平台需要叠加文字时，应保持简短，并避开服装。不要在封面上添加未经证明的面料、合身、性能、可持续性或折扣声明。文字应该对应真实商品页，而不是补足视觉证据空缺。"],
+            ["确认源图片、可识别成年模特、Logo、字体和图形元素都具备商业使用权。将批准封面与最终视频一同归档，避免误发旧草稿。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续检查封面与发布位置",
+      ctaTitle: "需要一帧真实候选封面吗？",
+      ctaBody: "先生成一条聚焦的 8 秒版本，把稳定帧与源图对照，再按真实发布尺寸检查封面。",
+      ctaLabel: "生成封面候选版本",
+    },
+  },
+  "when-to-reshoot-clothing-photos": {
+    slug: "when-to-reshoot-clothing-photos",
+    parentHref: "/three-images-to-clothing-video",
+    ctaHref: "/workspace?mode=trial&preset=minimal_studio",
+    relatedSlugs: [
+      "check-clothing-images-match",
+      "how-to-photograph-clothing-details",
+    ],
+    imageSrc: "/demo/cases/knit-cardigan/detail.webp",
+    en: {
+      metadataTitle: "When to reshoot clothing photos for AI video | AI Clothes Video",
+      title: "When should you reshoot clothing photos before making an AI video?",
+      description: "Decide whether a clothing photo can be re-exported or cropped, or whether missing, obscured, contradictory, or inaccurate product evidence requires a reshoot.",
+      eyebrow: "Source triage · Reshoot decision",
+      directAnswer: "Reshoot when the missing information is a real product fact: an unseen back, covered closure, unreadable print, wrong colorway, contradictory construction, or detail with no identifiable location. Re-export or recrop only when the evidence already exists and the problem is technical.",
+      imageAlt: "Close product image showing knit cardigan texture and button detail",
+      imageCaption: "A useful reshoot restores missing product evidence; it does not merely create a sharper file.",
+      parentLabel: "Review the evidence required by the three-image workflow",
+      sections: [
+        {
+          heading: "Separate a file problem from an evidence problem",
+          paragraphs: [
+            ["A file can be inconvenient while still containing the right garment fact. It can also be sharp and polished while proving the wrong color, version, or view. Before scheduling photography, state exactly what the planned shot needs to know."],
+            ["The ", { href: "/three-images-to-clothing-video", label: "three-image workflow" }, " assigns front, back, and detail roles. If a role has no trustworthy image, resolution enhancement and stronger prompts cannot create that missing evidence."],
+          ],
+        },
+        {
+          heading: "Fix technical delivery problems without reshooting",
+          paragraphs: [
+            ["Keep the original capture when the product fact is visible and accurate. Make only changes that preserve the garment rather than redesigning it."],
+          ],
+          table: {
+            headers: ["Problem", "Possible fix", "Boundary"],
+            rows: [
+              ["Wrong file format or oversized export", "Re-export from the original", "Do not recompress until text and texture disappear"],
+              ["Too much empty space", "Recrop while retaining the complete required view", "Do not cut sleeves, neckline, waist, or hem"],
+              ["Slight exposure imbalance", "Apply restrained global correction", "Do not change the product color or local fabric structure"],
+              ["Distracting background edge", "Use a clean crop or a better existing original", "Do not redraw garment boundaries"],
+            ],
+          },
+        },
+        {
+          heading: "Reshoot when the product fact is absent or unreliable",
+          paragraphs: [
+            ["A reshoot is necessary when no existing file can answer the buyer question. Trying to repair these cases with generative editing moves the uncertainty into the source set and makes later QA harder."],
+          ],
+          bullets: [
+            "The required front, back, side, or detail view was never photographed.",
+            "Hair, hands, outerwear, tags, props, or cropping cover the relevant construction.",
+            "Images show different colorways, trims, prints, samples, or production revisions.",
+            "White balance or reflections make the true product color impossible to determine.",
+            "Blur, compression, glare, or shallow focus removes the exact detail the shot needs.",
+            "A close-up has no recognizable garment anchor, so its location cannot be verified.",
+          ],
+        },
+        {
+          heading: "Plan the smallest reshoot that closes the gap",
+          paragraphs: [
+            ["Do not repeat an entire campaign shoot when one controlled evidence image is missing. Record the SKU, color, sample version, required view, visible construction, lighting reference, and crop before taking the replacement."],
+            ["For a missing close-up, follow the ", { href: "/guides/how-to-photograph-clothing-details", label: "clothing detail photography guide" }, ". For a missing rear view, use the ", { href: "/guides/clothing-video-without-back-image", label: "back-image capture checklist" }, " instead of substituting another front angle."],
+          ],
+          numberedItems: [
+            "Name the buyer question the replacement image must answer.",
+            "Match the exact SKU, colorway, trim, and production version.",
+            "Recreate neutral light without colored reflections or beauty filters.",
+            "Show the complete required structure with a small safety margin.",
+            "Place the new image beside the existing set and verify agreement.",
+          ],
+        },
+        {
+          heading: "Run one final source-set decision",
+          paragraphs: [
+            ["Use the ", { href: "/guides/check-clothing-images-match", label: "same-SKU checklist" }, " after every replacement. If all images agree, move to a low-risk test. If two sources still contradict each other, stop and identify which file represents the product currently being sold."],
+            ["A small reshoot costs time, but repeated generation from unreliable inputs costs time without resolving the source of the problem. The goal is not perfect photography; it is a source set that makes each planned product fact auditable."],
+          ],
+        },
+      ],
+      relatedHeading: "Repair or replace the source set",
+      ctaTitle: "Does every planned view now have evidence?",
+      ctaBody: "Upload the corrected matched set and use one low-risk 8-second trial to confirm that the reshoot closed the actual gap.",
+      ctaLabel: "Test the corrected source set",
+    },
+    "zh-CN": {
+      metadataTitle: "制作 AI 视频前，什么情况下应该重拍服装图？｜AI Clothes Video",
+      title: "制作 AI 视频前，什么情况下应该重拍服装图？",
+      description: "判断服装图只需重新导出或裁切，还是因为视角缺失、遮挡、冲突或商品信息不可靠而必须重拍。",
+      eyebrow: "素材分诊 · 重拍决策",
+      directAnswer: "缺少的是真实商品事实时就应该重拍，例如没有背面、闭合结构被挡住、印花不可读、色号错误、结构互相矛盾，或细节图无法确认位置。只有证据已经存在、问题纯属技术交付时，才适合重新导出或裁切。",
+      imageAlt: "展示针织开衫纹理与纽扣细节的近距离商品图",
+      imageCaption: "有效重拍要补回缺失的商品证据，而不只是得到一个更清晰的文件。",
+      parentLabel: "查看三图流程需要哪些素材证据",
+      sections: [
+        {
+          heading: "先区分文件问题和证据问题",
+          paragraphs: [
+            ["文件可能不方便使用，但仍包含正确商品事实；也可能非常清晰精致，却展示错误色号、版本或视角。安排重拍前，先写清楚计划镜头必须知道什么。"],
+            ["", { href: "/three-images-to-clothing-video", label: "三图生成流程" }, "会给正面、背面和细节图分配角色。如果某个角色没有可信图片，提高分辨率和加强提示词都不能创造缺失证据。"],
+          ],
+        },
+        {
+          heading: "纯技术交付问题可以不重拍",
+          paragraphs: [
+            ["商品事实清楚且准确时，应保留原始拍摄，只做不会重新设计服装的处理。"],
+          ],
+          table: {
+            headers: ["问题", "可用处理", "边界"],
+            rows: [
+              ["格式不合适或导出文件过大", "从原始文件重新导出", "不要压缩到文字与纹理消失"],
+              ["空白区域过多", "保留完整所需视角后重新裁切", "不要切掉袖子、领口、腰线或下摆"],
+              ["轻微整体曝光不平衡", "进行克制的全局校正", "不要改变商品颜色或局部面料结构"],
+              ["背景边缘干扰", "使用干净裁切或更好的现有原图", "不要重新绘制服装边界"],
+            ],
+          },
+        },
+        {
+          heading: "商品事实缺失或不可靠时必须重拍",
+          paragraphs: [
+            ["没有任何现有文件能回答买家问题时，就需要重拍。用生成式编辑修补这些情况，只会把不确定性提前放进源素材，让后续质检更困难。"],
+          ],
+          bullets: [
+            "需要的正面、背面、侧面或细节视角从未拍摄。",
+            "头发、手、外套、吊牌、道具或裁切遮挡关键结构。",
+            "图片来自不同色号、辅料、印花、样衣或生产版本。",
+            "白平衡或反光导致真实商品颜色无法判断。",
+            "模糊、压缩、眩光或浅景深删掉镜头需要的细节。",
+            "局部特写没有可识别结构锚点，无法确认具体位置。",
+          ],
+        },
+        {
+          heading: "只补拍真正缺失的那一张",
+          paragraphs: [
+            ["缺少一张受控证据图时，不必重新拍完整活动素材。拍摄替代图前，记录 SKU、颜色、样衣版本、所需视角、必须可见的结构、光线参考和裁切范围。"],
+            ["缺少局部素材时，按", { href: "/guides/how-to-photograph-clothing-details", label: "服装细节拍摄指南" }, "补拍；缺少背面时，使用", { href: "/guides/clothing-video-without-back-image", label: "背面图拍摄清单" }, "，不要用另一张正面角度替代。"],
+          ],
+          numberedItems: [
+            "写明替代图片必须回答的买家问题。",
+            "匹配准确 SKU、色号、辅料与生产版本。",
+            "还原中性光线，避免彩色反光和美颜滤镜。",
+            "完整展示所需结构，并保留少量安全边距。",
+            "把新图与现有素材并排，确认它们彼此一致。",
+          ],
+        },
+        {
+          heading: "对新素材组做最后一次判断",
+          paragraphs: [
+            ["每次更换图片后，都要重新执行", { href: "/guides/check-clothing-images-match", label: "同款一致性清单" }, "。全部图片一致后再做低风险测试；如果两张素材仍然冲突，应先确认哪张才代表当前正在销售的商品。"],
+            ["小规模重拍会占用时间，但从不可靠输入反复生成同样会耗时，而且不会解决根源。目标不是完美摄影，而是让每个计划展示的商品事实都有可核对素材。"],
+          ],
+        },
+      ],
+      relatedHeading: "继续修复或替换素材组",
+      ctaTitle: "每个计划视角现在都有证据了吗？",
+      ctaBody: "上传修正后的同款素材组，用一条低风险 8 秒试用视频确认重拍确实补上了缺口。",
+      ctaLabel: "测试修正后的素材组",
     },
   },
 } as const satisfies Record<GuideSlug, GuideArticle>;

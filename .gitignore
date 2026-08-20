@@ -14,6 +14,7 @@ coverage/
 dist/
 *.tsbuildinfo
 output/imagegen/
+.tmp/
 
 # env
 .env

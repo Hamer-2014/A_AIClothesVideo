@@ -67,7 +67,15 @@ describe("ThreeImagesLandingPage", () => {
       .toHaveAttribute("href", "/guides/why-ai-clothing-videos-deform");
     expect(within(guides).getByRole("link", { name: "How do you check whether clothing images show the same SKU?" }))
       .toHaveAttribute("href", "/guides/check-clothing-images-match");
-    expect(within(guides).getAllByRole("link")).toHaveLength(6);
+    expect(within(guides).getByRole("link", { name: "How to photograph clothing details for AI video" }))
+      .toHaveAttribute("href", "/guides/how-to-photograph-clothing-details");
+    expect(within(guides).getByRole("link", { name: "White background or lifestyle scene: which works for a clothing video?" }))
+      .toHaveAttribute("href", "/guides/choose-background-for-clothing-video");
+    expect(within(guides).getByRole("link", { name: "How to choose a cover image for a clothing product video" }))
+      .toHaveAttribute("href", "/guides/choose-clothing-video-cover-image");
+    expect(within(guides).getByRole("link", { name: "When should you reshoot clothing photos before making an AI video?" }))
+      .toHaveAttribute("href", "/guides/when-to-reshoot-clothing-photos");
+    expect(within(guides).getAllByRole("link")).toHaveLength(12);
     expect(container.textContent).not.toMatch(/100%|zero hallucination|any three images/i);
   });
 
@@ -93,7 +101,15 @@ describe("ThreeImagesLandingPage", () => {
       .toHaveAttribute("href", "/zh/guides/why-ai-clothing-videos-deform");
     expect(within(guides).getByRole("link", { name: "如何规划服装商品视频分镜清单？" }))
       .toHaveAttribute("href", "/zh/guides/plan-clothing-video-shots");
-    expect(within(guides).getAllByRole("link")).toHaveLength(6);
+    expect(within(guides).getByRole("link", { name: "AI 服装视频发布前要检查什么？" }))
+      .toHaveAttribute("href", "/zh/guides/review-clothing-video-before-publishing");
+    expect(within(guides).getByRole("link", { name: "服装视频用白底还是场景背景？" }))
+      .toHaveAttribute("href", "/zh/guides/choose-background-for-clothing-video");
+    expect(within(guides).getByRole("link", { name: "服装商品视频封面图怎么选？" }))
+      .toHaveAttribute("href", "/zh/guides/choose-clothing-video-cover-image");
+    expect(within(guides).getByRole("link", { name: "制作 AI 视频前，什么情况下应该重拍服装图？" }))
+      .toHaveAttribute("href", "/zh/guides/when-to-reshoot-clothing-photos");
+    expect(within(guides).getAllByRole("link")).toHaveLength(12);
     expect(mocks.recordFunnelEventSafely).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: "landing_viewed",
